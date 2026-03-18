@@ -1,0 +1,15 @@
+[    5909ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://www.googletagmanager.com/gtm.js?id=GTM-TFGFC7KH:0
+[    5909ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[    6596ms] [WARNING] [GSI_LOGGER]: google.accounts.id.initialize() is called multiple times. This could cause unexpected behavior and only the last initialized instance will be used. @ https://files.manuscdn.com/webapp/_next/static/chunks/923-f2ab0f9b2a1bac57.js:12
+[    6703ms] [WARNING] [GSI_LOGGER]: Your client application uses one of the Google One Tap prompt UI status methods that may stop functioning when FedCM becomes mandatory. Refer to the migration guide to update your code accordingly and opt-in to FedCM to test your changes. Learn more: https://developers.google.com/identity/gsi/web/guides/fedcm-migration?s=dc#display_moment and https://developers.google.com/identity/gsi/web/guides/fedcm-migration?s=dc#skipped_moment @ https://files.manuscdn.com/webapp/_next/static/chunks/923-f2ab0f9b2a1bac57.js:12
+[    6705ms] [ERROR] Not signed in with the identity provider. @ https://manus.im/zh-cn/features/agent-skills?utm_source=nav_skillsmp:0
+[    7054ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api2.amplitude.com/2/httpapi:0
+[    7500ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[    9354ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[   11584ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[   14367ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[   16790ms] [ERROR] [GSI_LOGGER]: FedCM get() rejects with NetworkError: Error retrieving a token. @ https://files.manuscdn.com/webapp/_next/static/chunks/923-f2ab0f9b2a1bac57.js:12
+[   17998ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[   22943ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[   29740ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0
+[   39408ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://api.lab.amplitude.com/sdk/v2/vardata?v=0:0

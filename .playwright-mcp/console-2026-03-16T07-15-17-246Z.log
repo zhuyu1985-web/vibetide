@@ -1,0 +1,233 @@
+[    5100ms] Error: Failed query: select "id", "organization_id", "name", "category", "type", "version", "description", "content", "input_schema", "output_schema", "runtime_config", "compatible_roles", "plugin_config", "created_at", "updated_at" from "skills" "skills" where "skills"."id" = $1 limit $2
+params: 50000000-0000-4000-8000-000000000008,1
+    at Promise.all (<anonymous>:1:20)
+    at getSkillDetailPageData (about://React/Server/file:///Users/zhuyu/dev/chinamcloud/vibetide/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__2d14a77b._.js?70:292:62)
+    at SkillDetailPage (about://React/Server/file:///Users/zhuyu/dev/chinamcloud/vibetide/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__2d14a77b._.js?71:429:18)
+    at resolveErrorDev (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:1894:148)
+    at processFullStringRow (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2402:29)
+    at processFullBinaryRow (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2361:9)
+    at processBinaryChunk (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2470:221)
+    at progress (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2640:13)
+[   54845ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=dYrDqt4ywsDBlrIni5wae' failed:  @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[   55850ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=dYrDqt4ywsDBlrIni5wae' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[   56853ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=dYrDqt4ywsDBlrIni5wae' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[   70289ms] [ERROR] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+%s%s https://react.dev/link/hydration-mismatch 
+
+  ...
+    <div data-slot="sidebar-wr..." style={{...}} className="group/side...">
+      ...
+        ...
+          <Collapsible data-slot="collapsible" defaultOpen={true} className="group/cms">
+            <CollapsibleProvider scope={undefined} disabled={undefined} contentId="radix-_R_1..." open={true} ...>
+              <Primitive.div data-state="open" data-disabled={undefined} data-slot="collapsible" className="group/cms" ...>
+                <div data-state="open" data-disabled={undefined} data-slot="collapsible" className="group/cms" ref={null}>
+                  <SidebarMenuItem className="list-none">
+                    <li data-slot="sidebar-me..." data-sidebar="menu-item" className="group/menu...">
+                      <CollapsibleTrigger asChild={true}>
+                        <CollapsibleTrigger data-slot="collapsibl..." asChild={true}>
+                          <Primitive.button type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                            <Primitive.button.Slot type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                              <Primitive.button.SlotClone type="button" aria-controls="radix-_R_1..." ...>
+                                <SidebarMenuButton className="transition..." type="button" aria-controls="radix-_R_1..." ...>
+                                  <button
+                                    data-slot="collapsible-trigger"
+                                    data-sidebar="menu-button"
+                                    data-size="default"
+                                    data-active={false}
+                                    className={"peer/menu-button flex w-full items-center gap-2 overflow-hidden p-2 t..."}
+                                    type="button"
++                                   aria-controls="radix-_R_13acnelb_"
+-                                   aria-controls="radix-_R_4d9knelb_"
+                                    aria-expanded={true}
+                                    data-state="open"
+                                    data-disabled={undefined}
+                                    disabled={undefined}
+                                    onClick={function handleEvent}
+                                    ref={null}
+                                  >
+                      <CollapsibleContent>
+                        <CollapsibleContent data-slot="collapsibl...">
+                          <Presence present={true}>
+                            <Primitive.div data-state="open" data-disabled={undefined} id="radix-_R_1..." hidden={false} ...>
+                              <div
+                                data-state="open"
+                                data-disabled={undefined}
++                               id="radix-_R_13acnelb_"
+-                               id="radix-_R_4d9knelb_"
+                                hidden={false}
+                                data-slot="collapsible-content"
+                                style={{--radix-collapsible-content-height:undefined, ...}}
+                                ref={function}
+                              >
+        ...
+          <Collapsible data-slot="collapsible" defaultOpen={true} className="group/asse...">
+            <CollapsibleProvider scope={undefined} disabled={undefined} contentId="radix-_R_1..." open={true} ...>
+              <Primitive.div data-state="open" data-disabled={undefined} data-slot="collapsible" ...>
+                <div data-state="open" data-disabled={undefined} data-slot="collapsible" className="group/asse..." ...>
+                  <SidebarMenuItem className="list-none">
+                    <li data-slot="sidebar-me..." data-sidebar="menu-item" className="group/menu...">
+                      <CollapsibleTrigger asChild={true}>
+                        <CollapsibleTrigger data-slot="collapsibl..." asChild={true}>
+                          <Primitive.button type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                            <Primitive.button.Slot type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                              <Primitive.button.SlotClone type="button" aria-controls="radix-_R_1..." ...>
+                                <SidebarMenuButton className="transition..." type="button" aria-controls="radix-_R_1..." ...>
+                                  <button
+                                    data-slot="collapsible-trigger"
+                                    data-sidebar="menu-button"
+                                    data-size="default"
+                                    data-active={false}
+                                    className={"peer/menu-button flex w-full items-center gap-2 overflow-hidden p-2 t..."}
+                                    type="button"
++                                   aria-controls="radix-_R_15acnelb_"
+-                                   aria-controls="radix-_R_4l9knelb_"
+                                    aria-expanded={true}
+                                    data-state="open"
+                                    data-disabled={undefined}
+                                    disabled={undefined}
+                                    onClick={function handleEvent}
+                                    ref={null}
+                                  >
+                      <CollapsibleContent>
+                        <CollapsibleContent data-slot="collapsibl...">
+                          <Presence present={true}>
+                            <Primitive.div data-state="open" data-disabled={undefined} id="radix-_R_1..." hidden={false} ...>
+                              <div
+                                data-state="open"
+                                data-disabled={undefined}
++                               id="radix-_R_15acnelb_"
+-                               id="radix-_R_4l9knelb_"
+                                hidden={false}
+                                data-slot="collapsible-content"
+                                style={{--radix-collapsible-content-height:undefined, ...}}
+                                ref={function}
+                              >
+        ...
+          <Collapsible data-slot="collapsible" defaultOpen={true} className="group/creator">
+            <CollapsibleProvider scope={undefined} disabled={undefined} contentId="radix-_R_1..." open={true} ...>
+              <Primitive.div data-state="open" data-disabled={undefined} data-slot="collapsible" ...>
+                <div data-state="open" data-disabled={undefined} data-slot="collapsible" className="group/creator" ...>
+                  <SidebarMenuItem className="list-none">
+                    <li data-slot="sidebar-me..." data-sidebar="menu-item" className="group/menu...">
+                      <CollapsibleTrigger asChild={true}>
+                        <CollapsibleTrigger data-slot="collapsibl..." asChild={true}>
+                          <Primitive.button type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                            <Primitive.button.Slot type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                              <Primitive.button.SlotClone type="button" aria-controls="radix-_R_1..." ...>
+                                <SidebarMenuButton className="transition..." type="button" aria-controls="radix-_R_1..." ...>
+                                  <button
+                                    data-slot="collapsible-trigger"
+                                    data-sidebar="menu-button"
+                                    data-size="default"
+                                    data-active={false}
+                                    className={"peer/menu-button flex w-full items-center gap-2 overflow-hidden p-2 t..."}
+                                    type="button"
++                                   aria-controls="radix-_R_17acnelb_"
+-                                   aria-controls="radix-_R_4t9knelb_"
+                                    aria-expanded={true}
+                                    data-state="open"
+                                    data-disabled={undefined}
+                                    disabled={undefined}
+                                    onClick={function handleEvent}
+                                    ref={null}
+                                  >
+                      <CollapsibleContent>
+                        <CollapsibleContent data-slot="collapsibl...">
+                          <Presence present={true}>
+                            <Primitive.div data-state="open" data-disabled={undefined} id="radix-_R_1..." hidden={false} ...>
+                              <div
+                                data-state="open"
+                                data-disabled={undefined}
++                               id="radix-_R_17acnelb_"
+-                               id="radix-_R_4t9knelb_"
+                                hidden={false}
+                                data-slot="collapsible-content"
+                                style={{--radix-collapsible-content-height:undefined, ...}}
+                                ref={function}
+                              >
+        ...
+          <Collapsible data-slot="collapsible" defaultOpen={true} className="group/oper...">
+            <CollapsibleProvider scope={undefined} disabled={undefined} contentId="radix-_R_1..." open={true} ...>
+              <Primitive.div data-state="open" data-disabled={undefined} data-slot="collapsible" ...>
+                <div data-state="open" data-disabled={undefined} data-slot="collapsible" className="group/oper..." ...>
+                  <SidebarMenuItem className="list-none">
+                    <li data-slot="sidebar-me..." data-sidebar="menu-item" className="group/menu...">
+                      <CollapsibleTrigger asChild={true}>
+                        <CollapsibleTrigger data-slot="collapsibl..." asChild={true}>
+                          <Primitive.button type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                            <Primitive.button.Slot type="button" aria-controls="radix-_R_1..." aria-expanded={true} ...>
+                              <Primitive.button.SlotClone type="button" aria-controls="radix-_R_1..." ...>
+                                <SidebarMenuButton className="transition..." type="button" aria-controls="radix-_R_1..." ...>
+                                  <button
+                                    data-slot="collapsible-trigger"
+                                    data-sidebar="menu-button"
+                                    data-size="default"
+                                    data-active={false}
+                                    className={"peer/menu-button flex w-full items-center gap-2 overflow-hidden p-2 t..."}
+                                    type="button"
++                                   aria-controls="radix-_R_19acnelb_"
+-                                   aria-controls="radix-_R_559knelb_"
+                                    aria-expanded={true}
+                                    data-state="open"
+                                    data-disabled={undefined}
+                                    disabled={undefined}
+                                    onClick={function handleEvent}
+                                    ref={null}
+                                  >
+                      <CollapsibleContent>
+                        <CollapsibleContent data-slot="collapsibl...">
+                          <Presence present={true}>
+                            <Primitive.div data-state="open" data-disabled={undefined} id="radix-_R_1..." hidden={false} ...>
+                              <div
+                                data-state="open"
+                                data-disabled={undefined}
++                               id="radix-_R_19acnelb_"
+-                               id="radix-_R_559knelb_"
+                                hidden={false}
+                                data-slot="collapsible-content"
+                                style={{--radix-collapsible-content-height:undefined, ...}}
+                                ref={function}
+                              >
+      ...
+        <MenuProvider scope={{Menu:[...], ...}} onClose={function Menu.useCallback} isUsingKeyboardRef={{current:false}} ...>
+          <DropdownMenuTrigger asChild={true}>
+            <DropdownMenuTrigger data-slot="dropdown-m..." asChild={true}>
+              <MenuAnchor asChild={true} __scopeMenu={{Menu:[...], ...}}>
+                <PopperAnchor __scopePopper={{Menu:[...], ...}} asChild={true} ref={null}>
+                  <Primitive.div asChild={true} ref={function}>
+                    <Primitive.div.Slot ref={function}>
+                      <Primitive.div.SlotClone ref={function}>
+                        <Primitive.button type="button" id="radix-_R_2..." aria-haspopup="menu" aria-expanded={false} ...>
+                          <Primitive.button.Slot type="button" id="radix-_R_2..." aria-haspopup="menu" ...>
+                            <Primitive.button.SlotClone type="button" id="radix-_R_2..." aria-haspopup="menu" ...>
+                              <Button variant="ghost" size="sm" className="h-8 gap-2 ..." type="button" ...>
+                                <button
+                                  data-slot="dropdown-menu-trigger"
+                                  data-variant="ghost"
+                                  data-size="sm"
+                                  className={"inline-flex shrink-0 items-center justify-center text-sm font-medium wh..."}
+                                  type="button"
++                                 id="radix-_R_2dknelb_"
+-                                 id="radix-_R_9mknelb_"
+                                  aria-haspopup="menu"
+                                  aria-expanded={false}
+                                  aria-controls={undefined}
+                                  data-state="closed"
+                                  data-disabled={undefined}
+                                  disabled={false}
+                                  onPointerDown={function handleEvent}
+                                  onKeyDown={function handleEvent}
+                                  ref={function}
+                                >
+          ...
+ @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:3127

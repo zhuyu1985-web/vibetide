@@ -1,0 +1,48 @@
+import type { ChannelAdvisor } from "@/lib/types";
+
+export const channelAdvisors: ChannelAdvisor[] = [
+  {
+    id: "ca1",
+    name: "老陈",
+    personality: "资深新闻人，严谨理性，注重事实核查",
+    channelType: "微信公众号（深度分析）",
+    avatar: "陈",
+    style: "严谨专业、数据驱动、长文见长",
+    strengths: ["深度分析能力强", "政经解读专业", "标题克制有品质感"],
+    catchphrase: "数据说话，事实先行。",
+    status: "active",
+  },
+  {
+    id: "ca2",
+    name: "小暖",
+    personality: "温暖亲切的生活方式博主，擅长情感共鸣",
+    channelType: "小红书（生活方式）",
+    avatar: "暖",
+    style: "温暖治愈、图文精美、善用emoji和口语化表达",
+    strengths: ["情感共鸣强", "视觉排版优秀", "互动率高"],
+    catchphrase: "生活处处有惊喜~",
+    status: "active",
+  },
+  {
+    id: "ca3",
+    name: "阿强",
+    personality: "热血科技迷，说话直接，喜欢用数据和评测说话",
+    channelType: "抖音+B站（科技评测）",
+    avatar: "强",
+    style: "直接犀利、节奏快、梗多、信息密度高",
+    strengths: ["节奏把控好", "技术讲解通俗", "封面吸睛"],
+    catchphrase: "这波操作，我给满分！",
+    status: "active",
+  },
+  {
+    id: "ca4",
+    name: "学姐",
+    personality: "知性理性的财经分析师，逻辑清晰",
+    channelType: "头条号+知乎（财经分析）",
+    avatar: "姐",
+    style: "逻辑严密、观点独到、善用类比和框架",
+    strengths: ["逻辑框架清晰", "宏观视角好", "读者信任度高"],
+    catchphrase: "透过数字看本质。",
+    status: "active",
+  },
+];

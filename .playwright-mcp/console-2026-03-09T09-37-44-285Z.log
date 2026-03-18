@@ -1,0 +1,7 @@
+[  127592ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=0Nxktt3p19uonlk6autQd' failed:  @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  127689ms] network error
+[  127744ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/__nextjs_original-stack-frames:0
+[  127758ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/__nextjs_font/geist-mono-latin.woff2:0
+[  128595ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=0Nxktt3p19uonlk6autQd' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  143077ms] [WARNING] %c%s%c [auth] user_profiles query failed, returning null org background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  143078ms] [WARNING] %c%s%c [auth] user_profiles query failed, returning null org background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297

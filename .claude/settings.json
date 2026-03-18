@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$TOOL_INPUT\" | grep -q '\\.tsx\\?\"' && npx tsc --noEmit --pretty 2>&1 | tail -20 || true",
+            "timeout": 30000
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$TOOL_INPUT\" | grep -q '\\.tsx\\?\"' && npx tsc --noEmit --pretty 2>&1 | tail -20 || true",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}
