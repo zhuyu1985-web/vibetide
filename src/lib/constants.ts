@@ -212,6 +212,24 @@ export const BUILTIN_SKILLS: BuiltinSkillDef[] = [
     compatibleRoles: ["trending_scout", "content_strategist", "asset_manager"],
   },
   {
+    slug: "web_deep_read", name: "网页深读", category: "perception", version: "1.0",
+    description: "抓取指定网页正文并提取结构化内容，用于深度分析",
+    content: "# 网页深读\n\n你是网页内容提取专家，能够从指定URL抓取网页正文并输出干净的结构化内容。\n\n## 输入规格\n| 参数 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| url | string | 是 | 要深读的网页URL |\n| maxLength | number | 否 | 正文截断字数，默认3000 |\n\n## 执行流程\n1. **URL验证**：检查URL格式合法性\n2. **正文抓取**：通过Jina Reader API或直接fetch获取网页内容\n3. **内容提取**：提取标题、正文、发布时间等关键信息\n4. **格式清洗**：去除广告、导航等无关内容，输出干净Markdown\n5. **长度控制**：按maxLength截断，保留完整段落\n\n## 输出规格\n```markdown\n## 网页深读结果\n- 标题：{title}\n- 来源：{domain}\n- 字数：{wordCount}\n- 抓取时间：{extractedAt}\n\n### 正文内容\n{content}\n```\n\n## 质量标准\n| 维度 | 要求 | 权重 |\n|------|------|------|\n| 提取准确性 | 正文内容完整无遗漏 | 40% |\n| 格式清洁度 | 无广告、导航等噪音 | 30% |\n| 结构保留 | 保留标题层级和段落结构 | 30% |",
+    inputSchema: { url: "网页URL", maxLength: "正文截断字数" },
+    outputSchema: { title: "页面标题", content: "提取的正文", wordCount: "字数", source: "来源域名" },
+    runtimeConfig: { type: "api_call", avgLatencyMs: 5000, maxConcurrency: 3 },
+    compatibleRoles: ["trending_scout", "content_strategist"],
+  },
+  {
+    slug: "trending_topics", name: "热榜聚合", category: "perception", version: "1.0",
+    description: "聚合多平台实时热榜，主动发现全网热点话题",
+    content: "# 热榜聚合\n\n你是全网热点聚合专家，能够实时获取各大平台热搜/热榜数据并进行跨平台分析。\n\n## 输入规格\n| 参数 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| platforms | string[] | 否 | 过滤平台：weibo/zhihu/baidu/douyin/36kr，默认全部 |\n| limit | number | 否 | 每个平台返回条数，默认20 |\n\n## 执行流程\n1. **数据获取**：从配置的热榜聚合API实时拉取各平台热搜数据\n2. **格式归一化**：将不同平台的数据映射为统一结构\n3. **跨平台聚合**：识别跨平台同话题，合并热度\n4. **排序输出**：按综合热度排序，标注跨平台覆盖情况\n\n## 输出规格\n```markdown\n## 热榜聚合报告\n**抓取时间**: {fetchedAt} | **覆盖平台**: {platforms}\n\n### 跨平台热点（多平台同时上榜）\n| 话题 | 覆盖平台 | 综合热度 | 是否已验证 |\n\n### 各平台热榜\n#### {platform}\n| 排名 | 话题 | 热度 | 链接 |\n```\n\n## 质量标准\n| 维度 | 要求 | 权重 |\n|------|------|------|\n| 实时性 | 数据延迟<5分钟 | 35% |\n| 覆盖度 | 主流平台均有数据 | 30% |\n| 聚合准确 | 跨平台话题匹配正确 | 35% |",
+    inputSchema: { platforms: "平台过滤", limit: "每平台返回条数" },
+    outputSchema: { topics: "热榜数据", crossPlatformTopics: "跨平台聚合", fetchedAt: "抓取时间" },
+    runtimeConfig: { type: "api_call", avgLatencyMs: 3000, maxConcurrency: 3 },
+    compatibleRoles: ["trending_scout", "content_strategist"],
+  },
+  {
     slug: "trend_monitor", name: "趋势监控", category: "perception", version: "2.1",
     description: "实时监控30+平台热点趋势变化",
     content: "# 趋势监控\n\n你是全网热点趋势分析专家，负责从30+主流平台实时捕捉热点变化并输出结构化趋势报告。\n\n## 输入规格\n| 参数 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| domain | string | 否 | 监控领域：科技/财经/娱乐/社会/体育 |\n| platforms | string[] | 否 | 指定平台，默认全平台 |\n| timeWindow | string | 否 | 监控窗口：1h/6h/24h，默认24h |\n\n## 执行流程\n1. **数据采集**：从微博热搜、百度热榜、抖音热点、头条指数、知乎热榜、B站热门等30+平台采集热点数据\n2. **跨平台去重**：基于语义相似度合并同一话题在不同平台的表现\n3. **趋势拐点识别**：对比前一周期数据，识别热度急升(>50%/h)、见顶、下降拐点\n4. **热度分级**：综合各平台数据计算统一热度指数，按S/A/B/C分级\n5. **输出报告**：生成结构化热点列表\n\n## 输出规格\n```markdown\n## 趋势监控报告\n**监控时间**: {时间} | **领域**: {domain} | **覆盖平台**: {N}个\n\n### 🔥 S级热点（热度≥90）\n| 排名 | 话题 | 热度 | 趋势 | 主要平台 | 持续时间 | 建议 |\n|------|------|------|------|----------|----------|------|\n\n### A级热点（热度70-89）\n...\n\n### 趋势拐点预警\n- {话题}：热度从{X}急升至{Y}，预计{时间}达到峰值\n```\n\n## 质量标准\n| 维度 | 要求 | 权重 |\n|------|------|------|\n| 覆盖率 | 不遗漏S级热点 | 30% |\n| 时效性 | 数据延迟<30分钟 | 30% |\n| 准确性 | 热度评分误差<10% | 25% |\n| 预判力 | 趋势方向判断准确 | 15% |",
@@ -572,8 +590,8 @@ export const TEAM_SCENARIOS: TeamScenario[] = [
 ];
 
 export const EMPLOYEE_CORE_SKILLS: Record<string, string[]> = {
-  xiaolei: ["web_search", "trend_monitor", "social_listening", "heat_scoring"],
-  xiaoce: ["topic_extraction", "angle_design", "audience_analysis", "task_planning"],
+  xiaolei: ["web_search", "web_deep_read", "trending_topics", "trend_monitor", "social_listening", "heat_scoring"],
+  xiaoce: ["web_search", "web_deep_read", "trending_topics", "topic_extraction", "angle_design", "audience_analysis", "task_planning"],
   xiaozi: ["media_search", "knowledge_retrieval", "news_aggregation", "case_reference"],
   xiaowen: ["content_generate", "headline_generate", "summary_generate", "style_rewrite", "script_generate"],
   xiaojian: ["video_edit_plan", "thumbnail_generate", "layout_design", "audio_plan"],
@@ -584,7 +602,8 @@ export const EMPLOYEE_CORE_SKILLS: Record<string, string[]> = {
 
 // Read-only tool names for advisor authority level
 export const READ_ONLY_TOOL_NAMES = [
-  "web_search", "trend_monitor", "social_listening", "news_aggregation",
+  "web_search", "web_deep_read", "trending_topics",
+  "trend_monitor", "social_listening", "news_aggregation",
   "knowledge_retrieval", "media_search", "case_reference", "data_report",
   "sentiment_analysis", "topic_extraction", "competitor_analysis",
   "audience_analysis", "fact_check", "heat_scoring",
@@ -593,6 +612,8 @@ export const READ_ONLY_TOOL_NAMES = [
 // Tool descriptions for UI display
 export const TOOL_DESCRIPTIONS: Record<string, string> = {
   web_search: "搜索互联网获取实时信息",
+  web_deep_read: "抓取网页正文进行深度分析",
+  trending_topics: "聚合多平台实时热榜",
   trend_monitor: "监控热点趋势和话题变化",
   social_listening: "社交媒体舆情监控",
   news_aggregation: "聚合多源新闻资讯",
