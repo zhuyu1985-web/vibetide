@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
 import { BUILTIN_SKILLS } from "@/lib/constants";
 import { ilike, sql } from "drizzle-orm";
-import * as cheerio from "cheerio";
 import type { AgentTool } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -525,6 +524,7 @@ async function fetchViaCheerio(url: string): Promise<{ title: string; content: s
     }
 
     const html = await response.text();
+    const cheerio = await import("cheerio");
     const $ = cheerio.load(html);
 
     // Remove noise elements
