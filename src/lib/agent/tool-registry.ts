@@ -575,15 +575,8 @@ function truncateContent(content: string, maxLength: number): string {
 // ---------------------------------------------------------------------------
 
 interface TrendingResponseMapping {
-  dataPath: string;
-  fields: {
-    platform: string;
-    rank: string;
-    title: string;
-    heat: string;
-    url: string;
-    category?: string;
-  };
+  nodes?: Record<string, string>;
+  authMode?: "bearer" | "raw";
 }
 
 interface TrendingItem {
@@ -605,77 +598,219 @@ function parseTrendingMapping(): TrendingResponseMapping | null {
   }
 }
 
-function extractByPath(obj: unknown, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current == null || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
-function mapTrendingResponse(data: unknown, mapping: TrendingResponseMapping): TrendingItem[] {
-  const items = extractByPath(data, mapping.dataPath);
-  if (!Array.isArray(items)) return [];
-
-  return items.map((item: unknown, index: number) => {
-    const record = item as Record<string, unknown>;
-    const fields = mapping.fields;
-    return {
-      platform: String(extractByPath(record, fields.platform) ?? "unknown"),
-      rank: Number(extractByPath(record, fields.rank) ?? index + 1),
-      title: String(extractByPath(record, fields.title) ?? ""),
-      heat: (extractByPath(record, fields.heat) as number | string) ?? 0,
-      url: String(extractByPath(record, fields.url) ?? ""),
-      category: fields.category ? String(extractByPath(record, fields.category) ?? "") : undefined,
-    };
-  }).filter((item) => item.title.length > 0);
-}
-
-async function fetchTrendingFromApi(
-  platforms?: string[],
-  limit?: number
-): Promise<TrendingItem[]> {
-  const apiUrl = process.env.TRENDING_API_URL;
+function buildTophubHeaders(): Record<string, string> {
   const apiKey = process.env.TRENDING_API_KEY;
   const mapping = parseTrendingMapping();
+  const authMode = mapping?.authMode ?? "raw";
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (apiKey) {
+    headers["Authorization"] = authMode === "bearer" ? `Bearer ${apiKey}` : apiKey;
+  }
+  return headers;
+}
 
-  if (!apiUrl) throw new Error("TRENDING_API_URL not configured");
-  if (!mapping) throw new Error("TRENDING_RESPONSE_MAPPING not configured or invalid JSON");
-
+/** Fetch /hot — cross-platform trending aggregation (one request, all platforms) */
+async function fetchTrendingHot(): Promise<TrendingItem[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const url = new URL(apiUrl);
-    if (platforms && platforms.length > 0) {
-      url.searchParams.set("platforms", platforms.join(","));
-    }
-    if (limit) {
-      url.searchParams.set("limit", String(limit));
-    }
-
-    const headers: Record<string, string> = { Accept: "application/json" };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
-    const response = await fetch(url.toString(), {
-      headers,
+    const response = await fetch("https://api.tophubdata.com/hot", {
+      headers: buildTophubHeaders(),
       signal: controller.signal,
       cache: "no-store",
     });
 
     if (!response.ok) {
-      throw new Error(`Trending API returned ${response.status}: ${response.statusText}`);
+      throw new Error(`TopHub /hot returned ${response.status}`);
     }
 
-    const data = await response.json();
-    return mapTrendingResponse(data, mapping);
+    const json = (await response.json()) as {
+      error: boolean;
+      data: {
+        title: string;
+        url: string;
+        domain: string;
+        sitename: string;
+        views: string;
+        time: string;
+      }[];
+    };
+
+    if (json.error || !Array.isArray(json.data)) return [];
+
+    return json.data.map((item, index) => ({
+      platform: item.sitename || item.domain,
+      rank: index + 1,
+      title: item.title,
+      heat: item.views || "",
+      url: item.url,
+    }));
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Fetch /nodes/@hashid — single platform trending list */
+async function fetchTrendingNode(
+  nodeId: string,
+  platformName?: string
+): Promise<TrendingItem[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(`https://api.tophubdata.com/nodes/${nodeId}`, {
+      headers: buildTophubHeaders(),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`TopHub /nodes/${nodeId} returned ${response.status}`);
+    }
+
+    const json = (await response.json()) as {
+      error: boolean;
+      data: {
+        name: string;
+        items: { title: string; url: string; rank: number; extra: string; description: string }[];
+      };
+    };
+
+    if (json.error || !json.data?.items) return [];
+
+    const name = platformName || json.data.name;
+    return json.data.items.map((item) => ({
+      platform: name,
+      rank: item.rank,
+      title: item.title,
+      heat: item.extra || "",
+      url: item.url,
+      category: item.description || undefined,
+    }));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Fetch /search — search across all trending lists */
+async function fetchTrendingSearch(query: string): Promise<TrendingItem[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const url = `https://api.tophubdata.com/search?q=${encodeURIComponent(query)}&p=1`;
+    const response = await fetch(url, {
+      headers: buildTophubHeaders(),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`TopHub /search returned ${response.status}`);
+    }
+
+    const json = (await response.json()) as {
+      error: boolean;
+      data: {
+        items: { title: string; url: string; extra: string; time: number }[];
+      };
+    };
+
+    if (json.error || !json.data?.items) return [];
+
+    return json.data.items.map((item, index) => ({
+      platform: "全网",
+      rank: index + 1,
+      title: item.title,
+      heat: item.extra || "",
+      url: item.url,
+    }));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Platform name → TopHub node hashid mapping
+const TOPHUB_DEFAULT_NODES: Record<string, string> = {
+  微博热搜: "KqndgxeLl9",
+  知乎热榜: "mproPpoq6O",
+  百度热点: "Jb0vmloB1G",
+  抖音热搜: "K7GdaMgdQy",
+  今日头条: "x9ozB4KoXb",
+  "36氪热榜": "Q1Vd5Ko85R",
+  哔哩哔哩: "74KvxwokxM",
+  小红书: "L4MdA5ldxD",
+  澎湃热榜: "wWmoO5Rd4E",
+  微信热文: "WnBe01o371",
+};
+
+const PLATFORM_ALIASES: Record<string, string[]> = {
+  微博热搜: ["weibo", "微博"],
+  知乎热榜: ["zhihu", "知乎"],
+  百度热点: ["baidu", "百度"],
+  抖音热搜: ["douyin", "抖音"],
+  今日头条: ["toutiao", "头条"],
+  "36氪热榜": ["36kr", "36氪"],
+  哔哩哔哩: ["bilibili", "b站", "哔哩"],
+  小红书: ["xiaohongshu", "小红书", "红书"],
+  澎湃热榜: ["thepaper", "澎湃"],
+  微信热文: ["weixin", "wechat", "微信"],
+};
+
+function resolveNodeIds(platforms?: string[]): Record<string, string> {
+  const mapping = parseTrendingMapping();
+  const nodes = { ...TOPHUB_DEFAULT_NODES, ...(mapping?.nodes || {}) };
+
+  if (!platforms || platforms.length === 0) return nodes;
+
+  const result: Record<string, string> = {};
+  for (const [name, hashid] of Object.entries(nodes)) {
+    const aliases = PLATFORM_ALIASES[name] || [name.toLowerCase()];
+    if (platforms.some((p) => aliases.some((a) => a.includes(p.toLowerCase()) || p.toLowerCase().includes(a)))) {
+      result[name] = hashid;
+    }
+  }
+  return result;
+}
+
+async function fetchTrendingFromApi(
+  mode: "hot" | "platforms" | "search",
+  options: { platforms?: string[]; limit?: number; query?: string }
+): Promise<TrendingItem[]> {
+  if (!process.env.TRENDING_API_KEY) {
+    throw new Error("TRENDING_API_KEY not configured");
+  }
+
+  if (mode === "hot") {
+    return fetchTrendingHot();
+  }
+
+  if (mode === "search" && options.query) {
+    return fetchTrendingSearch(options.query);
+  }
+
+  // platforms mode: fetch selected platform nodes in parallel
+  const nodes = resolveNodeIds(options.platforms);
+  const entries = Object.entries(nodes);
+
+  if (entries.length === 0) {
+    throw new Error(`未匹配到平台，可用平台: ${Object.keys(TOPHUB_DEFAULT_NODES).join("、")}`);
+  }
+
+  const results = await Promise.allSettled(
+    entries.map(([name, hashid]) => fetchTrendingNode(hashid, name))
+  );
+
+  const allItems: TrendingItem[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      const items = options.limit ? result.value.slice(0, options.limit) : result.value;
+      allItems.push(...items);
+    }
+  }
+  return allItems;
 }
 
 function buildCrossPlatformTopics(items: TrendingItem[]): {
@@ -907,37 +1042,52 @@ function createToolDefinitions(): ToolSet {
       },
     }),
     trending_topics: tool({
-      description: "聚合多平台实时热榜（微博/知乎/百度/抖音/36氪等），发现全网热点话题",
+      description: "聚合多平台实时热榜（微博/知乎/百度/抖音/小红书/36氪等），发现全网热点话题。支持三种模式：hot=全网热点榜中榜、platforms=指定平台热榜、search=全网热榜关键词搜索",
       inputSchema: z.object({
+        mode: z
+          .enum(["hot", "platforms", "search"])
+          .optional()
+          .default("hot")
+          .describe("模式：hot=全网热点聚合（推荐）、platforms=指定平台热榜、search=全网热榜搜索"),
         platforms: z
           .array(z.string())
           .optional()
-          .describe("过滤平台：weibo/zhihu/baidu/douyin/36kr，默认全部"),
+          .describe("platforms 模式下指定平台：weibo/zhihu/baidu/douyin/xiaohongshu/36kr/bilibili/toutiao/thepaper/weixin"),
+        query: z
+          .string()
+          .optional()
+          .describe("search 模式下的搜索关键词"),
         limit: z
           .number()
           .optional()
           .default(20)
           .describe("每个平台返回条数，默认 20"),
       }),
-      execute: async ({ platforms, limit = 20 }) => {
+      execute: async ({ mode = "hot", platforms, query, limit = 20 }) => {
         const warnings: string[] = [];
         let items: TrendingItem[] = [];
 
-        if (process.env.TRENDING_API_URL) {
-          try {
-            items = await fetchTrendingFromApi(platforms, limit);
-          } catch (err) {
-            warnings.push(
-              `热榜 API 失败: ${err instanceof Error ? err.message : String(err)}`
-            );
-          }
-        } else {
-          warnings.push("未配置 TRENDING_API_URL，无法获取实时热榜数据");
+        if (!process.env.TRENDING_API_KEY) {
+          return {
+            fetchedAt: new Date().toISOString(),
+            mode,
+            platforms: [],
+            topics: [],
+            crossPlatformTopics: [],
+            warnings: ["未配置 TRENDING_API_KEY，无法获取实时热榜数据"],
+          };
+        }
+
+        try {
+          items = await fetchTrendingFromApi(mode, { platforms, limit, query });
+        } catch (err) {
+          warnings.push(`热榜 API 失败: ${err instanceof Error ? err.message : String(err)}`);
         }
 
         if (items.length === 0 && warnings.length > 0) {
           return {
             fetchedAt: new Date().toISOString(),
+            mode,
             platforms: platforms ?? [],
             topics: [],
             crossPlatformTopics: [],
@@ -945,19 +1095,15 @@ function createToolDefinitions(): ToolSet {
           };
         }
 
-        const filteredItems = platforms && platforms.length > 0
-          ? items.filter((item) =>
-              platforms.some((p) => item.platform.toLowerCase().includes(p.toLowerCase()))
-            )
-          : items;
-
-        const crossPlatformTopics = buildCrossPlatformTopics(filteredItems);
-        const activePlatforms = Array.from(new Set(filteredItems.map((i) => i.platform)));
+        const crossPlatformTopics = mode === "hot" ? buildCrossPlatformTopics(items) : [];
+        const activePlatforms = Array.from(new Set(items.map((i) => i.platform)));
 
         return {
           fetchedAt: new Date().toISOString(),
+          mode,
           platforms: activePlatforms,
-          topics: filteredItems.slice(0, limit * activePlatforms.length),
+          totalCount: items.length,
+          topics: items.slice(0, mode === "hot" ? 50 : limit * Math.max(activePlatforms.length, 1)),
           crossPlatformTopics,
           warnings,
         };
