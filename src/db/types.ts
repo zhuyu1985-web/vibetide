@@ -10,12 +10,11 @@ import type {
   skillVersions,
   skillUsageRecords,
   employeeSkills,
-  teams,
-  teamMembers,
+  missions,
+  missionTasks,
+  missionMessages,
+  missionArtifacts,
   workflowTemplates,
-  workflowInstances,
-  workflowSteps,
-  teamMessages,
   tasks,
   knowledgeBases,
   employeeKnowledgeBases,
@@ -56,6 +55,9 @@ import type {
   benchmarkAnalyses,
   missedTopics,
   weeklyReports,
+  monitoredPlatforms,
+  platformContent,
+  benchmarkAlerts,
   batchJobs,
   batchItems,
   conversionTasks,
@@ -63,6 +65,9 @@ import type {
   eventHighlights,
   eventOutputs,
   eventTranscriptions,
+  employeeScenarios,
+  hotTopicCrawlLogs,
+  savedConversations,
 } from "./schema";
 
 // Select types (query results)
@@ -71,12 +76,10 @@ export type UserProfile = InferSelectModel<typeof userProfiles>;
 export type AIEmployeeRow = InferSelectModel<typeof aiEmployees>;
 export type SkillRow = InferSelectModel<typeof skills>;
 export type EmployeeSkillRow = InferSelectModel<typeof employeeSkills>;
-export type TeamRow = InferSelectModel<typeof teams>;
-export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
+export type MissionRow = InferSelectModel<typeof missions>;
+export type MissionTaskRow = InferSelectModel<typeof missionTasks>;
+export type MissionMessageRow = InferSelectModel<typeof missionMessages>;
 export type WorkflowTemplateRow = InferSelectModel<typeof workflowTemplates>;
-export type WorkflowInstanceRow = InferSelectModel<typeof workflowInstances>;
-export type WorkflowStepRow = InferSelectModel<typeof workflowSteps>;
-export type TeamMessageRow = InferSelectModel<typeof teamMessages>;
 export type TaskRow = InferSelectModel<typeof tasks>;
 export type KnowledgeBaseRow = InferSelectModel<typeof knowledgeBases>;
 export type EmployeeKnowledgeBaseRow = InferSelectModel<
@@ -110,12 +113,12 @@ export type NewUserProfile = InferInsertModel<typeof userProfiles>;
 export type NewAIEmployee = InferInsertModel<typeof aiEmployees>;
 export type NewSkill = InferInsertModel<typeof skills>;
 export type NewEmployeeSkill = InferInsertModel<typeof employeeSkills>;
-export type NewTeam = InferInsertModel<typeof teams>;
-export type NewTeamMember = InferInsertModel<typeof teamMembers>;
+export type NewMission = InferInsertModel<typeof missions>;
+export type NewMissionTask = InferInsertModel<typeof missionTasks>;
+export type NewMissionMessage = InferInsertModel<typeof missionMessages>;
+export type MissionArtifactRow = InferSelectModel<typeof missionArtifacts>;
+export type NewMissionArtifact = InferInsertModel<typeof missionArtifacts>;
 export type NewWorkflowTemplate = InferInsertModel<typeof workflowTemplates>;
-export type NewWorkflowInstance = InferInsertModel<typeof workflowInstances>;
-export type NewWorkflowStep = InferInsertModel<typeof workflowSteps>;
-export type NewTeamMessage = InferInsertModel<typeof teamMessages>;
 export type NewTask = InferInsertModel<typeof tasks>;
 export type NewKnowledgeBase = InferInsertModel<typeof knowledgeBases>;
 export type NewCategory = InferInsertModel<typeof categories>;
@@ -185,6 +188,14 @@ export type NewBenchmarkAnalysis = InferInsertModel<typeof benchmarkAnalyses>;
 export type NewMissedTopic = InferInsertModel<typeof missedTopics>;
 export type NewWeeklyReport = InferInsertModel<typeof weeklyReports>;
 
+// Benchmarking Deep-Dive
+export type MonitoredPlatformRow = InferSelectModel<typeof monitoredPlatforms>;
+export type PlatformContentRow = InferSelectModel<typeof platformContent>;
+export type BenchmarkAlertRow = InferSelectModel<typeof benchmarkAlerts>;
+export type NewMonitoredPlatform = InferInsertModel<typeof monitoredPlatforms>;
+export type NewPlatformContent = InferInsertModel<typeof platformContent>;
+export type NewBenchmarkAlert = InferInsertModel<typeof benchmarkAlerts>;
+
 // Batch Production (2.4)
 export type BatchJobRow = InferSelectModel<typeof batchJobs>;
 export type BatchItemRow = InferSelectModel<typeof batchItems>;
@@ -222,3 +233,15 @@ export type NewSkillVersion = InferInsertModel<typeof skillVersions>;
 // Skill Usage Records
 export type SkillUsageRecordRow = InferSelectModel<typeof skillUsageRecords>;
 export type NewSkillUsageRecord = InferInsertModel<typeof skillUsageRecords>;
+
+// Employee Scenarios
+export type EmployeeScenarioRow = InferSelectModel<typeof employeeScenarios>;
+export type NewEmployeeScenario = InferInsertModel<typeof employeeScenarios>;
+
+// Hot Topic Crawl Logs
+export type HotTopicCrawlLogRow = InferSelectModel<typeof hotTopicCrawlLogs>;
+export type NewHotTopicCrawlLog = InferInsertModel<typeof hotTopicCrawlLogs>;
+
+// Saved Conversations
+export type SavedConversationRow = InferSelectModel<typeof savedConversations>;
+export type NewSavedConversation = InferInsertModel<typeof savedConversations>;

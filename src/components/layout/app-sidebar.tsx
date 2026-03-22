@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Users,
   PenTool,
-  UserPlus,
   Brain,
   Radio,
   BarChart3,
@@ -27,9 +25,9 @@ import {
   FolderTree,
   Archive,
   Trophy,
-  CheckCircle,
   ClipboardCheck,
   LayoutTemplate,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -90,89 +88,88 @@ const themeStyles: Record<
   }
 > = {
   blue: {
-    dot: "bg-gradient-to-br from-blue-500 to-indigo-500",
-    line: "from-blue-500/40 via-indigo-500/20 to-transparent",
+    dot: "bg-gradient-to-br from-blue-400/70 to-indigo-400/70",
+    line: "from-blue-500/30 via-indigo-500/15 to-transparent",
     activeBg:
-      "bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent",
-    activeBar: "bg-gradient-to-b from-blue-500 to-indigo-500",
-    activeIcon: "text-blue-500 dark:text-blue-400",
+      "bg-gradient-to-r from-blue-500/8 via-indigo-500/4 to-transparent",
+    activeBar: "bg-gradient-to-b from-blue-400/80 to-indigo-400/80",
+    activeIcon: "text-blue-400/80 dark:text-blue-300/80",
     activeText: "text-foreground font-semibold",
-    hoverBg: "hover:bg-blue-500/5 dark:hover:bg-blue-400/5",
+    hoverBg: "hover:bg-blue-500/4 dark:hover:bg-blue-400/4",
     hoverIcon:
-      "group-hover/nav-item:text-blue-500 dark:group-hover/nav-item:text-blue-400",
-    headerActive: "text-blue-600 dark:text-blue-400",
-    subLine: "from-blue-500/30 to-transparent",
-    separator: "from-transparent via-blue-500/20 to-transparent",
+      "group-hover/nav-item:text-blue-400/80 dark:group-hover/nav-item:text-blue-300/80",
+    headerActive: "text-blue-500/80 dark:text-blue-400/80",
+    subLine: "from-blue-500/20 to-transparent",
+    separator: "from-transparent via-blue-500/15 to-transparent",
   },
   purple: {
-    dot: "bg-gradient-to-br from-purple-500 to-violet-500",
-    line: "from-purple-500/40 via-violet-500/20 to-transparent",
+    dot: "bg-gradient-to-br from-purple-400/70 to-violet-400/70",
+    line: "from-purple-500/30 via-violet-500/15 to-transparent",
     activeBg:
-      "bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-transparent",
-    activeBar: "bg-gradient-to-b from-purple-500 to-violet-500",
-    activeIcon: "text-purple-500 dark:text-purple-400",
+      "bg-gradient-to-r from-purple-500/8 via-violet-500/4 to-transparent",
+    activeBar: "bg-gradient-to-b from-purple-400/80 to-violet-400/80",
+    activeIcon: "text-purple-400/80 dark:text-purple-300/80",
     activeText: "text-foreground font-semibold",
-    hoverBg: "hover:bg-purple-500/5 dark:hover:bg-purple-400/5",
+    hoverBg: "hover:bg-purple-500/4 dark:hover:bg-purple-400/4",
     hoverIcon:
-      "group-hover/nav-item:text-purple-500 dark:group-hover/nav-item:text-purple-400",
-    headerActive: "text-purple-600 dark:text-purple-400",
-    subLine: "from-purple-500/30 to-transparent",
-    separator: "from-transparent via-purple-500/20 to-transparent",
+      "group-hover/nav-item:text-purple-400/80 dark:group-hover/nav-item:text-purple-300/80",
+    headerActive: "text-purple-500/80 dark:text-purple-400/80",
+    subLine: "from-purple-500/20 to-transparent",
+    separator: "from-transparent via-purple-500/15 to-transparent",
   },
   emerald: {
-    dot: "bg-gradient-to-br from-emerald-500 to-teal-500",
-    line: "from-emerald-500/40 via-teal-500/20 to-transparent",
+    dot: "bg-gradient-to-br from-emerald-400/70 to-teal-400/70",
+    line: "from-emerald-500/30 via-teal-500/15 to-transparent",
     activeBg:
-      "bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent",
-    activeBar: "bg-gradient-to-b from-emerald-500 to-teal-500",
-    activeIcon: "text-emerald-500 dark:text-emerald-400",
+      "bg-gradient-to-r from-emerald-500/8 via-teal-500/4 to-transparent",
+    activeBar: "bg-gradient-to-b from-emerald-400/80 to-teal-400/80",
+    activeIcon: "text-emerald-400/80 dark:text-emerald-300/80",
     activeText: "text-foreground font-semibold",
-    hoverBg: "hover:bg-emerald-500/5 dark:hover:bg-emerald-400/5",
+    hoverBg: "hover:bg-emerald-500/4 dark:hover:bg-emerald-400/4",
     hoverIcon:
-      "group-hover/nav-item:text-emerald-500 dark:group-hover/nav-item:text-emerald-400",
-    headerActive: "text-emerald-600 dark:text-emerald-400",
-    subLine: "from-emerald-500/30 to-transparent",
-    separator: "from-transparent via-emerald-500/20 to-transparent",
+      "group-hover/nav-item:text-emerald-400/80 dark:group-hover/nav-item:text-emerald-300/80",
+    headerActive: "text-emerald-500/80 dark:text-emerald-400/80",
+    subLine: "from-emerald-500/20 to-transparent",
+    separator: "from-transparent via-emerald-500/15 to-transparent",
   },
   amber: {
-    dot: "bg-gradient-to-br from-amber-500 to-orange-500",
-    line: "from-amber-500/40 via-orange-500/20 to-transparent",
+    dot: "bg-gradient-to-br from-amber-400/70 to-orange-400/70",
+    line: "from-amber-500/30 via-orange-500/15 to-transparent",
     activeBg:
-      "bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent",
-    activeBar: "bg-gradient-to-b from-amber-500 to-orange-500",
-    activeIcon: "text-amber-500 dark:text-amber-400",
+      "bg-gradient-to-r from-amber-500/8 via-orange-500/4 to-transparent",
+    activeBar: "bg-gradient-to-b from-amber-400/80 to-orange-400/80",
+    activeIcon: "text-amber-400/80 dark:text-amber-300/80",
     activeText: "text-foreground font-semibold",
-    hoverBg: "hover:bg-amber-500/5 dark:hover:bg-amber-400/5",
+    hoverBg: "hover:bg-amber-500/4 dark:hover:bg-amber-400/4",
     hoverIcon:
-      "group-hover/nav-item:text-amber-500 dark:group-hover/nav-item:text-amber-400",
-    headerActive: "text-amber-600 dark:text-amber-400",
-    subLine: "from-amber-500/30 to-transparent",
-    separator: "from-transparent via-amber-500/20 to-transparent",
+      "group-hover/nav-item:text-amber-400/80 dark:group-hover/nav-item:text-amber-300/80",
+    headerActive: "text-amber-500/80 dark:text-amber-400/80",
+    subLine: "from-amber-500/20 to-transparent",
+    separator: "from-transparent via-amber-500/15 to-transparent",
   },
   indigo: {
-    dot: "bg-gradient-to-br from-indigo-500 to-purple-500",
-    line: "from-indigo-500/40 via-purple-500/20 to-transparent",
+    dot: "bg-gradient-to-br from-indigo-400/70 to-purple-400/70",
+    line: "from-indigo-500/30 via-purple-500/15 to-transparent",
     activeBg:
-      "bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent",
-    activeBar: "bg-gradient-to-b from-indigo-500 to-purple-500",
-    activeIcon: "text-indigo-500 dark:text-indigo-400",
+      "bg-gradient-to-r from-indigo-500/8 via-purple-500/4 to-transparent",
+    activeBar: "bg-gradient-to-b from-indigo-400/80 to-purple-400/80",
+    activeIcon: "text-indigo-400/80 dark:text-indigo-300/80",
     activeText: "text-foreground font-semibold",
-    hoverBg: "hover:bg-indigo-500/5 dark:hover:bg-indigo-400/5",
+    hoverBg: "hover:bg-indigo-500/4 dark:hover:bg-indigo-400/4",
     hoverIcon:
-      "group-hover/nav-item:text-indigo-500 dark:group-hover/nav-item:text-indigo-400",
-    headerActive: "text-indigo-600 dark:text-indigo-400",
-    subLine: "from-indigo-500/30 to-transparent",
-    separator: "from-transparent via-indigo-500/20 to-transparent",
+      "group-hover/nav-item:text-indigo-400/80 dark:group-hover/nav-item:text-indigo-300/80",
+    headerActive: "text-indigo-500/80 dark:text-indigo-400/80",
+    subLine: "from-indigo-500/20 to-transparent",
+    separator: "from-transparent via-indigo-500/15 to-transparent",
   },
 };
 
 /* ─── Navigation Data ─── */
 
 const workspaceItems: NavItem[] = [
-  { label: "团队工作台", href: "/team-hub", icon: Users },
-  { label: "审批中心", href: "/approvals", icon: CheckCircle },
-  { label: "团队组建", href: "/team-builder", icon: UserPlus },
+  { label: "任务中心", href: "/missions", icon: Target },
   { label: "AI员工市场", href: "/employee-marketplace", icon: UserCog },
+  { label: "对话中心", href: "/chat", icon: MessageSquare },
   { label: "技能管理", href: "/skills", icon: Sparkles },
   { label: "频道顾问", href: "/channel-advisor", icon: Brain },
 ];
@@ -298,7 +295,7 @@ function NavSection({
           <CollapsibleTrigger asChild>
             <SidebarMenuButton
               className={cn(
-                "transition-all duration-150 ease-out font-medium rounded-lg",
+                "transition-all duration-200 ease-out font-medium rounded-lg",
                 styles.hoverBg,
                 groupActive && styles.headerActive
               )}
@@ -306,7 +303,7 @@ function NavSection({
               <GroupIcon
                 size={18}
                 className={cn(
-                  "transition-colors duration-150",
+                  "transition-colors duration-200",
                   groupActive
                     ? styles.activeIcon
                     : "text-muted-foreground/60"
@@ -385,7 +382,7 @@ function NavMenuItem({
           asChild
           isActive={isActive}
           className={cn(
-            "relative transition-all duration-150 ease-out rounded-md",
+            "relative transition-all duration-200 ease-out rounded-md",
             "translate-x-0",
             !isActive && styles.hoverBg,
             !isActive && "hover:translate-x-0.5",
@@ -399,7 +396,7 @@ function NavMenuItem({
             <Icon
               size={14}
               className={cn(
-                "transition-colors duration-150 shrink-0",
+                "transition-colors duration-200 shrink-0",
                 isActive
                   ? styles.activeIcon
                   : cn("text-muted-foreground/50", styles.hoverIcon)
@@ -418,7 +415,7 @@ function NavMenuItem({
         asChild
         isActive={isActive}
         className={cn(
-          "relative transition-all duration-150 ease-out rounded-lg overflow-hidden",
+          "relative transition-all duration-200 ease-out rounded-lg overflow-hidden",
           "translate-x-0",
           !isActive && styles.hoverBg,
           !isActive && "hover:translate-x-0.5",
@@ -441,7 +438,7 @@ function NavMenuItem({
           <Icon
             size={18}
             className={cn(
-              "transition-colors duration-150 shrink-0",
+              "transition-colors duration-200 shrink-0",
               isActive
                 ? styles.activeIcon
                 : cn("text-muted-foreground/50", styles.hoverIcon)
@@ -463,16 +460,16 @@ export function AppSidebar() {
     <Sidebar className="border-r border-border/50 glass-sidebar">
       {/* ── Brand Header ── */}
       <SidebarHeader className="p-4 pb-3">
-        <Link href="/team-hub" className="flex items-center gap-2.5">
+        <Link href="/missions" className="flex items-center gap-2.5">
           <div
-            className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
-            style={{ animation: "pulse-glow 3s ease-in-out infinite" }}
+            className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center"
+            style={{ boxShadow: "0 0 12px rgba(59, 130, 246, 0.3), 0 0 24px rgba(96, 165, 250, 0.15)", animation: "pulse-glow 3s ease-in-out infinite", willChange: "opacity" }}
           >
             <Sparkles size={18} className="text-white" />
           </div>
           <div>
             <h1 className="text-base font-bold leading-tight">
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">
                 Vibe
               </span>
               <span className="text-foreground ml-0.5">Media</span>
@@ -483,7 +480,7 @@ export function AppSidebar() {
           </div>
         </Link>
         {/* Header gradient separator */}
-        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
+        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/15 to-transparent" />
       </SidebarHeader>
 
       {/* ── Scrollable Content ── */}
@@ -518,7 +515,7 @@ export function AppSidebar() {
 
       {/* ── Footer ── */}
       <SidebarFooter className="p-3 pt-1">
-        <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/15 to-transparent mb-2" />
+        <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent mb-2" />
         <div className="flex items-center justify-between px-1">
           <span className="text-[10px] text-muted-foreground/40 tracking-wide">
             Vibe Media v1.0

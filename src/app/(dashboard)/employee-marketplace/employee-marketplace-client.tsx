@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -8,8 +8,16 @@ import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmployeeCreateDialog } from "@/components/shared/employee-create-dialog";
-import { Plus, Filter, Users, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Filter, Users, Loader2, RefreshCw, Trash2, Search, ArrowUpDown, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { EMPLOYEE_META } from "@/lib/constants";
 import { deleteEmployee } from "@/app/actions/employees";
@@ -61,6 +69,8 @@ export function EmployeeMarketplaceClient({
   const [employees, setEmployees] = useState(initialEmployees);
   const [orgId, setOrgId] = useState(initialOrgId);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchText, setSearchText] = useState("");
+  const [sortBy, setSortBy] = useState<"default" | "performance" | "name" | "status">("default");
   const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState(initialEmployees.length === 0);
   const [retryFailed, setRetryFailed] = useState(false);
@@ -126,10 +136,54 @@ export function EmployeeMarketplaceClient({
     }
   }, [deleteTarget]);
 
-  const filtered = employees.filter((emp) => {
-    if (statusFilter !== "all" && emp.status !== statusFilter) return false;
-    return true;
-  });
+  const filteredEmployees = useMemo(() => {
+    let result = employees;
+
+    // 状态筛选
+    if (statusFilter !== "all") {
+      result = result.filter((e) => e.status === statusFilter);
+    }
+
+    // 文本搜索
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      result = result.filter(
+        (e) =>
+          e.name.toLowerCase().includes(q) ||
+          e.nickname.toLowerCase().includes(q) ||
+          e.title.toLowerCase().includes(q)
+      );
+    }
+
+    // 排序
+    switch (sortBy) {
+      case "performance":
+        result = [...result].sort(
+          (a, b) => b.stats.tasksCompleted - a.stats.tasksCompleted
+        );
+        break;
+      case "name":
+        result = [...result].sort((a, b) =>
+          a.name.localeCompare(b.name, "zh-CN")
+        );
+        break;
+      case "status": {
+        const statusOrder: Record<string, number> = {
+          working: 0,
+          learning: 1,
+          reviewing: 2,
+          idle: 3,
+        };
+        result = [...result].sort(
+          (a, b) =>
+            (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
+        );
+        break;
+      }
+    }
+
+    return result;
+  }, [employees, statusFilter, searchText, sortBy]);
 
   return (
     <div className="max-w-[1200px] mx-auto">
@@ -139,32 +193,60 @@ export function EmployeeMarketplaceClient({
       />
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-6">
-        <Filter size={16} className="text-gray-400 dark:text-gray-500" />
-        <div className="flex gap-2">
-          {[
-            { value: "all", label: "全部" },
-            { value: "working", label: "工作中" },
-            { value: "idle", label: "空闲" },
-            { value: "learning", label: "学习中" },
-            { value: "reviewing", label: "审核中" },
-          ].map((opt) => (
-            <Button
-              key={opt.value}
-              variant={statusFilter === opt.value ? "default" : "outline"}
-              size="sm"
-              className="text-xs h-7"
-              onClick={() => setStatusFilter(opt.value)}
-            >
-              {opt.label}
-            </Button>
-          ))}
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <Filter size={16} className="text-gray-400 dark:text-gray-500" />
+          <div className="flex gap-2">
+            {[
+              { value: "all", label: "全部" },
+              { value: "working", label: "工作中" },
+              { value: "idle", label: "空闲" },
+              { value: "learning", label: "学习中" },
+              { value: "reviewing", label: "审核中" },
+            ].map((opt) => (
+              <Button
+                key={opt.value}
+                variant={statusFilter === opt.value ? "default" : "ghost"}
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setStatusFilter(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              <Users size={12} className="mr-1" />
+              {employees.length} 名员工
+            </Badge>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">
-            <Users size={12} className="mr-1" />
-            {employees.length} 名员工
-          </Badge>
+
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            <Input
+              placeholder="搜索员工名称、昵称或职位..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="pl-8 h-8 text-xs border-none bg-white/60 dark:bg-white/5"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown size={14} className="text-gray-400 dark:text-gray-500" />
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+              <SelectTrigger className="h-8 w-[130px] text-xs border-none bg-white/60 dark:bg-white/5">
+                <SelectValue placeholder="排序方式" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default" className="text-xs">默认排序</SelectItem>
+                <SelectItem value="performance" className="text-xs">按绩效排序</SelectItem>
+                <SelectItem value="name" className="text-xs">按名称排序</SelectItem>
+                <SelectItem value="status" className="text-xs">按状态排序</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -190,7 +272,7 @@ export function EmployeeMarketplaceClient({
       {/* Employee Grid */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((emp) => {
+          {filteredEmployees.map((emp) => {
             const isPreset = !!(EMPLOYEE_META as Record<string, unknown>)[emp.id];
             return (
               <div key={emp.dbId} className="relative group">
@@ -228,20 +310,30 @@ export function EmployeeMarketplaceClient({
                     </div>
                   </GlassCard>
                 </Link>
-                {!isPreset && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDeleteError(null);
-                      setDeleteTarget({ dbId: emp.dbId, nickname: emp.nickname });
-                    }}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400"
-                    title="删除员工"
+                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link
+                    href={`/chat?employee=${emp.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-500 dark:text-blue-400 border-none"
+                    title="对话"
                   >
-                    <Trash2 size={14} />
-                  </button>
-                )}
+                    <MessageSquare size={14} />
+                  </Link>
+                  {!isPreset && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteError(null);
+                        setDeleteTarget({ dbId: emp.dbId, nickname: emp.nickname });
+                      }}
+                      className="p-1.5 rounded-md bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 border-none"
+                      title="删除员工"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
