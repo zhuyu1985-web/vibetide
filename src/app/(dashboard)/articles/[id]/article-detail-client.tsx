@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
+import { OutlinePanel } from "./features/outline/outline-panel";
 
 export default function ArticleDetailClient({
   article,
@@ -84,9 +85,19 @@ export default function ArticleDetailClient({
                 ))}
               </div>
               <div className="flex-1 overflow-hidden flex flex-col">
-                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                  [左侧面板内容 -- 后续 Task 填充]
-                </div>
+                {leftTab === "outline" && (
+                  <OutlinePanel htmlContent={article.body ?? ""} />
+                )}
+                {leftTab === "chat" && (
+                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                    [AI 对话 — Phase 2]
+                  </div>
+                )}
+                {leftTab === "history" && (
+                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                    [对话历史 — Phase 5]
+                  </div>
+                )}
               </div>
             </div>
           ) : (
