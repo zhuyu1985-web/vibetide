@@ -38,81 +38,116 @@ type ScenarioInput = {
 
 const ALL_SCENARIOS: ScenarioInput[] = [
   // =========================================================================
-  // 小雷 (xiaolei) — 热点猎手  (3 scenarios)
+  // 小雷 (xiaolei) — 热点猎手  (5 scenarios — original from seed.ts)
   // =========================================================================
   {
     employeeSlug: "xiaolei",
-    name: "突发热点监控",
-    description: "实时监控特定领域的突发热点和新闻事件",
+    name: "全网热点扫描",
+    description: "扫描各平台热点话题，生成热点速报",
     icon: "Radar",
     systemInstruction:
-      "请针对{{domain}}领域，在{{timeRange}}范围内，搜索最新的热点话题和突发事件。要求：1. 列出至少5个热点话题 2. 每个话题标注热度等级和来源 3. 分析可能的传播趋势 4. 给出内容切入建议",
+      "请对{{domain}}领域进行全网热点扫描，覆盖微博、百度、头条、抖音、知乎等主流平台。输出格式：按热度排序的 Top 10 热点列表，每个热点包含标题、热度值、来源平台、上升趋势、建议追踪角度。最后给出整体热点态势总结。",
     inputFields: [
       {
         name: "domain",
-        label: "监控领域",
+        label: "关注领域",
+        type: "select" as const,
+        required: true,
+        placeholder: "选择领域",
+        options: ["全部", "科技", "财经", "娱乐", "体育", "社会", "教育", "汽车", "健康"],
+      },
+    ],
+    toolsHint: ["trending_topics", "web_search"],
+    sortOrder: 1,
+  },
+  {
+    employeeSlug: "xiaolei",
+    name: "话题深度追踪",
+    description: "深入分析特定话题的发展脉络",
+    icon: "Search",
+    systemInstruction:
+      "请对话题「{{topic}}」进行深度追踪分析。包含：1) 话题起源和发展时间线 2) 各平台传播路径 3) 关键节点和转折 4) 舆论情绪变化 5) 相关利益方观点汇总 6) 预测后续发展趋势 7) 建议的内容切入角度。",
+    inputFields: [
+      {
+        name: "topic",
+        label: "追踪话题",
         type: "text" as const,
         required: true,
-        placeholder: "如：AI、科技、财经",
+        placeholder: "输入要追踪的话题关键词",
+      },
+    ],
+    toolsHint: ["web_search", "web_deep_read", "trending_topics"],
+    sortOrder: 2,
+  },
+  {
+    employeeSlug: "xiaolei",
+    name: "平台热榜查看",
+    description: "查看指定平台的实时热榜",
+    icon: "BarChart3",
+    systemInstruction:
+      "请查看{{platform}}平台的实时热榜数据，列出当前 Top 20 热门话题，每个话题标注热度指数、上榜时长、趋势（上升/下降/平稳）。对排名前 5 的话题给出简要分析和内容制作建议。",
+    inputFields: [
+      {
+        name: "platform",
+        label: "目标平台",
+        type: "select" as const,
+        required: true,
+        placeholder: "选择平台",
+        options: ["微博", "百度", "头条", "抖音", "知乎", "B站", "微信"],
+      },
+    ],
+    toolsHint: ["trending_topics"],
+    sortOrder: 3,
+  },
+  {
+    employeeSlug: "xiaolei",
+    name: "热点分析报告",
+    description: "生成深度热点分析报告",
+    icon: "FileText",
+    systemInstruction:
+      "请针对话题「{{topic}}」生成一份{{depth}}的热点分析报告。报告结构：1) 热点概述 2) 数据分析（热度趋势、平台分布、用户画像） 3) 舆情分析（正面/负面/中性占比、典型观点） 4) 竞品响应（主流媒体的报道角度） 5) 内容机会（建议的选题角度、体裁、发布时机） 6) 风险提示（敏感点、合规注意事项）",
+    inputFields: [
+      {
+        name: "topic",
+        label: "分析话题",
+        type: "text" as const,
+        required: true,
+        placeholder: "输入要分析的话题",
+      },
+      {
+        name: "depth",
+        label: "报告深度",
+        type: "select" as const,
+        required: true,
+        placeholder: "选择深度",
+        options: ["快速摘要", "标准报告", "深度研报"],
+      },
+    ],
+    toolsHint: ["trending_topics", "web_search", "web_deep_read"],
+    sortOrder: 4,
+  },
+  {
+    employeeSlug: "xiaolei",
+    name: "关键词热度监测",
+    description: "监测关键词在各平台的热度变化",
+    icon: "Activity",
+    systemInstruction:
+      "请监测关键词「{{keyword}}」在{{timeRange}}内的热度变化情况。输出：1) 各平台当前热度指数 2) 热度趋势变化曲线描述 3) 关联热词和话题 4) 主要讨论内容摘要 5) 情感倾向分析 6) 是否建议跟进及原因。",
+    inputFields: [
+      {
+        name: "keyword",
+        label: "监测关键词",
+        type: "text" as const,
+        required: true,
+        placeholder: "输入关键词",
       },
       {
         name: "timeRange",
         label: "时间范围",
         type: "select" as const,
         required: true,
-        options: ["最近1小时", "今天", "近3天"],
-      },
-    ],
-    toolsHint: ["web_search", "trending_topics"],
-    sortOrder: 1,
-  },
-  {
-    employeeSlug: "xiaolei",
-    name: "竞品动态追踪",
-    description: "深度追踪竞争对手的最新动态和内容策略",
-    icon: "Search",
-    systemInstruction:
-      "请深度追踪{{competitor}}的最新动态，重点关注{{focus}}方面。要求：1. 搜集该竞品近期的重要动态 2. 分析其内容策略变化 3. 对比我方差异和优劣势 4. 给出可行的应对建议",
-    inputFields: [
-      {
-        name: "competitor",
-        label: "竞品名称",
-        type: "text" as const,
-        required: true,
-        placeholder: "如：某某传媒、某某MCN",
-      },
-      {
-        name: "focus",
-        label: "关注方面",
-        type: "select" as const,
-        required: false,
-        options: ["内容策略", "渠道布局", "爆款分析", "全部"],
-      },
-    ],
-    toolsHint: ["web_search", "web_deep_read"],
-    sortOrder: 2,
-  },
-  {
-    employeeSlug: "xiaolei",
-    name: "热点深度解读",
-    description: "对热点话题进行多维度深度分析和解读",
-    icon: "BookOpen",
-    systemInstruction:
-      "请对热点话题「{{topic}}」进行{{depth}}级别的深度解读。要求：1. 梳理事件来龙去脉 2. 多源交叉验证关键信息 3. 分析各方观点和立场 4. 预判后续发展走向 5. 给出内容创作切入角度",
-    inputFields: [
-      {
-        name: "topic",
-        label: "热点话题",
-        type: "text" as const,
-        required: true,
-        placeholder: "如：OpenAI发布GPT-5",
-      },
-      {
-        name: "depth",
-        label: "解读深度",
-        type: "select" as const,
-        required: true,
-        options: ["快速概览", "深度分析", "全景解读"],
+        placeholder: "选择时间范围",
+        options: ["最近1小时", "最近24小时", "最近7天", "最近30天"],
       },
     ],
     toolsHint: ["web_search", "web_deep_read", "trending_topics"],
