@@ -152,6 +152,13 @@ src/app/(dashboard)/articles/[id]/
 - 默认选中上次使用的颜色
 - 高亮后自动在右侧批注列表创建条目
 
+**文本选中检测实现：**
+- 阅读模式：使用原生 `document.getSelection()` API，监听 `mouseup` 事件
+- 编辑模式：通过 Tiptap `editor.on('selectionUpdate')` 读取 `editor.view.state.selection`
+- 防抖处理：100ms debounce 避免频繁触发
+- 气泡定位：基于 `Selection.getRangeAt(0).getBoundingClientRect()` 计算，确保不超出视口
+- 消失时机：点击气泡外区域、滚动、模式切换时自动消失
+
 ### 4.2 编辑模式
 
 点击顶部「编辑」按钮切换，保持滚动位置不变。
@@ -304,20 +311,125 @@ const model = deepseek.chat(process.env.OPENAI_MODEL || 'deepseek-chat')
 - 情感/立场标签：`客观中立` / `看涨` / `批判性` / `软广嫌疑`
 - 关键结论点击定位到原文段落
 
-### 5.4 AI Route Handler
+### 5.4 AI Route Handlers
+
+#### `/api/ai/chat/route.ts` — AI 对话
 
 ```typescript
-// src/app/api/ai/chat/route.ts — AI 对话
-// POST: { messages, articleContent, selectedText? }
-// Response: SSE stream (streamText → toTextStreamResponse)
+import { streamText } from 'ai'
+import { createOpenAI } from '@ai-sdk/openai'
 
-// src/app/api/ai/analysis/route.ts — AI 解读
-// POST: { articleId, articleContent, perspective }
-// Response: SSE stream, 完成后缓存到 DB
+const deepseek = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+  baseURL: process.env.OPENAI_API_BASE_URL!,
+})
 
-// src/app/api/ai/edit/route.ts — AI 编辑操作
-// POST: { content, selectedText?, instruction, mode }
-// Response: SSE stream (润色/续写/翻译等)
+interface ChatRequest {
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  articleContent: string       // 文章全文（< 8000 tokens）或摘要
+  selectedText?: string        // 用户选中的文本片段
+}
+
+export async function POST(req: Request) {
+  const { messages, articleContent, selectedText } = await req.json() as ChatRequest
+
+  const systemPrompt = `你是一位专业的新闻分析 AI 助手。以下是当前文章内容：\n\n${articleContent}`
+  const userContext = selectedText
+    ? `[用户选中的文本：「${selectedText}」]\n\n${messages.at(-1)?.content}`
+    : messages.at(-1)?.content
+
+  const result = streamText({
+    model: deepseek.chat(process.env.OPENAI_MODEL || 'deepseek-chat'),
+    system: systemPrompt,
+    messages: messages.slice(0, -1).concat([{ role: 'user', content: userContext! }]),
+  })
+
+  return result.toTextStreamResponse()
+}
+```
+
+#### `/api/ai/analysis/route.ts` — AI 解读
+
+```typescript
+import { streamText } from 'ai'
+
+type Perspective = 'summary' | 'journalist' | 'quotes' | 'timeline' | 'qa' | 'deep'
+
+interface AnalysisRequest {
+  articleId: string
+  articleContent: string
+  perspective: Perspective
+}
+
+// 每种视角对应的 system prompt
+const PERSPECTIVE_PROMPTS: Record<Perspective, string> = {
+  summary: '请对以下新闻文章生成摘要：一句话核心摘要 + 3-5 个关键要点，输出 Markdown 格式。',
+  journalist: '以记者视点分析以下文章：分析消息源可靠性、报道偏见倾向、利益相关方。',
+  quotes: '从以下文章中提取有新闻价值的引述和关键语句，标注出处段落。',
+  timeline: '梳理以下文章中的事件发展脉络，按时间线排列。',
+  qa: '针对以下文章提炼3个核心问题并给出精准回答，指出文章未回答的问题或逻辑漏洞。',
+  deep: '对以下文章做深度剖析：利益相关方分析表(Who/Did What/Impact)、数据透视、底层逻辑分析。',
+}
+
+export async function POST(req: Request) {
+  const { articleId, articleContent, perspective } = await req.json() as AnalysisRequest
+
+  const result = streamText({
+    model: deepseek.chat(process.env.OPENAI_MODEL || 'deepseek-chat'),
+    system: PERSPECTIVE_PROMPTS[perspective],
+    messages: [{ role: 'user', content: articleContent }],
+    onFinish: async ({ text }) => {
+      // 流式完成后，通过 Server Action 缓存到 article_ai_analysis 表
+      await cacheAIAnalysis(articleId, perspective, text)
+    },
+  })
+
+  return result.toTextStreamResponse()
+}
+```
+
+#### `/api/ai/edit/route.ts` — AI 编辑操作
+
+```typescript
+type EditMode = 'polish' | 'continue' | 'rewrite' | 'summarize' | 'translate' | 'extract'
+
+interface EditRequest {
+  fullContent: string          // 编辑器全文
+  selectedText?: string        // 选中的文本片段
+  instruction: string          // 用户指令（如"润色这段"、"翻译成英文"）
+  mode: EditMode
+}
+
+export async function POST(req: Request) {
+  const { fullContent, selectedText, instruction, mode } = await req.json() as EditRequest
+
+  const systemPrompt = `你是一位专业的新闻编辑 AI 助手。请根据指令对内容进行编辑。
+仅输出编辑后的内容，不要添加额外说明。${mode === 'polish' && selectedText ? '\n对比原文，仅修改需要润色的部分。' : ''}`
+
+  const userMessage = selectedText
+    ? `原文片段：「${selectedText}」\n\n指令：${instruction}\n\n完整文章上下文：${fullContent.slice(0, 2000)}`
+    : `指令：${instruction}\n\n文章内容：${fullContent}`
+
+  const result = streamText({
+    model: deepseek.chat(process.env.OPENAI_MODEL || 'deepseek-chat'),
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+  })
+
+  return result.toTextStreamResponse()
+}
+```
+
+**错误处理策略：**
+- 所有路由捕获异常返回 `{ error: string }` + 500 状态码
+- Token 超限时截断文章内容，优先保留标题 + 摘要 + 选中段落上下文
+- 流式中断时前端显示"生成中断，点击重试"
+
+**环境变量（需添加到 .env.local）：**
+```
+OPENAI_API_KEY=sk-xxx          # DeepSeek API Key
+OPENAI_API_BASE_URL=https://api.deepseek.com/v1
+OPENAI_MODEL=deepseek-chat
 ```
 
 ---
@@ -357,9 +469,16 @@ interface Annotation {
 
 **浮顶笔记 (Floating Sticky Note)：**
 - 点击卡片图钉📌 → 卡片脱离列表 → 变为半透明悬浮窗（z-50）
-- 可拖拽到屏幕任意位置（react-draggable 或自定义 drag hook）
+- 可拖拽到屏幕任意位置
 - 全局驻留：滚动/切换章节时保持可见
 - 归位：点击「取消浮顶」→ 卡片飞回列表原位（transition 动画）
+
+**浮顶笔记实现细节：**
+- 拖拽：自定义 `useDraggable` hook（mousedown → mousemove → mouseup），使用 CSS `transform: translate(x, y)` 避免 reflow
+- Z-index 层级：浮顶笔记 z-50 > 批注面板 z-30 > 侧栏 z-20 > 弹窗/对话框 z-40
+- 位置持久化：浮顶时 `pinnedPosition { x, y }` 存入 annotation 记录（Server Action 更新），页面加载时恢复
+- 碰撞处理：拖拽边界限制在 viewport 内（clamp x/y），多个浮顶笔记互不干扰（各自独立定位）
+- 半透明效果：`opacity: 0.92` + `backdrop-filter: blur(8px)` + `box-shadow`
 
 **批注卡片操作：**
 - 改色：5 色选择器
@@ -494,7 +613,41 @@ CREATE TABLE article_annotations (
 
 ## 10. 状态管理
 
-### 10.1 Zustand Store (全局协调)
+### 10.1 Server → Client 数据流
+
+遵循项目现有的 Server/Client 分离模式：
+
+```typescript
+// page.tsx (Server Component) — 数据获取
+export default async function ArticleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const [article, annotations, aiAnalysisCache] = await Promise.all([
+    getArticle(id),            // DAL 查询
+    getAnnotations(id),        // DAL 查询
+    getAIAnalysisCache(id),    // DAL 查询（已缓存的解读结果）
+  ])
+  if (!article) notFound()
+
+  return (
+    <ArticleDetailClient
+      article={article}
+      initialAnnotations={annotations}
+      initialAIAnalysis={aiAnalysisCache}
+    />
+  )
+}
+
+// article-detail-client.tsx (Client Component) — 接收 props 初始化 store
+interface ArticleDetailClientProps {
+  article: ArticleDetail
+  initialAnnotations: Annotation[]
+  initialAIAnalysis: AIAnalysisCacheItem[]
+}
+```
+
+### 10.2 Zustand Store (全局 UI 协调)
+
+Store 仅管理**瞬态 UI 状态**，不持有服务端数据：
 
 ```typescript
 interface ArticlePageStore {
@@ -516,15 +669,6 @@ interface ArticlePageStore {
   scrollToPosition: number | null
   highlightAnnotationId: string | null
 
-  // 阅读外观
-  appearance: {
-    fontSize: number      // 14-22px, 7 档
-    lineHeight: 'compact' | 'comfortable' | 'loose'
-    margins: 'narrow' | 'standard' | 'wide'
-    theme: 'light' | 'dark' | 'sepia' | 'system'
-    fontFamily: 'system' | 'serif' | 'sans' | 'mono'
-  }
-
   // Actions
   setViewMode: (mode: 'read' | 'edit') => void
   setActiveView: (view: string) => void
@@ -533,17 +677,37 @@ interface ArticlePageStore {
   toggleZenMode: () => void
   setSelectedText: (text: string | null, range?: { from: number; to: number }) => void
   scrollToAnnotation: (annotationId: string) => void
-  // ...
 }
 ```
 
-### 10.2 Feature Hooks (独立子系统)
+### 10.3 阅读外观持久化
+
+外观设置使用 `localStorage` 持久化，跨页面/会话保持：
+
+```typescript
+// 默认值
+const DEFAULT_APPEARANCE = {
+  fontSize: 16,            // 14-22px, 7 档
+  lineHeight: 'comfortable' as const,  // 'compact' | 'comfortable' | 'loose'
+  margins: 'standard' as const,        // 'narrow' | 'standard' | 'wide'
+  theme: 'system' as const,            // 'light' | 'dark' | 'sepia' | 'system'
+  fontFamily: 'system' as const,       // 'system' | 'serif' | 'sans' | 'mono'
+}
+
+// 使用 hook 封装 localStorage 读写
+function useAppearance() {
+  const [appearance, setAppearance] = useLocalStorage('article-appearance', DEFAULT_APPEARANCE)
+  return { appearance, setAppearance }
+}
+```
+
+### 10.4 Feature Hooks (独立子系统)
 
 每个 feature 目录下的 `use-*.ts` hook 管理各自的本地状态：
 
 - `useAIChat()` — 对话消息列表、流式状态、上下文构建
-- `useAIAnalysis()` — 解读缓存、当前视角、生成状态
-- `useAnnotations()` — 批注 CRUD、排序、浮顶管理
+- `useAIAnalysis(initialCache)` — 接收服务端缓存作为初始值，当前视角、生成状态
+- `useAnnotations(initialAnnotations)` — 接收服务端数据作为初始值，CRUD 通过 Server Action 持久化
 - `useArticleEditor()` — Tiptap 编辑器实例、脏检查、自动保存
 - `useVideoPlayer()` — 播放/暂停、当前时间、倍速、音量
 - `useTranscript()` — 听记数据、当前高亮段、校对修改
@@ -570,11 +734,126 @@ interface ArticlePageStore {
 
 ---
 
-## 12. 数据库变更
+## 12. Server Actions
+
+### 12.1 批注 Actions (`src/app/actions/annotations.ts`)
+
+```typescript
+'use server'
+
+import { requireAuth } from './auth'
+import { revalidatePath } from 'next/cache'
+
+export async function createAnnotation(
+  articleId: string,
+  data: {
+    quote: string
+    position: number
+    note?: string
+    color: AnnotationColor
+    timecode?: number
+    frameSnapshot?: string
+  }
+) {
+  const user = await requireAuth()
+  // Insert into article_annotations (user_id = user.id, org_id from user)
+  // Return created annotation with id, timestamps
+  revalidatePath(`/articles/${articleId}`)
+}
+
+export async function updateAnnotation(
+  annotationId: string,
+  data: Partial<{
+    note: string
+    color: AnnotationColor
+    isPinned: boolean
+    pinnedPosition: { x: number; y: number } | null
+  }>
+) {
+  const user = await requireAuth()
+  // Verify ownership: annotation.user_id === user.id
+  // Update fields, set updated_at
+  revalidatePath('/articles/[id]')
+}
+
+export async function deleteAnnotation(annotationId: string) {
+  const user = await requireAuth()
+  // Verify ownership, then delete
+  revalidatePath('/articles/[id]')
+}
+```
+
+### 12.2 AI 解读缓存 Action
+
+```typescript
+// 内部函数，由 API route onFinish 回调调用
+export async function cacheAIAnalysis(
+  articleId: string,
+  perspective: AIAnalysisPerspective,
+  analysisText: string,
+  sentiment?: AISentiment,
+  metadata?: unknown
+) {
+  // Upsert into article_ai_analysis
+  // UNIQUE(article_id, perspective) 确保每视角仅一条
+  // 不需要 auth — 由 API route 鉴权后内部调用
+}
+```
+
+### 12.3 AI 对话历史 Action
+
+```typescript
+export async function saveChatMessage(
+  articleId: string,
+  role: 'user' | 'assistant',
+  content: string,
+  metadata?: Record<string, unknown>
+) {
+  const user = await requireAuth()
+  // Insert into article_chat_history
+}
+
+export async function getChatHistory(articleId: string) {
+  const user = await requireAuth()
+  // Select from article_chat_history WHERE article_id AND user_id
+  // Order by created_at ASC
+}
+```
+
+---
+
+## 13. 数据库变更
+
+### 新增 Drizzle Enums (`src/db/schema/enums.ts`)
+
+```typescript
+// 批注颜色
+export const annotationColorEnum = pgEnum('annotation_color', [
+  'red', 'yellow', 'green', 'blue', 'purple'
+])
+
+// AI 解读视角
+export const aiAnalysisPerspectiveEnum = pgEnum('ai_analysis_perspective', [
+  'summary', 'journalist', 'quotes', 'timeline', 'qa', 'deep'
+])
+
+// AI 解读情感/立场标签
+export const aiSentimentEnum = pgEnum('ai_sentiment', [
+  'neutral', 'bullish', 'critical', 'advertorial'
+])
+```
+
+对应 TypeScript 类型 (`src/lib/types.ts`)：
+
+```typescript
+export type AnnotationColor = 'red' | 'yellow' | 'green' | 'blue' | 'purple'
+export type AIAnalysisPerspective = 'summary' | 'journalist' | 'quotes' | 'timeline' | 'qa' | 'deep'
+export type AISentiment = 'neutral' | 'bullish' | 'critical' | 'advertorial'
+```
 
 ### 新增表
 
-1. **article_annotations** — 批注数据（见 Section 6.3）
+1. **article_annotations** — 批注数据（见 Section 6.3，color 列使用 `annotationColorEnum`）
 2. **article_ai_analysis** — AI 解读缓存
 
 ```sql
@@ -582,9 +861,9 @@ CREATE TABLE article_ai_analysis (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   article_id UUID NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
   organization_id UUID NOT NULL REFERENCES organizations(id),
-  perspective VARCHAR(20) NOT NULL,  -- 'summary' | 'journalist' | 'quotes' | 'timeline' | 'qa' | 'deep'
-  content TEXT NOT NULL,              -- Markdown 格式
-  sentiment VARCHAR(20),              -- 'neutral' | 'bullish' | 'critical' | 'advertorial'
+  perspective ai_analysis_perspective NOT NULL,
+  analysis_text TEXT NOT NULL,         -- Markdown 格式的解读结果
+  sentiment ai_sentiment,
   metadata JSONB,                     -- 结构化数据（要点列表、利益相关方等）
   generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(article_id, perspective)
