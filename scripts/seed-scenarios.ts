@@ -741,16 +741,21 @@ const ALL_SCENARIOS: ScenarioInput[] = [
 async function seedScenarios() {
   console.log("Seeding 27 employee scenarios...\n");
 
-  // 1. Find the organization
-  const org = await db.query.organizations.findFirst();
-  if (!org) {
+  // 1. Find ALL organizations — seed scenarios for each
+  const orgs = await db.select().from(schema.organizations);
+  if (orgs.length === 0) {
     console.error("No organization found! Run the main seed first (npm run db:seed).");
     process.exit(1);
   }
-  console.log(`Organization: ${org.name} (${org.id})\n`);
+  console.log(`Found ${orgs.length} organization(s):`);
+  for (const o of orgs) console.log(`  - ${o.name} (${o.id})`);
+  console.log();
 
   // 2. Group scenarios by employee slug
   const slugs = [...new Set(ALL_SCENARIOS.map((s) => s.employeeSlug))];
+
+  for (const org of orgs) {
+    console.log(`\n── ${org.name} ──`);
 
   for (const slug of slugs) {
     const scenarios = ALL_SCENARIOS.filter((s) => s.employeeSlug === slug);
@@ -786,8 +791,9 @@ async function seedScenarios() {
       console.log(`    - ${s.name} (${s.icon})`);
     }
   }
+  } // end org loop
 
-  console.log(`\nDone! Total: ${ALL_SCENARIOS.length} scenarios across ${slugs.length} employees.`);
+  console.log(`\nDone! Total: ${ALL_SCENARIOS.length} scenarios × ${orgs.length} org(s) across ${slugs.length} employees.`);
 }
 
 seedScenarios()
