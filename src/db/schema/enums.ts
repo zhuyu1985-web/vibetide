@@ -29,23 +29,53 @@ export const skillTypeEnum = pgEnum("skill_type", [
   "plugin",
 ]);
 
-export const messageTypeEnum = pgEnum("message_type", [
-  "alert",
-  "decision_request",
-  "status_update",
-  "work_output",
-]);
-
-export const workflowStepStatusEnum = pgEnum("workflow_step_status", [
+// Mission system enums (multi-agent collaboration)
+export const missionStatusEnum = pgEnum("mission_status", [
+  "queued",
+  "planning",
+  "executing",
+  "coordinating",
+  "consolidating",
   "completed",
-  "active",
-  "pending",
-  "skipped",
-  "waiting_approval",
   "failed",
+  "cancelled",
 ]);
 
-export const memberTypeEnum = pgEnum("member_type", ["ai", "human"]);
+export const missionTaskStatusEnum = pgEnum("mission_task_status", [
+  "pending",
+  "ready",
+  "claimed",
+  "in_progress",
+  "in_review",
+  "completed",
+  "failed",
+  "cancelled",
+  "blocked",
+]);
+
+export const missionMessageTypeEnum = pgEnum("mission_message_type", [
+  "chat",
+  "question",
+  "answer",
+  "data_handoff",
+  "progress_update",
+  "task_completed",
+  "task_failed",
+  "help_request",
+  "status_update",
+  "result",
+  "coordination",
+]);
+
+export const missionPhaseEnum = pgEnum("mission_phase", [
+  "assembling",
+  "decomposing",
+  "executing",
+  "coordinating",
+  "delivering",
+]);
+
+// Note: workflowStepStatusEnum and memberTypeEnum removed — replaced by mission system
 
 // CMS & AI Asset Restructuring enums
 export const mediaAssetTypeEnum = pgEnum("media_asset_type", [
@@ -153,6 +183,33 @@ export const topicAngleStatusEnum = pgEnum("topic_angle_status", [
   "suggested",
   "accepted",
   "rejected",
+]);
+
+// Inspiration Pool: Calendar Events
+export const calendarEventTypeEnum = pgEnum("calendar_event_type", [
+  "festival",
+  "competition",
+  "conference",
+  "exhibition",
+  "launch",
+  "memorial",
+]);
+
+export const calendarRecurrenceEnum = pgEnum("calendar_recurrence", [
+  "once",
+  "yearly",
+  "custom",
+]);
+
+export const calendarSourceEnum = pgEnum("calendar_source", [
+  "builtin",
+  "manual",
+  "ai_discovered",
+]);
+
+export const calendarStatusEnum = pgEnum("calendar_status", [
+  "confirmed",
+  "pending_review",
 ]);
 
 // Super Creation Center (2.1)
@@ -296,4 +353,39 @@ export const artifactTypeEnum = pgEnum("artifact_type", [
   "publish_plan",
   "analytics_report",
   "generic",
+]);
+
+// Benchmarking deep-dive enums
+export const platformCategoryEnum = pgEnum("platform_category", [
+  "central",
+  "provincial",
+  "municipal",
+  "industry",
+]);
+
+export const crawlStatusEnum = pgEnum("crawl_status", [
+  "active",
+  "paused",
+  "error",
+]);
+
+export const benchmarkAlertPriorityEnum = pgEnum("benchmark_alert_priority", [
+  "urgent",
+  "high",
+  "medium",
+  "low",
+]);
+
+export const benchmarkAlertTypeEnum = pgEnum("benchmark_alert_type", [
+  "missed_topic",
+  "competitor_highlight",
+  "gap_warning",
+  "trend_alert",
+]);
+
+export const benchmarkAlertStatusEnum = pgEnum("benchmark_alert_status", [
+  "new",
+  "acknowledged",
+  "actioned",
+  "dismissed",
 ]);
