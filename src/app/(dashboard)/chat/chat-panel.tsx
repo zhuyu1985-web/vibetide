@@ -307,27 +307,7 @@ export function ChatPanel({
         </button>
       </div>
 
-      {/* ── Scenario bar ── */}
-      {!viewingSaved && scenarios.length > 0 && messages.length === 0 && (
-        <div className="relative flex items-center gap-2 px-6 py-2.5 overflow-x-auto border-b border-gray-300/40 dark:border-gray-600/40 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm scrollbar-hide">
-          <span className="text-[11px] text-gray-400 flex-shrink-0 mr-1">
-            场景
-          </span>
-          {scenarios.map((s) => {
-            const Icon = ICON_MAP[s.icon] || Sparkles;
-            return (
-              <button
-                key={s.id}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/60 dark:bg-gray-800/50 text-xs text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 flex-shrink-0 border-0"
-                onClick={() => onSelectScenario(s)}
-              >
-                <Icon size={13} className="text-gray-400" />
-                {s.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* Scenario bar removed from here — moved to above input bar */}
 
       {/* ── Message list ── */}
       <div ref={chatBodyRef} className="relative flex-1 min-h-0 overflow-y-auto">
@@ -642,103 +622,123 @@ export function ChatPanel({
         )}
       </div>
 
-      {/* ── Bottom input bar ── */}
+      {/* ── Bottom input bar (pinned) ── */}
       {!viewingSaved && (
-        <div className="relative px-6 pt-2 pb-4">
-          <div
-            ref={borderBoxRef}
-            className="relative rounded-2xl p-[1px]"
-            onMouseEnter={() => setInputHovered(true)}
-            onMouseLeave={() => setInputHovered(false)}
-          >
-            {/* SVG border-draw animation */}
-            {borderSize.w > 0 && (
-              <svg
-                className="absolute inset-0 w-full h-full pointer-events-none"
-                viewBox={`0 0 ${borderSize.w} ${borderSize.h}`}
-                fill="none"
-              >
-                <defs>
-                  <filter id="chat-border-glow">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-                <path
-                  ref={pathRef}
-                  d={buildBorderPath(borderSize.w, borderSize.h, 16)}
-                  className="stroke-blue-400 dark:stroke-blue-500"
-                  strokeWidth="1"
-                  pathLength={1}
-                  strokeDasharray="1"
-                  strokeDashoffset="1"
-                />
-                <path
-                  ref={glowRef}
-                  d={buildBorderPath(borderSize.w, borderSize.h, 16)}
-                  className="stroke-blue-500 dark:stroke-blue-400"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  pathLength={1}
-                  strokeDasharray="0.04 0.96"
-                  strokeDashoffset="0"
-                  filter="url(#chat-border-glow)"
-                  opacity="0"
-                />
-              </svg>
-            )}
+        <div className="relative flex-shrink-0 border-t border-gray-200/40 dark:border-gray-700/40 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm">
+          {/* Scenario quick-action chips — always visible like DingTalk action bar */}
+          {scenarios.length > 0 && (
+            <div className="flex items-center gap-1.5 px-5 pt-2.5 pb-1 overflow-x-auto scrollbar-hide">
+              {scenarios.map((s) => {
+                const Icon = ICON_MAP[s.icon] || Sparkles;
+                return (
+                  <button
+                    key={s.id}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 dark:bg-gray-800/60 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 flex-shrink-0 border-0"
+                    onClick={() => onSelectScenario(s)}
+                  >
+                    <Icon size={12} />
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-            {/* Static gray border */}
+          <div className="px-5 pt-1.5 pb-3">
             <div
-              className={cn(
-                "absolute inset-0 rounded-2xl border border-gray-200/70 dark:border-gray-700/60 pointer-events-none transition-opacity duration-200",
-                borderActive || borderDone ? "opacity-0" : "opacity-100"
-              )}
-            />
-
-            {/* Inner content */}
-            <div className="relative rounded-[15px] bg-white dark:bg-gray-800">
-              <textarea
-                ref={textareaRef}
-                className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 resize-none px-4 pt-3 pb-1 border-0"
-                rows={1}
-                placeholder={`和${employee.nickname}自由对话...`}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    !e.nativeEvent.isComposing
-                  ) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                disabled={loading}
-              />
-              <div className="flex items-center justify-between px-4 pb-2.5">
-                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <Globe size={14} className="text-blue-500" />
-                  <span>联网搜索</span>
-                </div>
-                <button
-                  className={cn(
-                    "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 border-0",
-                    inputText.trim() && !loading
-                      ? "bg-blue-500 text-white cursor-pointer shadow-sm"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
-                  )}
-                  onClick={handleSend}
-                  disabled={loading || !inputText.trim()}
+              ref={borderBoxRef}
+              className="relative rounded-2xl p-[1px]"
+              onMouseEnter={() => setInputHovered(true)}
+              onMouseLeave={() => setInputHovered(false)}
+            >
+              {/* SVG border-draw animation */}
+              {borderSize.w > 0 && (
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  viewBox={`0 0 ${borderSize.w} ${borderSize.h}`}
+                  fill="none"
                 >
-                  <Send size={14} />
-                </button>
+                  <defs>
+                    <filter id="chat-border-glow">
+                      <feGaussianBlur stdDeviation="2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <path
+                    ref={pathRef}
+                    d={buildBorderPath(borderSize.w, borderSize.h, 16)}
+                    className="stroke-blue-400 dark:stroke-blue-500"
+                    strokeWidth="1"
+                    pathLength={1}
+                    strokeDasharray="1"
+                    strokeDashoffset="1"
+                  />
+                  <path
+                    ref={glowRef}
+                    d={buildBorderPath(borderSize.w, borderSize.h, 16)}
+                    className="stroke-blue-500 dark:stroke-blue-400"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    pathLength={1}
+                    strokeDasharray="0.04 0.96"
+                    strokeDashoffset="0"
+                    filter="url(#chat-border-glow)"
+                    opacity="0"
+                  />
+                </svg>
+              )}
+
+              {/* Static gray border */}
+              <div
+                className={cn(
+                  "absolute inset-0 rounded-2xl border border-gray-200/70 dark:border-gray-700/60 pointer-events-none transition-opacity duration-200",
+                  borderActive || borderDone ? "opacity-0" : "opacity-100"
+                )}
+              />
+
+              {/* Inner content */}
+              <div className="relative rounded-[15px] bg-white dark:bg-gray-800">
+                <textarea
+                  ref={textareaRef}
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 resize-none px-4 pt-3 pb-1 border-0"
+                  rows={1}
+                  placeholder={`和${employee.nickname}自由对话...`}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onFocus={() => setInputFocused(true)}
+                  onBlur={() => setInputFocused(false)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !e.shiftKey &&
+                      !e.nativeEvent.isComposing
+                    ) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-between px-4 pb-2.5">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <Globe size={14} className="text-blue-500" />
+                    <span>联网搜索</span>
+                  </div>
+                  <button
+                    className={cn(
+                      "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 border-0",
+                      inputText.trim() && !loading
+                        ? "bg-blue-500 text-white cursor-pointer shadow-sm"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+                    )}
+                    onClick={handleSend}
+                    disabled={loading || !inputText.trim()}
+                  >
+                    <Send size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
