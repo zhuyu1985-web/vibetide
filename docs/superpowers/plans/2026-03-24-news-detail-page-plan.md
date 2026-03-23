@@ -112,8 +112,10 @@ src/app/api/ai/
 
 - [ ] **Step 1: 安装 Tiptap + Zustand + @ai-sdk/openai**
 
+> **Note:** `updateArticle` 已存在于 `src/app/actions/articles.ts`，无需新增。Glass UI CSS 变量 (`--glass-panel-bg`, `--glass-border`, `--ease-glass`) 已在 `src/app/globals.css` 中定义。DAL 函数 (`getAnnotations`, `getAIAnalysisCache`) 在 Task 10 (Phase 2) 中创建，Phase 1 使用空数组占位。
+
 ```bash
-npm install @tiptap/react @tiptap/starter-kit @tiptap/pm @tiptap/extension-underline @tiptap/extension-text-align @tiptap/extension-text-style @tiptap/extension-color @tiptap/extension-highlight @tiptap/extension-image @tiptap/extension-link @tiptap/extension-table @tiptap/extension-table-row @tiptap/extension-table-cell @tiptap/extension-table-header @tiptap/extension-task-list @tiptap/extension-task-item @tiptap/extension-code-block-lowlight @tiptap/extension-placeholder @tiptap/extension-character-count @tiptap/extension-dropcursor @tiptap/extension-typography @tiptap/extension-subscript @tiptap/extension-superscript lowlight zustand @ai-sdk/openai
+npm install @tiptap/react @tiptap/starter-kit @tiptap/pm @tiptap/extension-underline @tiptap/extension-text-align @tiptap/extension-text-style @tiptap/extension-color @tiptap/extension-highlight @tiptap/extension-image @tiptap/extension-link @tiptap/extension-table @tiptap/extension-table-row @tiptap/extension-table-cell @tiptap/extension-table-header @tiptap/extension-task-list @tiptap/extension-task-item @tiptap/extension-code-block-lowlight @tiptap/extension-placeholder @tiptap/extension-character-count @tiptap/extension-dropcursor @tiptap/extension-typography @tiptap/extension-subscript @tiptap/extension-superscript lowlight zustand @ai-sdk/openai@^1.0.0
 ```
 
 - [ ] **Step 2: 新增 Drizzle Enums**
