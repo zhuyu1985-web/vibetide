@@ -82,7 +82,7 @@ export function EmployeeListPanel({
   }, [savedConversations, search]);
 
   return (
-    <div className="w-[280px] flex flex-col border-r border-gray-200/40 dark:border-gray-700/40 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm">
+    <div className="w-[280px] flex flex-col border-r border-gray-300/60 dark:border-gray-600/60 bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm">
       {/* Search */}
       <div className="px-3 pt-3 pb-2">
         <div className="relative">

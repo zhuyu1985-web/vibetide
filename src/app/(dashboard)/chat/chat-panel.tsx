@@ -252,7 +252,7 @@ export function ChatPanel({
       <div className="absolute inset-0 bg-gradient-to-b from-blue-50/30 via-slate-50/60 to-slate-50/40 dark:from-blue-950/10 dark:via-gray-900/50 dark:to-gray-900/30 pointer-events-none" />
 
       {/* ── Header ── */}
-      <div className="relative flex items-center gap-3 px-6 py-3 border-b border-gray-200/40 dark:border-gray-700/40 bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm">
+      <div className="relative flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
         <EmployeeAvatar
           employeeId={employee.id}
           size="md"
@@ -304,7 +304,7 @@ export function ChatPanel({
 
       {/* ── Scenario bar ── */}
       {!viewingSaved && scenarios.length > 0 && messages.length === 0 && (
-        <div className="relative flex items-center gap-2 px-6 py-2.5 overflow-x-auto border-b border-gray-200/20 dark:border-gray-700/20 bg-white/20 dark:bg-gray-900/20 backdrop-blur-sm scrollbar-hide">
+        <div className="relative flex items-center gap-2 px-6 py-2.5 overflow-x-auto border-b border-gray-300/40 dark:border-gray-600/40 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm scrollbar-hide">
           <span className="text-[11px] text-gray-400 flex-shrink-0 mr-1">
             场景
           </span>
@@ -389,7 +389,7 @@ export function ChatPanel({
               {messages.map((msg, i) =>
                 msg.role === "user" ? (
                   <div key={i} className="flex justify-end">
-                    <div className="max-w-[75%] bg-blue-500 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed">
+                    <div className="max-w-[75%] bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed shadow-sm shadow-blue-500/20">
                       {msg.content}
                     </div>
                   </div>
@@ -487,7 +487,7 @@ export function ChatPanel({
 
                       {/* Message content */}
                       {msg.content && (
-                        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+                        <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30">
                           <div className="px-5 py-4">
                             {msg.durationMs ? (
                               <CollapsibleMessageContent
@@ -608,7 +608,7 @@ export function ChatPanel({
                         </div>
                       )}
 
-                      <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl px-5 py-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+                      <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl px-5 py-4 shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30">
                         <div className="flex gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce [animation-delay:0ms]" />
                           <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce [animation-delay:150ms]" />
