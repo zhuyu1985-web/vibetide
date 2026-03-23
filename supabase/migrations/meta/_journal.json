@@ -36,6 +36,69 @@
       "when": 1773546412110,
       "tag": "0004_happy_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773915325356,
+      "tag": "0005_clammy_mindworm",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773924609318,
+      "tag": "0006_jittery_northstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773927154860,
+      "tag": "0007_outgoing_magus",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774083619647,
+      "tag": "0008_heavy_thunderbolt_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774117366032,
+      "tag": "0009_classy_cobalt_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774310400000,
+      "tag": "0010_unique_constraints_and_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774175062902,
+      "tag": "0011_mission_source_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1774232190390,
+      "tag": "0012_robust_cannonball",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774290165928,
+      "tag": "0013_handy_umar",
+      "breakpoints": true
     }
   ]
 }
