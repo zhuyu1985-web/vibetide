@@ -341,6 +341,28 @@ export interface ChannelAdvisor {
   status: "active" | "training" | "draft";
 }
 
+// ---------------------------------------------------------------------------
+// Scenario Workbench
+// ---------------------------------------------------------------------------
+
+export interface ScenarioCardData {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  inputFields: InputFieldDef[];
+  toolsHint: string[];
+}
+
+export interface InputFieldDef {
+  name: string;
+  label: string;
+  type: "text" | "textarea" | "select";
+  required: boolean;
+  placeholder?: string;
+  options?: string[];
+}
+
 export type AuthorityLevel = "observer" | "advisor" | "executor" | "coordinator";
 
 export interface WorkPreferences {
@@ -381,30 +403,138 @@ export interface EmployeeFullProfile extends AIEmployee {
   knowledgeBases: KnowledgeBaseInfo[];
 }
 
-export interface Team {
+// ---------------------------------------------------------------------------
+// Mission System (multi-agent collaboration)
+// ---------------------------------------------------------------------------
+
+export type MissionStatus =
+  | "queued"
+  | "planning"
+  | "executing"
+  | "coordinating"
+  | "consolidating"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type MissionTaskStatus =
+  | "pending"
+  | "ready"
+  | "claimed"
+  | "in_progress"
+  | "in_review"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "blocked";
+
+export type MissionPhase =
+  | "assembling"
+  | "decomposing"
+  | "executing"
+  | "coordinating"
+  | "delivering";
+
+export type MissionMessageType =
+  | "chat"
+  | "question"
+  | "answer"
+  | "data_handoff"
+  | "progress_update"
+  | "task_completed"
+  | "task_failed"
+  | "help_request"
+  | "status_update"
+  | "result"
+  | "coordination";
+
+export interface Mission {
   id: string;
-  name: string;
+  organizationId: string;
+  title: string;
+  description?: string;
   scenario: string;
-  members: EmployeeId[];
-  humanMembers: string[];
-  rules: {
-    approvalRequired: boolean;
-    reportFrequency: string;
-    sensitiveTopics: string[];
-    approvalSteps?: string[];
-  };
+  userInstruction: string;
+  leaderEmployeeId: string;
+  teamMembers: string[];
+  status: MissionStatus;
+  phase?: MissionPhase;
+  progress: number;
+  config?: { max_retries: number; task_timeout: number; max_agents: number; archived?: boolean; archivedAt?: string };
+  finalOutput: unknown | null;
+  tokenBudget: number;
+  tokensUsed: number;
+  sourceModule?: string | null;
+  sourceEntityId?: string | null;
+  sourceEntityType?: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface MissionTask {
+  id: string;
+  missionId: string;
+  title: string;
+  description: string;
+  expectedOutput: string | null;
+  acceptanceCriteria?: string;
+  assignedEmployeeId: string | null;
+  assignedRole?: string;
+  assignedEmployee?: AIEmployee;
+  status: MissionTaskStatus;
+  dependencies: string[];
+  priority: number;
+  phase?: number;
+  progress: number;
+  inputContext: unknown | null;
+  outputData: unknown | null;
+  outputSummary?: string;
+  errorMessage: string | null;
+  errorRecoverable: boolean;
+  retryCount: number;
+  claimedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
 }
 
-export interface TeamWithMembers extends Team {
-  memberDetails: {
-    id: string;
-    memberType: "ai" | "human";
-    aiEmployeeId?: string;
-    displayName: string;
-    teamRole: string;
-    employee?: AIEmployee;
-  }[];
+export interface MissionMessage {
+  id: string;
+  missionId: string;
+  fromEmployeeId: string;
+  fromEmployee?: AIEmployee;
+  toEmployeeId: string | null;
+  messageType: MissionMessageType;
+  content: string;
+  channel: string;
+  structuredData?: unknown;
+  priority: string;
+  replyTo?: string;
+  relatedTaskId: string | null;
+  createdAt: string;
+}
+
+export interface MissionArtifact {
+  id: string;
+  missionId: string;
+  taskId: string | null;
+  producedBy: string;
+  type: string;
+  title: string;
+  content: string | null;
+  fileUrl: string | null;
+  metadata: Record<string, unknown>;
+  version: number;
+  createdAt: string;
+}
+
+export interface MissionWithDetails extends Mission {
+  tasks: MissionTask[];
+  messages: MissionMessage[];
+  artifacts: MissionArtifact[];
+  leader: AIEmployee;
+  team: AIEmployee[];
 }
 
 // ---------------------------------------------------------------------------
@@ -766,6 +896,21 @@ export interface InspirationTopic {
     negative: number;
     hotComments: string[];
   };
+  enrichedOutlines: Array<{
+    angle: string;
+    points: string[];
+    wordCount: string;
+    style: string;
+  }>;
+  relatedMaterials: Array<{
+    type: "report" | "data" | "comment";
+    title: string;
+    source: string;
+    url?: string;
+    snippet: string;
+  }>;
+  isRead: boolean;
+  missionId?: string;
 }
 
 export interface PlatformMonitor {
@@ -780,8 +925,47 @@ export interface EditorialMeeting {
   p0Count: number;
   p1Count: number;
   p2Count: number;
-  outputMatrix: { type: string; count: number }[];
+  totalTopics: number;
+  activePlatforms: number;
+  topCategories: { name: string; count: number }[];
+  aiSummary: string;
   generatedAt: string;
+  delta?: InspirationDelta;
+}
+
+export interface CalendarEvent {
+  id: string;
+  name: string;
+  category: string;
+  eventType: "festival" | "competition" | "conference" | "exhibition" | "launch" | "memorial";
+  startDate: string;
+  endDate: string;
+  isAllDay: boolean;
+  recurrence: "once" | "yearly" | "custom";
+  source: "builtin" | "manual" | "ai_discovered";
+  status: "confirmed" | "pending_review";
+  aiAngles: string[];
+  reminderDaysBefore: number;
+}
+
+export interface UserTopicSubscription {
+  subscribedCategories: string[];
+  subscribedEventTypes: string[];
+}
+
+export interface TopicReadState {
+  lastViewedAt: string;
+  readTopicIds: string[];
+}
+
+export interface InspirationDelta {
+  timeSinceLastView: string;
+  newTopicsCount: number;
+  newP0Count: number;
+  newP1Count: number;
+  newP2Count: number;
+  significantChanges: string[];
+  subscribedChannelUpdates: string;
 }
 
 // 2.1 - Super Creation Center
@@ -1011,5 +1195,129 @@ export interface ExhibitionEvent {
     company: string;
     product: string;
     summary: string;
+  }[];
+}
+
+// ---------------------------------------------------------------------------
+// Benchmarking Deep-Dive Types
+// ---------------------------------------------------------------------------
+
+export type AlertPriority = "urgent" | "high" | "medium" | "low";
+export type AlertType = "missed_topic" | "competitor_highlight" | "gap_warning" | "trend_alert";
+export type AlertStatus = "new" | "acknowledged" | "actioned" | "dismissed";
+export type PlatformCategory = "central" | "provincial" | "municipal" | "industry";
+export type CrawlStatus = "active" | "paused" | "error";
+
+export interface MonitoredPlatformUI {
+  id: string;
+  name: string;
+  url: string;
+  category: PlatformCategory;
+  province?: string;
+  crawlFrequencyMinutes: number;
+  status: CrawlStatus;
+  crawlConfig: {
+    rssUrl?: string;
+    searchQuery?: string;
+    urlPatterns?: string[];
+    categories?: string[];
+  };
+  lastCrawledAt?: string;
+  lastErrorMessage?: string;
+  totalContentCount: number;
+}
+
+export interface PlatformContentUI {
+  id: string;
+  platformId: string;
+  platformName?: string;
+  title: string;
+  summary?: string;
+  sourceUrl: string;
+  author?: string;
+  publishedAt?: string;
+  topics: string[];
+  category?: string;
+  sentiment?: string;
+  importance: number;
+  coverageStatus?: string;
+  gapAnalysis?: string;
+  crawledAt: string;
+  analyzedAt?: string;
+}
+
+export interface BenchmarkAlertUI {
+  id: string;
+  title: string;
+  description: string;
+  priority: AlertPriority;
+  type: AlertType;
+  status: AlertStatus;
+  platformContentIds: string[];
+  relatedPlatforms: string[];
+  relatedTopics: string[];
+  analysisData: {
+    heatScore?: number;
+    coverageGap?: string;
+    competitorCount?: number;
+    suggestedAngle?: string;
+    suggestedAction?: string;
+    estimatedUrgencyHours?: number;
+    sourceExcerpts?: string[];
+  };
+  actionNote?: string;
+  workflowInstanceId?: string;
+  createdAt: string;
+}
+
+export interface PlatformComparisonRow {
+  platformName: string;
+  category: PlatformCategory;
+  totalContent: number;
+  coveredCount: number;
+  missedCount: number;
+  coverageRate: number;
+  avgImportance: number;
+}
+
+export interface CoverageOverview {
+  totalExternal: number;
+  covered: number;
+  missed: number;
+  coverageRate: number;
+  byPlatformCategory: {
+    category: PlatformCategory;
+    total: number;
+    covered: number;
+    missed: number;
+  }[];
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Team type (stub — teams migrated to mission system)
+// ---------------------------------------------------------------------------
+
+export interface Team {
+  id: string;
+  name: string;
+  scenario: string;
+  members: string[];
+  humanMembers: string[];
+  createdAt: string;
+}
+
+export interface TeamWithMembers extends Team {
+  rules: {
+    approvalRequired: boolean;
+    reportFrequency: string;
+    sensitiveTopics: string[];
+    approvalSteps?: string[];
+  };
+  memberDetails: {
+    id: string;
+    memberType: "ai" | "human";
+    displayName: string;
+    teamRole: string;
+    employee?: AIEmployee;
   }[];
 }
