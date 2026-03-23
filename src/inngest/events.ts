@@ -1,30 +1,50 @@
 export type InngestEvents = {
-  "workflow/started": {
+  // ─── Mission System Events ───
+
+  "mission/created": {
     data: {
-      workflowInstanceId: string;
-      teamId: string;
+      missionId: string;
       organizationId: string;
-      topicTitle: string;
-      scenario: string;
     };
   };
-  "workflow/step-approved": {
+  "mission/task-ready": {
     data: {
-      workflowInstanceId: string;
-      stepId: string;
-      approved: boolean;
-      feedback?: string;
-      approvedBy: string;
+      missionId: string;
+      taskId: string;
+      organizationId: string;
     };
   };
-  "workflow/cancelled": {
+  "mission/task-completed": {
     data: {
-      workflowInstanceId: string;
+      missionId: string;
+      taskId: string;
+      employeeId: string;
+      organizationId: string;
+    };
+  };
+  "mission/task-failed": {
+    data: {
+      missionId: string;
+      taskId: string;
+      employeeId: string;
+      error: string;
+      organizationId: string;
+    };
+  };
+  "mission/all-tasks-done": {
+    data: {
+      missionId: string;
+      organizationId: string;
+    };
+  };
+  "mission/cancelled": {
+    data: {
+      missionId: string;
       cancelledBy: string;
     };
   };
 
-  // Module 3: Omnichannel Distribution Events
+  // ─── Module 3: Omnichannel Distribution Events ───
 
   // F3.1.08-12: Review completed
   "publishing/review-completed": {
@@ -57,18 +77,35 @@ export type InngestEvents = {
     };
   };
 
-  // F4.A.02: Hot topic reaches threshold — auto-trigger workflow
-  "hotTopic/threshold-reached": {
+  // ─── Benchmarking Events ───
+
+  "benchmarking/crawl-triggered": {
     data: {
       organizationId: string;
-      hotTopicId: string;
-      topicTitle: string;
-      heatScore: number;
-      teamId: string;
+      platformId?: string;
+      triggeredBy: "cron" | "manual";
+    };
+  };
+  "benchmarking/content-detected": {
+    data: {
+      organizationId: string;
+      platformContentIds: string[];
+      platformId: string;
+      contentCount: number;
+    };
+  };
+  "benchmarking/alert-generated": {
+    data: {
+      organizationId: string;
+      alertId: string;
+      alertType: string;
+      priority: string;
+      title: string;
     };
   };
 
-  // M4: Employee learning trigger
+  // ─── M4: Employee Learning ───
+
   "employee/learn": {
     data: {
       employeeId: string;
@@ -77,7 +114,8 @@ export type InngestEvents = {
     };
   };
 
-  // F3.1.17: Anomaly detected
+  // ─── F3.1.17: Anomaly Detection ───
+
   "analytics/anomaly-detected": {
     data: {
       organizationId: string;
@@ -86,6 +124,22 @@ export type InngestEvents = {
       severity: "critical" | "warning";
       message: string;
       changePercent: number;
+    };
+  };
+
+  // ─── Hot Topics Crawl Pipeline ───
+
+  "hot-topics/crawl-triggered": {
+    data: {
+      organizationId: string;
+      triggeredBy: "cron" | "manual";
+    };
+  };
+  "hot-topics/enrich-requested": {
+    data: {
+      organizationId: string;
+      topicIds: string[];
+      calendarEventId?: string;
     };
   };
 };
