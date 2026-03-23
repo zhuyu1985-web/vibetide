@@ -4,6 +4,7 @@ import { useArticlePageStore } from "./store";
 import { useAppearance } from "./hooks/use-article-context";
 import type { ArticleDetailClientProps } from "./types";
 import { cn } from "@/lib/utils";
+import { ArticleHeader } from "./features/header/article-header";
 
 export default function ArticleDetailClient({
   article,
@@ -32,14 +33,11 @@ export default function ArticleDetailClient({
         />
       </div>
 
-      {/* Header placeholder -- Task 4 will replace this */}
-      <div className="h-12 flex items-center justify-between px-4 border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl shrink-0">
-        <div className="text-sm text-muted-foreground">
-          ← 稿件管理 / {article.categoryName ?? "未分类"}
-        </div>
-        <div className="text-xs text-muted-foreground">[视图切换器]</div>
-        <div className="text-xs text-muted-foreground">[工具栏]</div>
-      </div>
+      {/* Header */}
+      <ArticleHeader
+        article={article}
+        annotationCount={initialAnnotations.length}
+      />
 
       {/* Three-column body */}
       <div className="flex flex-1 overflow-hidden">
