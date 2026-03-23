@@ -168,7 +168,7 @@ const themeStyles: Record<
 
 const workspaceItems: NavItem[] = [
   { label: "任务中心", href: "/missions", icon: Target },
-  { label: "AI员工市场", href: "/employee-marketplace", icon: UserCog },
+  { label: "AI数字员工", href: "/employee-marketplace", icon: UserCog },
   { label: "对话中心", href: "/chat", icon: MessageSquare },
   { label: "技能管理", href: "/skills", icon: Sparkles },
   { label: "频道顾问", href: "/channel-advisor", icon: Brain },
@@ -296,7 +296,7 @@ function NavSection({
             <SidebarMenuButton
               className={cn(
                 "transition-all duration-200 ease-out font-medium rounded-lg",
-                styles.hoverBg,
+                "glass-nav-item",
                 groupActive && styles.headerActive
               )}
             >
@@ -383,11 +383,9 @@ function NavMenuItem({
           isActive={isActive}
           className={cn(
             "relative transition-all duration-200 ease-out rounded-md",
-            "translate-x-0",
-            !isActive && styles.hoverBg,
-            !isActive && "hover:translate-x-0.5",
+            "glass-nav-item",
+            isActive && "active",
             isActive && [
-              styles.activeBg,
               styles.activeText,
             ]
           )}
@@ -416,11 +414,9 @@ function NavMenuItem({
         isActive={isActive}
         className={cn(
           "relative transition-all duration-200 ease-out rounded-lg overflow-hidden",
-          "translate-x-0",
-          !isActive && styles.hoverBg,
-          !isActive && "hover:translate-x-0.5",
+          "glass-nav-item",
+          isActive && "active",
           isActive && [
-            styles.activeBg,
             styles.activeText,
           ]
         )}

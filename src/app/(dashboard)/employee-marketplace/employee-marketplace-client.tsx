@@ -136,8 +136,19 @@ export function EmployeeMarketplaceClient({
     }
   }, [deleteTarget]);
 
+  const EMPLOYEE_ORDER = [
+    "xiaolei", "xiaoce", "xiaozi", "xiaowen",
+    "xiaoshen", "xiaofa", "xiaoshu", "xiaojian",
+    "xiaotan", "xiaoling",
+  ];
+
   const filteredEmployees = useMemo(() => {
-    let result = employees;
+    // 先按预定义顺序排列
+    let result = [...employees].sort((a, b) => {
+      const ia = EMPLOYEE_ORDER.indexOf(a.id);
+      const ib = EMPLOYEE_ORDER.indexOf(b.id);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
 
     // 状态筛选
     if (statusFilter !== "all") {
@@ -155,7 +166,7 @@ export function EmployeeMarketplaceClient({
       );
     }
 
-    // 排序
+    // 排序（非默认时覆盖预定义顺序）
     switch (sortBy) {
       case "performance":
         result = [...result].sort(
@@ -188,7 +199,7 @@ export function EmployeeMarketplaceClient({
   return (
     <div className="max-w-[1200px] mx-auto">
       <PageHeader
-        title="AI员工市场"
+        title="AI数字员工"
         description="浏览、管理和创建你的AI智能员工团队"
       />
 
