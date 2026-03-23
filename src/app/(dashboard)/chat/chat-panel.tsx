@@ -624,7 +624,7 @@ export function ChatPanel({
 
       {/* ── Bottom input bar (pinned) ── */}
       {!viewingSaved && (
-        <div className="relative flex-shrink-0 border-t border-gray-200/40 dark:border-gray-700/40 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm">
+        <div className="relative flex-shrink-0">
           {/* Scenario quick-action chips — always visible like DingTalk action bar */}
           {scenarios.length > 0 && (
             <div className="flex items-center gap-1.5 px-5 pt-2.5 pb-1 overflow-x-auto scrollbar-hide">
