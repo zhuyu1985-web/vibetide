@@ -5,13 +5,23 @@ import {
   hotTopics,
   topicAngles,
   commentInsights,
-  teams,
-  teamMembers,
+  hotTopicCrawlLogs,
+  userProfiles,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { inngest } from "@/inngest/client";
+import crypto from "crypto";
+import {
+  fetchTrendingFromApi,
+  buildCrossPlatformTopics,
+  normalizeHeatScore,
+  normalizeTitleKey,
+  parseChineseNumber,
+  TOPHUB_DEFAULT_NODES,
+  type TrendingItem,
+} from "@/lib/trending-api";
+
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -69,7 +79,91 @@ export async function startTopicTracking(id: string) {
     .where(eq(hotTopics.id, id));
 
   revalidatePath("/inspiration");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
+}
+
+/**
+ * Start a mission from a hot topic — creates a multi-agent task
+ * that generates multi-angle articles for the topic.
+ */
+export async function startTopicMission(
+  topicId: string,
+  selectedAngle?: { angle: string; outline?: string[] }
+) {
+  const user = await requireAuth();
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+  if (!profile?.organizationId) {
+    throw new Error("No organization found");
+  }
+
+  const topic = await db.query.hotTopics.findFirst({
+    where: eq(hotTopics.id, topicId),
+    with: { angles: true },
+  });
+  if (!topic) {
+    throw new Error("Topic not found");
+  }
+
+  // Build user instruction with topic context
+  const angleHints = topic.angles?.length
+    ? `\n\n可参考的切入角度：\n${topic.angles.map((a: { angleText: string }) => `- ${a.angleText}`).join("\n")}`
+    : "";
+
+  const platformInfo = (topic.platforms as string[])?.length
+    ? `来源平台：${(topic.platforms as string[]).join("、")}。`
+    : "";
+
+  const angleContext = selectedAngle
+    ? `\n\n选定创作角度：${selectedAngle.angle}\n大纲要点：\n${(selectedAngle.outline || []).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
+  const { startMissionFromModule } = await import("@/app/actions/missions");
+  const result = await startMissionFromModule({
+    organizationId: profile.organizationId,
+    title: `热点追踪：${topic.title}`,
+    scenario: "breaking_news",
+    userInstruction: `请围绕热点话题「${topic.title}」，生成多视角的内容稿件。
+
+话题摘要：${topic.summary || "暂无"}
+当前热度：${topic.heatScore}/100，趋势：${topic.trend}
+分类：${topic.category || "未分类"}
+${platformInfo}${angleHints}${angleContext}
+
+任务要求：
+1. 搜集该话题的最新信息和多方观点
+2. 从不同角度拆解话题，规划 2-3 篇不同视角的稿件
+3. 撰写稿件初稿（图文形式）
+4. 对稿件进行质量审核
+5. 准备好发布所需的标题、摘要、标签`,
+    sourceModule: "hot_topics",
+    sourceEntityId: topicId,
+    sourceEntityType: "hot_topic",
+    sourceContext: {
+      heatScore: topic.heatScore,
+      trend: topic.trend,
+      source: topic.source,
+      category: topic.category,
+      platforms: topic.platforms,
+      ...(selectedAngle && {
+        selectedAngle: selectedAngle.angle,
+        selectedOutline: selectedAngle.outline,
+      }),
+    },
+  });
+
+  // Mark topic as P0 (being tracked)
+  await db
+    .update(hotTopics)
+    .set({ priority: "P0", updatedAt: new Date() })
+    .where(eq(hotTopics.id, topicId));
+
+  revalidatePath("/inspiration");
+  revalidatePath("/missions");
+
+  return result;
 }
 
 export async function addTopicAngle(data: {
@@ -122,6 +216,194 @@ export async function updateCommentInsight(data: {
   revalidatePath("/inspiration");
 }
 
+/**
+ * Direct crawl: fetches all 10 platforms via TopHub API,
+ * deduplicates, and persists to hotTopics table.
+ * Called directly from the UI "刷新热点" button (no Inngest dependency).
+ */
+export async function triggerHotTopicCrawl() {
+  const user = await requireAuth();
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+
+  if (!profile?.organizationId) {
+    throw new Error("No organization found");
+  }
+
+  const organizationId = profile.organizationId;
+
+  // Step 1: Crawl all platforms
+  const platformEntries = Object.entries(TOPHUB_DEFAULT_NODES);
+  const allItems: TrendingItem[] = [];
+
+  const results = await Promise.allSettled(
+    platformEntries.map(async ([name]) => {
+      const items = await fetchTrendingFromApi("platforms", {
+        platforms: [name],
+        limit: 30,
+      });
+      return { name, items };
+    })
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const [name, nodeId] = platformEntries[i];
+
+    if (result.status === "fulfilled") {
+      allItems.push(...result.value.items);
+      await db.insert(hotTopicCrawlLogs).values({
+        organizationId,
+        platformName: name,
+        platformNodeId: nodeId,
+        status: "success",
+        topicsFound: result.value.items.length,
+      });
+    } else {
+      const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      await db.insert(hotTopicCrawlLogs).values({
+        organizationId,
+        platformName: name,
+        platformNodeId: nodeId,
+        status: "error",
+        topicsFound: 0,
+        errorMessage: errMsg,
+      });
+    }
+  }
+
+  if (allItems.length === 0) {
+    revalidatePath("/inspiration");
+    return { success: true, newTopics: 0, updatedTopics: 0 };
+  }
+
+  // Step 2: Dedup and persist
+  const crossPlatform = buildCrossPlatformTopics(allItems);
+
+  // Build aggregated topic map — track max heat (not sum) for better scoring
+  const topicAgg = new Map<string, {
+    title: string;
+    platforms: Set<string>;
+    maxHeat: number;
+    url: string;
+    category?: string;
+  }>();
+
+  for (const cp of crossPlatform) {
+    const key = normalizeTitleKey(cp.title);
+    topicAgg.set(key, {
+      title: cp.title,
+      platforms: new Set(cp.platforms),
+      maxHeat: cp.totalHeat,
+      url: "",
+      category: undefined,
+    });
+  }
+
+  for (const item of allItems) {
+    const key = normalizeTitleKey(item.title);
+    const numericHeat = parseChineseNumber(item.heat);
+    if (!topicAgg.has(key)) {
+      topicAgg.set(key, {
+        title: item.title,
+        platforms: new Set([item.platform]),
+        maxHeat: numericHeat,
+        url: item.url,
+        category: item.category,
+      });
+    } else {
+      const existing = topicAgg.get(key)!;
+      existing.platforms.add(item.platform);
+      if (numericHeat > existing.maxHeat) existing.maxHeat = numericHeat;
+      if (item.url && !existing.url) existing.url = item.url;
+    }
+  }
+
+  const now = new Date();
+  const timeLabel = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  let newCount = 0;
+  let updatedCount = 0;
+
+  for (const [, agg] of topicAgg) {
+    const titleHash = crypto
+      .createHash("md5")
+      .update(normalizeTitleKey(agg.title))
+      .digest("hex");
+
+    const platformCount = agg.platforms.size;
+    const heatScore = normalizeHeatScore(agg.maxHeat, platformCount);
+    const platformsArray = Array.from(agg.platforms);
+
+    // Check for existing topic within 24h
+    const existing = await db
+      .select({
+        id: hotTopics.id,
+        heatCurve: hotTopics.heatCurve,
+        platforms: hotTopics.platforms,
+      })
+      .from(hotTopics)
+      .where(
+        and(
+          eq(hotTopics.organizationId, organizationId),
+          eq(hotTopics.titleHash, titleHash),
+          gte(hotTopics.discoveredAt, cutoff)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      const row = existing[0];
+      const oldCurve = (row.heatCurve as { time: string; value: number }[]) || [];
+      const newCurve = [...oldCurve, { time: timeLabel, value: heatScore }].slice(-48);
+
+      const oldPlatforms = (row.platforms as string[]) || [];
+      const mergedPlatforms = Array.from(new Set([...oldPlatforms, ...platformsArray]));
+
+      await db
+        .update(hotTopics)
+        .set({
+          heatScore,
+          heatCurve: newCurve,
+          platforms: mergedPlatforms,
+          updatedAt: now,
+        })
+        .where(eq(hotTopics.id, row.id));
+
+      updatedCount++;
+    } else {
+      const priority = platformCount >= 3 || heatScore > 85
+        ? "P0"
+        : platformCount >= 2 || heatScore >= 50
+          ? "P1"
+          : "P2";
+
+      await db.insert(hotTopics).values({
+        organizationId,
+        title: agg.title,
+        titleHash,
+        sourceUrl: agg.url || null,
+        priority,
+        heatScore,
+        trend: "rising",
+        source: platformsArray[0] || "",
+        category: agg.category || null,
+        platforms: platformsArray,
+        heatCurve: [{ time: timeLabel, value: heatScore }],
+        discoveredAt: now,
+      });
+
+      newCount++;
+    }
+  }
+
+  revalidatePath("/inspiration");
+  return { success: true, newTopics: newCount, updatedTopics: updatedCount };
+}
+
 const AUTO_TRIGGER_HEAT_THRESHOLD = 80;
 
 /**
@@ -139,32 +421,24 @@ export async function updateTopicHeatScore(
     .set({ heatScore, updatedAt: new Date() })
     .where(eq(hotTopics.id, id));
 
-  // Auto-trigger workflow when heat exceeds threshold
-  if (heatScore >= AUTO_TRIGGER_HEAT_THRESHOLD) {
-    const topic = await db.query.hotTopics.findFirst({
-      where: eq(hotTopics.id, id),
-    });
-    if (!topic) return;
-
-    // Find the first team in this organization
-    const team = await db.query.teams.findFirst({
-      where: eq(teams.organizationId, organizationId),
-    });
-
-    if (team) {
-      await inngest.send({
-        name: "hotTopic/threshold-reached",
-        data: {
-          organizationId,
-          hotTopicId: id,
-          topicTitle: topic.title,
-          heatScore,
-          teamId: team.id,
-        },
-      });
+  // Auto-trigger mission when heat score reaches P0 threshold (≥80)
+  if (heatScore >= 80) {
+    const topic = await db.query.hotTopics.findFirst({ where: eq(hotTopics.id, id) });
+    if (topic) {
+      const { startMissionFromModule } = await import("@/app/actions/missions");
+      await startMissionFromModule({
+        organizationId,
+        title: `热点追踪：${topic.title}`,
+        scenario: "breaking_news",
+        userInstruction: `紧急追踪热点话题「${topic.title}」，当前热度 ${heatScore}。完成信息搜集、要点分析和快讯撰写。`,
+        sourceModule: "hot_topics",
+        sourceEntityId: id,
+        sourceEntityType: "hot_topic",
+        sourceContext: { heatScore, source: topic.source },
+      }).catch((err) => console.error("[hot-topics] auto-trigger failed:", err));
     }
   }
 
   revalidatePath("/inspiration");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 }
