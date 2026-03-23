@@ -300,7 +300,7 @@ export function ChatPanel({
       <div className="absolute inset-0 bg-gradient-to-b from-blue-50/30 via-slate-50/60 to-slate-50/40 dark:from-blue-950/10 dark:via-gray-900/50 dark:to-gray-900/30 pointer-events-none" />
 
       {/* ── Header ── */}
-      <div className="relative flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+      <div className="relative flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
         <EmployeeAvatar
           employeeId={employee.id}
           size="md"
