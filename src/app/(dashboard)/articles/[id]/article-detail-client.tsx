@@ -5,6 +5,7 @@ import { useAppearance } from "./hooks/use-article-context";
 import type { ArticleDetailClientProps } from "./types";
 import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
+import { ArticleReader } from "./features/reader/article-reader";
 
 export default function ArticleDetailClient({
   article,
@@ -97,16 +98,7 @@ export default function ArticleDetailClient({
 
         {/* Center stage */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[680px] mx-auto px-8 py-6">
-            <h1 className="text-2xl font-bold mb-3">{article.title}</h1>
-            <div className="text-sm text-muted-foreground mb-4">
-              {article.assigneeName ?? "未知来源"} · {article.updatedAt}
-            </div>
-            <div
-              className="prose dark:prose-invert max-w-none leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: article.body ?? "" }}
-            />
-          </div>
+          <ArticleReader article={article} appearance={appearance} />
         </div>
 
         {/* Right panel */}
