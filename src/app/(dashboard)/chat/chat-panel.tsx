@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import {
   CollapsibleMessageContent,
@@ -18,6 +18,10 @@ import {
   Globe,
   CheckCircle2,
   ChevronDown,
+  Crosshair,
+  LineChart,
+  PenLine,
+  Eraser,
   BookOpen,
   type LucideIcon,
   Radar,
@@ -74,6 +78,96 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Radio,
   Zap,
 };
+
+/* ── Context for passing onSendMessage into markdown ── */
+const ChatActionContext = createContext<((text: string) => void) | null>(null);
+
+/** Extract plain text from a React node tree */
+function extractText(node: React.ReactNode): string {
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (!node) return "";
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (typeof node === "object" && "props" in node) {
+    return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+  }
+  return "";
+}
+
+/** Interactive list item — shows action buttons on hover */
+function InteractiveLi({ children, ...props }: React.HTMLAttributes<HTMLLIElement>) {
+  const onAction = useContext(ChatActionContext);
+  const text = extractText(children).trim();
+  // Only show actions for substantive items (>8 chars, likely a topic/headline)
+  const showActions = text.length > 8;
+
+  return (
+    <li {...props} className="group/li relative">
+      {children}
+      {showActions && onAction && (
+        <span className="inline-flex items-center gap-0.5 ml-1.5 opacity-0 group-hover/li:opacity-100 transition-opacity duration-200 align-middle">
+          <button
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors border-0 cursor-pointer whitespace-nowrap"
+            onClick={() => onAction(`请深度追踪「${text.slice(0, 60)}」`)}
+          >
+            <Crosshair size={10} />
+            追踪
+          </button>
+          <button
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors border-0 cursor-pointer whitespace-nowrap"
+            onClick={() => onAction(`请针对「${text.slice(0, 60)}」进行深度分析`)}
+          >
+            <LineChart size={10} />
+            分析
+          </button>
+          <button
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors border-0 cursor-pointer whitespace-nowrap"
+            onClick={() => onAction(`请围绕「${text.slice(0, 60)}」生成一篇内容`)}
+          >
+            <PenLine size={10} />
+            创作
+          </button>
+        </span>
+      )}
+    </li>
+  );
+}
+
+/** Message action bar — shown at bottom of completed AI messages */
+function MessageActionBar({ onAction }: { onAction: (text: string) => void }) {
+  return (
+    <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-700/50">
+      <button
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-blue-500 transition-all border-0 cursor-pointer"
+        onClick={() => onAction("请查看当前有哪些热点内容")}
+      >
+        <Crosshair size={12} />
+        查热点
+      </button>
+      <button
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-purple-500 transition-all border-0 cursor-pointer"
+        onClick={() => onAction("请对以上内容进行数据分析")}
+      >
+        <LineChart size={12} />
+        数据分析
+      </button>
+      <button
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-emerald-500 transition-all border-0 cursor-pointer"
+        onClick={() => onAction("请基于以上内容生成一篇可发布的文章")}
+      >
+        <PenLine size={12} />
+        去创作
+      </button>
+      <button
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-red-400 transition-all border-0 cursor-pointer ml-auto"
+        onClick={() => onAction("请总结以上内容的要点")}
+      >
+        <Sparkles size={12} />
+        总结要点
+      </button>
+    </div>
+  );
+}
 
 /* ── Build a rounded-rect SVG path starting from top-center, clockwise ── */
 function buildBorderPath(w: number, h: number, r: number): string {
@@ -515,35 +609,41 @@ export function ChatPanel({
 
                       {/* Message content */}
                       {msg.content && (
-                        <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30">
-                          <div className="px-5 py-4">
-                            {msg.durationMs ? (
-                              <CollapsibleMessageContent
-                                markdown={msg.content}
-                              />
-                            ) : (
-                              <div
-                                className={cn(
-                                  "prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-2.5 [&_h2]:mb-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_strong]:text-gray-900 dark:[&_strong]:text-gray-100 [&_code]:text-xs [&_code]:bg-gray-100 dark:[&_code]:bg-gray-700 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded",
-                                  isLastMsgStreaming &&
-                                    i === messages.length - 1 &&
-                                    "streaming-text"
-                                )}
-                              >
-                                <ReactMarkdown
-                                  remarkPlugins={remarkPlugins}
-                                  components={markdownComponents}
-                                >
-                                  {msg.content}
-                                </ReactMarkdown>
-                                {isLastMsgStreaming &&
-                                  i === messages.length - 1 && (
-                                    <span className="streaming-cursor-dot" />
+                        <ChatActionContext.Provider value={onSendMessage}>
+                          <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30">
+                            <div className="px-5 py-4">
+                              {msg.durationMs ? (
+                                <CollapsibleMessageContent
+                                  markdown={msg.content}
+                                />
+                              ) : (
+                                <div
+                                  className={cn(
+                                    "prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-2.5 [&_h2]:mb-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_strong]:text-gray-900 dark:[&_strong]:text-gray-100 [&_code]:text-xs [&_code]:bg-gray-100 dark:[&_code]:bg-gray-700 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded",
+                                    isLastMsgStreaming &&
+                                      i === messages.length - 1 &&
+                                      "streaming-text"
                                   )}
-                              </div>
-                            )}
+                                >
+                                  <ReactMarkdown
+                                    remarkPlugins={remarkPlugins}
+                                    components={{ ...markdownComponents, li: InteractiveLi }}
+                                  >
+                                    {msg.content}
+                                  </ReactMarkdown>
+                                  {isLastMsgStreaming &&
+                                    i === messages.length - 1 && (
+                                      <span className="streaming-cursor-dot" />
+                                    )}
+                                </div>
+                              )}
+                              {/* Action bar for completed messages */}
+                              {msg.durationMs && (
+                                <MessageActionBar onAction={onSendMessage} />
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        </ChatActionContext.Provider>
                       )}
                     </div>
                   </div>
