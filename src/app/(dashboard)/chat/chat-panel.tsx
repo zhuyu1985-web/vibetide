@@ -107,7 +107,6 @@ export function ChatPanel({
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [borderSize, setBorderSize] = useState({ w: 0, h: 0 });
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -196,13 +195,19 @@ export function ChatPanel({
     return () => el.removeEventListener("scroll", handleScroll);
   }, [employee?.id]);
 
-  /* ── Auto-scroll ── */
+  /* ── Auto-scroll (use scrollTop to avoid scrollIntoView bubbling to outer containers) ── */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = chatBodyRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages, loading, currentThinking]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = chatBodyRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
   };
 
   /* ── Auto-resize textarea ── */
@@ -620,7 +625,7 @@ export function ChatPanel({
                 )}
             </>
           )}
-          <div ref={messagesEndRef} />
+          <div />
         </div>
 
         {/* Scroll to bottom button */}
