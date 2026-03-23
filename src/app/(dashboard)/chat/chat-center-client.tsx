@@ -63,6 +63,17 @@ export function ChatCenterClient({
 
   const selectedEmployee = employees.find((e) => e.id === selectedSlug) ?? null;
 
+  // Disable outer <main> scroll — chat center manages its own scrolling
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (main) {
+      main.style.overflow = "hidden";
+      return () => {
+        main.style.overflow = "";
+      };
+    }
+  }, []);
+
   // Fetch scenarios when employee changes
   const fetchScenarios = useCallback(async (slug: string) => {
     setScenariosLoading(true);

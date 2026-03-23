@@ -247,7 +247,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 relative">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
       {/* Gradient background */}
       <div className="absolute inset-0 bg-gradient-to-b from-blue-50/30 via-slate-50/60 to-slate-50/40 dark:from-blue-950/10 dark:via-gray-900/50 dark:to-gray-900/30 pointer-events-none" />
 
@@ -325,7 +325,7 @@ export function ChatPanel({
       )}
 
       {/* ── Message list ── */}
-      <div ref={chatBodyRef} className="relative flex-1 overflow-y-auto">
+      <div ref={chatBodyRef} className="relative flex-1 min-h-0 overflow-y-auto">
         <div className="px-6 py-5 space-y-5">
           {messages.length === 0 && !loading ? (
             /* ── Empty state greeting ── */
