@@ -27,6 +27,7 @@ interface EmployeeListPanelProps {
   savedConversations: SavedConversationRow[];
   selectedSlug: string;
   activeTab: "employees" | "saved";
+  unreadCounts: Record<string, number>;
   onSelectEmployee: (slug: string) => void;
   onSelectSaved: (conversation: SavedConversationRow) => void;
   onTabChange: (tab: "employees" | "saved") => void;
@@ -53,6 +54,7 @@ export function EmployeeListPanel({
   savedConversations,
   selectedSlug,
   activeTab,
+  unreadCounts,
   onSelectEmployee,
   onSelectSaved,
   onTabChange,
@@ -192,6 +194,11 @@ export function EmployeeListPanel({
                       {emp.title}
                     </p>
                   </div>
+                  {unreadCounts[emp.id] > 0 && !isSelected && (
+                    <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                      {unreadCounts[emp.id] > 99 ? "99+" : unreadCounts[emp.id]}
+                    </span>
+                  )}
                   {isSelected && (
                     <div
                       className="w-1 h-6 rounded-full flex-shrink-0"

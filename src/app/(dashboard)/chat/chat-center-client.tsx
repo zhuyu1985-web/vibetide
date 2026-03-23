@@ -37,6 +37,13 @@ export function ChatCenterClient({
   const [selectedSlug, setSelectedSlug] = useState(initialSlug);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
+  // Persist messages per employee across switches
+  const messagesMapRef = useRef<Record<string, ChatMessage[]>>({});
+  // Track unread: number of assistant messages user hasn't seen for each employee
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  // Track how many messages user has "seen" per employee
+  const seenCountRef = useRef<Record<string, number>>({});
+
   // Scenarios come from server-side props — instant lookup, no fetch needed
   const scenarios = scenarioMap[selectedSlug] ?? [];
   const [activeScenario, setActiveScenario] =
@@ -57,6 +64,37 @@ export function ChatCenterClient({
   const [currentSources, setCurrentSources] = useState<string[]>([]);
   const [currentRefCount, setCurrentRefCount] = useState(0);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // Keep messagesMap in sync and mark current employee as fully read
+  useEffect(() => {
+    if (!selectedSlug || viewingSaved) return;
+    if (messages.length > 0) {
+      messagesMapRef.current[selectedSlug] = messages;
+    }
+    // User is viewing this employee — mark all as seen
+    const assistantCount = messages.filter((m) => m.role === "assistant" && m.content).length;
+    seenCountRef.current[selectedSlug] = assistantCount;
+    // Clear unread for current employee
+    setUnreadCounts((prev) => {
+      if (!prev[selectedSlug]) return prev;
+      const next = { ...prev };
+      delete next[selectedSlug];
+      return next;
+    });
+  }, [messages, selectedSlug, viewingSaved]);
+
+  // Compute unread for all OTHER employees from their stored messages
+  useEffect(() => {
+    const newUnread: Record<string, number> = {};
+    for (const [slug, msgs] of Object.entries(messagesMapRef.current)) {
+      if (slug === selectedSlug) continue;
+      const assistantCount = msgs.filter((m) => m.role === "assistant" && m.content).length;
+      const seen = seenCountRef.current[slug] ?? 0;
+      const diff = assistantCount - seen;
+      if (diff > 0) newUnread[slug] = diff;
+    }
+    setUnreadCounts(newUnread);
+  }, [selectedSlug]);
 
   // Track whether the initial scenario was from a first execution (for follow-ups)
   const scenarioInputsRef = useRef<Record<string, string>>({});
@@ -112,8 +150,13 @@ export function ChatCenterClient({
   const handleSelectEmployee = useCallback(
     (slug: string) => {
       if (slug === selectedSlug && !viewingSaved) return;
-      // Clear current conversation
-      setMessages([]);
+      // Save current employee's messages
+      if (selectedSlug && messages.length > 0 && !viewingSaved) {
+        messagesMapRef.current[selectedSlug] = messages;
+      }
+      // Restore target employee's messages (or empty)
+      const restored = messagesMapRef.current[slug] ?? [];
+      setMessages(restored);
       setActiveScenario(null);
       setInlineScenario(null);
       setViewingSaved(null);
@@ -121,8 +164,15 @@ export function ChatCenterClient({
       setSelectedSlug(slug);
       setTab("employees");
       scenarioInputsRef.current = {};
+      // Clear unread for the target employee
+      setUnreadCounts((prev) => {
+        if (!prev[slug]) return prev;
+        const next = { ...prev };
+        delete next[slug];
+        return next;
+      });
     },
-    [selectedSlug, viewingSaved]
+    [selectedSlug, viewingSaved, messages]
   );
 
   /* ── Saved conversation selection ── */
@@ -165,7 +215,15 @@ export function ChatCenterClient({
     setViewingSaved(null);
     setIsSaved(false);
     scenarioInputsRef.current = {};
-  }, []);
+    // Clear stored messages for current employee
+    delete messagesMapRef.current[selectedSlug];
+    setUnreadCounts((prev) => {
+      if (!prev[selectedSlug]) return prev;
+      const next = { ...prev };
+      delete next[selectedSlug];
+      return next;
+    });
+  }, [selectedSlug]);
 
   /* ── Save conversation ── */
   const handleSave = useCallback(async () => {
@@ -387,6 +445,7 @@ export function ChatCenterClient({
         savedConversations={savedConversations}
         selectedSlug={selectedSlug}
         activeTab={tab}
+        unreadCounts={unreadCounts}
         onSelectEmployee={handleSelectEmployee}
         onSelectSaved={handleSelectSaved}
         onTabChange={setTab}
