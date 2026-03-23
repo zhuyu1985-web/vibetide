@@ -47,3 +47,8 @@ export * from "./saved-conversations";
 export * from "./calendar-events";
 export * from "./user-topic-subscriptions";
 export * from "./user-topic-reads";
+
+// News article detail page (2026-03-24)
+export * from "./article-annotations";
+export * from "./article-ai-analysis";
+export * from "./article-chat-history";

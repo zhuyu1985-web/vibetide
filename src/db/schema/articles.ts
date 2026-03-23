@@ -57,6 +57,13 @@ export const articles = pgTable("articles", {
     () => workflowInstances.id
   ),
 
+  // News reader / detail page fields
+  webArchiveHtml: text("web_archive_html"),
+  webArchiveAt: timestamp("web_archive_at", { withTimezone: true }),
+  readProgress: integer("read_progress").default(0),
+  transcript: jsonb("transcript"),
+  chapters: jsonb("chapters"),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
