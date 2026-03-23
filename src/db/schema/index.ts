@@ -42,3 +42,8 @@ export * from "./skill-usage-records";
 export * from "./employee-scenarios";
 export * from "./hot-topic-crawl-logs";
 export * from "./saved-conversations";
+
+// Inspiration Pool optimization (2026-03-24)
+export * from "./calendar-events";
+export * from "./user-topic-subscriptions";
+export * from "./user-topic-reads";
