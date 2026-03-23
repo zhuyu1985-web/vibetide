@@ -63,15 +63,35 @@ export function ChatCenterClient({
 
   const selectedEmployee = employees.find((e) => e.id === selectedSlug) ?? null;
 
-  // Disable outer <main> scroll — chat center manages its own scrolling
+  // Disable outer scroll — chat center manages its own scrolling
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const main = document.querySelector("main");
-    if (main) {
-      main.style.overflow = "hidden";
-      return () => {
-        main.style.overflow = "";
-      };
+    const el = rootRef.current;
+    if (!el) return;
+    // parentElement = div.p-6 wrapper, grandparent = main.overflow-y-auto
+    const wrapper = el.parentElement;
+    const scrollableMain = wrapper?.parentElement;
+    const saved = {
+      wPad: wrapper?.style.padding ?? "",
+      wH: wrapper?.style.height ?? "",
+      mOv: scrollableMain?.style.overflow ?? "",
+    };
+    if (wrapper) {
+      wrapper.style.padding = "0";
+      wrapper.style.height = "100%";
     }
+    if (scrollableMain) {
+      scrollableMain.style.overflow = "hidden";
+    }
+    return () => {
+      if (wrapper) {
+        wrapper.style.padding = saved.wPad;
+        wrapper.style.height = saved.wH;
+      }
+      if (scrollableMain) {
+        scrollableMain.style.overflow = saved.mOv;
+      }
+    };
   }, []);
 
   // Fetch scenarios when employee changes
@@ -384,7 +404,7 @@ export function ChatCenterClient({
   );
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] -m-6 overflow-hidden">
+    <div ref={rootRef} className="flex h-full overflow-hidden">
       <EmployeeListPanel
         employees={employees}
         savedConversations={savedConversations}
