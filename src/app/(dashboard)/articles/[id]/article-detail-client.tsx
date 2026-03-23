@@ -6,6 +6,7 @@ import type { ArticleDetailClientProps } from "./types";
 import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
 import { ArticleReader } from "./features/reader/article-reader";
+import { ArticleEditor } from "./features/editor/article-editor";
 
 export default function ArticleDetailClient({
   article,
@@ -13,6 +14,8 @@ export default function ArticleDetailClient({
   initialAIAnalysis,
 }: ArticleDetailClientProps) {
   const {
+    viewMode,
+    setViewMode,
     leftPanelOpen,
     rightPanelOpen,
     leftTab,
@@ -97,8 +100,18 @@ export default function ArticleDetailClient({
         </div>
 
         {/* Center stage */}
-        <div className="flex-1 overflow-y-auto">
-          <ArticleReader article={article} appearance={appearance} />
+        <div className="flex-1 overflow-hidden">
+          {viewMode === "edit" ? (
+            <ArticleEditor
+              article={article}
+              appearance={appearance}
+              onExitEdit={() => setViewMode("read")}
+            />
+          ) : (
+            <div className="h-full overflow-y-auto">
+              <ArticleReader article={article} appearance={appearance} />
+            </div>
+          )}
         </div>
 
         {/* Right panel */}
