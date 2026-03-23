@@ -21,11 +21,13 @@ import type { SavedConversationRow } from "@/db/types";
 interface ChatCenterClientProps {
   employees: AIEmployee[];
   savedConversations: SavedConversationRow[];
+  scenarioMap: Record<string, ScenarioCardData[]>;
 }
 
 export function ChatCenterClient({
   employees,
   savedConversations: initialSavedConversations,
+  scenarioMap,
 }: ChatCenterClientProps) {
   const searchParams = useSearchParams();
 
@@ -35,7 +37,9 @@ export function ChatCenterClient({
 
   const [selectedSlug, setSelectedSlug] = useState(initialSlug);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [scenarios, setScenarios] = useState<ScenarioCardData[]>([]);
+
+  // Scenarios come from server-side props — instant lookup, no fetch needed
+  const scenarios = scenarioMap[selectedSlug] ?? [];
   const [activeScenario, setActiveScenario] =
     useState<ScenarioCardData | null>(null);
   const [viewingSaved, setViewingSaved] =
@@ -49,8 +53,6 @@ export function ChatCenterClient({
   const [savedConversations, setSavedConversations] = useState(
     initialSavedConversations
   );
-  const [scenariosLoading, setScenariosLoading] = useState(false);
-
   // Streaming state lifted here so ChatPanel can display it
   const [currentThinking, setCurrentThinking] = useState<ThinkingStep[]>([]);
   const [currentSkillsUsed, setCurrentSkillsUsed] = useState<SkillUsed[]>([]);
@@ -94,37 +96,6 @@ export function ChatCenterClient({
       if (scrollableMain) scrollableMain.style.cssText = mCss;
     };
   }, []);
-
-  // Fetch scenarios when employee changes — AbortController prevents race conditions
-  const abortRef = useRef<AbortController | null>(null);
-  useEffect(() => {
-    if (!selectedSlug) return;
-
-    // Cancel any in-flight request for the previous employee
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setScenarios([]);
-    setScenariosLoading(true);
-
-    fetch(`/api/employees/${selectedSlug}/scenarios`, { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setScenarios(data as ScenarioCardData[]);
-        }
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        if (!controller.signal.aborted) setScenarios([]);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setScenariosLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [selectedSlug]);
 
   // Update URL when slug changes — use history.replaceState to avoid Next.js navigation/scroll
   useEffect(() => {
