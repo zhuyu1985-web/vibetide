@@ -26,11 +26,37 @@ export const hotTopics = pgTable("hot_topics", {
   source: text("source"),
   category: text("category"),
   summary: text("summary"),
+  titleHash: text("title_hash"),
+  sourceUrl: text("source_url"),
+
+  aiScore: real("ai_score"),
 
   heatCurve: jsonb("heat_curve")
     .$type<{ time: string; value: number }[]>()
     .default([]),
   platforms: jsonb("platforms").$type<string[]>().default([]),
+
+  enrichedOutlines: jsonb("enriched_outlines")
+    .$type<
+      Array<{
+        angle: string;
+        points: string[];
+        wordCount: string;
+        style: string;
+      }>
+    >()
+    .default([]),
+  relatedMaterials: jsonb("related_materials")
+    .$type<
+      Array<{
+        type: "report" | "data" | "comment";
+        title: string;
+        source: string;
+        url?: string;
+        snippet: string;
+      }>
+    >()
+    .default([]),
 
   discoveredAt: timestamp("discovered_at", { withTimezone: true })
     .defaultNow()
