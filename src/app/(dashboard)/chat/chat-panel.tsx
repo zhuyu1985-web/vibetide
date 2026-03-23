@@ -103,11 +103,15 @@ interface ChatPanelProps {
   messages: ChatMessage[];
   scenarios: ScenarioCardData[];
   activeScenario: ScenarioCardData | null;
+  /** Scenario whose inline form is currently shown (null = free chat mode) */
+  inlineScenario: ScenarioCardData | null;
   viewingSaved: SavedConversationRow | null;
   isSaved: boolean;
   loading: boolean;
   onSendMessage: (text: string) => void;
   onSelectScenario: (scenario: ScenarioCardData) => void;
+  onScenarioFormSubmit: (scenario: ScenarioCardData, inputs: Record<string, string>) => void;
+  onCancelScenario: () => void;
   onSave: () => void;
   onNewChat: () => void;
   currentThinking: ThinkingStep[];
@@ -122,11 +126,14 @@ export function ChatPanel({
   messages,
   scenarios,
   activeScenario,
+  inlineScenario,
   viewingSaved,
   isSaved,
   loading,
   onSendMessage,
   onSelectScenario,
+  onScenarioFormSubmit,
+  onCancelScenario,
   onSave,
   onNewChat,
   currentThinking,
@@ -136,6 +143,7 @@ export function ChatPanel({
   isStreaming,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
+  const [scenarioInputs, setScenarioInputs] = useState<Record<string, string>>({});
   const [inputHovered, setInputHovered] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [borderDone, setBorderDone] = useState(false);
@@ -639,6 +647,109 @@ export function ChatPanel({
                   </div>
                 )}
             </>
+          )}
+          {/* ── Inline scenario form (shown as AI message bubble) ── */}
+          {inlineScenario && !loading && (
+            <div className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <EmployeeAvatar
+                employeeId={employee.id}
+                size="sm"
+                className="mt-0.5 flex-shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30 px-5 py-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    {(() => {
+                      const ScIcon = ICON_MAP[inlineScenario.icon] || Sparkles;
+                      return <ScIcon size={16} style={{ color: meta?.color ?? "#3b82f6" }} />;
+                    })()}
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      {inlineScenario.name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    {inlineScenario.description}
+                  </p>
+                  <div className="space-y-3">
+                    {inlineScenario.inputFields.map((field) => (
+                      <div key={field.name}>
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                        </label>
+                        {field.type === "select" ? (
+                          <select
+                            className="w-full h-9 px-3 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400/50 border border-gray-200 dark:border-gray-600 transition-all"
+                            value={scenarioInputs[field.name] ?? ""}
+                            onChange={(e) =>
+                              setScenarioInputs((prev) => ({ ...prev, [field.name]: e.target.value }))
+                            }
+                          >
+                            <option value="">{field.placeholder || "请选择"}</option>
+                            {field.options?.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        ) : field.type === "textarea" ? (
+                          <textarea
+                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400/50 border border-gray-200 dark:border-gray-600 resize-none transition-all"
+                            rows={3}
+                            placeholder={field.placeholder}
+                            value={scenarioInputs[field.name] ?? ""}
+                            onChange={(e) =>
+                              setScenarioInputs((prev) => ({ ...prev, [field.name]: e.target.value }))
+                            }
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            className="w-full h-9 px-3 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400/50 border border-gray-200 dark:border-gray-600 transition-all"
+                            placeholder={field.placeholder}
+                            value={scenarioInputs[field.name] ?? ""}
+                            onChange={(e) =>
+                              setScenarioInputs((prev) => ({ ...prev, [field.name]: e.target.value }))
+                            }
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-4">
+                    <button
+                      className={cn(
+                        "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 border-0",
+                        inlineScenario.inputFields.every(
+                          (f) => !f.required || scenarioInputs[f.name]?.trim()
+                        )
+                          ? "bg-blue-500 text-white hover:bg-blue-600 shadow-sm"
+                          : "bg-gray-200 dark:bg-gray-600 text-gray-400 cursor-not-allowed"
+                      )}
+                      disabled={
+                        !inlineScenario.inputFields.every(
+                          (f) => !f.required || scenarioInputs[f.name]?.trim()
+                        )
+                      }
+                      onClick={() => {
+                        onScenarioFormSubmit(inlineScenario, scenarioInputs);
+                        setScenarioInputs({});
+                      }}
+                    >
+                      <Sparkles size={13} />
+                      开始执行
+                    </button>
+                    <button
+                      className="px-3 py-2 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 border-0"
+                      onClick={() => {
+                        onCancelScenario();
+                        setScenarioInputs({});
+                      }}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
           <div />
         </div>

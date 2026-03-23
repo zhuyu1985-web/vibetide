@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { EmployeeListPanel } from "./employee-list-panel";
 import { ChatPanel } from "./chat-panel";
-import { ScenarioFormSheet } from "./scenario-form-sheet";
 import {
   executeStreamingChat,
   type ChatMessage,
@@ -47,8 +46,7 @@ export function ChatCenterClient({
   const [isSaved, setIsSaved] = useState(false);
   const [tab, setTab] = useState<"employees" | "saved">("employees");
   const [loading, setLoading] = useState(false);
-  const [scenarioSheetOpen, setScenarioSheetOpen] = useState(false);
-  const [pendingScenario, setPendingScenario] =
+  const [inlineScenario, setInlineScenario] =
     useState<ScenarioCardData | null>(null);
   const [savedConversations, setSavedConversations] = useState(
     initialSavedConversations
@@ -114,6 +112,7 @@ export function ChatCenterClient({
       // Clear current conversation
       setMessages([]);
       setActiveScenario(null);
+      setInlineScenario(null);
       setViewingSaved(null);
       setIsSaved(false);
       setSelectedSlug(slug);
@@ -159,6 +158,7 @@ export function ChatCenterClient({
   const handleNewChat = useCallback(() => {
     setMessages([]);
     setActiveScenario(null);
+    setInlineScenario(null);
     setViewingSaved(null);
     setIsSaved(false);
     scenarioInputsRef.current = {};
@@ -199,13 +199,13 @@ export function ChatCenterClient({
     }
   }, [selectedEmployee, selectedSlug, messages, isSaved, activeScenario]);
 
-  /* ── Select scenario (opens form sheet) ── */
+  /* ── Select scenario — show inline form or execute directly ── */
   const handleSelectScenario = useCallback((scenario: ScenarioCardData) => {
     if (scenario.inputFields.length > 0) {
-      setPendingScenario(scenario);
-      setScenarioSheetOpen(true);
+      setInlineScenario(scenario);
     } else {
       // No inputs needed, execute directly
+      setInlineScenario(null);
       setActiveScenario(scenario);
       handleScenarioSubmit(scenario, {});
     }
@@ -217,6 +217,7 @@ export function ChatCenterClient({
     async (scenario: ScenarioCardData, inputs: Record<string, string>) => {
       if (!selectedEmployee) return;
       setActiveScenario(scenario);
+      setInlineScenario(null);
       scenarioInputsRef.current = inputs;
 
       const inputSummary = scenario.inputFields
@@ -371,16 +372,10 @@ export function ChatCenterClient({
     }
   };
 
-  /* ── Scenario form submit handler ── */
-  const handleScenarioFormSubmit = useCallback(
-    (inputs: Record<string, string>) => {
-      if (pendingScenario) {
-        handleScenarioSubmit(pendingScenario, inputs);
-        setPendingScenario(null);
-      }
-    },
-    [pendingScenario, handleScenarioSubmit]
-  );
+  /* ── Cancel inline scenario ── */
+  const handleCancelScenario = useCallback(() => {
+    setInlineScenario(null);
+  }, []);
 
   return (
     <div ref={rootRef} className="flex flex-1 min-h-0 overflow-hidden">
@@ -399,11 +394,14 @@ export function ChatCenterClient({
         messages={messages}
         scenarios={scenarios}
         activeScenario={activeScenario}
+        inlineScenario={inlineScenario}
         viewingSaved={viewingSaved}
         isSaved={isSaved}
         loading={loading}
         onSendMessage={handleSendMessage}
         onSelectScenario={handleSelectScenario}
+        onScenarioFormSubmit={handleScenarioSubmit}
+        onCancelScenario={handleCancelScenario}
         onSave={handleSave}
         onNewChat={handleNewChat}
         currentThinking={currentThinking}
@@ -411,12 +409,6 @@ export function ChatCenterClient({
         currentSources={currentSources}
         currentRefCount={currentRefCount}
         isStreaming={isStreaming}
-      />
-      <ScenarioFormSheet
-        open={scenarioSheetOpen}
-        onOpenChange={setScenarioSheetOpen}
-        scenario={pendingScenario}
-        onSubmit={handleScenarioFormSubmit}
       />
     </div>
   );
