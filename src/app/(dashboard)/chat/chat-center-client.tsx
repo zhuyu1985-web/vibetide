@@ -95,29 +95,36 @@ export function ChatCenterClient({
     };
   }, []);
 
-  // Fetch scenarios when employee changes
-  const fetchScenarios = useCallback(async (slug: string) => {
-    setScenariosLoading(true);
-    try {
-      const res = await fetch(`/api/employees/${slug}/scenarios`);
-      if (res.ok) {
-        const data = await res.json();
-        setScenarios(data as ScenarioCardData[]);
-      } else {
-        setScenarios([]);
-      }
-    } catch {
-      setScenarios([]);
-    } finally {
-      setScenariosLoading(false);
-    }
-  }, []);
-
+  // Fetch scenarios when employee changes — AbortController prevents race conditions
+  const abortRef = useRef<AbortController | null>(null);
   useEffect(() => {
-    if (selectedSlug) {
-      fetchScenarios(selectedSlug);
-    }
-  }, [selectedSlug, fetchScenarios]);
+    if (!selectedSlug) return;
+
+    // Cancel any in-flight request for the previous employee
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setScenarios([]);
+    setScenariosLoading(true);
+
+    fetch(`/api/employees/${selectedSlug}/scenarios`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setScenarios(data as ScenarioCardData[]);
+        }
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (!controller.signal.aborted) setScenarios([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setScenariosLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [selectedSlug]);
 
   // Update URL when slug changes — use history.replaceState to avoid Next.js navigation/scroll
   useEffect(() => {
