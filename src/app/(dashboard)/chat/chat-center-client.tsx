@@ -63,35 +63,38 @@ export function ChatCenterClient({
 
   const selectedEmployee = employees.find((e) => e.id === selectedSlug) ?? null;
 
-  // Make parent chain flex-based so the chat center fills available space exactly.
-  // Layout: SidebarInset > Topbar + inner-main(flex-1) > div.p-6(wrapper) > ChatCenterClient
+  // Lock the entire ancestor chain to fixed viewport height so the chat
+  // center can use flex layout without any container overflowing.
+  // Chain: sidebar-wrapper(min-h-svh) > SidebarInset(flex-1) > inner-main(flex-1) > div.p-6 > this
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
+
+    // Collect all ancestors up to body and patch them
+    const patches: { el: HTMLElement; saved: string }[] = [];
+    const patch = (target: HTMLElement | null | undefined, styles: Record<string, string>) => {
+      if (!target) return;
+      patches.push({ el: target, saved: target.style.cssText });
+      Object.assign(target.style, styles);
+    };
+
     const wrapper = el.parentElement; // div.relative.z-10.p-6
-    const scrollableMain = wrapper?.parentElement; // main.flex-1.overflow-y-auto
+    const innerMain = wrapper?.parentElement; // main.flex-1.overflow-y-auto
+    const sidebarInset = innerMain?.parentElement; // SidebarInset (main)
+    const sidebarWrapper = sidebarInset?.parentElement; // sidebar-wrapper div
 
-    // Save originals
-    const wCss = wrapper?.style.cssText ?? "";
-    const mCss = scrollableMain?.style.cssText ?? "";
-
-    if (scrollableMain) {
-      scrollableMain.style.overflow = "hidden";
-      scrollableMain.style.display = "flex";
-      scrollableMain.style.flexDirection = "column";
-    }
-    if (wrapper) {
-      wrapper.style.padding = "0";
-      wrapper.style.flex = "1";
-      wrapper.style.minHeight = "0";
-      wrapper.style.display = "flex";
-      wrapper.style.flexDirection = "column";
-    }
+    // sidebar-wrapper: lock to viewport height
+    patch(sidebarWrapper, { height: "100svh", maxHeight: "100svh", overflow: "hidden" });
+    // SidebarInset: constrain height, don't grow
+    patch(sidebarInset, { minHeight: "0", overflow: "hidden" });
+    // inner-main: flex container, no scroll
+    patch(innerMain, { overflow: "hidden", display: "flex", flexDirection: "column" });
+    // div.p-6 wrapper: fill remaining space
+    patch(wrapper, { padding: "0", flex: "1", minHeight: "0", display: "flex", flexDirection: "column" });
 
     return () => {
-      if (wrapper) wrapper.style.cssText = wCss;
-      if (scrollableMain) scrollableMain.style.cssText = mCss;
+      for (const p of patches) p.el.style.cssText = p.saved;
     };
   }, []);
 
