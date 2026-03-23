@@ -703,8 +703,8 @@ export function ChatPanel({
               <div className="relative rounded-[15px] bg-white dark:bg-gray-800">
                 <textarea
                   ref={textareaRef}
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 resize-none px-4 pt-3 pb-1 border-0"
-                  rows={1}
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 resize-none px-4 pt-3 pb-1 border-0 min-h-[72px]"
+                  rows={3}
                   placeholder={`和${employee.nickname}自由对话...`}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
