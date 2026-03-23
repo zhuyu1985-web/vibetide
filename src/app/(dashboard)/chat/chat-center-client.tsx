@@ -63,34 +63,35 @@ export function ChatCenterClient({
 
   const selectedEmployee = employees.find((e) => e.id === selectedSlug) ?? null;
 
-  // Disable outer scroll — chat center manages its own scrolling
+  // Make parent chain flex-based so the chat center fills available space exactly.
+  // Layout: SidebarInset > Topbar + inner-main(flex-1) > div.p-6(wrapper) > ChatCenterClient
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    // parentElement = div.p-6 wrapper, grandparent = main.overflow-y-auto
-    const wrapper = el.parentElement;
-    const scrollableMain = wrapper?.parentElement;
-    const saved = {
-      wPad: wrapper?.style.padding ?? "",
-      wH: wrapper?.style.height ?? "",
-      mOv: scrollableMain?.style.overflow ?? "",
-    };
-    if (wrapper) {
-      wrapper.style.padding = "0";
-      wrapper.style.height = "100%";
-    }
+    const wrapper = el.parentElement; // div.relative.z-10.p-6
+    const scrollableMain = wrapper?.parentElement; // main.flex-1.overflow-y-auto
+
+    // Save originals
+    const wCss = wrapper?.style.cssText ?? "";
+    const mCss = scrollableMain?.style.cssText ?? "";
+
     if (scrollableMain) {
       scrollableMain.style.overflow = "hidden";
+      scrollableMain.style.display = "flex";
+      scrollableMain.style.flexDirection = "column";
     }
+    if (wrapper) {
+      wrapper.style.padding = "0";
+      wrapper.style.flex = "1";
+      wrapper.style.minHeight = "0";
+      wrapper.style.display = "flex";
+      wrapper.style.flexDirection = "column";
+    }
+
     return () => {
-      if (wrapper) {
-        wrapper.style.padding = saved.wPad;
-        wrapper.style.height = saved.wH;
-      }
-      if (scrollableMain) {
-        scrollableMain.style.overflow = saved.mOv;
-      }
+      if (wrapper) wrapper.style.cssText = wCss;
+      if (scrollableMain) scrollableMain.style.cssText = mCss;
     };
   }, []);
 
@@ -404,7 +405,7 @@ export function ChatCenterClient({
   );
 
   return (
-    <div ref={rootRef} className="flex h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-1 min-h-0 overflow-hidden">
       <EmployeeListPanel
         employees={employees}
         savedConversations={savedConversations}
