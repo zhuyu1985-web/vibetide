@@ -60,10 +60,21 @@ export function EmployeeListPanel({
 }: EmployeeListPanelProps) {
   const [search, setSearch] = useState("");
 
+  const EMPLOYEE_ORDER = [
+    "xiaolei", "xiaoce", "xiaozi", "xiaowen",
+    "xiaoshen", "xiaofa", "xiaoshu", "xiaojian",
+    "xiaotan", "xiaoling",
+  ];
+
   const filteredEmployees = useMemo(() => {
-    if (!search.trim()) return employees;
+    const sorted = [...employees].sort((a, b) => {
+      const ia = EMPLOYEE_ORDER.indexOf(a.id);
+      const ib = EMPLOYEE_ORDER.indexOf(b.id);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+    if (!search.trim()) return sorted;
     const q = search.toLowerCase();
-    return employees.filter(
+    return sorted.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
         e.nickname.toLowerCase().includes(q) ||
