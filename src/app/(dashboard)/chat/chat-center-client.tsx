@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { EmployeeListPanel } from "./employee-list-panel";
 import { ChatPanel } from "./chat-panel";
 import { ScenarioFormSheet } from "./scenario-form-sheet";
@@ -27,7 +27,6 @@ export function ChatCenterClient({
   employees,
   savedConversations: initialSavedConversations,
 }: ChatCenterClientProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Determine initial slug from URL or first employee
@@ -88,15 +87,15 @@ export function ChatCenterClient({
     }
   }, [selectedSlug, fetchScenarios]);
 
-  // Update URL when slug changes
+  // Update URL when slug changes — use history.replaceState to avoid Next.js navigation/scroll
   useEffect(() => {
     if (selectedSlug) {
       const current = searchParams.get("employee");
       if (current !== selectedSlug) {
-        router.replace(`/chat?employee=${selectedSlug}`, { scroll: false });
+        window.history.replaceState(null, "", `/chat?employee=${selectedSlug}`);
       }
     }
-  }, [selectedSlug, router, searchParams]);
+  }, [selectedSlug, searchParams]);
 
   /* ── Employee selection ── */
   const handleSelectEmployee = useCallback(
