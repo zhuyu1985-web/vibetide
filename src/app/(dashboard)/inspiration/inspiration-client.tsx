@@ -205,7 +205,7 @@ export function InspirationClient({
   const router = useRouter();
 
   // Core state
-  const [activeTab, setActiveTab] = useState<"subscribed" | "all" | "calendar">("subscribed");
+  const [activeTab, setActiveTab] = useState<"subscribed" | "all" | "calendar">("all");
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [localTopics, setLocalTopics] = useState(topics);
   const [localReadIds, setLocalReadIds] = useState<Set<string>>(
@@ -349,6 +349,11 @@ export function InspirationClient({
 
   const handleSelectTopic = useCallback(
     (topicId: string) => {
+      // Toggle: click same topic to collapse, or click empty string to collapse
+      if (!topicId || topicId === selectedTopicId) {
+        setSelectedTopicId(null);
+        return;
+      }
       setSelectedTopicId(topicId);
       // Mark as read optimistically
       if (!localReadIds.has(topicId)) {
@@ -357,9 +362,7 @@ export function InspirationClient({
           next.add(topicId);
           return next;
         });
-        // Fire server action (no await needed)
         markAsReadAction([topicId]).catch(() => {
-          // Revert on failure
           setLocalReadIds((prev) => {
             const next = new Set(prev);
             next.delete(topicId);
@@ -368,7 +371,7 @@ export function InspirationClient({
         });
       }
     },
-    [localReadIds]
+    [localReadIds, selectedTopicId]
   );
 
   const handleMarkAllRead = useCallback(() => {
@@ -503,6 +506,9 @@ export function InspirationClient({
                     showSubscribedAccent={activeTab === "all"}
                     timelineDividerIndex={timelineDividerIndex}
                     lastViewedAt={lastViewedAt}
+                    trackedIds={trackedIds}
+                    missionPendingId={missionPendingId}
+                    onStartMission={handleStartMission}
                   />
                 )}
               </div>
@@ -517,29 +523,19 @@ export function InspirationClient({
           </div>
         </div>
 
-        {/* ======================== Right Panel (55%) ======================== */}
+        {/* ======================== Right Panel (55%) — Always Editorial Briefing ======================== */}
         <div className="w-[55%] flex flex-col min-h-0">
           <ScrollArea className="h-full">
             <div className="p-5">
-              {selectedTopic ? (
-                <TopicDetail
-                  topic={selectedTopic}
-                  isTracked={trackedIds.has(selectedTopic.id)}
-                  missionPending={missionPendingId === selectedTopic.id}
-                  onStartMission={handleStartMission}
-                  onBack={() => setSelectedTopicId(null)}
-                />
-              ) : (
-                <EditorialBriefing
-                  meeting={meeting}
-                  calendarEvents={calendarEvents}
-                  p0Count={meeting.p0Count}
-                  p1Count={meeting.p1Count}
-                  p2Count={meeting.p2Count}
-                  onTrackAllP0={handleTrackAllP0}
-                  isTrackingAll={isTrackingAll}
-                />
-              )}
+              <EditorialBriefing
+                meeting={meeting}
+                calendarEvents={calendarEvents}
+                p0Count={meeting.p0Count}
+                p1Count={meeting.p1Count}
+                p2Count={meeting.p2Count}
+                onTrackAllP0={handleTrackAllP0}
+                isTrackingAll={isTrackingAll}
+              />
             </div>
           </ScrollArea>
         </div>
@@ -711,8 +707,8 @@ function TabBar({
   onSettingsClick: () => void;
 }) {
   const tabs: { key: "subscribed" | "all" | "calendar"; label: string; count: number }[] = [
+    { key: "all", label: "全网热点", count: unreadAll },
     { key: "subscribed", label: "我的订阅", count: unreadSubscribed },
-    { key: "all", label: "全部热点", count: unreadAll },
     { key: "calendar", label: "日历灵感", count: calendarCount },
   ];
 
@@ -767,6 +763,9 @@ function TopicList({
   showSubscribedAccent,
   timelineDividerIndex,
   lastViewedAt,
+  trackedIds,
+  missionPendingId,
+  onStartMission,
 }: {
   topics: InspirationTopic[];
   readIds: Set<string>;
@@ -776,6 +775,9 @@ function TopicList({
   showSubscribedAccent: boolean;
   timelineDividerIndex: number;
   lastViewedAt?: string;
+  trackedIds: Set<string>;
+  missionPendingId: string | null;
+  onStartMission: (id: string) => void;
 }) {
   if (topics.length === 0) {
     return (
@@ -792,7 +794,7 @@ function TopicList({
     <div className="space-y-0.5">
       {topics.map((topic, index) => {
         const isRead = readIds.has(topic.id);
-        const isSelected = selectedId === topic.id;
+        const isExpanded = selectedId === topic.id;
         const cat = normalizeCategory(topic.category);
         const isSubscribed = subscribedCategories.has(cat);
 
@@ -809,11 +811,12 @@ function TopicList({
               </div>
             )}
 
+            {/* Topic item header — always visible */}
             <div
-              onClick={() => onSelect(topic.id)}
+              onClick={() => onSelect(isExpanded ? "" : topic.id)}
               className={cn(
                 "relative flex gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-150 group",
-                isSelected
+                isExpanded
                   ? "bg-blue-50 dark:bg-white/[0.08] border-l-2 border-l-blue-400"
                   : "hover:bg-gray-50 dark:hover:bg-white/[0.03] border-l-2 border-l-transparent",
               )}
@@ -827,7 +830,7 @@ function TopicList({
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                {/* Top row: priority + heat + trend + category */}
+                {/* Top row: badges */}
                 <div className="flex items-center gap-1.5 mb-1">
                   <PriorityBadge priority={topic.priority} />
                   <HeatScoreBadge score={topic.heatScore} />
@@ -844,12 +847,16 @@ function TopicList({
                       {cat}
                     </span>
                   )}
+                  <div className="ml-auto">
+                    {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                  </div>
                 </div>
 
                 {/* Title */}
                 <h4
                   className={cn(
-                    "text-[13px] leading-snug mb-1 line-clamp-2",
+                    "text-[13px] leading-snug mb-1",
+                    isExpanded ? "line-clamp-none" : "line-clamp-2",
                     isRead
                       ? "text-gray-500 dark:text-gray-500 font-normal"
                       : "text-gray-900 dark:text-gray-100 font-semibold"
@@ -858,14 +865,14 @@ function TopicList({
                   {topic.title}
                 </h4>
 
-                {/* Summary */}
-                {topic.summary && (
+                {/* Summary — collapsed only */}
+                {!isExpanded && topic.summary && (
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed line-clamp-2 mb-1.5">
                     {truncText(topic.summary, 80)}
                   </p>
                 )}
 
-                {/* Bottom: platforms + time + angles */}
+                {/* Bottom: platforms + time */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {topic.platforms.slice(0, 3).map((p) => (
                     <PlatformTag key={p} name={p} size="xs" />
@@ -876,7 +883,7 @@ function TopicList({
                   <span className="text-[9px] text-gray-300 dark:text-gray-600 ml-auto">
                     {timeAgo(topic.discoveredAt)}
                   </span>
-                  {topic.suggestedAngles.length > 0 && (
+                  {!isExpanded && topic.suggestedAngles.length > 0 && (
                     <span className="text-[9px] text-amber-600 dark:text-amber-400/60">
                       <Lightbulb size={8} className="inline mr-0.5" />
                       {topic.suggestedAngles.length}
@@ -885,10 +892,149 @@ function TopicList({
                 </div>
               </div>
             </div>
+
+            {/* Inline expanded detail */}
+            <AnimatePresence>
+              {isExpanded && (
+                <TopicInlineDetail
+                  topic={topic}
+                  isTracked={trackedIds.has(topic.id)}
+                  missionPending={missionPendingId === topic.id}
+                  onStartMission={onStartMission}
+                />
+              )}
+            </AnimatePresence>
           </div>
         );
       })}
     </div>
+  );
+}
+
+// ========================
+// Left Panel: Inline Topic Detail (expanded in list)
+// ========================
+
+function TopicInlineDetail({
+  topic,
+  isTracked,
+  missionPending,
+  onStartMission,
+}: {
+  topic: InspirationTopic;
+  isTracked: boolean;
+  missionPending: boolean;
+  onStartMission: (id: string) => void;
+}) {
+  const totalSentiment =
+    topic.commentInsight.positive + topic.commentInsight.neutral + topic.commentInsight.negative;
+  const posPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.positive / totalSentiment) * 100) : 0;
+  const neuPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.neutral / totalSentiment) * 100) : 0;
+  const negPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.negative / totalSentiment) * 100) : 0;
+
+  const angles = topic.enrichedOutlines.length > 0
+    ? topic.enrichedOutlines
+    : topic.suggestedAngles.map((a) => ({ angle: a, points: [], wordCount: "", style: "" }));
+
+  return (
+    <motion.div
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="overflow-hidden"
+    >
+      <div className="ml-[22px] mr-2 mb-2 space-y-2.5 border-l-2 border-blue-400/30 pl-3">
+        {/* Full summary */}
+        {topic.summary && (
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">
+            {topic.summary}
+          </p>
+        )}
+
+        {/* Heat Curve — compact */}
+        {topic.heatCurve.length >= 2 && (
+          <div className="rounded-lg bg-gray-50 dark:bg-white/[0.03] p-2">
+            <div className="text-[9px] text-gray-400 dark:text-gray-500 mb-1 flex items-center gap-1">
+              <Eye size={9} /> 热度曲线
+            </div>
+            <HeatCurveChart data={topic.heatCurve} height={60} />
+          </div>
+        )}
+
+        {/* AI Angles — compact list */}
+        {angles.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <Lightbulb size={10} /> AI 建议切角
+            </div>
+            {angles.map((outline, i) => (
+              <div key={i} className="rounded-lg bg-amber-50 dark:bg-amber-500/5 p-2">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-[9px] font-bold text-amber-500">#{i + 1}</span>
+                  <span className="text-[11px] font-medium text-gray-800 dark:text-gray-200">{outline.angle}</span>
+                  {outline.wordCount && (
+                    <span className="text-[9px] text-gray-400 dark:text-gray-500 ml-auto">{outline.wordCount}字</span>
+                  )}
+                </div>
+                {outline.points.length > 0 && (
+                  <div className="space-y-0.5 mt-1">
+                    {outline.points.map((pt, j) => (
+                      <p key={j} className="text-[10px] text-gray-500 dark:text-gray-500 leading-relaxed">
+                        · {pt}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Sentiment — compact bar */}
+        {totalSentiment > 0 && (
+          <div className="rounded-lg bg-gray-50 dark:bg-white/[0.03] p-2">
+            <div className="flex h-1.5 rounded-full overflow-hidden mb-1">
+              <div className="bg-green-500/80" style={{ width: `${posPercent}%` }} />
+              <div className="bg-gray-400/60" style={{ width: `${neuPercent}%` }} />
+              <div className="bg-red-500/80" style={{ width: `${negPercent}%` }} />
+            </div>
+            <div className="flex items-center gap-3 text-[9px]">
+              <span className="text-green-600 dark:text-green-400">正面 {posPercent}%</span>
+              <span className="text-gray-500 dark:text-gray-400">中性 {neuPercent}%</span>
+              <span className="text-red-600 dark:text-red-400">负面 {negPercent}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 pt-1">
+          {isTracked ? (
+            <Button size="sm" disabled className="h-7 text-[11px] bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0">
+              <Eye size={12} className="mr-1" /> 已追踪
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); onStartMission(topic.id); }}
+              disabled={missionPending}
+              className="h-7 text-[11px] bg-blue-600 hover:bg-blue-700 text-white border-0"
+            >
+              <Rocket size={12} className="mr-1" />
+              {missionPending ? "创建中..." : "启动追踪"}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[11px] text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Star size={12} className="mr-1" /> 收藏
+          </Button>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1138,7 +1284,7 @@ function EditorialBriefing({
               const style = getCategoryStyle(cat.name);
               return (
                 <div key={cat.name} className="flex items-center gap-3">
-                  <span className={cn("text-[11px] font-medium w-10", style.text)}>{cat.name}</span>
+                  <span className={cn("text-[11px] font-medium w-12 shrink-0 truncate", style.text)}>{cat.name}</span>
                   <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-blue-500/60 transition-all"
