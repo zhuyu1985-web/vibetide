@@ -10,9 +10,11 @@ import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
 import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
+import { AnnotationsPanel } from "./features/annotations/annotations-panel";
 
 export default function ArticleDetailClient({
   article,
+  organizationId,
   initialAnnotations,
   initialAIAnalysis,
 }: ArticleDetailClientProps) {
@@ -169,9 +171,11 @@ export default function ArticleDetailClient({
                   />
                 )}
                 {rightTab === "annotations" && (
-                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                    [批注 — 后续 Task 填充]
-                  </div>
+                  <AnnotationsPanel
+                    articleId={article.id}
+                    organizationId={organizationId}
+                    initialAnnotations={initialAnnotations}
+                  />
                 )}
                 {rightTab === "transcript" && (
                   <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">

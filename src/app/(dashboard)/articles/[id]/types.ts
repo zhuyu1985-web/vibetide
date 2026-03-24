@@ -48,6 +48,7 @@ export interface VideoChapter {
 
 export interface ArticleDetailClientProps {
   article: ArticleDetail;
+  organizationId: string;
   initialAnnotations: Annotation[];
   initialAIAnalysis: AIAnalysisCacheItem[];
 }
