@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useArticlePageStore } from "./store";
 import { useAppearance } from "./hooks/use-article-context";
 import type { ArticleDetailClientProps } from "./types";
@@ -8,9 +9,17 @@ import { ArticleHeader } from "./features/header/article-header";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
+import { VideoChapters } from "./features/outline/video-chapters";
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
 import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
 import { AnnotationsPanel } from "./features/annotations/annotations-panel";
+import { VideoPlayer } from "./features/video-player/video-player";
+import { TranscriptPanel } from "./features/transcript/transcript-panel";
+import {
+  MOCK_VIDEO_URL,
+  MOCK_CHAPTERS,
+  MOCK_TRANSCRIPT,
+} from "./data/mock-video";
 
 export default function ArticleDetailClient({
   article,
@@ -31,6 +40,21 @@ export default function ArticleDetailClient({
     setRightTab,
   } = useArticlePageStore();
   const { appearance } = useAppearance();
+
+  // Video mode state
+  const isVideo = article.mediaType === "video";
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const videoSeekRef = useRef<((time: number) => void) | null>(null);
+
+  // Set contentType in store on mount
+  useEffect(() => {
+    useArticlePageStore.getState().setContentType(isVideo ? "video" : "article");
+  }, [isVideo]);
+
+  // Build right panel tabs dynamically
+  const rightTabs = isVideo
+    ? (["analysis", "annotations", "transcript"] as const)
+    : (["analysis", "annotations"] as const);
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
@@ -81,7 +105,9 @@ export default function ArticleDetailClient({
                     onClick={() => setLeftTab(tab)}
                   >
                     {tab === "outline"
-                      ? "大纲"
+                      ? isVideo
+                        ? "章节"
+                        : "大纲"
                       : tab === "chat"
                         ? "对话"
                         : "历史"}
@@ -89,14 +115,21 @@ export default function ArticleDetailClient({
                 ))}
               </div>
               <div className="flex-1 overflow-hidden flex flex-col">
-                {leftTab === "outline" && (
-                  <OutlinePanel htmlContent={article.body ?? ""} />
-                )}
+                {leftTab === "outline" &&
+                  (isVideo ? (
+                    <VideoChapters
+                      chapters={MOCK_CHAPTERS}
+                      currentTime={videoCurrentTime}
+                      onChapterClick={(time) => videoSeekRef.current?.(time)}
+                    />
+                  ) : (
+                    <OutlinePanel htmlContent={article.body ?? ""} />
+                  ))}
                 {leftTab === "chat" && (
                   <AIChatPanel
                     articleContent={article.body ?? ""}
                     viewMode={viewMode}
-                    contentType={article.mediaType === "video" ? "video" : "article"}
+                    contentType={isVideo ? "video" : "article"}
                   />
                 )}
                 {leftTab === "history" && (
@@ -117,8 +150,16 @@ export default function ArticleDetailClient({
         </div>
 
         {/* Center stage */}
-        <div className="flex-1 overflow-hidden">
-          {viewMode === "edit" ? (
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {isVideo ? (
+            <div className="h-full overflow-y-auto">
+              <VideoPlayer
+                videoUrl={article.videoUrl ?? MOCK_VIDEO_URL}
+                onTimeUpdate={setVideoCurrentTime}
+                seekRef={videoSeekRef}
+              />
+            </div>
+          ) : viewMode === "edit" ? (
             <ArticleEditor
               article={article}
               appearance={appearance}
@@ -145,26 +186,24 @@ export default function ArticleDetailClient({
           {rightPanelOpen ? (
             <div className="flex flex-col h-full">
               <div className="flex border-b border-[var(--glass-border)] text-xs">
-                {(["analysis", "annotations", "transcript"] as const).map(
-                  (tab) => (
-                    <button
-                      key={tab}
-                      className={cn(
-                        "flex-1 text-center py-2 transition-colors",
-                        rightTab === tab
-                          ? "text-blue-500 border-b-2 border-blue-500"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      onClick={() => setRightTab(tab)}
-                    >
-                      {tab === "analysis"
-                        ? "AI 解读"
-                        : tab === "annotations"
-                          ? "批注"
-                          : "听记"}
-                    </button>
-                  )
-                )}
+                {rightTabs.map((tab) => (
+                  <button
+                    key={tab}
+                    className={cn(
+                      "flex-1 text-center py-2 transition-colors",
+                      rightTab === tab
+                        ? "text-blue-500 border-b-2 border-blue-500"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightTab(tab)}
+                  >
+                    {tab === "analysis"
+                      ? "AI 解读"
+                      : tab === "annotations"
+                        ? "批注"
+                        : "听记"}
+                  </button>
+                ))}
               </div>
               <div className="flex-1 overflow-hidden flex flex-col">
                 {rightTab === "analysis" && (
@@ -181,10 +220,12 @@ export default function ArticleDetailClient({
                     initialAnnotations={initialAnnotations}
                   />
                 )}
-                {rightTab === "transcript" && (
-                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                    [听记 — 后续 Task 填充]
-                  </div>
+                {rightTab === "transcript" && isVideo && (
+                  <TranscriptPanel
+                    segments={MOCK_TRANSCRIPT}
+                    currentTime={videoCurrentTime}
+                    onSeek={(time) => videoSeekRef.current?.(time)}
+                  />
                 )}
               </div>
             </div>

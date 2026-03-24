@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 interface VideoPlayerProps {
   videoUrl: string;
   onTimeUpdate?: (time: number) => void;
+  seekRef?: React.MutableRefObject<((time: number) => void) | null>;
 }
 
-export function VideoPlayer({ videoUrl, onTimeUpdate }: VideoPlayerProps) {
+export function VideoPlayer({ videoUrl, onTimeUpdate, seekRef }: VideoPlayerProps) {
   const {
     videoRef,
     isPlaying,
@@ -28,6 +29,11 @@ export function VideoPlayer({ videoUrl, onTimeUpdate }: VideoPlayerProps) {
     captureFrame,
     setLoopRange,
   } = useVideoPlayer();
+
+  // Expose seek function to parent via ref
+  useEffect(() => {
+    if (seekRef) seekRef.current = seek;
+  }, [seek, seekRef]);
 
   // Notify parent of time updates
   useEffect(() => {
