@@ -169,13 +169,23 @@ function truncText(text: string, max: number) {
 }
 
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+  const diff = Date.now() - date.getTime();
+  if (diff < 0) return "刚刚";
   const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "刚刚";
   if (minutes < 60) return `${minutes}分钟前`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}小时前`;
   const days = Math.floor(hours / 24);
   return `${days}天前`;
+}
+
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
 function PlatformTag({ name, size = "sm" }: { name: string; size?: "xs" | "sm" }) {
@@ -791,7 +801,7 @@ function TopicList({
   }
 
   return (
-    <div className="space-y-0.5">
+    <div className="divide-y divide-gray-100 dark:divide-white/5">
       {topics.map((topic, index) => {
         const isRead = readIds.has(topic.id);
         const isExpanded = selectedId === topic.id;
@@ -873,15 +883,16 @@ function TopicList({
                 )}
 
                 {/* Bottom: platforms + time */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap mt-1">
                   {topic.platforms.slice(0, 3).map((p) => (
                     <PlatformTag key={p} name={p} size="xs" />
                   ))}
                   {topic.platforms.length > 3 && (
                     <span className="text-[9px] text-gray-300 dark:text-gray-600">+{topic.platforms.length - 3}</span>
                   )}
-                  <span className="text-[9px] text-gray-300 dark:text-gray-600 ml-auto">
-                    {timeAgo(topic.discoveredAt)}
+                  <span className="text-[9px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-0.5">
+                    <Clock size={8} />
+                    {formatTime(topic.discoveredAt)} · {timeAgo(topic.discoveredAt)}
                   </span>
                   {!isExpanded && topic.suggestedAngles.length > 0 && (
                     <span className="text-[9px] text-amber-600 dark:text-amber-400/60">
@@ -944,43 +955,43 @@ function TopicInlineDetail({
       transition={{ duration: 0.2 }}
       className="overflow-hidden"
     >
-      <div className="ml-[22px] mr-2 mb-2 space-y-2.5 border-l-2 border-blue-400/30 pl-3">
+      <div className="mx-2 mb-3 mt-1 rounded-xl bg-gradient-to-b from-blue-50/80 to-gray-50/50 dark:from-blue-950/20 dark:to-gray-900/20 p-3 space-y-3 ring-1 ring-blue-200/50 dark:ring-blue-500/10">
         {/* Full summary */}
         {topic.summary && (
-          <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">
+          <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed">
             {topic.summary}
           </p>
         )}
 
         {/* Heat Curve — compact */}
         {topic.heatCurve.length >= 2 && (
-          <div className="rounded-lg bg-gray-50 dark:bg-white/[0.03] p-2">
-            <div className="text-[9px] text-gray-400 dark:text-gray-500 mb-1 flex items-center gap-1">
-              <Eye size={9} /> 热度曲线
+          <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
+            <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
+              <BarChart3 size={10} /> 热度趋势
             </div>
             <HeatCurveChart data={topic.heatCurve} height={60} />
           </div>
         )}
 
-        {/* AI Angles — compact list */}
+        {/* AI Angles — styled cards */}
         {angles.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
-              <Lightbulb size={10} /> AI 建议切角
+          <div className="space-y-2">
+            <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+              <Lightbulb size={12} /> AI 建议切角
             </div>
             {angles.map((outline, i) => (
-              <div key={i} className="rounded-lg bg-amber-50 dark:bg-amber-500/5 p-2">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[9px] font-bold text-amber-500">#{i + 1}</span>
-                  <span className="text-[11px] font-medium text-gray-800 dark:text-gray-200">{outline.angle}</span>
+              <div key={i} className="rounded-lg bg-white/80 dark:bg-amber-500/5 p-2.5 ring-1 ring-amber-200/50 dark:ring-amber-500/10">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                  <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 flex-1">{outline.angle}</span>
                   {outline.wordCount && (
-                    <span className="text-[9px] text-gray-400 dark:text-gray-500 ml-auto">{outline.wordCount}字</span>
+                    <span className="text-[9px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">{outline.wordCount}字</span>
                   )}
                 </div>
                 {outline.points.length > 0 && (
-                  <div className="space-y-0.5 mt-1">
+                  <div className="space-y-0.5 ml-7">
                     {outline.points.map((pt, j) => (
-                      <p key={j} className="text-[10px] text-gray-500 dark:text-gray-500 leading-relaxed">
+                      <p key={j} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">
                         · {pt}
                       </p>
                     ))}
@@ -993,13 +1004,16 @@ function TopicInlineDetail({
 
         {/* Sentiment — compact bar */}
         {totalSentiment > 0 && (
-          <div className="rounded-lg bg-gray-50 dark:bg-white/[0.03] p-2">
-            <div className="flex h-1.5 rounded-full overflow-hidden mb-1">
-              <div className="bg-green-500/80" style={{ width: `${posPercent}%` }} />
-              <div className="bg-gray-400/60" style={{ width: `${neuPercent}%` }} />
-              <div className="bg-red-500/80" style={{ width: `${negPercent}%` }} />
+          <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
+            <div className="text-[10px] font-medium text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1">
+              <MessageSquare size={10} /> 舆情
             </div>
-            <div className="flex items-center gap-3 text-[9px]">
+            <div className="flex h-2 rounded-full overflow-hidden mb-1.5">
+              <div className="bg-green-500" style={{ width: `${posPercent}%` }} />
+              <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${neuPercent}%` }} />
+              <div className="bg-red-500" style={{ width: `${negPercent}%` }} />
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
               <span className="text-green-600 dark:text-green-400">正面 {posPercent}%</span>
               <span className="text-gray-500 dark:text-gray-400">中性 {neuPercent}%</span>
               <span className="text-red-600 dark:text-red-400">负面 {negPercent}%</span>
@@ -1010,27 +1024,27 @@ function TopicInlineDetail({
         {/* Action buttons */}
         <div className="flex items-center gap-2 pt-1">
           {isTracked ? (
-            <Button size="sm" disabled className="h-7 text-[11px] bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0">
-              <Eye size={12} className="mr-1" /> 已追踪
+            <Button size="sm" disabled className="h-8 text-[11px] bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0 rounded-lg">
+              <Eye size={12} className="mr-1.5" /> 已追踪
             </Button>
           ) : (
             <Button
               size="sm"
               onClick={(e) => { e.stopPropagation(); onStartMission(topic.id); }}
               disabled={missionPending}
-              className="h-7 text-[11px] bg-blue-600 hover:bg-blue-700 text-white border-0"
+              className="h-8 text-[11px] bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-lg shadow-sm"
             >
-              <Rocket size={12} className="mr-1" />
+              <Rocket size={12} className="mr-1.5" />
               {missionPending ? "创建中..." : "启动追踪"}
             </Button>
           )}
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 text-[11px] text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0"
+            className="h-8 text-[11px] text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0 rounded-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            <Star size={12} className="mr-1" /> 收藏
+            <Star size={12} className="mr-1.5" /> 收藏
           </Button>
         </div>
       </div>

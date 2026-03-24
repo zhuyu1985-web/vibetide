@@ -78,10 +78,7 @@ export async function getInspirationTopics(
       trend: row.trend,
       source: row.source || "",
       category: row.category || "",
-      discoveredAt: row.discoveredAt.toLocaleTimeString("zh-CN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      discoveredAt: row.discoveredAt.toISOString(),
       heatCurve: (row.heatCurve as { time: string; value: number }[]) || [],
       suggestedAngles,
       competitorResponse: row.competitorResponses.map(
@@ -233,10 +230,12 @@ export function getEditorialMeeting(
   const p2Count = topics.filter((t) => t.priority === "P2").length;
   const activePlatforms = monitors.filter((m) => m.status === "online").length;
 
-  // Compute category distribution — push "未分类" to the end
+  // Compute category distribution — only count valid categories
+  const VALID_CATS = new Set(["要闻", "国际", "军事", "体育", "娱乐", "财经", "科技", "社会", "健康", "教育", "时政"]);
   const catMap = new Map<string, number>();
   for (const t of topics) {
-    const cat = t.category || "未分类";
+    const raw = (t.category || "").trim();
+    const cat = VALID_CATS.has(raw) ? raw : "未分类";
     catMap.set(cat, (catMap.get(cat) || 0) + 1);
   }
   const topCategories = Array.from(catMap.entries())
