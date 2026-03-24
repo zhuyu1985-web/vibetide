@@ -439,11 +439,11 @@ export function InspirationClient({
     return (
       <div className="flex h-full items-center justify-center">
         <div className="flex flex-col items-center justify-center py-24">
-          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-            <Radar size={32} className="text-white/30" />
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-4">
+            <Radar size={32} className="text-gray-400 dark:text-gray-500" />
           </div>
-          <h3 className="text-lg font-semibold text-white/80 mb-2">暂无热点数据</h3>
-          <p className="text-sm text-white/40 mb-6">点击下方按钮从全网平台获取最新热点</p>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">暂无热点数据</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">点击下方按钮从全网平台获取最新热点</p>
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -462,7 +462,7 @@ export function InspirationClient({
       {/* Main dual-panel layout */}
       <div className="flex flex-1 min-h-0 gap-0">
         {/* ======================== Left Panel (45%) ======================== */}
-        <div className="w-[45%] flex flex-col min-h-0 border-r border-white/5">
+        <div className="w-[45%] flex flex-col min-h-0 border-r border-gray-200 dark:border-white/5">
           {/* AI Summary Bar */}
           <AISummaryBar
             delta={meeting.delta}
@@ -618,21 +618,21 @@ function AISummaryBar({
   const newCount = delta?.newTopicsCount ?? 0;
 
   return (
-    <div className="border-b border-white/5">
+    <div className="border-b border-gray-200 dark:border-white/5">
       {/* Collapsed: one-line summary */}
       <div
-        className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-white/[0.02] transition-colors"
+        className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
         onClick={onToggle}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <Zap size={14} className="text-amber-400 shrink-0" />
-          <span className="text-xs text-white/60 truncate">
+          <Zap size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
             {timeSince ? `距上次 ${timeSince}` : "欢迎回来"}
             {newCount > 0 && (
-              <span className="text-amber-400 font-medium ml-1">+{newCount} 新热点</span>
+              <span className="text-amber-600 dark:text-amber-400 font-medium ml-1">+{newCount} 新热点</span>
             )}
             {delta && delta.newP0Count > 0 && (
-              <span className="text-red-400 font-medium ml-1">
+              <span className="text-red-600 dark:text-red-400 font-medium ml-1">
                 (P0: {delta.newP0Count})
               </span>
             )}
@@ -644,12 +644,12 @@ function AISummaryBar({
               e.stopPropagation();
               onMarkAllRead();
             }}
-            className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors px-2 py-0.5 rounded"
+            className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors px-2 py-0.5 rounded"
           >
             <EyeOff size={10} className="inline mr-1" />
             一键全部已读
           </button>
-          {collapsed ? <ChevronDown size={12} className="text-white/30" /> : <ChevronUp size={12} className="text-white/30" />}
+          {collapsed ? <ChevronDown size={12} className="text-gray-400 dark:text-gray-500" /> : <ChevronUp size={12} className="text-gray-400 dark:text-gray-500" />}
         </div>
       </div>
 
@@ -667,21 +667,21 @@ function AISummaryBar({
               {delta.significantChanges.length > 0 && (
                 <div className="space-y-1">
                   {delta.significantChanges.map((change, i) => (
-                    <p key={i} className="text-[11px] text-white/50 leading-relaxed">
+                    <p key={i} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">
                       {change}
                     </p>
                   ))}
                 </div>
               )}
               {delta.subscribedChannelUpdates && (
-                <p className="text-[11px] text-blue-400/70">
+                <p className="text-[11px] text-blue-600 dark:text-blue-400/70">
                   {delta.subscribedChannelUpdates}
                 </p>
               )}
-              <div className="flex items-center gap-3 text-[10px] text-white/30">
-                <span>P0: <span className="text-red-400">{delta.newP0Count}</span></span>
-                <span>P1: <span className="text-orange-400">{delta.newP1Count}</span></span>
-                <span>P2: <span className="text-white/50">{delta.newP2Count}</span></span>
+              <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-gray-500">
+                <span>P0: <span className="text-red-600 dark:text-red-400">{delta.newP0Count}</span></span>
+                <span>P1: <span className="text-orange-600 dark:text-orange-400">{delta.newP1Count}</span></span>
+                <span>P2: <span className="text-gray-500 dark:text-gray-500">{delta.newP2Count}</span></span>
               </div>
             </div>
           </motion.div>
@@ -717,7 +717,7 @@ function TabBar({
   ];
 
   return (
-    <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
+    <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-200 dark:border-white/5">
       <div className="flex items-center gap-0.5">
         {tabs.map((tab) => (
           <button
@@ -726,8 +726,8 @@ function TabBar({
             className={cn(
               "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
               activeTab === tab.key
-                ? "bg-white/10 text-white"
-                : "text-white/40 hover:text-white/60 hover:bg-white/5"
+                ? "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5"
             )}
           >
             {tab.label}
@@ -735,8 +735,8 @@ function TabBar({
               <span className={cn(
                 "ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold",
                 activeTab === tab.key
-                  ? "bg-blue-500/20 text-blue-400"
-                  : "bg-white/10 text-white/40"
+                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400"
               )}>
                 {tab.count}
               </span>
@@ -746,7 +746,7 @@ function TabBar({
       </div>
       <button
         onClick={onSettingsClick}
-        className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+        className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
       >
         <Settings size={14} />
       </button>
@@ -780,8 +780,8 @@ function TopicList({
   if (topics.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <Eye size={24} className="text-white/20 mb-2" />
-        <p className="text-xs text-white/30">
+        <Eye size={24} className="text-gray-300 dark:text-gray-600 mb-2" />
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           {showSubscribedAccent ? "暂无热点" : "暂无订阅热点，请先设置订阅分类"}
         </p>
       </div>
@@ -801,11 +801,11 @@ function TopicList({
             {/* Timeline divider */}
             {timelineDividerIndex === index && timelineDividerIndex > 0 && (
               <div className="flex items-center gap-2 py-2 px-2">
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-[10px] text-white/30 whitespace-nowrap">
+                <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
                   上次查看到这里 {lastViewedAt ? `· ${timeAgo(lastViewedAt)}` : ""}
                 </span>
-                <div className="flex-1 h-px bg-white/10" />
+                <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
               </div>
             )}
 
@@ -814,8 +814,8 @@ function TopicList({
               className={cn(
                 "relative flex gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-150 group",
                 isSelected
-                  ? "bg-white/[0.08] border-l-2 border-l-blue-400"
-                  : "hover:bg-white/[0.03] border-l-2 border-l-transparent",
+                  ? "bg-blue-50 dark:bg-white/[0.08] border-l-2 border-l-blue-400"
+                  : "hover:bg-gray-50 dark:hover:bg-white/[0.03] border-l-2 border-l-transparent",
               )}
             >
               {/* Unread dot */}
@@ -838,7 +838,7 @@ function TopicList({
                         "inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium",
                         showSubscribedAccent && isSubscribed
                           ? `${getCategoryStyle(cat).bg} ${getCategoryStyle(cat).text}`
-                          : "bg-white/5 text-white/40"
+                          : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
                       )}
                     >
                       {cat}
@@ -851,8 +851,8 @@ function TopicList({
                   className={cn(
                     "text-[13px] leading-snug mb-1 line-clamp-2",
                     isRead
-                      ? "text-white/50 font-normal"
-                      : "text-white/90 font-semibold"
+                      ? "text-gray-500 dark:text-gray-500 font-normal"
+                      : "text-gray-900 dark:text-gray-100 font-semibold"
                   )}
                 >
                   {topic.title}
@@ -860,7 +860,7 @@ function TopicList({
 
                 {/* Summary */}
                 {topic.summary && (
-                  <p className="text-[11px] text-white/30 leading-relaxed line-clamp-2 mb-1.5">
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed line-clamp-2 mb-1.5">
                     {truncText(topic.summary, 80)}
                   </p>
                 )}
@@ -871,13 +871,13 @@ function TopicList({
                     <PlatformTag key={p} name={p} size="xs" />
                   ))}
                   {topic.platforms.length > 3 && (
-                    <span className="text-[9px] text-white/20">+{topic.platforms.length - 3}</span>
+                    <span className="text-[9px] text-gray-300 dark:text-gray-600">+{topic.platforms.length - 3}</span>
                   )}
-                  <span className="text-[9px] text-white/20 ml-auto">
+                  <span className="text-[9px] text-gray-300 dark:text-gray-600 ml-auto">
                     {timeAgo(topic.discoveredAt)}
                   </span>
                   {topic.suggestedAngles.length > 0 && (
-                    <span className="text-[9px] text-amber-400/60">
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400/60">
                       <Lightbulb size={8} className="inline mr-0.5" />
                       {topic.suggestedAngles.length}
                     </span>
@@ -941,7 +941,7 @@ function CalendarList({
       {/* Add event button */}
       <button
         onClick={onAddEvent}
-        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 hover:bg-white/8 text-white/50 hover:text-white/70 text-xs transition-colors"
+        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8 text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white/70 text-xs transition-colors"
       >
         <CalendarPlus size={14} />
         添加事件
@@ -949,26 +949,26 @@ function CalendarList({
 
       {grouped.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12">
-          <Calendar size={24} className="text-white/20 mb-2" />
-          <p className="text-xs text-white/30">暂无日历事件</p>
+          <Calendar size={24} className="text-gray-300 dark:text-gray-600 mb-2" />
+          <p className="text-xs text-gray-400 dark:text-gray-500">暂无日历事件</p>
         </div>
       )}
 
       {grouped.map((group) => (
         <div key={group.label}>
-          <div className="text-[10px] font-medium text-white/30 uppercase tracking-wider mb-1.5 px-1">
+          <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 px-1">
             {group.label}
           </div>
           <div className="space-y-1">
             {group.items.map((ev) => (
               <div
                 key={ev.id}
-                className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
+                className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
               >
                 <span className="text-lg mt-0.5">{EVENT_TYPE_EMOJI[ev.eventType] ?? "📅"}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[12px] font-medium text-white/80 truncate">
+                    <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 truncate">
                       {ev.name}
                     </span>
                     {normalizeCategory(ev.category) && (
@@ -981,20 +981,20 @@ function CalendarList({
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] text-white/30 mb-1">
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">
                     {new Date(ev.startDate).toLocaleDateString("zh-CN")}
                     {ev.endDate !== ev.startDate && ` - ${new Date(ev.endDate).toLocaleDateString("zh-CN")}`}
                   </div>
                   {ev.aiAngles.length > 0 && (
                     <div className="flex items-center gap-1 flex-wrap">
-                      <Lightbulb size={9} className="text-amber-400/60" />
+                      <Lightbulb size={9} className="text-amber-600 dark:text-amber-400/60" />
                       {ev.aiAngles.slice(0, 2).map((angle, i) => (
-                        <span key={i} className="text-[10px] text-amber-400/50 bg-amber-400/5 px-1.5 py-0.5 rounded">
+                        <span key={i} className="text-[10px] text-amber-600 dark:text-amber-400/50 bg-amber-50 dark:bg-amber-400/5 px-1.5 py-0.5 rounded">
                           {truncText(angle, 20)}
                         </span>
                       ))}
                       {ev.aiAngles.length > 2 && (
-                        <span className="text-[9px] text-white/20">+{ev.aiAngles.length - 2}</span>
+                        <span className="text-[9px] text-gray-300 dark:text-gray-600">+{ev.aiAngles.length - 2}</span>
                       )}
                     </div>
                   )}
@@ -1004,13 +1004,13 @@ function CalendarList({
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => onConfirm(ev.id)}
-                      className="p-1 rounded text-green-400 hover:bg-green-400/10 transition-colors"
+                      className="p-1 rounded text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-400/10 transition-colors"
                     >
                       <Check size={14} />
                     </button>
                     <button
                       onClick={() => onReject(ev.id)}
-                      className="p-1 rounded text-red-400 hover:bg-red-400/10 transition-colors"
+                      className="p-1 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10 transition-colors"
                     >
                       <X size={14} />
                     </button>
@@ -1040,7 +1040,7 @@ function FloatingNewTopicBar({ count, onClick }: { count: number; onClick: () =>
     >
       <button
         onClick={onClick}
-        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-500/20 backdrop-blur-sm text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-colors"
+        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-100 dark:bg-blue-500/20 backdrop-blur-sm text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
       >
         <ArrowUp size={12} />
         发现 {count} 条新热点，点击查看
@@ -1081,10 +1081,10 @@ function EditorialBriefing({
       {/* Title */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap size={18} className="text-blue-400" />
-          <h2 className="text-lg font-bold text-white/90">编辑简报 · 今日全景</h2>
+          <Zap size={18} className="text-blue-600 dark:text-blue-400" />
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">编辑简报 · 今日全景</h2>
         </div>
-        <Badge variant="outline" className="text-[10px] bg-white/5 text-white/40 border-white/10">
+        <Badge variant="outline" className="text-[10px] bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10">
           <Clock size={10} className="mr-1" />
           {meeting.generatedAt} 更新
         </Badge>
@@ -1092,7 +1092,7 @@ function EditorialBriefing({
 
       {/* AI Summary */}
       <GlassCard variant="accent" padding="md">
-        <div className="text-xs text-white/70 leading-relaxed space-y-1">
+        <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed space-y-1">
           {meeting.aiSummary.split("\n").map((line, i) => (
             <p key={i}>{line}</p>
           ))}
@@ -1101,25 +1101,25 @@ function EditorialBriefing({
 
       {/* Priority Distribution */}
       <GlassCard variant="default" padding="md">
-        <h3 className="text-xs font-semibold text-white/60 mb-3 flex items-center gap-1.5">
+        <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
           <BarChart3 size={12} />
           优先级分布
         </h3>
         <div className="space-y-2">
           {[
-            { label: "P0 必追", count: p0Count, color: "bg-red-500", textColor: "text-red-400" },
-            { label: "P1 建议", count: p1Count, color: "bg-orange-500", textColor: "text-orange-400" },
-            { label: "P2 关注", count: p2Count, color: "bg-gray-500", textColor: "text-gray-400" },
+            { label: "P0 必追", count: p0Count, color: "bg-red-500", textColor: "text-red-600 dark:text-red-400" },
+            { label: "P1 建议", count: p1Count, color: "bg-orange-500", textColor: "text-orange-600 dark:text-orange-400" },
+            { label: "P2 关注", count: p2Count, color: "bg-gray-500", textColor: "text-gray-600 dark:text-gray-400" },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3">
               <span className={cn("text-[11px] font-medium w-14", item.textColor)}>{item.label}</span>
-              <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+              <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
                 <div
                   className={cn("h-full rounded-full transition-all", item.color)}
                   style={{ width: total > 0 ? `${(item.count / total) * 100}%` : "0%" }}
                 />
               </div>
-              <span className="text-[11px] text-white/50 w-6 text-right">{item.count}</span>
+              <span className="text-[11px] text-gray-500 dark:text-gray-500 w-6 text-right">{item.count}</span>
             </div>
           ))}
         </div>
@@ -1128,7 +1128,7 @@ function EditorialBriefing({
       {/* Category TOP 5 */}
       {meeting.topCategories.length > 0 && (
         <GlassCard variant="default" padding="md">
-          <h3 className="text-xs font-semibold text-white/60 mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
             <Tag size={12} />
             分类 TOP 5
           </h3>
@@ -1139,13 +1139,13 @@ function EditorialBriefing({
               return (
                 <div key={cat.name} className="flex items-center gap-3">
                   <span className={cn("text-[11px] font-medium w-10", style.text)}>{cat.name}</span>
-                  <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                  <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-blue-500/60 transition-all"
                       style={{ width: `${(cat.count / maxCount) * 100}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-white/50 w-6 text-right">{cat.count}</span>
+                  <span className="text-[11px] text-gray-500 dark:text-gray-500 w-6 text-right">{cat.count}</span>
                 </div>
               );
             })}
@@ -1156,7 +1156,7 @@ function EditorialBriefing({
       {/* Calendar Preview: next 3 days */}
       {next3DaysEvents.length > 0 && (
         <GlassCard variant="default" padding="md">
-          <h3 className="text-xs font-semibold text-white/60 mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
             <Calendar size={12} />
             近3日事件
           </h3>
@@ -1164,8 +1164,8 @@ function EditorialBriefing({
             {next3DaysEvents.map((ev) => (
               <div key={ev.id} className="flex items-center gap-2 text-[11px]">
                 <span>{EVENT_TYPE_EMOJI[ev.eventType] ?? "📅"}</span>
-                <span className="text-white/70 truncate flex-1">{ev.name}</span>
-                <span className="text-white/30">{new Date(ev.startDate).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}</span>
+                <span className="text-gray-700 dark:text-gray-300 truncate flex-1">{ev.name}</span>
+                <span className="text-gray-400 dark:text-gray-500">{new Date(ev.startDate).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}</span>
               </div>
             ))}
           </div>
@@ -1239,7 +1239,7 @@ function TopicDetail({
       {/* Back link */}
       <button
         onClick={onBack}
-        className="flex items-center gap-1 text-xs text-white/40 hover:text-white/60 transition-colors"
+        className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white/60 transition-colors"
       >
         <ChevronLeft size={14} />
         返回简报
@@ -1263,12 +1263,12 @@ function TopicDetail({
             </span>
           )}
         </div>
-        <h2 className="text-lg font-bold text-white/90 leading-snug">{topic.title}</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug">{topic.title}</h2>
         <div className="flex items-center gap-2 flex-wrap">
           {topic.platforms.map((p) => (
             <PlatformTag key={p} name={p} />
           ))}
-          <span className="text-[10px] text-white/30 ml-auto flex items-center gap-1">
+          <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-1">
             <Clock size={10} />
             {topic.discoveredAt}
           </span>
@@ -1277,13 +1277,13 @@ function TopicDetail({
 
       {/* Summary */}
       {topic.summary && (
-        <p className="text-xs text-white/60 leading-relaxed">{topic.summary}</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{topic.summary}</p>
       )}
 
       {/* Heat Curve */}
       {topic.heatCurve.length >= 2 && (
         <GlassCard variant="default" padding="md">
-          <div className="text-[10px] text-white/40 mb-2 flex items-center gap-1">
+          <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
             <Eye size={10} /> 热度曲线
           </div>
           <HeatCurveChart data={topic.heatCurve} height={100} />
@@ -1297,11 +1297,11 @@ function TopicDetail({
             onClick={() => setAnglesExpanded(!anglesExpanded)}
             className="w-full flex items-center justify-between p-4 text-left"
           >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
               <Lightbulb size={14} />
               AI 建议切角 ({angles.length})
             </div>
-            {anglesExpanded ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
+            {anglesExpanded ? <ChevronUp size={14} className="text-gray-400 dark:text-gray-500" /> : <ChevronDown size={14} className="text-gray-400 dark:text-gray-500" />}
           </button>
           <AnimatePresence>
             {anglesExpanded && (
@@ -1317,18 +1317,18 @@ function TopicDetail({
                     <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-[10px] font-bold text-amber-500">#{i + 1}</span>
-                        <span className="text-xs font-medium text-white/80">{outline.angle}</span>
+                        <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{outline.angle}</span>
                         {outline.wordCount && (
-                          <span className="text-[9px] text-white/30 ml-auto">{outline.wordCount}</span>
+                          <span className="text-[9px] text-gray-400 dark:text-gray-500 ml-auto">{outline.wordCount}</span>
                         )}
                         {outline.style && (
-                          <span className="text-[9px] text-white/30">{outline.style}</span>
+                          <span className="text-[9px] text-gray-400 dark:text-gray-500">{outline.style}</span>
                         )}
                       </div>
                       {outline.points.length > 0 && (
                         <div className="space-y-0.5 ml-5">
                           {outline.points.map((pt, j) => (
-                            <p key={j} className="text-[11px] text-white/50 leading-relaxed">
+                            <p key={j} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">
                               · {pt}
                             </p>
                           ))}
@@ -1350,11 +1350,11 @@ function TopicDetail({
             onClick={() => setMaterialsExpanded(!materialsExpanded)}
             className="w-full flex items-center justify-between p-4 text-left"
           >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-400">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
               <FileText size={14} />
               相关素材 ({topic.relatedMaterials.length})
             </div>
-            {materialsExpanded ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
+            {materialsExpanded ? <ChevronUp size={14} className="text-gray-400 dark:text-gray-500" /> : <ChevronDown size={14} className="text-gray-400 dark:text-gray-500" />}
           </button>
           <AnimatePresence>
             {materialsExpanded && (
@@ -1371,16 +1371,16 @@ function TopicDetail({
                     const Icon = info.icon;
                     return (
                       <div key={type}>
-                        <div className="flex items-center gap-1 text-[10px] text-white/40 mb-1.5">
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 mb-1.5">
                           <Icon size={10} />
                           {info.label}
                         </div>
                         <div className="space-y-1.5">
                           {items.map((m, i) => (
-                            <div key={i} className="p-2 rounded-lg bg-white/[0.03]">
-                              <div className="text-[11px] font-medium text-white/70 mb-0.5">{m.title}</div>
-                              <p className="text-[10px] text-white/40 line-clamp-2">{m.snippet}</p>
-                              <span className="text-[9px] text-white/20">{m.source}</span>
+                            <div key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-white/[0.03]">
+                              <div className="text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">{m.title}</div>
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2">{m.snippet}</p>
+                              <span className="text-[9px] text-gray-300 dark:text-gray-600">{m.source}</span>
                             </div>
                           ))}
                         </div>
@@ -1397,8 +1397,8 @@ function TopicDetail({
       {/* Sentiment */}
       {totalSentiment > 0 && (
         <GlassCard variant="default" padding="md">
-          <div className="flex items-center gap-1 text-xs font-semibold text-white/60 mb-3">
-            <MessageSquare size={12} className="text-purple-400" />
+          <div className="flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
+            <MessageSquare size={12} className="text-purple-600 dark:text-purple-400" />
             舆情分布
           </div>
           <div className="flex h-2.5 rounded-full overflow-hidden mb-2">
@@ -1407,15 +1407,15 @@ function TopicDetail({
             <div className="bg-red-500/80" style={{ width: `${negPercent}%` }} />
           </div>
           <div className="flex items-center gap-4 text-[10px]">
-            <span className="text-green-400"><ThumbsUp size={10} className="inline mr-0.5" />正面 {posPercent}%</span>
-            <span className="text-white/40"><Minus size={10} className="inline mr-0.5" />中性 {neuPercent}%</span>
-            <span className="text-red-400"><ThumbsDown size={10} className="inline mr-0.5" />负面 {negPercent}%</span>
+            <span className="text-green-600 dark:text-green-400"><ThumbsUp size={10} className="inline mr-0.5" />正面 {posPercent}%</span>
+            <span className="text-gray-500 dark:text-gray-400"><Minus size={10} className="inline mr-0.5" />中性 {neuPercent}%</span>
+            <span className="text-red-600 dark:text-red-400"><ThumbsDown size={10} className="inline mr-0.5" />负面 {negPercent}%</span>
           </div>
           {topic.commentInsight.hotComments.length > 0 && (
             <div className="mt-3 space-y-1">
-              <div className="text-[10px] text-white/30">热门评论</div>
+              <div className="text-[10px] text-gray-400 dark:text-gray-500">热门评论</div>
               {topic.commentInsight.hotComments.slice(0, 3).map((comment, i) => (
-                <p key={i} className="text-[11px] text-white/50 leading-relaxed pl-2 border-l-2 border-white/10">
+                <p key={i} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed pl-2 border-l-2 border-gray-200 dark:border-white/10">
                   {comment}
                 </p>
               ))}
@@ -1427,13 +1427,13 @@ function TopicDetail({
       {/* Competitor */}
       {topic.competitorResponse.length > 0 && (
         <GlassCard variant="default" padding="md">
-          <div className="flex items-center gap-1 text-xs font-semibold text-white/60 mb-3">
-            <Users size={12} className="text-blue-400" />
+          <div className="flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
+            <Users size={12} className="text-blue-600 dark:text-blue-400" />
             竞品动态
           </div>
           <div className="space-y-1.5">
             {topic.competitorResponse.map((resp, i) => (
-              <p key={i} className="text-[11px] text-white/50 leading-relaxed">{resp}</p>
+              <p key={i} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">{resp}</p>
             ))}
           </div>
         </GlassCard>
@@ -1442,7 +1442,7 @@ function TopicDetail({
       {/* Actions */}
       <div className="flex items-center gap-3 pt-2">
         {isTracked ? (
-          <Button disabled className="flex-1 bg-green-600/20 text-green-400 border-0">
+          <Button disabled className="flex-1 bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0">
             <Eye size={14} className="mr-1.5" />
             已追踪
           </Button>
@@ -1458,7 +1458,7 @@ function TopicDetail({
         )}
         <Button
           variant="ghost"
-          className="flex-1 text-white/50 hover:text-white/70 border-0"
+          className="flex-1 text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white/70 border-0"
         >
           <Star size={14} className="mr-1.5" />
           加入选题策划会素材
@@ -1482,7 +1482,7 @@ function PlatformStatusBar({
   onRefresh: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between px-4 py-1.5 border-t border-white/5 bg-black/20">
+    <div className="flex items-center justify-between px-4 py-1.5 border-t border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-black/20">
       <div className="flex items-center gap-3 overflow-x-auto">
         {monitors.map((m) => (
           <div key={m.name} className="flex items-center gap-1.5 shrink-0">
@@ -1492,15 +1492,15 @@ function PlatformStatusBar({
                 m.status === "online" ? "bg-green-400" : "bg-gray-500"
               )}
             />
-            <span className="text-[10px] text-white/40">{getPlatformShort(m.name)}</span>
-            <span className="text-[9px] text-white/20">{m.lastScan}</span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">{getPlatformShort(m.name)}</span>
+            <span className="text-[9px] text-gray-300 dark:text-gray-600">{m.lastScan}</span>
           </div>
         ))}
       </div>
       <button
         onClick={onRefresh}
         disabled={isRefreshing}
-        className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/50 transition-colors shrink-0 ml-3"
+        className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-white/50 transition-colors shrink-0 ml-3"
       >
         <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} />
         {isRefreshing ? "抓取中" : "刷新"}
@@ -1541,7 +1541,7 @@ function SubscriptionCheckboxGrid({
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-xs font-medium text-white/60 mb-2">内容分类</h4>
+        <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">内容分类</h4>
         <div className="grid grid-cols-3 gap-2">
           {VALID_CATEGORIES.map((cat) => (
             <label key={cat} className="flex items-center gap-2 cursor-pointer">
@@ -1549,13 +1549,13 @@ function SubscriptionCheckboxGrid({
                 checked={categories.has(cat)}
                 onCheckedChange={() => toggleCategory(cat)}
               />
-              <span className="text-xs text-white/70">{cat}</span>
+              <span className="text-xs text-gray-700 dark:text-gray-300">{cat}</span>
             </label>
           ))}
         </div>
       </div>
       <div>
-        <h4 className="text-xs font-medium text-white/60 mb-2">事件类型</h4>
+        <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">事件类型</h4>
         <div className="grid grid-cols-3 gap-2">
           {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -1563,7 +1563,7 @@ function SubscriptionCheckboxGrid({
                 checked={eventTypes.has(key)}
                 onCheckedChange={() => toggleEventType(key)}
               />
-              <span className="text-xs text-white/70">
+              <span className="text-xs text-gray-700 dark:text-gray-300">
                 {EVENT_TYPE_EMOJI[key]} {label}
               </span>
             </label>
@@ -1593,10 +1593,10 @@ function SubscriptionSheet({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[380px] bg-gray-950 border-white/10">
+      <SheetContent side="right" className="w-[380px] bg-white dark:bg-gray-950 border-gray-200 dark:border-white/10">
         <SheetHeader>
-          <SheetTitle className="text-white/90">订阅管理</SheetTitle>
-          <SheetDescription className="text-white/40">
+          <SheetTitle className="text-gray-900 dark:text-gray-100">订阅管理</SheetTitle>
+          <SheetDescription className="text-gray-500 dark:text-gray-400">
             选择你关注的内容分类和事件类型
           </SheetDescription>
         </SheetHeader>
@@ -1644,10 +1644,10 @@ function OnboardingDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-950 border-white/10 max-w-lg">
+      <DialogContent className="bg-white dark:bg-gray-950 border-gray-200 dark:border-white/10 max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-white/90">选择你感兴趣的内容</DialogTitle>
-          <DialogDescription className="text-white/40">
+          <DialogTitle className="text-gray-900 dark:text-gray-100">选择你感兴趣的内容</DialogTitle>
+          <DialogDescription className="text-gray-500 dark:text-gray-400">
             设置订阅分类，灵感池将优先展示你关注的领域
           </DialogDescription>
         </DialogHeader>
@@ -1661,7 +1661,7 @@ function OnboardingDialog({
           <Button
             variant="ghost"
             onClick={onSkip}
-            className="text-white/40 hover:text-white/60 border-0"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white/60 border-0"
           >
             跳过
           </Button>
@@ -1725,30 +1725,30 @@ function CalendarEventSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[380px] bg-gray-950 border-white/10">
+      <SheetContent side="right" className="w-[380px] bg-white dark:bg-gray-950 border-gray-200 dark:border-white/10">
         <SheetHeader>
-          <SheetTitle className="text-white/90">添加日历事件</SheetTitle>
-          <SheetDescription className="text-white/40">
+          <SheetTitle className="text-gray-900 dark:text-gray-100">添加日历事件</SheetTitle>
+          <SheetDescription className="text-gray-500 dark:text-gray-400">
             创建选题灵感日历事件
           </SheetDescription>
         </SheetHeader>
         <div className="mt-4 px-4 space-y-4">
           {/* Name */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">事件名称</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">事件名称</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：2026世界杯"
-              className="bg-white/5 border-white/10 text-white/80"
+              className="bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200"
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">分类</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">分类</label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full bg-white/5 border-white/10 text-white/80">
+              <SelectTrigger className="w-full bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1761,9 +1761,9 @@ function CalendarEventSheet({
 
           {/* Event Type */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">事件类型</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">事件类型</label>
             <Select value={eventType} onValueChange={(v) => setEventType(v as typeof eventType)}>
-              <SelectTrigger className="w-full bg-white/5 border-white/10 text-white/80">
+              <SelectTrigger className="w-full bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1776,31 +1776,31 @@ function CalendarEventSheet({
 
           {/* Start Date */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">开始日期</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">开始日期</label>
             <Input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="bg-white/5 border-white/10 text-white/80"
+              className="bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200"
             />
           </div>
 
           {/* End Date */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">结束日期</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">结束日期</label>
             <Input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-white/5 border-white/10 text-white/80"
+              className="bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200"
             />
           </div>
 
           {/* Recurrence */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">重复</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">重复</label>
             <Select value={recurrence} onValueChange={(v) => setRecurrence(v as typeof recurrence)}>
-              <SelectTrigger className="w-full bg-white/5 border-white/10 text-white/80">
+              <SelectTrigger className="w-full bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1813,12 +1813,12 @@ function CalendarEventSheet({
 
           {/* Reminder */}
           <div>
-            <label className="text-xs text-white/50 mb-1 block">提前提醒（天）</label>
+            <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">提前提醒（天）</label>
             <Input
               type="number"
               value={reminderDays}
               onChange={(e) => setReminderDays(e.target.value)}
-              className="bg-white/5 border-white/10 text-white/80"
+              className="bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200"
               min={0}
               max={30}
             />
