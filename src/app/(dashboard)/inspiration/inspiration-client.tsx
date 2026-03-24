@@ -193,8 +193,8 @@ function PlatformTag({ name, size = "sm" }: { name: string; size?: "xs" | "sm" }
   const short = getPlatformShort(name);
   const isXs = size === "xs";
   return (
-    <span className={cn("inline-flex items-center gap-0.5 rounded-full font-medium", style.bg, style.text, isXs ? "px-1.5 py-0 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
-      <span className={isXs ? "text-[8px]" : "text-[10px]"}>{style.icon}</span>
+    <span className={cn("inline-flex items-center gap-0.5 rounded-full font-medium", style.bg, style.text, isXs ? "px-1.5 py-0 text-[11px]" : "px-2 py-0.5 text-[11px]")}>
+      <span className={isXs ? "text-[8px]" : "text-[11px]"}>{style.icon}</span>
       {short}
     </span>
   );
@@ -223,6 +223,9 @@ export function InspirationClient({
   );
   const [newTopicCount, setNewTopicCount] = useState(0);
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+
+  // Category filter state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Dialog/Sheet state
   const [showSubscriptionSheet, setShowSubscriptionSheet] = useState(false);
@@ -308,10 +311,29 @@ export function InspirationClient({
     [subscriptions]
   );
 
+  // Compute available categories with counts (for filter chips)
+  const categoryStats = useMemo(() => {
+    const base = activeTab === "subscribed"
+      ? localTopics.filter((t) => subscribedCategories.has(normalizeCategory(t.category)))
+      : localTopics;
+    const counts = new Map<string, number>();
+    for (const t of base) {
+      const cat = normalizeCategory(t.category);
+      if (cat) counts.set(cat, (counts.get(cat) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [localTopics, activeTab, subscribedCategories]);
+
   const filteredTopics = useMemo(() => {
     let result = localTopics;
     if (activeTab === "subscribed") {
       result = result.filter((t) => subscribedCategories.has(normalizeCategory(t.category)));
+    }
+    // Apply category filter
+    if (selectedCategory) {
+      result = result.filter((t) => normalizeCategory(t.category) === selectedCategory);
     }
     // Sort: priority > subscribed-first (in "all" tab) > heatScore desc
     const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
@@ -326,7 +348,7 @@ export function InspirationClient({
       }
       return b.heatScore - a.heatScore;
     });
-  }, [localTopics, activeTab, subscribedCategories]);
+  }, [localTopics, activeTab, subscribedCategories, selectedCategory]);
 
   // Unread counts per tab
   const unreadSubscribed = useMemo(() => {
@@ -443,6 +465,7 @@ export function InspirationClient({
   const handleTabChange = useCallback((tab: "subscribed" | "all" | "calendar") => {
     setActiveTab(tab);
     setSelectedTopicId(null);
+    setSelectedCategory(null);
   }, []);
 
   // ========================
@@ -494,6 +517,38 @@ export function InspirationClient({
             calendarCount={calendarEventCount}
             onSettingsClick={() => setShowSubscriptionSheet(true)}
           />
+
+          {/* Category Filter Chips — only for topic tabs */}
+          {activeTab !== "calendar" && categoryStats.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-white/5 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={cn(
+                  "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                  !selectedCategory
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                )}
+              >
+                全部
+              </button>
+              {categoryStats.map((cat) => (
+                <button
+                  key={cat.name}
+                  onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
+                  className={cn(
+                    "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                    selectedCategory === cat.name
+                      ? `${getCategoryStyle(cat.name).bg} ${getCategoryStyle(cat.name).text} ring-1 ring-current/20`
+                      : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                  )}
+                >
+                  {cat.name}
+                  <span className="ml-1 text-[11px] opacity-60">{cat.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Content Area */}
           <div className="flex-1 min-h-0 relative">
@@ -650,7 +705,7 @@ function AISummaryBar({
               e.stopPropagation();
               onMarkAllRead();
             }}
-            className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors px-2 py-0.5 rounded"
+            className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors px-2 py-0.5 rounded"
           >
             <EyeOff size={10} className="inline mr-1" />
             一键全部已读
@@ -673,18 +728,18 @@ function AISummaryBar({
               {delta.significantChanges.length > 0 && (
                 <div className="space-y-1">
                   {delta.significantChanges.map((change, i) => (
-                    <p key={i} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">
+                    <p key={i} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
                       {change}
                     </p>
                   ))}
                 </div>
               )}
               {delta.subscribedChannelUpdates && (
-                <p className="text-[11px] text-blue-600 dark:text-blue-400/70">
+                <p className="text-xs text-blue-600 dark:text-blue-400/70">
                   {delta.subscribedChannelUpdates}
                 </p>
               )}
-              <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-gray-500">
+              <div className="flex items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500">
                 <span>P0: <span className="text-red-600 dark:text-red-400">{delta.newP0Count}</span></span>
                 <span>P1: <span className="text-orange-600 dark:text-orange-400">{delta.newP1Count}</span></span>
                 <span>P2: <span className="text-gray-500 dark:text-gray-500">{delta.newP2Count}</span></span>
@@ -739,7 +794,7 @@ function TabBar({
             {tab.label}
             {tab.count > 0 && (
               <span className={cn(
-                "ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold",
+                "ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[11px] font-bold",
                 activeTab === tab.key
                   ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
                   : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400"
@@ -814,7 +869,7 @@ function TopicList({
             {timelineDividerIndex === index && timelineDividerIndex > 0 && (
               <div className="flex items-center gap-2 py-2 px-2">
                 <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                <span className="text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
                   上次查看到这里 {lastViewedAt ? `· ${timeAgo(lastViewedAt)}` : ""}
                 </span>
                 <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
@@ -848,7 +903,7 @@ function TopicList({
                   {cat && (
                     <span
                       className={cn(
-                        "inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium",
+                        "inline-flex items-center px-1.5 py-0 rounded-full text-[11px] font-medium",
                         showSubscribedAccent && isSubscribed
                           ? `${getCategoryStyle(cat).bg} ${getCategoryStyle(cat).text}`
                           : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
@@ -865,7 +920,7 @@ function TopicList({
                 {/* Title */}
                 <h4
                   className={cn(
-                    "text-[13px] leading-snug mb-1",
+                    "text-sm leading-snug mb-1",
                     isExpanded ? "line-clamp-none" : "line-clamp-2",
                     isRead
                       ? "text-gray-500 dark:text-gray-500 font-normal"
@@ -877,7 +932,7 @@ function TopicList({
 
                 {/* Summary — collapsed only */}
                 {!isExpanded && topic.summary && (
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed line-clamp-2 mb-1.5">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed line-clamp-2 mb-1.5">
                     {truncText(topic.summary, 80)}
                   </p>
                 )}
@@ -888,14 +943,14 @@ function TopicList({
                     <PlatformTag key={p} name={p} size="xs" />
                   ))}
                   {topic.platforms.length > 3 && (
-                    <span className="text-[9px] text-gray-300 dark:text-gray-600">+{topic.platforms.length - 3}</span>
+                    <span className="text-[11px] text-gray-300 dark:text-gray-600">+{topic.platforms.length - 3}</span>
                   )}
-                  <span className="text-[9px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-0.5">
+                  <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-0.5">
                     <Clock size={8} />
                     {formatTime(topic.discoveredAt)} · {timeAgo(topic.discoveredAt)}
                   </span>
                   {!isExpanded && topic.suggestedAngles.length > 0 && (
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400/60">
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400/60">
                       <Lightbulb size={8} className="inline mr-0.5" />
                       {topic.suggestedAngles.length}
                     </span>
@@ -966,7 +1021,7 @@ function TopicInlineDetail({
         {/* Heat Curve — compact */}
         {topic.heatCurve.length >= 2 && (
           <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
-            <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
+            <div className="text-[11px] text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
               <BarChart3 size={10} /> 热度趋势
             </div>
             <HeatCurveChart data={topic.heatCurve} height={60} />
@@ -976,22 +1031,22 @@ function TopicInlineDetail({
         {/* AI Angles — styled cards */}
         {angles.length > 0 && (
           <div className="space-y-2">
-            <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+            <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
               <Lightbulb size={12} /> AI 建议切角
             </div>
             {angles.map((outline, i) => (
               <div key={i} className="rounded-lg bg-white/80 dark:bg-amber-500/5 p-2.5 ring-1 ring-amber-200/50 dark:ring-amber-500/10">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                  <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
                   <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 flex-1">{outline.angle}</span>
                   {outline.wordCount && (
-                    <span className="text-[9px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">{outline.wordCount}字</span>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">{outline.wordCount}字</span>
                   )}
                 </div>
                 {outline.points.length > 0 && (
                   <div className="space-y-0.5 ml-7">
                     {outline.points.map((pt, j) => (
-                      <p key={j} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">
+                      <p key={j} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
                         · {pt}
                       </p>
                     ))}
@@ -1005,7 +1060,7 @@ function TopicInlineDetail({
         {/* Sentiment — compact bar */}
         {totalSentiment > 0 && (
           <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
-            <div className="text-[10px] font-medium text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1">
+            <div className="text-[11px] font-medium text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1">
               <MessageSquare size={10} /> 舆情
             </div>
             <div className="flex h-2 rounded-full overflow-hidden mb-1.5">
@@ -1013,7 +1068,7 @@ function TopicInlineDetail({
               <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${neuPercent}%` }} />
               <div className="bg-red-500" style={{ width: `${negPercent}%` }} />
             </div>
-            <div className="flex items-center gap-3 text-[10px]">
+            <div className="flex items-center gap-3 text-[11px]">
               <span className="text-green-600 dark:text-green-400">正面 {posPercent}%</span>
               <span className="text-gray-500 dark:text-gray-400">中性 {neuPercent}%</span>
               <span className="text-red-600 dark:text-red-400">负面 {negPercent}%</span>
@@ -1024,7 +1079,7 @@ function TopicInlineDetail({
         {/* Action buttons */}
         <div className="flex items-center gap-2 pt-1">
           {isTracked ? (
-            <Button size="sm" disabled className="h-8 text-[11px] bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0 rounded-lg">
+            <Button size="sm" disabled className="h-8 text-xs bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0 rounded-lg">
               <Eye size={12} className="mr-1.5" /> 已追踪
             </Button>
           ) : (
@@ -1032,7 +1087,7 @@ function TopicInlineDetail({
               size="sm"
               onClick={(e) => { e.stopPropagation(); onStartMission(topic.id); }}
               disabled={missionPending}
-              className="h-8 text-[11px] bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-lg shadow-sm"
+              className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-lg shadow-sm"
             >
               <Rocket size={12} className="mr-1.5" />
               {missionPending ? "创建中..." : "启动追踪"}
@@ -1041,7 +1096,7 @@ function TopicInlineDetail({
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 text-[11px] text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0 rounded-lg"
+            className="h-8 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0 rounded-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <Star size={12} className="mr-1.5" /> 收藏
@@ -1116,7 +1171,7 @@ function CalendarList({
 
       {grouped.map((group) => (
         <div key={group.label}>
-          <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 px-1">
+          <div className="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 px-1">
             {group.label}
           </div>
           <div className="space-y-1">
@@ -1133,7 +1188,7 @@ function CalendarList({
                     </span>
                     {normalizeCategory(ev.category) && (
                       <span className={cn(
-                        "inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium",
+                        "inline-flex items-center px-1.5 py-0 rounded-full text-[11px] font-medium",
                         getCategoryStyle(normalizeCategory(ev.category)).bg,
                         getCategoryStyle(normalizeCategory(ev.category)).text,
                       )}>
@@ -1141,7 +1196,7 @@ function CalendarList({
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">
+                  <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1">
                     {new Date(ev.startDate).toLocaleDateString("zh-CN")}
                     {ev.endDate !== ev.startDate && ` - ${new Date(ev.endDate).toLocaleDateString("zh-CN")}`}
                   </div>
@@ -1149,12 +1204,12 @@ function CalendarList({
                     <div className="flex items-center gap-1 flex-wrap">
                       <Lightbulb size={9} className="text-amber-600 dark:text-amber-400/60" />
                       {ev.aiAngles.slice(0, 2).map((angle, i) => (
-                        <span key={i} className="text-[10px] text-amber-600 dark:text-amber-400/50 bg-amber-50 dark:bg-amber-400/5 px-1.5 py-0.5 rounded">
+                        <span key={i} className="text-[11px] text-amber-600 dark:text-amber-400/50 bg-amber-50 dark:bg-amber-400/5 px-1.5 py-0.5 rounded">
                           {truncText(angle, 20)}
                         </span>
                       ))}
                       {ev.aiAngles.length > 2 && (
-                        <span className="text-[9px] text-gray-300 dark:text-gray-600">+{ev.aiAngles.length - 2}</span>
+                        <span className="text-[11px] text-gray-300 dark:text-gray-600">+{ev.aiAngles.length - 2}</span>
                       )}
                     </div>
                   )}
@@ -1244,7 +1299,7 @@ function EditorialBriefing({
           <Zap size={18} className="text-blue-600 dark:text-blue-400" />
           <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">编辑简报 · 今日全景</h2>
         </div>
-        <Badge variant="outline" className="text-[10px] bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10">
+        <Badge variant="outline" className="text-[11px] bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10">
           <Clock size={10} className="mr-1" />
           {meeting.generatedAt} 更新
         </Badge>
@@ -1252,7 +1307,7 @@ function EditorialBriefing({
 
       {/* AI Summary */}
       <GlassCard variant="accent" padding="md">
-        <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed space-y-1">
+        <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed space-y-1.5">
           {meeting.aiSummary.split("\n").map((line, i) => (
             <p key={i}>{line}</p>
           ))}
@@ -1261,7 +1316,7 @@ function EditorialBriefing({
 
       {/* Priority Distribution */}
       <GlassCard variant="default" padding="md">
-        <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+        <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
           <BarChart3 size={12} />
           优先级分布
         </h3>
@@ -1272,14 +1327,14 @@ function EditorialBriefing({
             { label: "P2 关注", count: p2Count, color: "bg-gray-500", textColor: "text-gray-600 dark:text-gray-400" },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3">
-              <span className={cn("text-[11px] font-medium w-14", item.textColor)}>{item.label}</span>
+              <span className={cn("text-xs font-medium w-14", item.textColor)}>{item.label}</span>
               <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
                 <div
                   className={cn("h-full rounded-full transition-all", item.color)}
                   style={{ width: total > 0 ? `${(item.count / total) * 100}%` : "0%" }}
                 />
               </div>
-              <span className="text-[11px] text-gray-500 dark:text-gray-500 w-6 text-right">{item.count}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-500 w-6 text-right">{item.count}</span>
             </div>
           ))}
         </div>
@@ -1288,7 +1343,7 @@ function EditorialBriefing({
       {/* Category TOP 5 */}
       {meeting.topCategories.length > 0 && (
         <GlassCard variant="default" padding="md">
-          <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
             <Tag size={12} />
             分类 TOP 5
           </h3>
@@ -1298,14 +1353,14 @@ function EditorialBriefing({
               const style = getCategoryStyle(cat.name);
               return (
                 <div key={cat.name} className="flex items-center gap-3">
-                  <span className={cn("text-[11px] font-medium w-12 shrink-0 truncate", style.text)}>{cat.name}</span>
+                  <span className={cn("text-xs font-medium w-12 shrink-0 truncate", style.text)}>{cat.name}</span>
                   <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-blue-500/60 transition-all"
                       style={{ width: `${(cat.count / maxCount) * 100}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-500 w-6 text-right">{cat.count}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500 w-6 text-right">{cat.count}</span>
                 </div>
               );
             })}
@@ -1316,13 +1371,13 @@ function EditorialBriefing({
       {/* Calendar Preview: next 3 days */}
       {next3DaysEvents.length > 0 && (
         <GlassCard variant="default" padding="md">
-          <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
             <Calendar size={12} />
             近3日事件
           </h3>
           <div className="space-y-1.5">
             {next3DaysEvents.map((ev) => (
-              <div key={ev.id} className="flex items-center gap-2 text-[11px]">
+              <div key={ev.id} className="flex items-center gap-2 text-xs">
                 <span>{EVENT_TYPE_EMOJI[ev.eventType] ?? "📅"}</span>
                 <span className="text-gray-700 dark:text-gray-300 truncate flex-1">{ev.name}</span>
                 <span className="text-gray-400 dark:text-gray-500">{new Date(ev.startDate).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}</span>
@@ -1414,7 +1469,7 @@ function TopicDetail({
           <AIScoreBadge score={topic.aiScore} size={32} />
           {normalizeCategory(topic.category) && (
             <span className={cn(
-              "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium",
+              "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium",
               getCategoryStyle(normalizeCategory(topic.category)).bg,
               getCategoryStyle(normalizeCategory(topic.category)).text,
             )}>
@@ -1428,7 +1483,7 @@ function TopicDetail({
           {topic.platforms.map((p) => (
             <PlatformTag key={p} name={p} />
           ))}
-          <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-1">
+          <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-1">
             <Clock size={10} />
             {topic.discoveredAt}
           </span>
@@ -1443,7 +1498,7 @@ function TopicDetail({
       {/* Heat Curve */}
       {topic.heatCurve.length >= 2 && (
         <GlassCard variant="default" padding="md">
-          <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
+          <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
             <Eye size={10} /> 热度曲线
           </div>
           <HeatCurveChart data={topic.heatCurve} height={100} />
@@ -1476,19 +1531,19 @@ function TopicDetail({
                   {angles.map((outline, i) => (
                     <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-bold text-amber-500">#{i + 1}</span>
+                        <span className="text-[11px] font-bold text-amber-500">#{i + 1}</span>
                         <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{outline.angle}</span>
                         {outline.wordCount && (
-                          <span className="text-[9px] text-gray-400 dark:text-gray-500 ml-auto">{outline.wordCount}</span>
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-auto">{outline.wordCount}</span>
                         )}
                         {outline.style && (
-                          <span className="text-[9px] text-gray-400 dark:text-gray-500">{outline.style}</span>
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500">{outline.style}</span>
                         )}
                       </div>
                       {outline.points.length > 0 && (
                         <div className="space-y-0.5 ml-5">
                           {outline.points.map((pt, j) => (
-                            <p key={j} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">
+                            <p key={j} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
                               · {pt}
                             </p>
                           ))}
@@ -1531,16 +1586,16 @@ function TopicDetail({
                     const Icon = info.icon;
                     return (
                       <div key={type}>
-                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 mb-1.5">
+                        <div className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 mb-1.5">
                           <Icon size={10} />
                           {info.label}
                         </div>
                         <div className="space-y-1.5">
                           {items.map((m, i) => (
                             <div key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-white/[0.03]">
-                              <div className="text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">{m.title}</div>
-                              <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2">{m.snippet}</p>
-                              <span className="text-[9px] text-gray-300 dark:text-gray-600">{m.source}</span>
+                              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">{m.title}</div>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2">{m.snippet}</p>
+                              <span className="text-[11px] text-gray-300 dark:text-gray-600">{m.source}</span>
                             </div>
                           ))}
                         </div>
@@ -1566,16 +1621,16 @@ function TopicDetail({
             <div className="bg-gray-500/60" style={{ width: `${neuPercent}%` }} />
             <div className="bg-red-500/80" style={{ width: `${negPercent}%` }} />
           </div>
-          <div className="flex items-center gap-4 text-[10px]">
+          <div className="flex items-center gap-4 text-[11px]">
             <span className="text-green-600 dark:text-green-400"><ThumbsUp size={10} className="inline mr-0.5" />正面 {posPercent}%</span>
             <span className="text-gray-500 dark:text-gray-400"><Minus size={10} className="inline mr-0.5" />中性 {neuPercent}%</span>
             <span className="text-red-600 dark:text-red-400"><ThumbsDown size={10} className="inline mr-0.5" />负面 {negPercent}%</span>
           </div>
           {topic.commentInsight.hotComments.length > 0 && (
             <div className="mt-3 space-y-1">
-              <div className="text-[10px] text-gray-400 dark:text-gray-500">热门评论</div>
+              <div className="text-[11px] text-gray-400 dark:text-gray-500">热门评论</div>
               {topic.commentInsight.hotComments.slice(0, 3).map((comment, i) => (
-                <p key={i} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed pl-2 border-l-2 border-gray-200 dark:border-white/10">
+                <p key={i} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed pl-2 border-l-2 border-gray-200 dark:border-white/10">
                   {comment}
                 </p>
               ))}
@@ -1593,7 +1648,7 @@ function TopicDetail({
           </div>
           <div className="space-y-1.5">
             {topic.competitorResponse.map((resp, i) => (
-              <p key={i} className="text-[11px] text-gray-500 dark:text-gray-500 leading-relaxed">{resp}</p>
+              <p key={i} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">{resp}</p>
             ))}
           </div>
         </GlassCard>
@@ -1652,15 +1707,15 @@ function PlatformStatusBar({
                 m.status === "online" ? "bg-green-400" : "bg-gray-500"
               )}
             />
-            <span className="text-[10px] text-gray-500 dark:text-gray-400">{getPlatformShort(m.name)}</span>
-            <span className="text-[9px] text-gray-300 dark:text-gray-600">{m.lastScan}</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">{getPlatformShort(m.name)}</span>
+            <span className="text-[11px] text-gray-300 dark:text-gray-600">{m.lastScan}</span>
           </div>
         ))}
       </div>
       <button
         onClick={onRefresh}
         disabled={isRefreshing}
-        className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-white/50 transition-colors shrink-0 ml-3"
+        className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-white/50 transition-colors shrink-0 ml-3"
       >
         <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} />
         {isRefreshing ? "抓取中" : "刷新"}
