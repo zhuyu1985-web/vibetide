@@ -2,26 +2,28 @@
 
 import { useEffect, useRef } from "react";
 import { useArticlePageStore } from "../../store";
-import { useAnnotations } from "./use-annotations";
 import { AnnotationCard } from "./annotation-card";
 import type { Annotation, AnnotationColor } from "../../types";
 
 interface AnnotationsPanelProps {
-  articleId: string;
-  organizationId: string;
-  initialAnnotations: Annotation[];
+  annotations: Annotation[];
+  editAnnotation: (
+    id: string,
+    data: Partial<{
+      note: string;
+      color: AnnotationColor;
+      isPinned: boolean;
+      pinnedPosition: { x: number; y: number } | null;
+    }>
+  ) => void;
+  removeAnnotation: (id: string) => void;
 }
 
 export function AnnotationsPanel({
-  articleId,
-  organizationId,
-  initialAnnotations,
+  annotations,
+  editAnnotation,
+  removeAnnotation,
 }: AnnotationsPanelProps) {
-  const { annotations, editAnnotation, removeAnnotation } = useAnnotations(
-    articleId,
-    organizationId,
-    initialAnnotations
-  );
 
   const highlightAnnotationId = useArticlePageStore(
     (s) => s.highlightAnnotationId

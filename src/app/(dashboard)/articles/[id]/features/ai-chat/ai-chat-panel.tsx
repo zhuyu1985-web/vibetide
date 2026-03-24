@@ -11,6 +11,7 @@ import { useArticlePageStore } from "../../store";
 import type { ViewMode, ContentType } from "../../types";
 
 interface AIChatPanelProps {
+  articleId: string;
   articleContent: string;
   viewMode: ViewMode;
   contentType: ContentType;
@@ -26,8 +27,8 @@ const EDIT_COMMAND_MAP: Record<string, EditActionType> = {
   "生成标题": "rewrite",
 };
 
-export function AIChatPanel({ articleContent, viewMode, contentType }: AIChatPanelProps) {
-  const { messages, isStreaming, sendMessage, sendEditCommand } = useAIChat(articleContent);
+export function AIChatPanel({ articleId, articleContent, viewMode, contentType }: AIChatPanelProps) {
+  const { messages, isStreaming, sendMessage, sendEditCommand } = useAIChat(articleId, articleContent);
   const selectedText = useArticlePageStore((s) => s.selectedText);
   const selectedRange = useArticlePageStore((s) => s.selectedRange);
   const setSelectedText = useArticlePageStore((s) => s.setSelectedText);

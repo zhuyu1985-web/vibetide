@@ -11,8 +11,11 @@ import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
 import { VideoChapters } from "./features/outline/video-chapters";
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
+import { ChatHistoryPanel } from "./features/ai-chat/chat-history-panel";
 import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
 import { AnnotationsPanel } from "./features/annotations/annotations-panel";
+import { FloatingNote } from "./features/annotations/floating-note";
+import { useAnnotations } from "./features/annotations/use-annotations";
 import { VideoPlayer } from "./features/video-player/video-player";
 import { TranscriptPanel } from "./features/transcript/transcript-panel";
 import {
@@ -40,6 +43,13 @@ export default function ArticleDetailClient({
     setRightTab,
   } = useArticlePageStore();
   const { appearance } = useAppearance();
+
+  // Annotations state — lifted here so floating notes can render outside the panel
+  const { annotations, editAnnotation, removeAnnotation } = useAnnotations(
+    article.id,
+    organizationId,
+    initialAnnotations
+  );
 
   // Video mode state
   const isVideo = article.mediaType === "video";
@@ -69,7 +79,7 @@ export default function ArticleDetailClient({
       {/* Header */}
       <ArticleHeader
         article={article}
-        annotationCount={initialAnnotations.length}
+        annotationCount={annotations.length}
       />
 
       {/* Three-column body */}
@@ -127,15 +137,14 @@ export default function ArticleDetailClient({
                   ))}
                 {leftTab === "chat" && (
                   <AIChatPanel
+                    articleId={article.id}
                     articleContent={article.body ?? ""}
                     viewMode={viewMode}
                     contentType={isVideo ? "video" : "article"}
                   />
                 )}
                 {leftTab === "history" && (
-                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                    [对话历史 — Phase 5]
-                  </div>
+                  <ChatHistoryPanel articleId={article.id} />
                 )}
               </div>
             </div>
@@ -215,9 +224,9 @@ export default function ArticleDetailClient({
                 )}
                 {rightTab === "annotations" && (
                   <AnnotationsPanel
-                    articleId={article.id}
-                    organizationId={organizationId}
-                    initialAnnotations={initialAnnotations}
+                    annotations={annotations}
+                    editAnnotation={editAnnotation}
+                    removeAnnotation={removeAnnotation}
                   />
                 )}
                 {rightTab === "transcript" && isVideo && (
@@ -239,6 +248,21 @@ export default function ArticleDetailClient({
           )}
         </div>
       </div>
+
+      {/* Floating sticky notes — rendered above everything via fixed positioning */}
+      {annotations
+        .filter((a) => a.isPinned)
+        .map((annotation) => (
+          <FloatingNote
+            key={annotation.id}
+            annotation={annotation}
+            onUnpin={() => editAnnotation(annotation.id, { isPinned: false })}
+            onClose={() => editAnnotation(annotation.id, { isPinned: false })}
+            onPositionChange={(position) =>
+              editAnnotation(annotation.id, { pinnedPosition: position })
+            }
+          />
+        ))}
     </div>
   );
 }

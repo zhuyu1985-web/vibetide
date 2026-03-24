@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { saveChatMessage } from "@/app/actions/ai-analysis";
 
 export type EditActionType = "polish" | "continue" | "rewrite" | "summarize" | "translate" | "extract";
 
@@ -14,7 +15,7 @@ export interface ChatMessage {
   selectionRange?: { from: number; to: number };
 }
 
-export function useAIChat(articleContent: string) {
+export function useAIChat(articleId: string, articleContent: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -72,12 +73,14 @@ export function useAIChat(articleContent: string) {
 
         const reader = body.getReader();
         const decoder = new TextDecoder();
+        let fullText = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
+          fullText += chunk;
 
           setMessages((prev) =>
             prev.map((m) =>
@@ -87,6 +90,10 @@ export function useAIChat(articleContent: string) {
             )
           );
         }
+
+        // Persist the exchange to DB (fire-and-forget, non-critical)
+        saveChatMessage(articleId, "user", userMessage).catch(() => {});
+        saveChatMessage(articleId, "assistant", fullText).catch(() => {});
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
 
@@ -104,7 +111,7 @@ export function useAIChat(articleContent: string) {
         setIsStreaming(false);
       }
     },
-    [messages, articleContent]
+    [messages, articleId, articleContent]
   );
 
   const sendEditCommand = useCallback(
