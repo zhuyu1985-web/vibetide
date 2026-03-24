@@ -317,13 +317,22 @@ export function InspirationClient({
       ? localTopics.filter((t) => subscribedCategories.has(normalizeCategory(t.category)))
       : localTopics;
     const counts = new Map<string, number>();
+    let uncategorized = 0;
     for (const t of base) {
       const cat = normalizeCategory(t.category);
-      if (cat) counts.set(cat, (counts.get(cat) || 0) + 1);
+      if (cat) {
+        counts.set(cat, (counts.get(cat) || 0) + 1);
+      } else {
+        uncategorized++;
+      }
     }
-    return Array.from(counts.entries())
+    const sorted = Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, count]) => ({ name, count }));
+    if (uncategorized > 0) {
+      sorted.push({ name: "未分类", count: uncategorized });
+    }
+    return sorted;
   }, [localTopics, activeTab, subscribedCategories]);
 
   const filteredTopics = useMemo(() => {
@@ -333,7 +342,11 @@ export function InspirationClient({
     }
     // Apply category filter
     if (selectedCategory) {
-      result = result.filter((t) => normalizeCategory(t.category) === selectedCategory);
+      if (selectedCategory === "未分类") {
+        result = result.filter((t) => !normalizeCategory(t.category));
+      } else {
+        result = result.filter((t) => normalizeCategory(t.category) === selectedCategory);
+      }
     }
     // Sort: priority > subscribed-first (in "all" tab) > heatScore desc
     const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
@@ -519,7 +532,7 @@ export function InspirationClient({
           />
 
           {/* Category Filter Chips — only for topic tabs */}
-          {activeTab !== "calendar" && categoryStats.length > 0 && (
+          {activeTab !== "calendar" && (
             <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-white/5 overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setSelectedCategory(null)}
