@@ -224,7 +224,8 @@ export function InspirationClient({
   const [newTopicCount, setNewTopicCount] = useState(0);
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
-  // Category filter state
+  // Filter state
+  const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Dialog/Sheet state
@@ -311,14 +312,27 @@ export function InspirationClient({
     [subscriptions]
   );
 
-  // Compute available categories with counts (for filter chips)
-  const categoryStats = useMemo(() => {
-    const base = activeTab === "subscribed"
+  // Compute priority counts and category stats for filter chips
+  const baseTopics = useMemo(() => {
+    return activeTab === "subscribed"
       ? localTopics.filter((t) => subscribedCategories.has(normalizeCategory(t.category)))
       : localTopics;
+  }, [localTopics, activeTab, subscribedCategories]);
+
+  const priorityStats = useMemo(() => {
+    const counts: Record<string, number> = { P0: 0, P1: 0, P2: 0 };
+    for (const t of baseTopics) counts[t.priority] = (counts[t.priority] || 0) + 1;
+    return [
+      { key: "P0", label: "P0 必追", count: counts.P0, color: "bg-red-600 text-white", inactiveColor: "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400" },
+      { key: "P1", label: "P1 建议", count: counts.P1, color: "bg-orange-500 text-white", inactiveColor: "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400" },
+      { key: "P2", label: "P2 关注", count: counts.P2, color: "bg-gray-600 text-white dark:bg-gray-500", inactiveColor: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+    ].filter((p) => p.count > 0);
+  }, [baseTopics]);
+
+  const categoryStats = useMemo(() => {
     const counts = new Map<string, number>();
     let uncategorized = 0;
-    for (const t of base) {
+    for (const t of baseTopics) {
       const cat = normalizeCategory(t.category);
       if (cat) {
         counts.set(cat, (counts.get(cat) || 0) + 1);
@@ -333,12 +347,13 @@ export function InspirationClient({
       sorted.push({ name: "未分类", count: uncategorized });
     }
     return sorted;
-  }, [localTopics, activeTab, subscribedCategories]);
+  }, [baseTopics]);
 
   const filteredTopics = useMemo(() => {
-    let result = localTopics;
-    if (activeTab === "subscribed") {
-      result = result.filter((t) => subscribedCategories.has(normalizeCategory(t.category)));
+    let result = baseTopics;
+    // Apply priority filter
+    if (selectedPriority) {
+      result = result.filter((t) => t.priority === selectedPriority);
     }
     // Apply category filter
     if (selectedCategory) {
@@ -361,7 +376,7 @@ export function InspirationClient({
       }
       return b.heatScore - a.heatScore;
     });
-  }, [localTopics, activeTab, subscribedCategories, selectedCategory]);
+  }, [baseTopics, activeTab, subscribedCategories, selectedPriority, selectedCategory]);
 
   // Unread counts per tab
   const unreadSubscribed = useMemo(() => {
@@ -478,6 +493,7 @@ export function InspirationClient({
   const handleTabChange = useCallback((tab: "subscribed" | "all" | "calendar") => {
     setActiveTab(tab);
     setSelectedTopicId(null);
+    setSelectedPriority(null);
     setSelectedCategory(null);
   }, []);
 
@@ -531,35 +547,71 @@ export function InspirationClient({
             onSettingsClick={() => setShowSubscriptionSheet(true)}
           />
 
-          {/* Category Filter Chips — only for topic tabs */}
+          {/* Filter Bar — priority + category chips */}
           {activeTab !== "calendar" && (
-            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-white/5 overflow-x-auto no-scrollbar">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={cn(
-                  "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                  !selectedCategory
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                )}
-              >
-                全部
-              </button>
-              {categoryStats.map((cat) => (
+            <div className="border-b border-gray-200 dark:border-white/5">
+              {/* Priority filter row */}
+              <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">优先级</span>
                 <button
-                  key={cat.name}
-                  onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
+                  onClick={() => setSelectedPriority(null)}
                   className={cn(
                     "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                    selectedCategory === cat.name
-                      ? `${getCategoryStyle(cat.name).bg} ${getCategoryStyle(cat.name).text} ring-1 ring-current/20`
+                    !selectedPriority
+                      ? "bg-blue-600 text-white"
                       : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
                   )}
                 >
-                  {cat.name}
-                  <span className="ml-1 text-[11px] opacity-60">{cat.count}</span>
+                  全部
                 </button>
-              ))}
+                {priorityStats.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => setSelectedPriority(selectedPriority === p.key ? null : p.key)}
+                    className={cn(
+                      "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                      selectedPriority === p.key ? p.color : p.inactiveColor
+                    )}
+                  >
+                    {p.label}
+                    <span className="ml-1 opacity-70">{p.count}</span>
+                  </button>
+                ))}
+                {/* Filtered count */}
+                <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                  {filteredTopics.length} 条
+                </span>
+              </div>
+              {/* Category filter row */}
+              <div className="flex items-center gap-1.5 px-3 pb-2 overflow-x-auto no-scrollbar">
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">分类</span>
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className={cn(
+                    "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                    !selectedCategory
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                  )}
+                >
+                  全部
+                </button>
+                {categoryStats.map((cat) => (
+                  <button
+                    key={cat.name}
+                    onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
+                    className={cn(
+                      "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                      selectedCategory === cat.name
+                        ? `${getCategoryStyle(cat.name).bg} ${getCategoryStyle(cat.name).text} ring-1 ring-current/20`
+                        : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                    )}
+                  >
+                    {cat.name}
+                    <span className="ml-1 opacity-60">{cat.count}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
