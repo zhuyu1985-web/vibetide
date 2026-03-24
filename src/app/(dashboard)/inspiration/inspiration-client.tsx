@@ -7,8 +7,6 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { HeatScoreBadge } from "@/components/shared/heat-score-badge";
 import { TrendIndicator } from "@/components/shared/trend-indicator";
-import { AIScoreBadge } from "@/components/shared/ai-score-badge";
-import { HeatCurveChart } from "@/components/charts/heat-curve-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,18 +44,11 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
   Eye,
   EyeOff,
-  MessageSquare,
   Lightbulb,
-  Users,
   Clock,
   Rocket,
-  ThumbsUp,
-  Minus,
-  ThumbsDown,
-  FileText,
   RefreshCw,
   Radar,
   Tag,
@@ -68,8 +59,9 @@ import {
   Check,
   X,
   BarChart3,
-  Database,
   Star,
+  Search,
+  Sparkles,
 } from "lucide-react";
 import { triggerHotTopicCrawl, startTopicMission } from "@/app/actions/hot-topics";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
@@ -113,6 +105,19 @@ const PLATFORM_STYLE: Record<string, { bg: string; text: string; icon: string }>
   澎湃: { bg: "bg-indigo-50 dark:bg-indigo-950/30", text: "text-indigo-600 dark:text-indigo-400", icon: "📰" },
   微信: { bg: "bg-green-50 dark:bg-green-950/30", text: "text-green-600 dark:text-green-400", icon: "💬" },
 };
+
+const PLATFORM_SIDEBAR_LIST: { name: string; subtitle: string }[] = [
+  { name: "综合榜单", subtitle: "全网热搜" },
+  { name: "微博", subtitle: "热搜榜" },
+  { name: "百度", subtitle: "实时热点" },
+  { name: "抖音", subtitle: "热搜榜" },
+  { name: "今日头条", subtitle: "热搜榜" },
+  { name: "36氪", subtitle: "热榜" },
+  { name: "哔哩哔哩", subtitle: "全站日榜" },
+  { name: "小红书", subtitle: "热搜" },
+  { name: "澎湃", subtitle: "热榜" },
+  { name: "微信", subtitle: "24h热文" },
+];
 
 const VALID_CATEGORIES = ["要闻", "国际", "军事", "体育", "娱乐", "财经", "科技", "社会", "健康", "教育", "时政"] as const;
 const VALID_CATEGORY_SET = new Set<string>(VALID_CATEGORIES);
@@ -221,18 +226,18 @@ export function InspirationClient({
   const router = useRouter();
 
   // Core state
-  const [activeTab, setActiveTab] = useState<"subscribed" | "all" | "calendar">("all");
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [localTopics, setLocalTopics] = useState(topics);
   const [localReadIds, setLocalReadIds] = useState<Set<string>>(
     new Set(topics.filter((t) => t.isRead).map((t) => t.id))
   );
   const [newTopicCount, setNewTopicCount] = useState(0);
-  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  const [summaryCollapsed, setSummaryCollapsed] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Filter state
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<"today" | "yesterday" | "3days" | "all">("all");
 
   // Dialog/Sheet state
   const [showSubscriptionSheet, setShowSubscriptionSheet] = useState(false);
@@ -318,12 +323,9 @@ export function InspirationClient({
     [subscriptions]
   );
 
-  // Compute priority counts and category stats for filter chips
   const baseTopics = useMemo(() => {
-    return activeTab === "subscribed"
-      ? localTopics.filter((t) => subscribedCategories.has(normalizeCategory(t.category)))
-      : localTopics;
-  }, [localTopics, activeTab, subscribedCategories]);
+    return localTopics;
+  }, [localTopics]);
 
   const priorityStats = useMemo(() => {
     const counts: Record<string, number> = { P0: 0, P1: 0, P2: 0 };
@@ -335,101 +337,57 @@ export function InspirationClient({
     ].filter((p) => p.count > 0);
   }, [baseTopics]);
 
-  const platformStats = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const t of baseTopics) {
-      for (const p of t.platforms) {
-        const short = getPlatformShort(p);
-        counts.set(short, (counts.get(short) || 0) + 1);
-      }
-    }
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => ({ name, count }));
-  }, [baseTopics]);
-
   const filteredTopics = useMemo(() => {
     let result = baseTopics;
+
+    // Apply date filter
+    if (dateFilter !== "all") {
+      const cutoff = new Date();
+      if (dateFilter === "today") cutoff.setHours(0, 0, 0, 0);
+      else if (dateFilter === "yesterday") cutoff.setDate(cutoff.getDate() - 1);
+      else if (dateFilter === "3days") cutoff.setDate(cutoff.getDate() - 3);
+      result = result.filter((t) => new Date(t.discoveredAt) >= cutoff);
+    }
+
     // Apply priority filter
     if (selectedPriority) {
       result = result.filter((t) => t.priority === selectedPriority);
     }
+
     // Apply platform filter
     if (selectedPlatform) {
       result = result.filter((t) =>
         t.platforms.some((p) => getPlatformShort(p) === selectedPlatform)
       );
     }
-    // Sort: priority > subscribed-first (in "all" tab) > heatScore desc
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.summary?.toLowerCase().includes(q) ||
+          t.suggestedAngles.some((a) => a.toLowerCase().includes(q))
+      );
+    }
+
+    // Sort: priority > subscribed-first > heatScore desc
     const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
     return [...result].sort((a, b) => {
       const pa = priorityOrder[a.priority] ?? 3;
       const pb = priorityOrder[b.priority] ?? 3;
       if (pa !== pb) return pa - pb;
-      if (activeTab === "all") {
-        const aSub = subscribedCategories.has(normalizeCategory(a.category)) ? 0 : 1;
-        const bSub = subscribedCategories.has(normalizeCategory(b.category)) ? 0 : 1;
-        if (aSub !== bSub) return aSub - bSub;
-      }
+      const aSub = subscribedCategories.has(normalizeCategory(a.category)) ? 0 : 1;
+      const bSub = subscribedCategories.has(normalizeCategory(b.category)) ? 0 : 1;
+      if (aSub !== bSub) return aSub - bSub;
       return b.heatScore - a.heatScore;
     });
-  }, [baseTopics, activeTab, subscribedCategories, selectedPriority, selectedPlatform]);
-
-  // Unread counts per tab
-  const unreadSubscribed = useMemo(() => {
-    return localTopics.filter(
-      (t) => subscribedCategories.has(normalizeCategory(t.category)) && !localReadIds.has(t.id)
-    ).length;
-  }, [localTopics, subscribedCategories, localReadIds]);
-
-  const unreadAll = useMemo(() => {
-    return localTopics.filter((t) => !localReadIds.has(t.id)).length;
-  }, [localTopics, localReadIds]);
-
-  const calendarEventCount = calendarEvents.length;
-
-  // Timeline divider index: first topic discovered before lastViewedAt
-  const timelineDividerIndex = useMemo(() => {
-    if (!lastViewedAt) return -1;
-    const lvDate = new Date(lastViewedAt).getTime();
-    return filteredTopics.findIndex((t) => new Date(t.discoveredAt).getTime() < lvDate);
-  }, [filteredTopics, lastViewedAt]);
-
-  const selectedTopic = useMemo(
-    () => localTopics.find((t) => t.id === selectedTopicId) ?? null,
-    [localTopics, selectedTopicId]
-  );
+  }, [baseTopics, subscribedCategories, selectedPriority, selectedPlatform, dateFilter, searchQuery]);
 
   // ========================
   // Actions
   // ========================
-
-  const handleSelectTopic = useCallback(
-    (topicId: string) => {
-      // Toggle: click same topic to collapse, or click empty string to collapse
-      if (!topicId || topicId === selectedTopicId) {
-        setSelectedTopicId(null);
-        return;
-      }
-      setSelectedTopicId(topicId);
-      // Mark as read optimistically
-      if (!localReadIds.has(topicId)) {
-        setLocalReadIds((prev) => {
-          const next = new Set(prev);
-          next.add(topicId);
-          return next;
-        });
-        markAsReadAction([topicId]).catch(() => {
-          setLocalReadIds((prev) => {
-            const next = new Set(prev);
-            next.delete(topicId);
-            return next;
-          });
-        });
-      }
-    },
-    [localReadIds, selectedTopicId]
-  );
 
   const handleMarkAllRead = useCallback(() => {
     const visibleIds = filteredTopics.map((t) => t.id);
@@ -487,12 +445,22 @@ export function InspirationClient({
     router.refresh();
   }, [router]);
 
-  const handleTabChange = useCallback((tab: "subscribed" | "all" | "calendar") => {
-    setActiveTab(tab);
-    setSelectedTopicId(null);
-    setSelectedPriority(null);
-    setSelectedPlatform(null);
-  }, []);
+  const handleMarkRead = useCallback((topicId: string) => {
+    if (!localReadIds.has(topicId)) {
+      setLocalReadIds((prev) => {
+        const next = new Set(prev);
+        next.add(topicId);
+        return next;
+      });
+      markAsReadAction([topicId]).catch(() => {
+        setLocalReadIds((prev) => {
+          const next = new Set(prev);
+          next.delete(topicId);
+          return next;
+        });
+      });
+    }
+  }, [localReadIds]);
 
   // ========================
   // Empty state
@@ -521,11 +489,81 @@ export function InspirationClient({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Main dual-panel layout */}
-      <div className="flex flex-1 min-h-0 gap-0">
-        {/* ======================== Left Panel (45%) ======================== */}
-        <div className="w-[45%] flex flex-col min-h-0 border-r border-gray-200 dark:border-white/5">
-          {/* AI Summary Bar */}
+      {/* Three-column layout */}
+      <div className="flex flex-1 min-h-0">
+        {/* ======================== Column 1: Platform Sidebar ======================== */}
+        <div className="w-[140px] shrink-0 flex flex-col min-h-0 border-r border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.01]">
+          <ScrollArea className="h-full">
+            <div className="py-2 px-1.5 space-y-0.5">
+              {PLATFORM_SIDEBAR_LIST.map((item) => {
+                const isAll = item.name === "综合榜单";
+                const isActive = isAll ? !selectedPlatform : selectedPlatform === item.name;
+                const style = isAll
+                  ? { icon: "🌐", bg: "", text: "" }
+                  : PLATFORM_STYLE[item.name] || { icon: "📡", bg: "", text: "" };
+
+                return (
+                  <button
+                    key={item.name}
+                    onClick={() => setSelectedPlatform(isAll ? null : item.name)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-all duration-150",
+                      isActive
+                        ? "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-200/50 dark:ring-blue-500/20"
+                        : "hover:bg-gray-100 dark:hover:bg-white/[0.04]"
+                    )}
+                  >
+                    <span className="text-base shrink-0">{style.icon}</span>
+                    <div className="min-w-0">
+                      <div className={cn(
+                        "text-xs font-medium truncate",
+                        isActive
+                          ? "text-blue-700 dark:text-blue-300"
+                          : "text-gray-700 dark:text-gray-300"
+                      )}>
+                        {item.name}
+                      </div>
+                      <div className={cn(
+                        "text-[10px] truncate",
+                        isActive
+                          ? "text-blue-500/70 dark:text-blue-400/50"
+                          : "text-gray-400 dark:text-gray-500"
+                      )}>
+                        {item.subtitle}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Divider */}
+              <div className="h-px bg-gray-200 dark:bg-white/5 mx-2 my-2" />
+
+              {/* Settings & Refresh */}
+              <button
+                onClick={() => setShowSubscriptionSheet(true)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
+              >
+                <Settings size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">订阅管理</span>
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
+              >
+                <RefreshCw size={14} className={cn("text-gray-400 dark:text-gray-500 shrink-0", isRefreshing && "animate-spin")} />
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {isRefreshing ? "抓取中..." : "刷新数据"}
+                </span>
+              </button>
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* ======================== Column 2: Main Content ======================== */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* AI Summary Bar (thin, collapsible) */}
           <AISummaryBar
             delta={meeting.delta}
             collapsed={summaryCollapsed}
@@ -534,127 +572,104 @@ export function InspirationClient({
             lastViewedAt={lastViewedAt}
           />
 
-          {/* Tab Bar */}
-          <TabBar
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            unreadSubscribed={unreadSubscribed}
-            unreadAll={unreadAll}
-            calendarCount={calendarEventCount}
-            onSettingsClick={() => setShowSubscriptionSheet(true)}
-          />
-
-          {/* Filter Bar — priority + platform chips */}
-          {activeTab !== "calendar" && (
-            <div className="border-b border-gray-200 dark:border-white/5">
-              {/* Priority filter row */}
-              <TooltipProvider delayDuration={200}>
-                <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5 bg-gray-50/50 dark:bg-white/[0.02]">
-                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">优先级</span>
-                  <button
-                    onClick={() => setSelectedPriority(null)}
-                    className={cn(
-                      "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                      !selectedPriority
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                    )}
-                  >
-                    全部
-                  </button>
-                  {priorityStats.map((p) => (
-                    <Tooltip key={p.key}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setSelectedPriority(selectedPriority === p.key ? null : p.key)}
-                          className={cn(
-                            "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                            selectedPriority === p.key ? p.color : p.inactiveColor
-                          )}
-                        >
-                          {p.label}
-                          <span className="ml-1 opacity-70">{p.count}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[240px] text-xs">
-                        <p>{p.desc}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                  {/* Filtered count */}
-                  <span className={cn(
-                    "ml-auto text-xs shrink-0 transition-colors",
-                    (selectedPriority || selectedPlatform)
-                      ? "text-blue-600 dark:text-blue-400 font-medium"
-                      : "text-gray-400 dark:text-gray-500"
-                  )}>
-                    {filteredTopics.length} 条
-                  </span>
-                </div>
-              </TooltipProvider>
-              {/* Platform filter row */}
-              <div className="flex items-center gap-1.5 px-3 pb-2 overflow-x-auto no-scrollbar">
-                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">来源</span>
+          {/* Top bar: Date filter + Search */}
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 dark:border-white/5">
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  { key: "all", label: "全部" },
+                  { key: "today", label: "今日" },
+                  { key: "yesterday", label: "昨日" },
+                  { key: "3days", label: "近3天" },
+                ] as const
+              ).map((item) => (
                 <button
-                  onClick={() => setSelectedPlatform(null)}
+                  key={item.key}
+                  onClick={() => setDateFilter(item.key)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                    dateFilter === item.key
+                      ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索热点..."
+                className="h-8 w-48 rounded-lg bg-gray-100 dark:bg-white/5 pl-8 pr-3 text-xs text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Priority filter row */}
+          <div className="border-b border-gray-200 dark:border-white/5">
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-1.5 px-4 py-2 bg-gray-50/50 dark:bg-white/[0.02]">
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">优先级</span>
+                <button
+                  onClick={() => setSelectedPriority(null)}
                   className={cn(
                     "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                    !selectedPlatform
+                    !selectedPriority
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
                   )}
                 >
                   全部
                 </button>
-                {platformStats.map((p) => {
-                  const style = getPlatformStyle(p.name);
-                  return (
-                    <button
-                      key={p.name}
-                      onClick={() => setSelectedPlatform(selectedPlatform === p.name ? null : p.name)}
-                      className={cn(
-                        "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1",
-                        selectedPlatform === p.name
-                          ? `${style.bg} ${style.text} ring-1 ring-current/20`
-                          : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                      )}
-                    >
-                      <span className="text-[11px]">{style.icon}</span>
-                      {p.name}
-                      <span className="opacity-60">{p.count}</span>
-                    </button>
-                  );
-                })}
+                {priorityStats.map((p) => (
+                  <Tooltip key={p.key}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setSelectedPriority(selectedPriority === p.key ? null : p.key)}
+                        className={cn(
+                          "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                          selectedPriority === p.key ? p.color : p.inactiveColor
+                        )}
+                      >
+                        {p.label}
+                        <span className="ml-1 opacity-70">{p.count}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[240px] text-xs">
+                      <p>{p.desc}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                {/* Filtered count */}
+                <span className={cn(
+                  "ml-auto text-xs shrink-0 transition-colors",
+                  (selectedPriority || selectedPlatform || dateFilter !== "all" || searchQuery)
+                    ? "text-blue-600 dark:text-blue-400 font-medium"
+                    : "text-gray-400 dark:text-gray-500"
+                )}>
+                  {filteredTopics.length} 条
+                </span>
               </div>
-            </div>
-          )}
+            </TooltipProvider>
+          </div>
 
-          {/* Content Area */}
+          {/* Topic list area */}
           <div className="flex-1 min-h-0 relative">
             <ScrollArea className="h-full">
-              <div className="p-3">
-                {activeTab === "calendar" ? (
-                  <CalendarList
-                    events={calendarEvents}
-                    onAddEvent={() => setShowCalendarSheet(true)}
-                    onConfirm={(id) => { confirmCalendarEventAction(id); router.refresh(); }}
-                    onReject={(id) => { rejectCalendarEventAction(id); router.refresh(); }}
-                  />
-                ) : (
-                  <TopicList
-                    topics={filteredTopics}
-                    readIds={localReadIds}
-                    selectedId={selectedTopicId}
-                    onSelect={handleSelectTopic}
-                    subscribedCategories={subscribedCategories}
-                    showSubscribedAccent={activeTab === "all"}
-                    timelineDividerIndex={timelineDividerIndex}
-                    lastViewedAt={lastViewedAt}
-                    trackedIds={trackedIds}
-                    missionPendingId={missionPendingId}
-                    onStartMission={handleStartMission}
-                  />
-                )}
+              <div className="p-4">
+                <TopicList
+                  topics={filteredTopics}
+                  readIds={localReadIds}
+                  trackedIds={trackedIds}
+                  missionPendingId={missionPendingId}
+                  onStartMission={handleStartMission}
+                  onMarkRead={handleMarkRead}
+                  subscribedCategories={subscribedCategories}
+                />
               </div>
             </ScrollArea>
 
@@ -667,8 +682,8 @@ export function InspirationClient({
           </div>
         </div>
 
-        {/* ======================== Right Panel (55%) — Always Editorial Briefing ======================== */}
-        <div className="w-[55%] flex flex-col min-h-0">
+        {/* ======================== Column 3: Right Panel ======================== */}
+        <div className="w-[380px] shrink-0 flex flex-col min-h-0 border-l border-gray-200 dark:border-white/5">
           <ScrollArea className="h-full">
             <div className="p-5">
               <EditorialBriefing
@@ -684,9 +699,6 @@ export function InspirationClient({
           </ScrollArea>
         </div>
       </div>
-
-      {/* ======================== Bottom: Platform Status Bar ======================== */}
-      <PlatformStatusBar monitors={monitors} isRefreshing={isRefreshing} onRefresh={handleRefresh} />
 
       {/* ======================== Dialogs ======================== */}
       <SubscriptionSheet
@@ -738,7 +750,7 @@ export function InspirationClient({
 }
 
 // ========================
-// Left Panel: AI Summary Bar
+// AI Summary Bar (thin collapsible bar)
 // ========================
 
 function AISummaryBar({
@@ -759,7 +771,6 @@ function AISummaryBar({
 
   return (
     <div className="border-b border-gray-200 dark:border-white/5">
-      {/* Collapsed: one-line summary */}
       <div
         className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
         onClick={onToggle}
@@ -793,7 +804,6 @@ function AISummaryBar({
         </div>
       </div>
 
-      {/* Expanded detail */}
       <AnimatePresence>
         {!collapsed && delta && (
           <motion.div
@@ -832,225 +842,168 @@ function AISummaryBar({
 }
 
 // ========================
-// Left Panel: Tab Bar
-// ========================
-
-function TabBar({
-  activeTab,
-  onTabChange,
-  unreadSubscribed,
-  unreadAll,
-  calendarCount,
-  onSettingsClick,
-}: {
-  activeTab: "subscribed" | "all" | "calendar";
-  onTabChange: (tab: "subscribed" | "all" | "calendar") => void;
-  unreadSubscribed: number;
-  unreadAll: number;
-  calendarCount: number;
-  onSettingsClick: () => void;
-}) {
-  const tabs: { key: "subscribed" | "all" | "calendar"; label: string; count: number }[] = [
-    { key: "all", label: "全网热点", count: unreadAll },
-    { key: "subscribed", label: "我的订阅", count: unreadSubscribed },
-    { key: "calendar", label: "日历灵感", count: calendarCount },
-  ];
-
-  return (
-    <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-200 dark:border-white/5">
-      <div className="flex items-center gap-0.5">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => onTabChange(tab.key)}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              activeTab === tab.key
-                ? "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5"
-            )}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span className={cn(
-                "ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[11px] font-bold",
-                activeTab === tab.key
-                  ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-                  : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400"
-              )}>
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      <button
-        onClick={onSettingsClick}
-        className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-      >
-        <Settings size={14} />
-      </button>
-    </div>
-  );
-}
-
-// ========================
-// Left Panel: Topic List
+// Column 2: Topic List (clean numbered list, no expand/collapse)
 // ========================
 
 function TopicList({
   topics,
   readIds,
-  selectedId,
-  onSelect,
-  subscribedCategories,
-  showSubscribedAccent,
-  timelineDividerIndex,
-  lastViewedAt,
   trackedIds,
   missionPendingId,
   onStartMission,
+  onMarkRead,
+  subscribedCategories,
 }: {
   topics: InspirationTopic[];
   readIds: Set<string>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  subscribedCategories: Set<string>;
-  showSubscribedAccent: boolean;
-  timelineDividerIndex: number;
-  lastViewedAt?: string;
   trackedIds: Set<string>;
   missionPendingId: string | null;
   onStartMission: (id: string) => void;
+  onMarkRead: (id: string) => void;
+  subscribedCategories: Set<string>;
 }) {
   if (topics.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <Eye size={24} className="text-gray-300 dark:text-gray-600 mb-2" />
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          {showSubscribedAccent ? "暂无热点" : "暂无订阅热点，请先设置订阅分类"}
-        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">暂无匹配的热点</p>
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-gray-100 dark:divide-white/5">
+    <div className="space-y-0">
       {topics.map((topic, index) => {
         const isRead = readIds.has(topic.id);
-        const isExpanded = selectedId === topic.id;
+        const isTracked = trackedIds.has(topic.id);
+        const isMissionPending = missionPendingId === topic.id;
+        const isTop3 = index < 3;
+        const isP0 = topic.priority === "P0";
         const cat = normalizeCategory(topic.category);
         const isSubscribed = subscribedCategories.has(cat);
 
-        return (
-          <div key={topic.id}>
-            {/* Timeline divider */}
-            {timelineDividerIndex === index && timelineDividerIndex > 0 && (
-              <div className="flex items-center gap-2 py-2 px-2">
-                <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
-                <span className="text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                  上次查看到这里 {lastViewedAt ? `· ${timeAgo(lastViewedAt)}` : ""}
-                </span>
-                <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
-              </div>
-            )}
+        const angles = topic.enrichedOutlines.length > 0
+          ? topic.enrichedOutlines
+          : topic.suggestedAngles.map((a) => ({ angle: a, points: [] as string[], wordCount: "", style: "" }));
 
-            {/* Topic item header — always visible */}
-            <div
-              onClick={() => onSelect(isExpanded ? "" : topic.id)}
-              className={cn(
-                "relative flex gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-150 group border-l-2",
-                isExpanded
-                  ? "bg-blue-50 dark:bg-white/[0.08] border-l-blue-500 dark:border-l-blue-400"
-                  : cn(
-                      "hover:bg-gray-50 dark:hover:bg-white/[0.03]",
-                      topic.priority === "P0" ? "border-l-red-400" :
-                      topic.priority === "P1" ? "border-l-orange-400" :
-                      "border-l-gray-300 dark:border-l-gray-600"
-                    ),
-              )}
-            >
-              {/* Unread dot */}
-              <div className="pt-1.5 w-3 shrink-0 flex justify-center">
-                {!isRead && (
-                  <span className="w-2 h-2 rounded-full bg-blue-400" />
+        return (
+          <div
+            key={topic.id}
+            className={cn(
+              "py-4 transition-colors hover:bg-gray-50/50 dark:hover:bg-white/[0.02]",
+              index < topics.length - 1 && "border-b border-gray-100 dark:border-white/5"
+            )}
+            onMouseEnter={() => onMarkRead(topic.id)}
+          >
+            <div className="flex gap-3">
+              {/* Number column */}
+              <div className="w-8 shrink-0 flex justify-center pt-0.5">
+                {(isTop3 || isP0) ? (
+                  <span className="text-lg">🔥</span>
+                ) : (
+                  <span className="w-6 h-6 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-xs font-semibold text-gray-400 dark:text-gray-500">
+                    {index + 1}
+                  </span>
                 )}
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                {/* Top row: badges */}
-                <div className="flex items-center gap-1.5 mb-1">
+                {/* Title row */}
+                <div className="flex items-start gap-2 mb-1">
+                  <h4 className={cn(
+                    "text-base leading-snug flex-1",
+                    isRead
+                      ? "text-gray-500 dark:text-gray-500 font-normal"
+                      : "text-gray-900 dark:text-gray-100 font-semibold"
+                  )}>
+                    {topic.title}
+                  </h4>
+                  {!isRead && (
+                    <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0 mt-2" />
+                  )}
+                </div>
+
+                {/* Badges row */}
+                <div className="flex items-center gap-1.5 mb-1.5">
                   <PriorityBadge priority={topic.priority} />
                   <HeatScoreBadge score={topic.heatScore} />
                   <TrendIndicator trend={topic.trend} />
                   {cat && (
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-1.5 py-0 rounded-full text-[11px] font-medium",
-                        showSubscribedAccent && isSubscribed
-                          ? `${getCategoryStyle(cat).bg} ${getCategoryStyle(cat).text}`
-                          : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
-                      )}
-                    >
+                    <span className={cn(
+                      "inline-flex items-center px-1.5 py-0 rounded-full text-[11px] font-medium",
+                      isSubscribed
+                        ? `${getCategoryStyle(cat).bg} ${getCategoryStyle(cat).text}`
+                        : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
+                    )}>
                       {cat}
                     </span>
                   )}
-                  <div className="ml-auto">
-                    {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                  </div>
                 </div>
 
-                {/* Title */}
-                <h4
-                  className={cn(
-                    "text-sm leading-snug mb-1",
-                    isExpanded ? "line-clamp-none" : "line-clamp-2",
-                    isRead
-                      ? "text-gray-500 dark:text-gray-500 font-normal"
-                      : "text-gray-900 dark:text-gray-100 font-semibold"
-                  )}
-                >
-                  {topic.title}
-                </h4>
-
-                {/* Summary — collapsed only */}
-                {!isExpanded && topic.summary && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed line-clamp-2 mb-1.5">
-                    {truncText(topic.summary, 80)}
+                {/* Summary */}
+                {topic.summary && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2 mb-2">
+                    {topic.summary}
                   </p>
                 )}
 
-                {/* Bottom: platforms + time */}
-                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                {/* AI Angles card */}
+                {angles.length > 0 && (
+                  <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-3 mb-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">
+                      <Sparkles size={12} />
+                      AI要点提炼
+                    </div>
+                    <div className="space-y-1">
+                      {angles.map((outline, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                          <span className="text-blue-500 dark:text-blue-400 font-semibold shrink-0 mt-px">{i + 1}.</span>
+                          <span>{outline.angle}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom row: platforms + time + actions */}
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {topic.platforms.slice(0, 3).map((p) => (
                     <PlatformTag key={p} name={p} size="xs" />
                   ))}
                   {topic.platforms.length > 3 && (
                     <span className="text-[11px] text-gray-300 dark:text-gray-600">+{topic.platforms.length - 3}</span>
                   )}
-                  <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-0.5">
+                  <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
                     <Clock size={8} />
                     {formatTime(topic.discoveredAt)} · {timeAgo(topic.discoveredAt)}
                   </span>
-                  {!isExpanded && topic.suggestedAngles.length > 0 && (
-                    <span className="text-[11px] text-amber-600 dark:text-amber-400/60">
-                      <Lightbulb size={8} className="inline mr-0.5" />
-                      {topic.suggestedAngles.length}
-                    </span>
-                  )}
+                  <div className="ml-auto flex items-center gap-1">
+                    {isTracked ? (
+                      <span className="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-0.5">
+                        <Eye size={10} />
+                        已追踪
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => onStartMission(topic.id)}
+                        disabled={isMissionPending}
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-0.5 transition-colors"
+                      >
+                        <Rocket size={10} />
+                        {isMissionPending ? "创建中..." : "启动追踪"}
+                      </button>
+                    )}
+                    <button
+                      className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-0.5 ml-2 transition-colors"
+                    >
+                      <Star size={10} />
+                      收藏
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Inline expanded detail */}
-            <TopicInlineDetail
-              topic={topic}
-              isExpanded={isExpanded}
-              isTracked={trackedIds.has(topic.id)}
-              missionPending={missionPendingId === topic.id}
-              onStartMission={onStartMission}
-            />
           </div>
         );
       })}
@@ -1059,273 +1012,7 @@ function TopicList({
 }
 
 // ========================
-// Left Panel: Inline Topic Detail (expanded in list)
-// ========================
-
-function TopicInlineDetail({
-  topic,
-  isExpanded,
-  isTracked,
-  missionPending,
-  onStartMission,
-}: {
-  topic: InspirationTopic;
-  isExpanded: boolean;
-  isTracked: boolean;
-  missionPending: boolean;
-  onStartMission: (id: string) => void;
-}) {
-  const totalSentiment =
-    topic.commentInsight.positive + topic.commentInsight.neutral + topic.commentInsight.negative;
-  const posPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.positive / totalSentiment) * 100) : 0;
-  const neuPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.neutral / totalSentiment) * 100) : 0;
-  const negPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.negative / totalSentiment) * 100) : 0;
-
-  const angles = topic.enrichedOutlines.length > 0
-    ? topic.enrichedOutlines
-    : topic.suggestedAngles.map((a) => ({ angle: a, points: [], wordCount: "", style: "" }));
-
-  return (
-    <div
-      className={cn(
-        "grid transition-all duration-300 ease-in-out",
-        isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-      )}
-    >
-      <div className="overflow-hidden">
-        <div className="mx-2 mb-3 mt-1 rounded-xl bg-gradient-to-b from-blue-50/80 to-gray-50/50 dark:from-blue-950/20 dark:to-gray-900/20 p-3 space-y-3 ring-1 ring-blue-200/50 dark:ring-blue-500/10">
-          {/* Full summary */}
-          {topic.summary && (
-            <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed">
-              {topic.summary}
-            </p>
-          )}
-
-          {/* Heat Curve — compact */}
-          {topic.heatCurve.length >= 2 && (
-            <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
-              <div className="text-[11px] text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
-                <BarChart3 size={10} /> 热度趋势
-              </div>
-              <HeatCurveChart data={topic.heatCurve} height={60} />
-            </div>
-          )}
-
-          {/* AI Angles — styled cards */}
-          {angles.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                <Lightbulb size={12} /> AI 建议切角
-              </div>
-              {angles.map((outline, i) => (
-                <div key={i} className="rounded-lg bg-white/80 dark:bg-amber-500/5 p-2.5 ring-1 ring-amber-200/50 dark:ring-amber-500/10">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                    <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 flex-1">{outline.angle}</span>
-                    {outline.wordCount && (
-                      <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">{outline.wordCount}字</span>
-                    )}
-                  </div>
-                  {outline.points.length > 0 && (
-                    <div className="space-y-0.5 ml-7">
-                      {outline.points.map((pt, j) => (
-                        <p key={j} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
-                          · {pt}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Sentiment — compact bar */}
-          {totalSentiment > 0 && (
-            <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
-              <div className="text-[11px] font-medium text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1">
-                <MessageSquare size={10} /> 舆情
-              </div>
-              <div className="flex h-2 rounded-full overflow-hidden mb-1.5">
-                <div className="bg-green-500" style={{ width: `${posPercent}%` }} />
-                <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${neuPercent}%` }} />
-                <div className="bg-red-500" style={{ width: `${negPercent}%` }} />
-              </div>
-              <div className="flex items-center gap-3 text-[11px]">
-                <span className="text-green-600 dark:text-green-400">正面 {posPercent}%</span>
-                <span className="text-gray-500 dark:text-gray-400">中性 {neuPercent}%</span>
-                <span className="text-red-600 dark:text-red-400">负面 {negPercent}%</span>
-              </div>
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 pt-1">
-            {isTracked ? (
-              <Button size="sm" disabled className="h-8 text-xs bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0 rounded-lg">
-                <Eye size={12} className="mr-1.5" /> 已追踪
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); onStartMission(topic.id); }}
-                disabled={missionPending}
-                className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-lg shadow-sm"
-              >
-                <Rocket size={12} className="mr-1.5" />
-                {missionPending ? "创建中..." : "启动追踪"}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0 rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Star size={12} className="mr-1.5" /> 收藏
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ========================
-// Left Panel: Calendar List
-// ========================
-
-function CalendarList({
-  events,
-  onAddEvent,
-  onConfirm,
-  onReject,
-}: {
-  events: CalendarEvent[];
-  onAddEvent: () => void;
-  onConfirm: (id: string) => void;
-  onReject: (id: string) => void;
-}) {
-  // Group events by time bucket
-  const grouped = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(today.getTime() + 86400000);
-    const endOfWeek = new Date(today.getTime() + 7 * 86400000);
-    const endOfNextWeek = new Date(today.getTime() + 14 * 86400000);
-    const endOf30Days = new Date(today.getTime() + 30 * 86400000);
-
-    const groups: { label: string; items: CalendarEvent[] }[] = [
-      { label: "今天", items: [] },
-      { label: "明天", items: [] },
-      { label: "本周", items: [] },
-      { label: "下周", items: [] },
-      { label: "未来30天", items: [] },
-    ];
-
-    for (const ev of events) {
-      const start = new Date(ev.startDate);
-      if (start < tomorrow) groups[0].items.push(ev);
-      else if (start < new Date(tomorrow.getTime() + 86400000)) groups[1].items.push(ev);
-      else if (start < endOfWeek) groups[2].items.push(ev);
-      else if (start < endOfNextWeek) groups[3].items.push(ev);
-      else if (start < endOf30Days) groups[4].items.push(ev);
-    }
-
-    return groups.filter((g) => g.items.length > 0);
-  }, [events]);
-
-  return (
-    <div className="space-y-3">
-      {/* Add event button */}
-      <button
-        onClick={onAddEvent}
-        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8 text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white/70 text-xs transition-colors"
-      >
-        <CalendarPlus size={14} />
-        添加事件
-      </button>
-
-      {grouped.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12">
-          <Calendar size={24} className="text-gray-300 dark:text-gray-600 mb-2" />
-          <p className="text-xs text-gray-400 dark:text-gray-500">暂无日历事件</p>
-        </div>
-      )}
-
-      {grouped.map((group) => (
-        <div key={group.label}>
-          <div className="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 px-1">
-            {group.label}
-          </div>
-          <div className="space-y-1">
-            {group.items.map((ev) => (
-              <div
-                key={ev.id}
-                className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
-              >
-                <span className="text-lg mt-0.5">{EVENT_TYPE_EMOJI[ev.eventType] ?? "📅"}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 truncate">
-                      {ev.name}
-                    </span>
-                    {normalizeCategory(ev.category) && (
-                      <span className={cn(
-                        "inline-flex items-center px-1.5 py-0 rounded-full text-[11px] font-medium",
-                        getCategoryStyle(normalizeCategory(ev.category)).bg,
-                        getCategoryStyle(normalizeCategory(ev.category)).text,
-                      )}>
-                        {normalizeCategory(ev.category)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1">
-                    {new Date(ev.startDate).toLocaleDateString("zh-CN")}
-                    {ev.endDate !== ev.startDate && ` - ${new Date(ev.endDate).toLocaleDateString("zh-CN")}`}
-                  </div>
-                  {ev.aiAngles.length > 0 && (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <Lightbulb size={9} className="text-amber-600 dark:text-amber-400/60" />
-                      {ev.aiAngles.slice(0, 2).map((angle, i) => (
-                        <span key={i} className="text-[11px] text-amber-600 dark:text-amber-400/50 bg-amber-50 dark:bg-amber-400/5 px-1.5 py-0.5 rounded">
-                          {truncText(angle, 20)}
-                        </span>
-                      ))}
-                      {ev.aiAngles.length > 2 && (
-                        <span className="text-[11px] text-gray-300 dark:text-gray-600">+{ev.aiAngles.length - 2}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {/* Pending review actions */}
-                {ev.status === "pending_review" && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => onConfirm(ev.id)}
-                      className="p-1 rounded text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-400/10 transition-colors"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      onClick={() => onReject(ev.id)}
-                      className="p-1 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ========================
-// Left Panel: Floating Notification
+// Floating Notification
 // ========================
 
 function FloatingNewTopicBar({ count, onClick }: { count: number; onClick: () => void }) {
@@ -1349,7 +1036,7 @@ function FloatingNewTopicBar({ count, onClick }: { count: number; onClick: () =>
 }
 
 // ========================
-// Right Panel: Editorial Briefing
+// Column 3: Editorial Briefing
 // ========================
 
 function EditorialBriefing({
@@ -1488,328 +1175,6 @@ function EditorialBriefing({
           {isTrackingAll ? "启动中..." : `一键追踪全部 P0（${p0Count} 条）`}
         </Button>
       )}
-    </div>
-  );
-}
-
-// ========================
-// Right Panel: Topic Detail
-// ========================
-
-function TopicDetail({
-  topic,
-  isTracked,
-  missionPending,
-  onStartMission,
-  onBack,
-}: {
-  topic: InspirationTopic;
-  isTracked: boolean;
-  missionPending: boolean;
-  onStartMission: (id: string) => void;
-  onBack: () => void;
-}) {
-  const [anglesExpanded, setAnglesExpanded] = useState(true);
-  const [materialsExpanded, setMaterialsExpanded] = useState(true);
-
-  const totalSentiment =
-    topic.commentInsight.positive + topic.commentInsight.neutral + topic.commentInsight.negative;
-  const posPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.positive / totalSentiment) * 100) : 0;
-  const neuPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.neutral / totalSentiment) * 100) : 0;
-  const negPercent = totalSentiment > 0 ? Math.round((topic.commentInsight.negative / totalSentiment) * 100) : 0;
-
-  // Use enrichedOutlines or fallback to suggestedAngles
-  const angles = topic.enrichedOutlines.length > 0
-    ? topic.enrichedOutlines
-    : topic.suggestedAngles.map((a) => ({ angle: a, points: [], wordCount: "", style: "" }));
-
-  // Group materials by type
-  const materialsByType = useMemo(() => {
-    const groups: Record<string, typeof topic.relatedMaterials> = {};
-    for (const m of topic.relatedMaterials) {
-      if (!groups[m.type]) groups[m.type] = [];
-      groups[m.type].push(m);
-    }
-    return groups;
-  }, [topic.relatedMaterials]);
-
-  const materialTypeLabels: Record<string, { label: string; icon: typeof FileText }> = {
-    report: { label: "报告", icon: FileText },
-    data: { label: "数据", icon: Database },
-    comment: { label: "评论", icon: MessageSquare },
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Back link */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white/60 transition-colors"
-      >
-        <ChevronLeft size={14} />
-        返回简报
-      </button>
-
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <PriorityBadge priority={topic.priority} />
-          <HeatScoreBadge score={topic.heatScore} />
-          <TrendIndicator trend={topic.trend} />
-          <AIScoreBadge score={topic.aiScore} size={32} />
-          {normalizeCategory(topic.category) && (
-            <span className={cn(
-              "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium",
-              getCategoryStyle(normalizeCategory(topic.category)).bg,
-              getCategoryStyle(normalizeCategory(topic.category)).text,
-            )}>
-              <Tag size={8} />
-              {normalizeCategory(topic.category)}
-            </span>
-          )}
-        </div>
-        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug">{topic.title}</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          {topic.platforms.map((p) => (
-            <PlatformTag key={p} name={p} />
-          ))}
-          <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-auto flex items-center gap-1">
-            <Clock size={10} />
-            {topic.discoveredAt}
-          </span>
-        </div>
-      </div>
-
-      {/* Summary */}
-      {topic.summary && (
-        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{topic.summary}</p>
-      )}
-
-      {/* Heat Curve */}
-      {topic.heatCurve.length >= 2 && (
-        <GlassCard variant="default" padding="md">
-          <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
-            <Eye size={10} /> 热度曲线
-          </div>
-          <HeatCurveChart data={topic.heatCurve} height={100} />
-        </GlassCard>
-      )}
-
-      {/* AI Angles */}
-      {angles.length > 0 && (
-        <GlassCard variant="default" padding="none">
-          <button
-            onClick={() => setAnglesExpanded(!anglesExpanded)}
-            className="w-full flex items-center justify-between p-4 text-left"
-          >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-              <Lightbulb size={14} />
-              AI 建议切角 ({angles.length})
-            </div>
-            {anglesExpanded ? <ChevronUp size={14} className="text-gray-400 dark:text-gray-500" /> : <ChevronDown size={14} className="text-gray-400 dark:text-gray-500" />}
-          </button>
-          <AnimatePresence>
-            {anglesExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="px-4 pb-4 space-y-3">
-                  {angles.map((outline, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[11px] font-bold text-amber-500">#{i + 1}</span>
-                        <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{outline.angle}</span>
-                        {outline.wordCount && (
-                          <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-auto">{outline.wordCount}</span>
-                        )}
-                        {outline.style && (
-                          <span className="text-[11px] text-gray-400 dark:text-gray-500">{outline.style}</span>
-                        )}
-                      </div>
-                      {outline.points.length > 0 && (
-                        <div className="space-y-0.5 ml-5">
-                          {outline.points.map((pt, j) => (
-                            <p key={j} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
-                              · {pt}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </GlassCard>
-      )}
-
-      {/* Materials */}
-      {topic.relatedMaterials.length > 0 && (
-        <GlassCard variant="default" padding="none">
-          <button
-            onClick={() => setMaterialsExpanded(!materialsExpanded)}
-            className="w-full flex items-center justify-between p-4 text-left"
-          >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-              <FileText size={14} />
-              相关素材 ({topic.relatedMaterials.length})
-            </div>
-            {materialsExpanded ? <ChevronUp size={14} className="text-gray-400 dark:text-gray-500" /> : <ChevronDown size={14} className="text-gray-400 dark:text-gray-500" />}
-          </button>
-          <AnimatePresence>
-            {materialsExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="px-4 pb-4 space-y-3">
-                  {Object.entries(materialsByType).map(([type, items]) => {
-                    const info = materialTypeLabels[type] ?? { label: type, icon: FileText };
-                    const Icon = info.icon;
-                    return (
-                      <div key={type}>
-                        <div className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 mb-1.5">
-                          <Icon size={10} />
-                          {info.label}
-                        </div>
-                        <div className="space-y-1.5">
-                          {items.map((m, i) => (
-                            <div key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-white/[0.03]">
-                              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">{m.title}</div>
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2">{m.snippet}</p>
-                              <span className="text-[11px] text-gray-300 dark:text-gray-600">{m.source}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </GlassCard>
-      )}
-
-      {/* Sentiment */}
-      {totalSentiment > 0 && (
-        <GlassCard variant="default" padding="md">
-          <div className="flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
-            <MessageSquare size={12} className="text-purple-600 dark:text-purple-400" />
-            舆情分布
-          </div>
-          <div className="flex h-2.5 rounded-full overflow-hidden mb-2">
-            <div className="bg-green-500/80" style={{ width: `${posPercent}%` }} />
-            <div className="bg-gray-500/60" style={{ width: `${neuPercent}%` }} />
-            <div className="bg-red-500/80" style={{ width: `${negPercent}%` }} />
-          </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span className="text-green-600 dark:text-green-400"><ThumbsUp size={10} className="inline mr-0.5" />正面 {posPercent}%</span>
-            <span className="text-gray-500 dark:text-gray-400"><Minus size={10} className="inline mr-0.5" />中性 {neuPercent}%</span>
-            <span className="text-red-600 dark:text-red-400"><ThumbsDown size={10} className="inline mr-0.5" />负面 {negPercent}%</span>
-          </div>
-          {topic.commentInsight.hotComments.length > 0 && (
-            <div className="mt-3 space-y-1">
-              <div className="text-[11px] text-gray-400 dark:text-gray-500">热门评论</div>
-              {topic.commentInsight.hotComments.slice(0, 3).map((comment, i) => (
-                <p key={i} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed pl-2 border-l-2 border-gray-200 dark:border-white/10">
-                  {comment}
-                </p>
-              ))}
-            </div>
-          )}
-        </GlassCard>
-      )}
-
-      {/* Competitor */}
-      {topic.competitorResponse.length > 0 && (
-        <GlassCard variant="default" padding="md">
-          <div className="flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
-            <Users size={12} className="text-blue-600 dark:text-blue-400" />
-            竞品动态
-          </div>
-          <div className="space-y-1.5">
-            {topic.competitorResponse.map((resp, i) => (
-              <p key={i} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">{resp}</p>
-            ))}
-          </div>
-        </GlassCard>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
-        {isTracked ? (
-          <Button disabled className="flex-1 bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0">
-            <Eye size={14} className="mr-1.5" />
-            已追踪
-          </Button>
-        ) : (
-          <Button
-            onClick={() => onStartMission(topic.id)}
-            disabled={missionPending}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border-0"
-          >
-            <Rocket size={14} className="mr-1.5" />
-            {missionPending ? "创建中..." : "启动追踪"}
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          className="flex-1 text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white/70 border-0"
-        >
-          <Star size={14} className="mr-1.5" />
-          加入选题策划会素材
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ========================
-// Bottom: Platform Status Bar
-// ========================
-
-function PlatformStatusBar({
-  monitors,
-  isRefreshing,
-  onRefresh,
-}: {
-  monitors: PlatformMonitor[];
-  isRefreshing: boolean;
-  onRefresh: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between px-4 py-1.5 border-t border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-black/20">
-      <div className="flex items-center gap-3 overflow-x-auto">
-        {monitors.map((m) => (
-          <div key={m.name} className="flex items-center gap-1.5 shrink-0">
-            <span
-              className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                m.status === "online" ? "bg-green-400" : "bg-gray-500"
-              )}
-            />
-            <span className="text-[11px] text-gray-500 dark:text-gray-400">{getPlatformShort(m.name)}</span>
-            <span className="text-[11px] text-gray-300 dark:text-gray-600">{m.lastScan}</span>
-          </div>
-        ))}
-      </div>
-      <button
-        onClick={onRefresh}
-        disabled={isRefreshing}
-        className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-white/50 transition-colors shrink-0 ml-3"
-      >
-        <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} />
-        {isRefreshing ? "抓取中" : "刷新"}
-      </button>
     </div>
   );
 }
