@@ -232,7 +232,7 @@ export function InspirationClient({
 
   // Filter state
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   // Dialog/Sheet state
   const [showSubscriptionSheet, setShowSubscriptionSheet] = useState(false);
@@ -335,24 +335,17 @@ export function InspirationClient({
     ].filter((p) => p.count > 0);
   }, [baseTopics]);
 
-  const categoryStats = useMemo(() => {
+  const platformStats = useMemo(() => {
     const counts = new Map<string, number>();
-    let uncategorized = 0;
     for (const t of baseTopics) {
-      const cat = normalizeCategory(t.category);
-      if (cat) {
-        counts.set(cat, (counts.get(cat) || 0) + 1);
-      } else {
-        uncategorized++;
+      for (const p of t.platforms) {
+        const short = getPlatformShort(p);
+        counts.set(short, (counts.get(short) || 0) + 1);
       }
     }
-    const sorted = Array.from(counts.entries())
+    return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, count]) => ({ name, count }));
-    if (uncategorized > 0) {
-      sorted.push({ name: "未分类", count: uncategorized });
-    }
-    return sorted;
   }, [baseTopics]);
 
   const filteredTopics = useMemo(() => {
@@ -361,13 +354,11 @@ export function InspirationClient({
     if (selectedPriority) {
       result = result.filter((t) => t.priority === selectedPriority);
     }
-    // Apply category filter
-    if (selectedCategory) {
-      if (selectedCategory === "未分类") {
-        result = result.filter((t) => !normalizeCategory(t.category));
-      } else {
-        result = result.filter((t) => normalizeCategory(t.category) === selectedCategory);
-      }
+    // Apply platform filter
+    if (selectedPlatform) {
+      result = result.filter((t) =>
+        t.platforms.some((p) => getPlatformShort(p) === selectedPlatform)
+      );
     }
     // Sort: priority > subscribed-first (in "all" tab) > heatScore desc
     const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
@@ -382,7 +373,7 @@ export function InspirationClient({
       }
       return b.heatScore - a.heatScore;
     });
-  }, [baseTopics, activeTab, subscribedCategories, selectedPriority, selectedCategory]);
+  }, [baseTopics, activeTab, subscribedCategories, selectedPriority, selectedPlatform]);
 
   // Unread counts per tab
   const unreadSubscribed = useMemo(() => {
@@ -500,7 +491,7 @@ export function InspirationClient({
     setActiveTab(tab);
     setSelectedTopicId(null);
     setSelectedPriority(null);
-    setSelectedCategory(null);
+    setSelectedPlatform(null);
   }, []);
 
   // ========================
@@ -553,12 +544,12 @@ export function InspirationClient({
             onSettingsClick={() => setShowSubscriptionSheet(true)}
           />
 
-          {/* Filter Bar — priority + category chips */}
+          {/* Filter Bar — priority + platform chips */}
           {activeTab !== "calendar" && (
             <div className="border-b border-gray-200 dark:border-white/5">
               {/* Priority filter row */}
               <TooltipProvider delayDuration={200}>
-                <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
+                <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5 bg-gray-50/50 dark:bg-white/[0.02]">
                   <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">优先级</span>
                   <button
                     onClick={() => setSelectedPriority(null)}
@@ -591,40 +582,49 @@ export function InspirationClient({
                     </Tooltip>
                   ))}
                   {/* Filtered count */}
-                  <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                  <span className={cn(
+                    "ml-auto text-xs shrink-0 transition-colors",
+                    (selectedPriority || selectedPlatform)
+                      ? "text-blue-600 dark:text-blue-400 font-medium"
+                      : "text-gray-400 dark:text-gray-500"
+                  )}>
                     {filteredTopics.length} 条
                   </span>
                 </div>
               </TooltipProvider>
-              {/* Category filter row */}
+              {/* Platform filter row */}
               <div className="flex items-center gap-1.5 px-3 pb-2 overflow-x-auto no-scrollbar">
-                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">分类</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">来源</span>
                 <button
-                  onClick={() => setSelectedCategory(null)}
+                  onClick={() => setSelectedPlatform(null)}
                   className={cn(
                     "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                    !selectedCategory
+                    !selectedPlatform
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
                   )}
                 >
                   全部
                 </button>
-                {categoryStats.map((cat) => (
-                  <button
-                    key={cat.name}
-                    onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
-                    className={cn(
-                      "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                      selectedCategory === cat.name
-                        ? `${getCategoryStyle(cat.name).bg} ${getCategoryStyle(cat.name).text} ring-1 ring-current/20`
-                        : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                    )}
-                  >
-                    {cat.name}
-                    <span className="ml-1 opacity-60">{cat.count}</span>
-                  </button>
-                ))}
+                {platformStats.map((p) => {
+                  const style = getPlatformStyle(p.name);
+                  return (
+                    <button
+                      key={p.name}
+                      onClick={() => setSelectedPlatform(selectedPlatform === p.name ? null : p.name)}
+                      className={cn(
+                        "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1",
+                        selectedPlatform === p.name
+                          ? `${style.bg} ${style.text} ring-1 ring-current/20`
+                          : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                      )}
+                    >
+                      <span className="text-[11px]">{style.icon}</span>
+                      {p.name}
+                      <span className="opacity-60">{p.count}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -959,10 +959,15 @@ function TopicList({
             <div
               onClick={() => onSelect(isExpanded ? "" : topic.id)}
               className={cn(
-                "relative flex gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-150 group",
+                "relative flex gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-150 group border-l-2",
                 isExpanded
-                  ? "bg-blue-50 dark:bg-white/[0.08] border-l-2 border-l-blue-400"
-                  : "hover:bg-gray-50 dark:hover:bg-white/[0.03] border-l-2 border-l-transparent",
+                  ? "bg-blue-50 dark:bg-white/[0.08] border-l-blue-500 dark:border-l-blue-400"
+                  : cn(
+                      "hover:bg-gray-50 dark:hover:bg-white/[0.03]",
+                      topic.priority === "P0" ? "border-l-red-400" :
+                      topic.priority === "P1" ? "border-l-orange-400" :
+                      "border-l-gray-300 dark:border-l-gray-600"
+                    ),
               )}
             >
               {/* Unread dot */}
@@ -1039,16 +1044,13 @@ function TopicList({
             </div>
 
             {/* Inline expanded detail */}
-            <AnimatePresence>
-              {isExpanded && (
-                <TopicInlineDetail
-                  topic={topic}
-                  isTracked={trackedIds.has(topic.id)}
-                  missionPending={missionPendingId === topic.id}
-                  onStartMission={onStartMission}
-                />
-              )}
-            </AnimatePresence>
+            <TopicInlineDetail
+              topic={topic}
+              isExpanded={isExpanded}
+              isTracked={trackedIds.has(topic.id)}
+              missionPending={missionPendingId === topic.id}
+              onStartMission={onStartMission}
+            />
           </div>
         );
       })}
@@ -1062,11 +1064,13 @@ function TopicList({
 
 function TopicInlineDetail({
   topic,
+  isExpanded,
   isTracked,
   missionPending,
   onStartMission,
 }: {
   topic: InspirationTopic;
+  isExpanded: boolean;
   isTracked: boolean;
   missionPending: boolean;
   onStartMission: (id: string) => void;
@@ -1082,107 +1086,108 @@ function TopicInlineDetail({
     : topic.suggestedAngles.map((a) => ({ angle: a, points: [], wordCount: "", style: "" }));
 
   return (
-    <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: "auto", opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="overflow-hidden"
+    <div
+      className={cn(
+        "grid transition-all duration-300 ease-in-out",
+        isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+      )}
     >
-      <div className="mx-2 mb-3 mt-1 rounded-xl bg-gradient-to-b from-blue-50/80 to-gray-50/50 dark:from-blue-950/20 dark:to-gray-900/20 p-3 space-y-3 ring-1 ring-blue-200/50 dark:ring-blue-500/10">
-        {/* Full summary */}
-        {topic.summary && (
-          <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed">
-            {topic.summary}
-          </p>
-        )}
+      <div className="overflow-hidden">
+        <div className="mx-2 mb-3 mt-1 rounded-xl bg-gradient-to-b from-blue-50/80 to-gray-50/50 dark:from-blue-950/20 dark:to-gray-900/20 p-3 space-y-3 ring-1 ring-blue-200/50 dark:ring-blue-500/10">
+          {/* Full summary */}
+          {topic.summary && (
+            <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed">
+              {topic.summary}
+            </p>
+          )}
 
-        {/* Heat Curve — compact */}
-        {topic.heatCurve.length >= 2 && (
-          <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
-            <div className="text-[11px] text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
-              <BarChart3 size={10} /> 热度趋势
+          {/* Heat Curve — compact */}
+          {topic.heatCurve.length >= 2 && (
+            <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
+              <div className="text-[11px] text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
+                <BarChart3 size={10} /> 热度趋势
+              </div>
+              <HeatCurveChart data={topic.heatCurve} height={60} />
             </div>
-            <HeatCurveChart data={topic.heatCurve} height={60} />
-          </div>
-        )}
+          )}
 
-        {/* AI Angles — styled cards */}
-        {angles.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <Lightbulb size={12} /> AI 建议切角
-            </div>
-            {angles.map((outline, i) => (
-              <div key={i} className="rounded-lg bg-white/80 dark:bg-amber-500/5 p-2.5 ring-1 ring-amber-200/50 dark:ring-amber-500/10">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                  <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 flex-1">{outline.angle}</span>
-                  {outline.wordCount && (
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">{outline.wordCount}字</span>
+          {/* AI Angles — styled cards */}
+          {angles.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <Lightbulb size={12} /> AI 建议切角
+              </div>
+              {angles.map((outline, i) => (
+                <div key={i} className="rounded-lg bg-white/80 dark:bg-amber-500/5 p-2.5 ring-1 ring-amber-200/50 dark:ring-amber-500/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                    <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 flex-1">{outline.angle}</span>
+                    {outline.wordCount && (
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">{outline.wordCount}字</span>
+                    )}
+                  </div>
+                  {outline.points.length > 0 && (
+                    <div className="space-y-0.5 ml-7">
+                      {outline.points.map((pt, j) => (
+                        <p key={j} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
+                          · {pt}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </div>
-                {outline.points.length > 0 && (
-                  <div className="space-y-0.5 ml-7">
-                    {outline.points.map((pt, j) => (
-                      <p key={j} className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
-                        · {pt}
-                      </p>
-                    ))}
-                  </div>
-                )}
+              ))}
+            </div>
+          )}
+
+          {/* Sentiment — compact bar */}
+          {totalSentiment > 0 && (
+            <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
+              <div className="text-[11px] font-medium text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1">
+                <MessageSquare size={10} /> 舆情
               </div>
-            ))}
-          </div>
-        )}
+              <div className="flex h-2 rounded-full overflow-hidden mb-1.5">
+                <div className="bg-green-500" style={{ width: `${posPercent}%` }} />
+                <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${neuPercent}%` }} />
+                <div className="bg-red-500" style={{ width: `${negPercent}%` }} />
+              </div>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className="text-green-600 dark:text-green-400">正面 {posPercent}%</span>
+                <span className="text-gray-500 dark:text-gray-400">中性 {neuPercent}%</span>
+                <span className="text-red-600 dark:text-red-400">负面 {negPercent}%</span>
+              </div>
+            </div>
+          )}
 
-        {/* Sentiment — compact bar */}
-        {totalSentiment > 0 && (
-          <div className="rounded-lg bg-white/70 dark:bg-white/[0.03] p-2.5 ring-1 ring-gray-200/50 dark:ring-white/5">
-            <div className="text-[11px] font-medium text-gray-500 dark:text-gray-500 mb-1.5 flex items-center gap-1">
-              <MessageSquare size={10} /> 舆情
-            </div>
-            <div className="flex h-2 rounded-full overflow-hidden mb-1.5">
-              <div className="bg-green-500" style={{ width: `${posPercent}%` }} />
-              <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${neuPercent}%` }} />
-              <div className="bg-red-500" style={{ width: `${negPercent}%` }} />
-            </div>
-            <div className="flex items-center gap-3 text-[11px]">
-              <span className="text-green-600 dark:text-green-400">正面 {posPercent}%</span>
-              <span className="text-gray-500 dark:text-gray-400">中性 {neuPercent}%</span>
-              <span className="text-red-600 dark:text-red-400">负面 {negPercent}%</span>
-            </div>
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 pt-1">
-          {isTracked ? (
-            <Button size="sm" disabled className="h-8 text-xs bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0 rounded-lg">
-              <Eye size={12} className="mr-1.5" /> 已追踪
-            </Button>
-          ) : (
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 pt-1">
+            {isTracked ? (
+              <Button size="sm" disabled className="h-8 text-xs bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-400 border-0 rounded-lg">
+                <Eye size={12} className="mr-1.5" /> 已追踪
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onStartMission(topic.id); }}
+                disabled={missionPending}
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-lg shadow-sm"
+              >
+                <Rocket size={12} className="mr-1.5" />
+                {missionPending ? "创建中..." : "启动追踪"}
+              </Button>
+            )}
             <Button
               size="sm"
-              onClick={(e) => { e.stopPropagation(); onStartMission(topic.id); }}
-              disabled={missionPending}
-              className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-lg shadow-sm"
+              variant="ghost"
+              className="h-8 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0 rounded-lg"
+              onClick={(e) => e.stopPropagation()}
             >
-              <Rocket size={12} className="mr-1.5" />
-              {missionPending ? "创建中..." : "启动追踪"}
+              <Star size={12} className="mr-1.5" /> 收藏
             </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 border-0 rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Star size={12} className="mr-1.5" /> 收藏
-          </Button>
+          </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
