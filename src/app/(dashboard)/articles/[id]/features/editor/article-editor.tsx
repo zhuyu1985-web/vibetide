@@ -15,8 +15,12 @@ import CharacterCount from "@tiptap/extension-character-count";
 import Typography from "@tiptap/extension-typography";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
+import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import { EditorToolbar } from "./editor-toolbar";
 import { EditorStatusBar } from "./editor-status-bar";
+import { SlashCommand } from "./slash-command";
+import { BubbleMenuBar } from "./bubble-menu-bar";
+import { AIHighlight } from "./extensions/ai-highlight";
 import { updateArticle } from "@/app/actions/articles";
 import { cn } from "@/lib/utils";
 import type { ArticleDetail } from "@/lib/types";
@@ -82,6 +86,11 @@ export function ArticleEditor({
       Typography,
       Subscript,
       Superscript,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      AIHighlight,
     ],
     content: article.body ?? "",
     editorProps: {
@@ -199,7 +208,18 @@ export function ArticleEditor({
   const wordCount = editor?.storage.characterCount?.words() ?? 0;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      <style>{`
+        .ai-highlight-fade {
+          background-color: rgba(168, 85, 247, 0.15);
+          animation: ai-fade 2s ease-out forwards;
+        }
+        @keyframes ai-fade {
+          0% { background-color: rgba(168, 85, 247, 0.15); }
+          100% { background-color: transparent; }
+        }
+      `}</style>
+
       <EditorToolbar
         editor={editor}
         isSaving={isSaving}
@@ -221,8 +241,11 @@ export function ArticleEditor({
 
           {/* Editor content */}
           <EditorContent editor={editor} />
+          <BubbleMenuBar editor={editor} />
         </div>
       </div>
+
+      <SlashCommand editor={editor} />
 
       <EditorStatusBar
         characterCount={characterCount}
