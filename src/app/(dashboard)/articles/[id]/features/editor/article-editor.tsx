@@ -22,6 +22,7 @@ import { SlashCommand } from "./slash-command";
 import { BubbleMenuBar } from "./bubble-menu-bar";
 import { AIHighlight } from "./extensions/ai-highlight";
 import { updateArticle } from "@/app/actions/articles";
+import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
 import type { ArticleDetail } from "@/lib/types";
 import type { AppearanceSettings } from "../../types";
@@ -191,6 +192,17 @@ export function ArticleEditor({
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
   }, []);
+
+  // Register editor instance in store for cross-panel access
+  const setEditorInstance = useArticlePageStore((s) => s.setEditorInstance);
+  useEffect(() => {
+    if (editor) {
+      setEditorInstance(editor);
+    }
+    return () => {
+      setEditorInstance(null);
+    };
+  }, [editor, setEditorInstance]);
 
   // Title change triggers dirty state + auto-save
   const handleTitleChange = (newTitle: string) => {

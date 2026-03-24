@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { Editor } from "@tiptap/react";
 import type { ViewMode, ContentType, ActiveView, LeftTab, RightTab } from "./types";
 
 interface ArticlePageStore {
@@ -14,6 +15,7 @@ interface ArticlePageStore {
   selectedRange: { from: number; to: number } | null;
   scrollToPosition: number | null;
   highlightAnnotationId: string | null;
+  editorInstance: Editor | null;
 
   setViewMode: (mode: ViewMode) => void;
   setContentType: (type: ContentType) => void;
@@ -26,6 +28,7 @@ interface ArticlePageStore {
   setSelectedText: (text: string | null, range?: { from: number; to: number }) => void;
   scrollToAnnotation: (annotationId: string) => void;
   clearScrollTarget: () => void;
+  setEditorInstance: (editor: Editor | null) => void;
 }
 
 export const useArticlePageStore = create<ArticlePageStore>((set) => ({
@@ -41,6 +44,7 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   selectedRange: null,
   scrollToPosition: null,
   highlightAnnotationId: null,
+  editorInstance: null,
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setContentType: (type) => set({ contentType: type }),
@@ -58,4 +62,5 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   setSelectedText: (text, range) => set({ selectedText: text, selectedRange: range ?? null }),
   scrollToAnnotation: (id) => set({ highlightAnnotationId: id, scrollToPosition: Date.now() }),
   clearScrollTarget: () => set({ highlightAnnotationId: null, scrollToPosition: null }),
+  setEditorInstance: (editor) => set({ editorInstance: editor }),
 }));
