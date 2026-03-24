@@ -15,6 +15,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -323,9 +329,9 @@ export function InspirationClient({
     const counts: Record<string, number> = { P0: 0, P1: 0, P2: 0 };
     for (const t of baseTopics) counts[t.priority] = (counts[t.priority] || 0) + 1;
     return [
-      { key: "P0", label: "P0 必追", count: counts.P0, color: "bg-red-600 text-white", inactiveColor: "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400" },
-      { key: "P1", label: "P1 建议", count: counts.P1, color: "bg-orange-500 text-white", inactiveColor: "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400" },
-      { key: "P2", label: "P2 关注", count: counts.P2, color: "bg-gray-600 text-white dark:bg-gray-500", inactiveColor: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+      { key: "P0", label: "P0 必追", count: counts.P0, color: "bg-red-600 text-white", inactiveColor: "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400", desc: "跨3+平台且热度>90，全网爆点级话题，需立即跟进" },
+      { key: "P1", label: "P1 建议", count: counts.P1, color: "bg-orange-500 text-white", inactiveColor: "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400", desc: "跨2+平台或热度较高，建议安排跟进报道" },
+      { key: "P2", label: "P2 关注", count: counts.P2, color: "bg-gray-600 text-white dark:bg-gray-500", inactiveColor: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", desc: "单平台热点，持续关注动态，必要时升级" },
     ].filter((p) => p.count > 0);
   }, [baseTopics]);
 
@@ -551,37 +557,45 @@ export function InspirationClient({
           {activeTab !== "calendar" && (
             <div className="border-b border-gray-200 dark:border-white/5">
               {/* Priority filter row */}
-              <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
-                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">优先级</span>
-                <button
-                  onClick={() => setSelectedPriority(null)}
-                  className={cn(
-                    "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                    !selectedPriority
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                  )}
-                >
-                  全部
-                </button>
-                {priorityStats.map((p) => (
+              <TooltipProvider delayDuration={200}>
+                <div className="flex items-center gap-1.5 px-3 pt-2 pb-1.5">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">优先级</span>
                   <button
-                    key={p.key}
-                    onClick={() => setSelectedPriority(selectedPriority === p.key ? null : p.key)}
+                    onClick={() => setSelectedPriority(null)}
                     className={cn(
                       "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                      selectedPriority === p.key ? p.color : p.inactiveColor
+                      !selectedPriority
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
                     )}
                   >
-                    {p.label}
-                    <span className="ml-1 opacity-70">{p.count}</span>
+                    全部
                   </button>
-                ))}
-                {/* Filtered count */}
-                <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                  {filteredTopics.length} 条
-                </span>
-              </div>
+                  {priorityStats.map((p) => (
+                    <Tooltip key={p.key}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setSelectedPriority(selectedPriority === p.key ? null : p.key)}
+                          className={cn(
+                            "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                            selectedPriority === p.key ? p.color : p.inactiveColor
+                          )}
+                        >
+                          {p.label}
+                          <span className="ml-1 opacity-70">{p.count}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[240px] text-xs">
+                        <p>{p.desc}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                  {/* Filtered count */}
+                  <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                    {filteredTopics.length} 条
+                  </span>
+                </div>
+              </TooltipProvider>
               {/* Category filter row */}
               <div className="flex items-center gap-1.5 px-3 pb-2 overflow-x-auto no-scrollbar">
                 <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mr-1">分类</span>
@@ -1382,24 +1396,30 @@ function EditorialBriefing({
       {/* Priority Distribution */}
       <GlassCard variant="default" padding="md">
         <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
-          <BarChart3 size={12} />
+          <BarChart3 size={14} />
           优先级分布
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-3">
           {[
-            { label: "P0 必追", count: p0Count, color: "bg-red-500", textColor: "text-red-600 dark:text-red-400" },
-            { label: "P1 建议", count: p1Count, color: "bg-orange-500", textColor: "text-orange-600 dark:text-orange-400" },
-            { label: "P2 关注", count: p2Count, color: "bg-gray-500", textColor: "text-gray-600 dark:text-gray-400" },
+            { label: "P0 必追", desc: "跨3+平台且热度>90，全网爆点，需立即跟进", count: p0Count, color: "bg-red-500", textColor: "text-red-600 dark:text-red-400", dotColor: "bg-red-500" },
+            { label: "P1 建议", desc: "跨2+平台或热度较高，建议安排跟进报道", count: p1Count, color: "bg-orange-500", textColor: "text-orange-600 dark:text-orange-400", dotColor: "bg-orange-500" },
+            { label: "P2 关注", desc: "单平台热点，持续关注，必要时升级", count: p2Count, color: "bg-gray-500", textColor: "text-gray-600 dark:text-gray-400", dotColor: "bg-gray-400" },
           ].map((item) => (
-            <div key={item.label} className="flex items-center gap-3">
-              <span className={cn("text-xs font-medium w-14", item.textColor)}>{item.label}</span>
-              <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
-                <div
-                  className={cn("h-full rounded-full transition-all", item.color)}
-                  style={{ width: total > 0 ? `${(item.count / total) * 100}%` : "0%" }}
-                />
+            <div key={item.label} className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 w-16 shrink-0">
+                  <span className={cn("w-2 h-2 rounded-full shrink-0", item.dotColor)} />
+                  <span className={cn("text-sm font-semibold", item.textColor)}>{item.label}</span>
+                </div>
+                <div className="flex-1 h-2.5 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full transition-all", item.color)}
+                    style={{ width: total > 0 ? `${(item.count / total) * 100}%` : "0%" }}
+                  />
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-8 text-right">{item.count}</span>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-500 w-6 text-right">{item.count}</span>
+              <p className="text-xs text-gray-400 dark:text-gray-500 ml-[22px]">{item.desc}</p>
             </div>
           ))}
         </div>
