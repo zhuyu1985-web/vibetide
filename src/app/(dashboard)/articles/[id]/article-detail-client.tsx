@@ -9,6 +9,7 @@ import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
+import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
 
 export default function ArticleDetailClient({
   article,
@@ -159,8 +160,24 @@ export default function ArticleDetailClient({
                   )
                 )}
               </div>
-              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                [右侧面板内容 -- 后续 Task 填充]
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {rightTab === "analysis" && (
+                  <AIAnalysisPanel
+                    articleId={article.id}
+                    articleContent={article.body ?? ""}
+                    initialCache={initialAIAnalysis}
+                  />
+                )}
+                {rightTab === "annotations" && (
+                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                    [批注 — 后续 Task 填充]
+                  </div>
+                )}
+                {rightTab === "transcript" && (
+                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                    [听记 — 后续 Task 填充]
+                  </div>
+                )}
               </div>
             </div>
           ) : (
