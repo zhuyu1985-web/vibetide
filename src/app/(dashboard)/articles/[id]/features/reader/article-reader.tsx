@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { MetaHeader } from "./meta-header";
+import { TextSelectionMenu } from "./text-selection-menu";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { ArticleDetail } from "@/lib/types";
@@ -9,6 +11,7 @@ import type { AppearanceSettings } from "../../types";
 interface ArticleReaderProps {
   article: ArticleDetail;
   appearance: AppearanceSettings;
+  organizationId?: string;
 }
 
 const marginWidths: Record<AppearanceSettings["margins"], number> = {
@@ -30,27 +33,38 @@ const fontFamilyClasses: Record<AppearanceSettings["fontFamily"], string> = {
   mono: "font-mono",
 };
 
-export function ArticleReader({ article, appearance }: ArticleReaderProps) {
+export function ArticleReader({ article, appearance, organizationId = "" }: ArticleReaderProps) {
   const maxWidth = marginWidths[appearance.margins];
+  const contentRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div
-      className="mx-auto px-8 py-6"
-      style={{ maxWidth: `${maxWidth}px` }}
-    >
-      <MetaHeader article={article} />
+    <>
+      <div
+        className="mx-auto px-8 py-6"
+        style={{ maxWidth: `${maxWidth}px` }}
+      >
+        <MetaHeader article={article} />
 
-      <Separator className="my-5" />
+        <Separator className="my-5" />
 
-      <article
-        className={cn(
-          "prose dark:prose-invert max-w-none",
-          lineHeightClasses[appearance.lineHeight],
-          fontFamilyClasses[appearance.fontFamily]
-        )}
-        style={{ fontSize: `${appearance.fontSize}px` }}
-        dangerouslySetInnerHTML={{ __html: article.body ?? "" }}
+        <div ref={contentRef}>
+          <article
+            className={cn(
+              "prose dark:prose-invert max-w-none",
+              lineHeightClasses[appearance.lineHeight],
+              fontFamilyClasses[appearance.fontFamily]
+            )}
+            style={{ fontSize: `${appearance.fontSize}px` }}
+            dangerouslySetInnerHTML={{ __html: article.body ?? "" }}
+          />
+        </div>
+      </div>
+
+      <TextSelectionMenu
+        articleId={article.id}
+        organizationId={organizationId}
+        containerRef={contentRef}
       />
-    </div>
+    </>
   );
 }

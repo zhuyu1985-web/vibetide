@@ -126,7 +126,11 @@ export default function ArticleDetailClient({
             />
           ) : (
             <div className="h-full overflow-y-auto">
-              <ArticleReader article={article} appearance={appearance} />
+              <ArticleReader
+                article={article}
+                appearance={appearance}
+                organizationId={organizationId}
+              />
             </div>
           )}
         </div>
