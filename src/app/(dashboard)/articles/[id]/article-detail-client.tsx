@@ -8,6 +8,7 @@ import { ArticleHeader } from "./features/header/article-header";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
+import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
 
 export default function ArticleDetailClient({
   article,
@@ -89,9 +90,11 @@ export default function ArticleDetailClient({
                   <OutlinePanel htmlContent={article.body ?? ""} />
                 )}
                 {leftTab === "chat" && (
-                  <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                    [AI 对话 — Phase 2]
-                  </div>
+                  <AIChatPanel
+                    articleContent={article.body ?? ""}
+                    viewMode={viewMode}
+                    contentType={article.mediaType === "video" ? "video" : "article"}
+                  />
                 )}
                 {leftTab === "history" && (
                   <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
