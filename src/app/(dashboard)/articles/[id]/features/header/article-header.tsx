@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -12,21 +13,34 @@ import {
 } from "lucide-react";
 import { useArticlePageStore } from "../../store";
 import { ViewSwitcher } from "./view-switcher";
+import { AppearancePopover } from "./appearance-popover";
+import { ActionsMenu } from "./actions-menu";
 import { cn } from "@/lib/utils";
 import type { ArticleDetail } from "@/lib/types";
+import type { AppearanceSettings } from "../../types";
 
 interface ArticleHeaderProps {
   article: ArticleDetail;
   annotationCount: number;
+  appearance: AppearanceSettings;
+  onUpdateAppearance: (updates: Partial<AppearanceSettings>) => void;
 }
 
-export function ArticleHeader({ article, annotationCount }: ArticleHeaderProps) {
+export function ArticleHeader({
+  article,
+  annotationCount,
+  appearance,
+  onUpdateAppearance,
+}: ArticleHeaderProps) {
   const router = useRouter();
   const viewMode = useArticlePageStore((s) => s.viewMode);
   const setViewMode = useArticlePageStore((s) => s.setViewMode);
 
+  const [showAppearance, setShowAppearance] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+
   return (
-    <div className="h-12 flex items-center justify-between px-4 border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl shrink-0">
+    <div className="relative h-12 flex items-center justify-between px-4 border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl shrink-0">
       {/* Left: back + breadcrumb */}
       <div className="flex items-center gap-2 min-w-0">
         <button
@@ -52,7 +66,7 @@ export function ArticleHeader({ article, annotationCount }: ArticleHeaderProps) 
       </div>
 
       {/* Right: toolbar icons */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0 relative">
         {/* Read / Edit toggle */}
         <button
           onClick={() => setViewMode(viewMode === "read" ? "edit" : "read")}
@@ -78,10 +92,30 @@ export function ArticleHeader({ article, annotationCount }: ArticleHeaderProps) 
 
         <div className="w-px h-5 bg-border mx-1" />
 
-        {/* Type (Aa) */}
-        <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
-          <Type className="h-4 w-4" />
-        </button>
+        {/* Type (Aa) — appearance popover trigger */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowAppearance((v) => !v);
+              setShowActionsMenu(false);
+            }}
+            className={cn(
+              "p-1.5 rounded-md transition-colors",
+              showAppearance
+                ? "bg-blue-500/10 text-blue-500"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            )}
+          >
+            <Type className="h-4 w-4" />
+          </button>
+          {showAppearance && (
+            <AppearancePopover
+              appearance={appearance}
+              onUpdate={onUpdateAppearance}
+              onClose={() => setShowAppearance(false)}
+            />
+          )}
+        </div>
 
         {/* Sparkles (AI) */}
         <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
@@ -98,10 +132,30 @@ export function ArticleHeader({ article, annotationCount }: ArticleHeaderProps) 
           )}
         </button>
 
-        {/* More actions */}
-        <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        {/* More actions — actions menu trigger */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowActionsMenu((v) => !v);
+              setShowAppearance(false);
+            }}
+            className={cn(
+              "p-1.5 rounded-md transition-colors",
+              showActionsMenu
+                ? "bg-blue-500/10 text-blue-500"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            )}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {showActionsMenu && (
+            <ActionsMenu
+              articleId={article.id}
+              articleUrl={undefined}
+              onClose={() => setShowActionsMenu(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

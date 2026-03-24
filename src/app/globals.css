@@ -386,6 +386,12 @@
   }
 }
 
+/* Zen mode hint fade-out animation */
+@keyframes zenHintFadeOut {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Custom scrollbar */
 @layer base {
   ::-webkit-scrollbar {

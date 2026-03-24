@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { MetaHeader } from "./meta-header";
 import { TextSelectionMenu } from "./text-selection-menu";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +36,17 @@ const fontFamilyClasses: Record<AppearanceSettings["fontFamily"], string> = {
 export function ArticleReader({ article, appearance, organizationId = "" }: ArticleReaderProps) {
   const maxWidth = marginWidths[appearance.margins];
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Apply native lazy loading to all images in the article body
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+    const images = container.querySelectorAll("img");
+    images.forEach((img) => {
+      img.loading = "lazy";
+      img.decoding = "async";
+    });
+  }, [article.body]);
 
   return (
     <>
