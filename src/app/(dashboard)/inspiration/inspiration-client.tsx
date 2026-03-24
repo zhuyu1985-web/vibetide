@@ -1169,7 +1169,7 @@ function EditorialBriefing({
         <Button
           onClick={onTrackAllP0}
           disabled={isTrackingAll}
-          className="w-full bg-red-600 hover:bg-red-700 text-white border-0"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white border-0"
         >
           <Rocket size={14} className="mr-1.5" />
           {isTrackingAll ? "启动中..." : `一键追踪全部 P0（${p0Count} 条）`}
