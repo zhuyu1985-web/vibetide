@@ -389,3 +389,28 @@ export const benchmarkAlertStatusEnum = pgEnum("benchmark_alert_status", [
   "actioned",
   "dismissed",
 ]);
+
+// Article detail / news reader enums
+export const annotationColorEnum = pgEnum("annotation_color", [
+  "red",
+  "yellow",
+  "green",
+  "blue",
+  "purple",
+]);
+
+export const aiAnalysisPerspectiveEnum = pgEnum("ai_analysis_perspective", [
+  "summary",
+  "journalist",
+  "quotes",
+  "timeline",
+  "qa",
+  "deep",
+]);
+
+export const aiSentimentEnum = pgEnum("ai_sentiment", [
+  "neutral",
+  "bullish",
+  "critical",
+  "advertorial",
+]);

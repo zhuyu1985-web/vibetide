@@ -777,6 +777,7 @@ export interface ArticleListItem {
 export interface ArticleDetail extends ArticleListItem {
   body?: string;
   summary?: string;
+  videoUrl?: string;
   imageNotes?: string[];
   advisorNotes?: string[];
   sourceAssetId?: string;
