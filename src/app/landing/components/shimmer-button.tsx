@@ -29,13 +29,13 @@ export function ShimmerButton({
   const sharedClasses = cn(
     "relative inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 cursor-pointer",
     isPrimary
-      ? "text-white bg-[#0A84FF] hover:bg-[#0071e3] shadow-[0_2px_8px_rgba(10,132,255,0.3)] hover:shadow-[0_4px_16px_rgba(10,132,255,0.4)] dark:shadow-[0_4px_20px_rgba(10,132,255,0.4)] dark:hover:shadow-[0_8px_30px_rgba(10,132,255,0.5)]"
+      ? "text-primary-foreground bg-primary hover:brightness-110 shadow-[0_2px_8px_color-mix(in_srgb,var(--primary)_30%,transparent)] hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--primary)_40%,transparent)]"
       : [
-          "text-slate-700 dark:text-slate-200",
-          "bg-white dark:bg-[#111a2e]",
-          "border border-slate-200 dark:border-[#1e293b]",
+          "text-foreground",
+          "bg-card",
+          "border border-border",
           "shadow-sm hover:shadow-md",
-          "hover:border-slate-300 dark:hover:border-[#2d3a50]",
+          "hover:border-border",
         ].join(" "),
     className
   );

@@ -27,7 +27,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { approveWorkflowStep, batchApproveWorkflowSteps } from "@/app/actions/workflow-engine";
+// TODO: re-implement approval actions with mission system
 import { AUTO_SCENARIO_TEMPLATES, WORKFLOW_STEPS } from "@/lib/constants";
 import type { EmployeeId } from "@/lib/constants";
 import type {
@@ -103,44 +103,23 @@ export function ApprovalsClient({
       ? pending
       : pending.filter((p) => p.teamId === teamFilter);
 
-  function handleApprove(item: PendingApproval) {
+  function handleApprove(_item: PendingApproval) {
+    // TODO: re-implement with mission system
     startTransition(async () => {
-      await approveWorkflowStep({
-        workflowInstanceId: item.workflowInstanceId,
-        stepId: item.stepId,
-        approved: true,
-        feedback: feedbackMap[item.stepId] || undefined,
-      });
       router.refresh();
     });
   }
 
-  function handleReject(item: PendingApproval) {
+  function handleReject(_item: PendingApproval) {
+    // TODO: re-implement with mission system
     startTransition(async () => {
-      await approveWorkflowStep({
-        workflowInstanceId: item.workflowInstanceId,
-        stepId: item.stepId,
-        approved: false,
-        feedback: feedbackMap[item.stepId] || "审批驳回",
-      });
       router.refresh();
     });
   }
 
   function handleBatchApprove() {
-    const items = filteredPending
-      .filter((p) => selectedIds.has(p.stepId))
-      .map((p) => ({
-        workflowInstanceId: p.workflowInstanceId,
-        stepId: p.stepId,
-        approved: true,
-        feedback: feedbackMap[p.stepId] || undefined,
-      }));
-
-    if (items.length === 0) return;
-
+    // TODO: re-implement with mission system
     startTransition(async () => {
-      await batchApproveWorkflowSteps({ items });
       setSelectedIds(new Set());
       router.refresh();
     });

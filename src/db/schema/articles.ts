@@ -10,9 +10,8 @@ import { relations } from "drizzle-orm";
 import { organizations, userProfiles } from "./users";
 import { categories } from "./categories";
 import { aiEmployees } from "./ai-employees";
-import { teams } from "./teams";
 import { tasks } from "./tasks";
-import { workflowInstances } from "./workflows";
+import { missions } from "./missions";
 import { mediaAssets } from "./media-assets";
 import { articleStatusEnum } from "./enums";
 
@@ -41,7 +40,6 @@ export const articles = pgTable("articles", {
 
   categoryId: uuid("category_id").references(() => categories.id),
   assigneeId: uuid("assignee_id").references(() => aiEmployees.id),
-  teamId: uuid("team_id").references(() => teams.id),
   createdBy: uuid("created_by").references(() => userProfiles.id),
 
   advisorNotes: jsonb("advisor_notes").$type<string[]>(),
@@ -53,9 +51,7 @@ export const articles = pgTable("articles", {
   archivedAt: timestamp("archived_at", { withTimezone: true }),
 
   taskId: uuid("task_id").references(() => tasks.id),
-  workflowInstanceId: uuid("workflow_instance_id").references(
-    () => workflowInstances.id
-  ),
+  missionId: uuid("mission_id").references(() => missions.id),
 
   // News reader / detail page fields
   webArchiveHtml: text("web_archive_html"),
@@ -107,10 +103,6 @@ export const articlesRelations = relations(articles, ({ one, many }) => ({
     fields: [articles.assigneeId],
     references: [aiEmployees.id],
   }),
-  team: one(teams, {
-    fields: [articles.teamId],
-    references: [teams.id],
-  }),
   creator: one(userProfiles, {
     fields: [articles.createdBy],
     references: [userProfiles.id],
@@ -119,9 +111,9 @@ export const articlesRelations = relations(articles, ({ one, many }) => ({
     fields: [articles.taskId],
     references: [tasks.id],
   }),
-  workflowInstance: one(workflowInstances, {
-    fields: [articles.workflowInstanceId],
-    references: [workflowInstances.id],
+  mission: one(missions, {
+    fields: [articles.missionId],
+    references: [missions.id],
   }),
   articleAssets: many(articleAssets),
 }));

@@ -178,7 +178,7 @@ async function testSkill(
     const { getLanguageModel } = await import("../src/lib/agent/model-router");
 
     const model = getLanguageModel({
-      provider: resolvedProvider as "zhipu" | "anthropic" | "openai",
+      provider: resolvedProvider as "zhipu" | "openai",
       model: resolvedModel,
       temperature: 0.5,
       maxTokens: 4096,

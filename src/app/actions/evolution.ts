@@ -52,7 +52,7 @@ export async function submitFeedback(data: {
   });
 
   revalidatePath("/employee");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 }
 
 // ---------------------------------------------------------------------------

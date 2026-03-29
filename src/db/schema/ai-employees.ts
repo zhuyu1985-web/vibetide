@@ -77,6 +77,8 @@ export const aiEmployees = pgTable("ai_employees", {
     .defaultNow()
     .notNull(),
 });
+// Unique constraint on (organization_id, slug) should be added via migration:
+// CREATE UNIQUE INDEX ai_employees_org_slug_unique ON ai_employees (organization_id, slug);
 
 // Note: Cross-module relations (employeeSkills, teamMembers, etc.)
 // are defined in their respective schema files pointing back to aiEmployees.

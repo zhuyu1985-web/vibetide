@@ -541,8 +541,6 @@ export interface MissionWithDetails extends Mission {
 // 智能媒资 - 页面1: 媒资智能理解
 // ---------------------------------------------------------------------------
 
-export type AssetProcessingStatus = "queued" | "processing" | "completed" | "failed";
-
 export type AssetTagCategory =
   | "topic"
   | "event"
@@ -585,7 +583,7 @@ export interface VideoSegment {
 export interface IntelligentAsset {
   id: string;
   title: string;
-  type: "video" | "audio" | "image" | "document";
+  type: MediaAssetType;
   duration: string;
   fileSize: string;
   thumbnailPlaceholder: string;
@@ -730,19 +728,120 @@ export interface ReviveMetrics {
 // CMS: Media Asset Library
 // ---------------------------------------------------------------------------
 
+export type MediaAssetType = "video" | "image" | "audio" | "document" | "manuscript";
+export type MediaLibraryType = "personal" | "product" | "public" | "copyright" | "knowledge" | "sharing" | "recycle";
+export type SecurityLevel = "public" | "secret" | "private" | "top_secret" | "confidential";
+export type MediaReviewStatus = "not_submitted" | "pending" | "reviewing" | "approved" | "rejected";
+export type CatalogStatus = "uncataloged" | "cataloged";
+export type TranscodeStatus = "not_started" | "processing" | "completed" | "failed" | "cancelled";
+export type CdnCmsStatus = "not_started" | "processing" | "completed" | "failed" | "revoked";
+export type AssetProcessingStatus = "queued" | "processing" | "completed" | "failed";
+
 export interface MediaAssetListItem {
   id: string;
   title: string;
-  type: "video" | "image" | "audio" | "document";
+  type: MediaAssetType;
   duration?: string;
   fileSize: number;
   fileSizeDisplay?: string;
   thumbnailUrl?: string;
-  understandingStatus: "queued" | "processing" | "completed" | "failed";
+  understandingStatus: AssetProcessingStatus;
   tags: string[];
   usageCount: number;
   categoryName?: string;
   createdAt: string;
+}
+
+// Keep backwards-compatible alias for existing code
+export type MediaAssetTypeCompat = "video" | "image" | "audio" | "document";
+
+export interface MediaAssetFull extends MediaAssetListItem {
+  libraryType: "personal" | "product" | "public";
+  isPublic: boolean;
+  securityLevel: SecurityLevel;
+  reviewStatus: MediaReviewStatus;
+  catalogStatus: CatalogStatus;
+  transcodeStatus: TranscodeStatus;
+  cdnStatus: CdnCmsStatus;
+  cmsStatus: CdnCmsStatus;
+  versionNumber: number;
+  uploaderName?: string;
+  description?: string;
+  fileName?: string;
+  width?: number;
+  height?: number;
+  tosObjectKey?: string;
+  mimeType?: string;
+}
+
+export interface PaginatedAssets {
+  items: MediaAssetFull[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface UploadFileItem {
+  id: string;
+  file: File;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+  status: "pending" | "uploading" | "uploaded" | "transcoding" | "completed" | "failed";
+  progress: number;
+  objectKey?: string;
+  error?: string;
+}
+
+export interface MediaCategoryNode extends CategoryNode {
+  workflowId?: string;
+  videoTranscodeGroup?: string;
+  audioTranscodeGroup?: string;
+  mediaAssetCount: number;
+}
+
+export interface AssetDetailFull {
+  id: string;
+  title: string;
+  type: MediaAssetType;
+  description?: string;
+  fileUrl?: string;
+  thumbnailUrl?: string;
+  fileName?: string;
+  fileSize: number;
+  fileSizeDisplay?: string;
+  mimeType?: string;
+  duration?: string;
+  durationSeconds?: number;
+  width?: number;
+  height?: number;
+  tosObjectKey?: string;
+  tosBucket?: string;
+  source?: string;
+  tags: string[];
+  libraryType: "personal" | "product" | "public";
+  isPublic: boolean;
+  securityLevel: SecurityLevel;
+  reviewStatus: MediaReviewStatus;
+  catalogStatus: CatalogStatus;
+  transcodeStatus: TranscodeStatus;
+  cdnStatus: CdnCmsStatus;
+  cmsStatus: CdnCmsStatus;
+  understandingStatus: AssetProcessingStatus;
+  understandingProgress: number;
+  totalTags: number;
+  versionNumber: number;
+  catalogData?: Record<string, unknown>;
+  categoryId?: string;
+  categoryPath?: string;
+  uploaderName?: string;
+  uploadedBy?: string;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  processedAt?: string;
+  segments?: VideoSegment[];
 }
 
 export interface MediaAssetStats {
@@ -751,6 +850,7 @@ export interface MediaAssetStats {
   imageCount: number;
   audioCount: number;
   documentCount: number;
+  manuscriptCount?: number;
   totalStorageDisplay: string;
 }
 
@@ -816,7 +916,7 @@ export interface CategoryNode {
 export interface ProcessingQueueItem {
   id: string;
   title: string;
-  type: "video" | "image" | "audio" | "document";
+  type: MediaAssetType;
   status: AssetProcessingStatus;
   progress: number;
   duration?: string;
@@ -878,6 +978,7 @@ export interface ScenarioDistribution {
 export interface InspirationTopic {
   id: string;
   title: string;
+  sourceUrl?: string;
   priority: "P0" | "P1" | "P2";
   heatScore: number;
   aiScore: number;

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { postTeamMessage } from "@/lib/dal/team-messages";
+// TODO: re-implement message notifications via mission system
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -72,37 +72,7 @@ export async function updateReviewStatus(
     .set(updates)
     .where(eq(reviewResults.id, reviewId));
 
-  // Post team message per Section 七
-  const review = await db.query.reviewResults.findFirst({
-    where: eq(reviewResults.id, reviewId),
-  });
-
-  if (review) {
-    if (status === "approved") {
-      await postTeamMessage({
-        senderSlug: "xiaoshen",
-        type: "status_update",
-        content: `内容《${review.contentId}》审核通过${review.score ? `，审核评分 ${review.score}` : ""}`,
-        attachments: [{ type: "draft_preview", title: review.contentId }],
-      });
-    } else if (status === "rejected") {
-      await postTeamMessage({
-        senderSlug: "xiaoshen",
-        type: "decision_request",
-        content: `内容《${review.contentId}》审核驳回，请确认处理方式`,
-        actions: [
-          { label: "退回修改", variant: "default" },
-          { label: "人工审核", variant: "primary" },
-        ],
-      });
-    } else if (status === "escalated") {
-      await postTeamMessage({
-        senderSlug: "xiaoshen",
-        type: "alert",
-        content: `检测到敏感内容，已升级人工审核：${review.contentId}${escalationReason ? `（${escalationReason}）` : ""}`,
-      });
-    }
-  }
+  // TODO: re-implement message notifications via mission system
 
   revalidatePath("/publishing");
 }

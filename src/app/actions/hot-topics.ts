@@ -8,7 +8,7 @@ import {
   hotTopicCrawlLogs,
   userProfiles,
 } from "@/db/schema";
-import { eq, and, gte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
@@ -248,30 +248,22 @@ export async function triggerHotTopicCrawl() {
     })
   );
 
+  const crawlLogValues: (typeof hotTopicCrawlLogs.$inferInsert)[] = [];
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     const [name, nodeId] = platformEntries[i];
 
     if (result.status === "fulfilled") {
       allItems.push(...result.value.items);
-      await db.insert(hotTopicCrawlLogs).values({
-        organizationId,
-        platformName: name,
-        platformNodeId: nodeId,
-        status: "success",
-        topicsFound: result.value.items.length,
-      });
+      crawlLogValues.push({ organizationId, platformName: name, platformNodeId: nodeId, status: "success", topicsFound: result.value.items.length });
     } else {
       const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      await db.insert(hotTopicCrawlLogs).values({
-        organizationId,
-        platformName: name,
-        platformNodeId: nodeId,
-        status: "error",
-        topicsFound: 0,
-        errorMessage: errMsg,
-      });
+      crawlLogValues.push({ organizationId, platformName: name, platformNodeId: nodeId, status: "error", topicsFound: 0, errorMessage: errMsg });
     }
+  }
+  // Write all crawl logs in one batch
+  if (crawlLogValues.length > 0) {
+    await db.insert(hotTopicCrawlLogs).values(crawlLogValues);
   }
 
   if (allItems.length === 0) {
@@ -279,12 +271,12 @@ export async function triggerHotTopicCrawl() {
     return { success: true, newTopics: 0, updatedTopics: 0 };
   }
 
-  // Step 2: Dedup and persist
+  // Step 2: Dedup and persist (batch approach to avoid N+1 queries)
   const crossPlatform = buildCrossPlatformTopics(allItems);
 
-  // Build aggregated topic map — track max heat (not sum) for better scoring
   const topicAgg = new Map<string, {
     title: string;
+    titleHash: string;
     platforms: Set<string>;
     maxHeat: number;
     url: string;
@@ -293,8 +285,10 @@ export async function triggerHotTopicCrawl() {
 
   for (const cp of crossPlatform) {
     const key = normalizeTitleKey(cp.title);
+    const titleHash = crypto.createHash("md5").update(key).digest("hex");
     topicAgg.set(key, {
       title: cp.title,
+      titleHash,
       platforms: new Set(cp.platforms),
       maxHeat: cp.totalHeat,
       url: "",
@@ -306,8 +300,10 @@ export async function triggerHotTopicCrawl() {
     const key = normalizeTitleKey(item.title);
     const numericHeat = parseChineseNumber(item.heat);
     if (!topicAgg.has(key)) {
+      const titleHash = crypto.createHash("md5").update(key).digest("hex");
       topicAgg.set(key, {
         title: item.title,
+        titleHash,
         platforms: new Set([item.platform]),
         maxHeat: numericHeat,
         url: item.url,
@@ -323,68 +319,30 @@ export async function triggerHotTopicCrawl() {
 
   const now = new Date();
   const timeLabel = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+  // Upsert: INSERT ... ON CONFLICT (organization_id, title_hash) DO UPDATE
+  // This relies on the unique index `hot_topics_org_title_hash_uniq`.
+  // No separate SELECT needed — the DB handles dedup atomically.
   let newCount = 0;
   let updatedCount = 0;
 
   for (const [, agg] of topicAgg) {
-    const titleHash = crypto
-      .createHash("md5")
-      .update(normalizeTitleKey(agg.title))
-      .digest("hex");
-
     const platformCount = agg.platforms.size;
     const heatScore = normalizeHeatScore(agg.maxHeat, platformCount);
     const platformsArray = Array.from(agg.platforms);
 
-    // Check for existing topic within 24h
-    const existing = await db
-      .select({
-        id: hotTopics.id,
-        heatCurve: hotTopics.heatCurve,
-        platforms: hotTopics.platforms,
-      })
-      .from(hotTopics)
-      .where(
-        and(
-          eq(hotTopics.organizationId, organizationId),
-          eq(hotTopics.titleHash, titleHash),
-          gte(hotTopics.discoveredAt, cutoff)
-        )
-      )
-      .limit(1);
+    const priority = platformCount >= 3 || heatScore > 85
+      ? "P0"
+      : platformCount >= 2 || heatScore >= 50
+        ? "P1"
+        : "P2";
 
-    if (existing.length > 0) {
-      const row = existing[0];
-      const oldCurve = (row.heatCurve as { time: string; value: number }[]) || [];
-      const newCurve = [...oldCurve, { time: timeLabel, value: heatScore }].slice(-48);
-
-      const oldPlatforms = (row.platforms as string[]) || [];
-      const mergedPlatforms = Array.from(new Set([...oldPlatforms, ...platformsArray]));
-
-      await db
-        .update(hotTopics)
-        .set({
-          heatScore,
-          heatCurve: newCurve,
-          platforms: mergedPlatforms,
-          updatedAt: now,
-        })
-        .where(eq(hotTopics.id, row.id));
-
-      updatedCount++;
-    } else {
-      const priority = platformCount >= 3 || heatScore > 85
-        ? "P0"
-        : platformCount >= 2 || heatScore >= 50
-          ? "P1"
-          : "P2";
-
-      await db.insert(hotTopics).values({
+    const result = await db
+      .insert(hotTopics)
+      .values({
         organizationId,
         title: agg.title,
-        titleHash,
+        titleHash: agg.titleHash,
         sourceUrl: agg.url || null,
         priority,
         heatScore,
@@ -394,8 +352,21 @@ export async function triggerHotTopicCrawl() {
         platforms: platformsArray,
         heatCurve: [{ time: timeLabel, value: heatScore }],
         discoveredAt: now,
-      });
+      })
+      .onConflictDoUpdate({
+        target: [hotTopics.organizationId, hotTopics.titleHash],
+        set: {
+          heatScore,
+          platforms: platformsArray,
+          updatedAt: now,
+        },
+      })
+      .returning({ id: hotTopics.id, updatedAt: hotTopics.updatedAt });
 
+    // If updatedAt was just set, it's an update; otherwise it's a new insert
+    if (result[0]?.updatedAt) {
+      updatedCount++;
+    } else {
       newCount++;
     }
   }

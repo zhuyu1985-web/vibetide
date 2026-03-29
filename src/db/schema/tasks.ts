@@ -9,12 +9,10 @@ import {
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
-import { teams } from "./teams";
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id),
-  teamId: uuid("team_id").references(() => teams.id),
   assigneeId: uuid("assignee_id").references(() => aiEmployees.id),
   sessionId: uuid("session_id"), // FK to creation_sessions, nullable
 
@@ -47,10 +45,6 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   organization: one(organizations, {
     fields: [tasks.organizationId],
     references: [organizations.id],
-  }),
-  team: one(teams, {
-    fields: [tasks.teamId],
-    references: [teams.id],
   }),
   assignee: one(aiEmployees, {
     fields: [tasks.assigneeId],

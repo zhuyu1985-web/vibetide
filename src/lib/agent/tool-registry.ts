@@ -3,28 +3,26 @@ import { z } from "zod/v4";
 import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
 import { BUILTIN_SKILLS } from "@/lib/constants";
+import {
+  searchViaTavily,
+  fetchViaJinaReader,
+  fetchViaCheerio,
+  truncateContent,
+  inferSourceType,
+  inferCredibility,
+  parseDate,
+  type NewsFeedItem,
+  type SourceType,
+} from "@/lib/web-fetch";
 import { ilike, sql } from "drizzle-orm";
 import type { AgentTool } from "./types";
+import { decrypt } from "@/lib/crypto";
 
 // ---------------------------------------------------------------------------
 // Web search helpers
 // ---------------------------------------------------------------------------
 
 type WebSearchTimeRange = "1h" | "24h" | "7d" | "30d" | "all";
-type SourceType = "official" | "industry" | "social" | "news" | "unknown";
-type Credibility = "high" | "medium" | "low";
-
-interface NewsFeedItem {
-  title: string;
-  snippet: string;
-  url: string;
-  source: string;
-  publishedAt: string | null;
-  publishedAtMs: number | null;
-  engine: "google-news" | "bing-news";
-  sourceType: SourceType;
-  credibility: Credibility;
-}
 
 const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
   official: "央媒/官方",
@@ -41,16 +39,6 @@ const TIME_RANGE_MS: Record<WebSearchTimeRange, number> = {
   "30d": 30 * 24 * 60 * 60 * 1000,
   all: Number.POSITIVE_INFINITY,
 };
-
-const OFFICIAL_SOURCE_PATTERNS = [
-  /新华社|人民日报|央视|央视新闻|中国新闻网|中国政府网|国务院|工信部|商务部|国家统计局|中国日报|人民网/i,
-];
-const INDUSTRY_SOURCE_PATTERNS = [
-  /36氪|虎嗅|钛媒体|界面|财联社|财新|第一财经|TechCrunch|The Verge|Wired|Bloomberg|Reuters|华尔街见闻/i,
-];
-const SOCIAL_SOURCE_PATTERNS = [
-  /微博|知乎|小红书|抖音|快手|B站|豆瓣|Reddit|X|Twitter|Telegram/i,
-];
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -84,35 +72,9 @@ function safeUrl(value: string) {
   }
 }
 
-function parseDate(value: string) {
-  const ms = Date.parse(value);
-  if (Number.isNaN(ms)) {
-    return { publishedAt: null as string | null, publishedAtMs: null as number | null };
-  }
-  return {
-    publishedAt: new Date(ms).toISOString(),
-    publishedAtMs: ms,
-  };
-}
-
 function inferSource(title: string, source: string, url: string) {
   const candidate = source || title.split(" - ").at(-1) || url;
   return normalizeWhitespace(candidate);
-}
-
-function inferSourceType(source: string, url: string): SourceType {
-  const text = `${source} ${url}`;
-  if (OFFICIAL_SOURCE_PATTERNS.some((pattern) => pattern.test(text))) return "official";
-  if (INDUSTRY_SOURCE_PATTERNS.some((pattern) => pattern.test(text))) return "industry";
-  if (SOCIAL_SOURCE_PATTERNS.some((pattern) => pattern.test(text))) return "social";
-  if (source) return "news";
-  return "unknown";
-}
-
-function inferCredibility(sourceType: SourceType): Credibility {
-  if (sourceType === "official") return "high";
-  if (sourceType === "industry" || sourceType === "news") return "medium";
-  return "low";
 }
 
 function buildSearchVariants(query: string) {
@@ -361,499 +323,14 @@ function buildSearchSummary(results: NewsFeedItem[], hotTopics: ReturnType<typeo
 }
 
 // ---------------------------------------------------------------------------
-// Tavily Search API helpers
+// Trending Topics helpers — extracted to @/lib/trending-api for shared use
 // ---------------------------------------------------------------------------
 
-interface TavilySearchResult {
-  title: string;
-  url: string;
-  content: string;
-  raw_content?: string;
-  score: number;
-  published_date?: string;
-}
-
-interface TavilySearchResponse {
-  query: string;
-  answer?: string;
-  results: TavilySearchResult[];
-  response_time: number;
-}
-
-async function searchViaTavily(
-  query: string,
-  options: {
-    timeRange?: WebSearchTimeRange;
-    maxResults?: number;
-    topic?: "general" | "news" | "finance";
-  }
-): Promise<{
-  items: NewsFeedItem[];
-  answer?: string;
-  responseTime: number;
-}> {
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) throw new Error("TAVILY_API_KEY not configured");
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const body: Record<string, unknown> = {
-      query,
-      search_depth: "advanced",
-      include_answer: true,
-      max_results: Math.min(options.maxResults ?? 8, 20),
-      include_domains: [
-        "xinhuanet.com", "people.com.cn", "cctv.com", "chinanews.com",
-        "36kr.com", "huxiu.com", "tmtpost.com", "jiemian.com",
-        "caixin.com", "yicai.com", "thepaper.cn", "sina.com.cn",
-        "weibo.com", "zhihu.com", "bilibili.com", "sohu.com",
-        "163.com", "qq.com", "baidu.com", "toutiao.com",
-      ],
-    };
-
-    if (options.topic) {
-      body.topic = options.topic;
-    }
-
-    if (options.timeRange && options.timeRange !== "all") {
-      const daysMap: Record<string, string> = {
-        "1h": "day",
-        "24h": "day",
-        "7d": "week",
-        "30d": "month",
-      };
-      body.time_range = daysMap[options.timeRange] || "week";
-    }
-
-    const response = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: apiKey, ...body }),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Tavily API returned ${response.status}: ${response.statusText}`);
-    }
-
-    const data = (await response.json()) as TavilySearchResponse;
-
-    const items: NewsFeedItem[] = data.results.map((r) => {
-      const source = new URL(r.url).hostname.replace(/^www\./, "");
-      const sourceType = inferSourceType(source, r.url);
-      const { publishedAt, publishedAtMs } = r.published_date
-        ? parseDate(r.published_date)
-        : { publishedAt: null, publishedAtMs: null };
-
-      return {
-        title: r.title,
-        snippet: r.content,
-        url: r.url,
-        source,
-        publishedAt,
-        publishedAtMs,
-        engine: "google-news" as const,
-        sourceType,
-        credibility: inferCredibility(sourceType),
-      };
-    });
-
-    return { items, answer: data.answer, responseTime: data.response_time };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Web Deep Read helpers
-// ---------------------------------------------------------------------------
-
-async function fetchViaJinaReader(url: string): Promise<{ title: string; content: string }> {
-  const apiKey = process.env.JINA_API_KEY;
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    "X-Return-Format": "markdown",
-  };
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(`https://r.jina.ai/${url}`, {
-      headers,
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Jina Reader returned ${response.status}`);
-    }
-
-    const data = (await response.json()) as { data?: { title?: string; content?: string } };
-    return {
-      title: data.data?.title || "",
-      content: data.data?.content || "",
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function fetchViaCheerio(url: string): Promise<{ title: string; content: string }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 VibeTideBot/1.0",
-        Accept: "text/html",
-      },
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Fetch returned ${response.status}`);
-    }
-
-    const html = await response.text();
-    const cheerio = await import("cheerio");
-    const $ = cheerio.load(html);
-
-    // Remove noise elements
-    $("script, style, nav, header, footer, aside, iframe, .ad, .advertisement, .sidebar, .comment, .comments").remove();
-
-    const title = $("title").text().trim() ||
-      $('meta[property="og:title"]').attr("content") || "";
-
-    // Try article/main first, then fall back to body
-    let content = "";
-    const selectors = ["article", "main", '[role="main"]', ".post-content", ".article-content", ".entry-content"];
-    for (const selector of selectors) {
-      const el = $(selector);
-      if (el.length > 0) {
-        content = el.text().trim();
-        break;
-      }
-    }
-    if (!content) {
-      content = $("body").text().trim();
-    }
-
-    // Clean up whitespace
-    content = content.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ").trim();
-
-    return { title, content };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function truncateContent(content: string, maxLength: number): string {
-  if (content.length <= maxLength) return content;
-  const truncated = content.slice(0, maxLength);
-  const lastParagraph = truncated.lastIndexOf("\n\n");
-  if (lastParagraph > maxLength * 0.7) {
-    return truncated.slice(0, lastParagraph) + "\n\n[...内容已截断]";
-  }
-  const lastSentence = truncated.lastIndexOf("。");
-  if (lastSentence > maxLength * 0.7) {
-    return truncated.slice(0, lastSentence + 1) + "\n\n[...内容已截断]";
-  }
-  return truncated + "...\n\n[...内容已截断]";
-}
-
-// ---------------------------------------------------------------------------
-// Trending Topics helpers
-// ---------------------------------------------------------------------------
-
-interface TrendingResponseMapping {
-  nodes?: Record<string, string>;
-  authMode?: "bearer" | "raw";
-}
-
-interface TrendingItem {
-  platform: string;
-  rank: number;
-  title: string;
-  heat: number | string;
-  url: string;
-  category?: string;
-}
-
-function parseTrendingMapping(): TrendingResponseMapping | null {
-  const raw = process.env.TRENDING_RESPONSE_MAPPING;
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as TrendingResponseMapping;
-  } catch {
-    return null;
-  }
-}
-
-function buildTophubHeaders(): Record<string, string> {
-  const apiKey = process.env.TRENDING_API_KEY;
-  const mapping = parseTrendingMapping();
-  const authMode = mapping?.authMode ?? "raw";
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (apiKey) {
-    headers["Authorization"] = authMode === "bearer" ? `Bearer ${apiKey}` : apiKey;
-  }
-  return headers;
-}
-
-/** Fetch /hot — cross-platform trending aggregation (one request, all platforms) */
-async function fetchTrendingHot(): Promise<TrendingItem[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch("https://api.tophubdata.com/hot", {
-      headers: buildTophubHeaders(),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`TopHub /hot returned ${response.status}`);
-    }
-
-    const json = (await response.json()) as {
-      error: boolean;
-      data: {
-        title: string;
-        url: string;
-        domain: string;
-        sitename: string;
-        views: string;
-        time: string;
-      }[];
-    };
-
-    if (json.error || !Array.isArray(json.data)) return [];
-
-    return json.data.map((item, index) => ({
-      platform: item.sitename || item.domain,
-      rank: index + 1,
-      title: item.title,
-      heat: item.views || "",
-      url: item.url,
-    }));
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/** Fetch /nodes/@hashid — single platform trending list */
-async function fetchTrendingNode(
-  nodeId: string,
-  platformName?: string
-): Promise<TrendingItem[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(`https://api.tophubdata.com/nodes/${nodeId}`, {
-      headers: buildTophubHeaders(),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`TopHub /nodes/${nodeId} returned ${response.status}`);
-    }
-
-    const json = (await response.json()) as {
-      error: boolean;
-      data: {
-        name: string;
-        items: { title: string; url: string; rank: number; extra: string; description: string }[];
-      };
-    };
-
-    if (json.error || !json.data?.items) return [];
-
-    const name = platformName || json.data.name;
-    return json.data.items.map((item) => ({
-      platform: name,
-      rank: item.rank,
-      title: item.title,
-      heat: item.extra || "",
-      url: item.url,
-      category: item.description || undefined,
-    }));
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/** Fetch /search — search across all trending lists */
-async function fetchTrendingSearch(query: string): Promise<TrendingItem[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const url = `https://api.tophubdata.com/search?q=${encodeURIComponent(query)}&p=1`;
-    const response = await fetch(url, {
-      headers: buildTophubHeaders(),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`TopHub /search returned ${response.status}`);
-    }
-
-    const json = (await response.json()) as {
-      error: boolean;
-      data: {
-        items: { title: string; url: string; extra: string; time: number }[];
-      };
-    };
-
-    if (json.error || !json.data?.items) return [];
-
-    return json.data.items.map((item, index) => ({
-      platform: "全网",
-      rank: index + 1,
-      title: item.title,
-      heat: item.extra || "",
-      url: item.url,
-    }));
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// Platform name → TopHub node hashid mapping
-const TOPHUB_DEFAULT_NODES: Record<string, string> = {
-  微博热搜: "KqndgxeLl9",
-  知乎热榜: "mproPpoq6O",
-  百度热点: "Jb0vmloB1G",
-  抖音热搜: "K7GdaMgdQy",
-  今日头条: "x9ozB4KoXb",
-  "36氪热榜": "Q1Vd5Ko85R",
-  哔哩哔哩: "74KvxwokxM",
-  小红书: "L4MdA5ldxD",
-  澎湃热榜: "wWmoO5Rd4E",
-  微信热文: "WnBe01o371",
-};
-
-const PLATFORM_ALIASES: Record<string, string[]> = {
-  微博热搜: ["weibo", "微博"],
-  知乎热榜: ["zhihu", "知乎"],
-  百度热点: ["baidu", "百度"],
-  抖音热搜: ["douyin", "抖音"],
-  今日头条: ["toutiao", "头条"],
-  "36氪热榜": ["36kr", "36氪"],
-  哔哩哔哩: ["bilibili", "b站", "哔哩"],
-  小红书: ["xiaohongshu", "小红书", "红书"],
-  澎湃热榜: ["thepaper", "澎湃"],
-  微信热文: ["weixin", "wechat", "微信"],
-};
-
-function resolveNodeIds(platforms?: string[]): Record<string, string> {
-  const mapping = parseTrendingMapping();
-  const nodes = { ...TOPHUB_DEFAULT_NODES, ...(mapping?.nodes || {}) };
-
-  if (!platforms || platforms.length === 0) return nodes;
-
-  const result: Record<string, string> = {};
-  for (const [name, hashid] of Object.entries(nodes)) {
-    const aliases = PLATFORM_ALIASES[name] || [name.toLowerCase()];
-    if (platforms.some((p) => aliases.some((a) => a.includes(p.toLowerCase()) || p.toLowerCase().includes(a)))) {
-      result[name] = hashid;
-    }
-  }
-  return result;
-}
-
-async function fetchTrendingFromApi(
-  mode: "hot" | "platforms" | "search",
-  options: { platforms?: string[]; limit?: number; query?: string }
-): Promise<TrendingItem[]> {
-  if (!process.env.TRENDING_API_KEY) {
-    throw new Error("TRENDING_API_KEY not configured");
-  }
-
-  if (mode === "hot") {
-    return fetchTrendingHot();
-  }
-
-  if (mode === "search" && options.query) {
-    return fetchTrendingSearch(options.query);
-  }
-
-  // platforms mode: fetch selected platform nodes in parallel
-  const nodes = resolveNodeIds(options.platforms);
-  const entries = Object.entries(nodes);
-
-  if (entries.length === 0) {
-    throw new Error(`未匹配到平台，可用平台: ${Object.keys(TOPHUB_DEFAULT_NODES).join("、")}`);
-  }
-
-  const results = await Promise.allSettled(
-    entries.map(([name, hashid]) => fetchTrendingNode(hashid, name))
-  );
-
-  const allItems: TrendingItem[] = [];
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      const items = options.limit ? result.value.slice(0, options.limit) : result.value;
-      allItems.push(...items);
-    }
-  }
-  return allItems;
-}
-
-function buildCrossPlatformTopics(items: TrendingItem[]): {
-  title: string;
-  platforms: string[];
-  totalHeat: number;
-  verified: boolean;
-}[] {
-  const topicMap = new Map<string, {
-    title: string;
-    platforms: Set<string>;
-    totalHeat: number;
-  }>();
-
-  for (const item of items) {
-    const key = item.title
-      .replace(/[#【】\[\]《》「」\s]/g, "")
-      .toLowerCase()
-      .slice(0, 20);
-
-    const existing = topicMap.get(key);
-    if (existing) {
-      existing.platforms.add(item.platform);
-      existing.totalHeat += typeof item.heat === "number" ? item.heat : 0;
-    } else {
-      topicMap.set(key, {
-        title: item.title,
-        platforms: new Set([item.platform]),
-        totalHeat: typeof item.heat === "number" ? item.heat : 0,
-      });
-    }
-  }
-
-  return Array.from(topicMap.values())
-    .filter((t) => t.platforms.size >= 2)
-    .sort((a, b) => b.totalHeat - a.totalHeat)
-    .map((t) => ({
-      title: t.title,
-      platforms: Array.from(t.platforms),
-      totalHeat: t.totalHeat,
-      verified: false,
-    }));
-}
+import {
+  fetchTrendingFromApi,
+  buildCrossPlatformTopics,
+  type TrendingItem,
+} from "@/lib/trending-api";
 
 // ---------------------------------------------------------------------------
 // Tool definitions using Vercel AI SDK format
@@ -1117,25 +594,51 @@ function createToolDefinitions(): ToolSet {
           .string()
           .optional()
           .default("professional")
-          .describe("写作风格"),
+          .describe("写作风格：professional/casual/news/academic"),
         maxLength: z.number().optional().default(2000).describe("最大字数"),
       }),
-      execute: async ({ outline, style }) => ({
-        content: `[模拟生成内容] 基于大纲「${outline}」，以${style}风格生成的内容。`,
-        wordCount: 100,
-      }),
+      execute: async ({ outline, style, maxLength }) => {
+        try {
+          const { generateText: gen } = await import("ai");
+          const { getLanguageModel, resolveModelConfig } = await import("./model-router");
+          const cfg = resolveModelConfig(["generation"], { temperature: 0.7, maxTokens: Math.min(maxLength * 2, 8192) });
+          const model = getLanguageModel(cfg);
+          const { text, usage } = await gen({
+            model,
+            prompt: `你是一名资深内容创作者。请根据以下大纲，以「${style}」风格撰写一篇内容。\n\n要求：\n- 字数控制在 ${maxLength} 字以内\n- 结构清晰，逻辑连贯\n- 语言专业且易读\n\n大纲：\n${outline}\n\n请直接输出正文内容，不要包含标题和前言。`,
+          });
+          return { content: text, wordCount: text.length, tokensUsed: usage?.totalTokens ?? 0 };
+        } catch (e) {
+          return { content: `[生成失败] ${e instanceof Error ? e.message : "未知错误"}`, wordCount: 0, tokensUsed: 0 };
+        }
+      },
     }),
     fact_check: tool({
-      description: "对给定文本进行事实核查",
+      description: "对给定文本进行事实核查，检查事实准确性和逻辑一致性",
       inputSchema: z.object({
         text: z.string().describe("需要核查的文本"),
         claims: z.array(z.string()).optional().describe("具体需要核查的声明"),
       }),
-      execute: async ({ text }) => ({
-        overallScore: 85,
-        issues: [],
-        summary: `[模拟核查] 文本（${text.slice(0, 50)}...）的事实核查结果：整体可信度 85/100。`,
-      }),
+      execute: async ({ text, claims }) => {
+        try {
+          const { generateText: gen } = await import("ai");
+          const { getLanguageModel, resolveModelConfig } = await import("./model-router");
+          const cfg = resolveModelConfig(["analysis"], { temperature: 0.2, maxTokens: 4096 });
+          const model = getLanguageModel(cfg);
+          const claimsList = claims?.length ? `\n\n需要重点核查的声明：\n${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}` : "";
+          const { text: result } = await gen({
+            model,
+            prompt: `你是一名专业事实核查编辑。请对以下文本进行事实核查。${claimsList}\n\n文本内容：\n${text.slice(0, 4000)}\n\n请以 JSON 格式输出核查结果：\n{"overallScore": 0-100分, "issues": [{"claim": "有问题的表述", "issue": "问题说明", "severity": "high/medium/low"}], "summary": "总结"}\n\n只输出 JSON，不要输出其他内容。`,
+          });
+          try {
+            const jsonMatch = result.match(/\{[\s\S]*\}/);
+            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+          } catch { /* fallthrough */ }
+          return { overallScore: 70, issues: [], summary: result.slice(0, 500) };
+        } catch (e) {
+          return { overallScore: 0, issues: [{ claim: "核查失败", issue: e instanceof Error ? e.message : "未知错误", severity: "high" }], summary: "事实核查服务异常" };
+        }
+      },
     }),
     media_search: tool({
       description: "从媒资库中检索素材（图片、视频、音频、文档）",
@@ -1228,8 +731,10 @@ export function resolveTools(skillNames: string[]): AgentTool[] {
         parameters: {},
       };
     }
+    // Sanitize name for API compatibility (must match ^[a-zA-Z0-9_-]+$)
+    const safeName = normalizedName.replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "unknown_tool";
     return {
-      name,
+      name: safeName,
       description: `执行「${name}」技能`,
       parameters: {},
     };
@@ -1266,9 +771,9 @@ function createPluginTool(name: string, description: string, config: PluginConfi
         };
 
         if (config.authType === "bearer" && config.authKey) {
-          headers["Authorization"] = `Bearer ${config.authKey}`;
+          headers["Authorization"] = `Bearer ${decrypt(config.authKey)}`;
         } else if (config.authType === "api_key" && config.authKey) {
-          headers["X-API-Key"] = config.authKey;
+          headers["X-API-Key"] = decrypt(config.authKey);
         }
 
         const body = config.requestTemplate
@@ -1315,9 +820,180 @@ function createPluginTool(name: string, description: string, config: PluginConfi
 // Convert AgentTools to Vercel AI SDK ToolSet for generateText().
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Mission collaboration tools (injected during mission execution)
+// ---------------------------------------------------------------------------
+
+export function createMissionTools(context: {
+  missionId: string;
+  employeeId: string;
+  employeeSlug: string;
+  isLeader: boolean;
+}) {
+  const tools: ToolSet = {};
+
+  // All team members can send messages
+  tools["send_message"] = tool({
+    description: "给团队中的其他同事发送消息，讨论问题或协调工作",
+    inputSchema: z.object({
+      toEmployeeSlug: z.string().describe("接收者的员工slug标识"),
+      content: z.string().describe("消息内容"),
+    }),
+    execute: async ({ toEmployeeSlug, content }) => {
+      const { db: _db } = await import("@/db");
+      const { missionMessages, aiEmployees: _emp } = await import("@/db/schema");
+      const { eq: _eq } = await import("drizzle-orm");
+
+      const recipient = await _db.query.aiEmployees.findFirst({
+        where: _eq(_emp.slug, toEmployeeSlug),
+      });
+      if (!recipient) return { error: `未找到员工：${toEmployeeSlug}` };
+
+      await _db.insert(missionMessages).values({
+        missionId: context.missionId,
+        fromEmployeeId: context.employeeId,
+        toEmployeeId: recipient.id,
+        messageType: "question",
+        content,
+      });
+      return { sent: true, to: toEmployeeSlug };
+    },
+  });
+
+  // All team members can read their messages
+  tools["read_messages"] = tool({
+    description: "查看团队成员发给自己的消息",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const { db: _db } = await import("@/db");
+      const { missionMessages: _mm } = await import("@/db/schema");
+      const { eq: _eq, and: _and, asc: _asc } = await import("drizzle-orm");
+
+      const msgs = await _db
+        .select()
+        .from(_mm)
+        .where(
+          _and(
+            _eq(_mm.missionId, context.missionId),
+            _eq(_mm.toEmployeeId, context.employeeId)
+          )
+        )
+        .orderBy(_asc(_mm.createdAt))
+        .limit(20);
+
+      return {
+        messages: msgs.map((m) => ({
+          from: m.fromEmployeeId,
+          type: m.messageType,
+          content: m.content,
+          at: m.createdAt.toISOString(),
+        })),
+      };
+    },
+  });
+
+  // Leader-only tools
+  if (context.isLeader) {
+    tools["create_task"] = tool({
+      description: "创建一个新任务到共享任务板",
+      inputSchema: z.object({
+        title: z.string().describe("任务名称"),
+        description: z.string().describe("任务详细描述"),
+        expectedOutput: z.string().optional().describe("期望输出描述"),
+        assignedEmployeeSlug: z.string().describe("分配给哪个员工（slug）"),
+        dependencyTitles: z.array(z.string()).default([]).describe("依赖的任务标题列表"),
+        priority: z.number().default(0).describe("优先级，越大越优先"),
+      }),
+      execute: async ({ title, description, expectedOutput, assignedEmployeeSlug, dependencyTitles, priority }) => {
+        const { db: _db } = await import("@/db");
+        const { missionTasks: _mt, aiEmployees: _emp } = await import("@/db/schema");
+        const { eq: _eq, and: _and } = await import("drizzle-orm");
+
+        // Find employee by slug
+        const emp = await _db.query.aiEmployees.findFirst({
+          where: _eq(_emp.slug, assignedEmployeeSlug),
+        });
+        if (!emp) return { error: `未找到员工：${assignedEmployeeSlug}` };
+
+        // Resolve dependency IDs from titles
+        const deps: string[] = [];
+        if (dependencyTitles.length > 0) {
+          const allTasks = await _db
+            .select({ id: _mt.id, title: _mt.title })
+            .from(_mt)
+            .where(_eq(_mt.missionId, context.missionId));
+          for (const depTitle of dependencyTitles) {
+            const found = allTasks.find((t) => t.title === depTitle);
+            if (found) deps.push(found.id);
+          }
+        }
+
+        const [task] = await _db
+          .insert(_mt)
+          .values({
+            missionId: context.missionId,
+            title,
+            description,
+            expectedOutput,
+            assignedEmployeeId: emp.id,
+            dependencies: deps,
+            priority,
+            status: deps.length > 0 ? "pending" : "ready",
+          })
+          .returning({ id: _mt.id });
+
+        return { created: true, taskId: task.id, title, assignedTo: assignedEmployeeSlug };
+      },
+    });
+
+    tools["check_progress"] = tool({
+      description: "查看当前任务板上所有任务的执行状态",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { db: _db } = await import("@/db");
+        const { missionTasks: _mt, aiEmployees: _emp } = await import("@/db/schema");
+        const { eq: _eq } = await import("drizzle-orm");
+
+        const tasks = await _db
+          .select({
+            id: _mt.id,
+            title: _mt.title,
+            status: _mt.status,
+            assignedEmployeeId: _mt.assignedEmployeeId,
+          })
+          .from(_mt)
+          .where(_eq(_mt.missionId, context.missionId));
+
+        // Load employee slugs for display
+        const empIds = [...new Set(tasks.filter((t) => t.assignedEmployeeId).map((t) => t.assignedEmployeeId!))];
+        const empMap = new Map<string, string>();
+        for (const eid of empIds) {
+          const emp = await _db.query.aiEmployees.findFirst({ where: _eq(_emp.id, eid) });
+          if (emp) empMap.set(eid, emp.slug);
+        }
+
+        return {
+          tasks: tasks.map((t) => ({
+            title: t.title,
+            status: t.status,
+            assignedTo: t.assignedEmployeeId ? empMap.get(t.assignedEmployeeId) : null,
+          })),
+          total: tasks.length,
+          completed: tasks.filter((t) => t.status === "completed").length,
+          inProgress: tasks.filter((t) => t.status === "in_progress").length,
+          pending: tasks.filter((t) => t.status === "pending" || t.status === "ready").length,
+        };
+      },
+    });
+  }
+
+  return tools;
+}
+
 export function toVercelTools(
   agentTools: AgentTool[],
-  pluginConfigs?: Map<string, { description: string; config: PluginConfig }>
+  pluginConfigs?: Map<string, { description: string; config: PluginConfig }>,
+  missionTools?: ToolSet
 ): ToolSet {
   const result: ToolSet = {};
 
@@ -1338,6 +1014,11 @@ export function toVercelTools(
         }),
       });
     }
+  }
+
+  // Merge mission collaboration tools if provided
+  if (missionTools) {
+    Object.assign(result, missionTools);
   }
 
   return result;

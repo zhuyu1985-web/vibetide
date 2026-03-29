@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, GitPullRequest, Activity, FileText, Loader2 } from "lucide-react";
-import { approveWorkflowStep } from "@/app/actions/workflow-engine";
 import { markMessageRead } from "@/app/actions/notifications";
 import type { TeamMessage, MessageAction } from "@/lib/types";
 
@@ -62,32 +61,10 @@ export function MessageBubble({ message, isRead = false }: MessageBubbleProps) {
     minute: "2-digit",
   });
 
-  const handleAction = async (action: MessageAction) => {
-    if (!message.workflowInstanceId) return;
-
-    const stepId = action.stepId || message.workflowStepId || "";
-    setActionLoading(action.label);
-
-    try {
-      if (action.label === "批准") {
-        await approveWorkflowStep({
-          workflowInstanceId: message.workflowInstanceId,
-          stepId,
-          approved: true,
-        });
-      } else if (action.label === "驳回") {
-        await approveWorkflowStep({
-          workflowInstanceId: message.workflowInstanceId,
-          stepId,
-          approved: false,
-          feedback: "人工驳回",
-        });
-      }
-      setActionsHandled(true);
-      router.refresh();
-    } finally {
-      setActionLoading(null);
-    }
+  const handleAction = async (_action: MessageAction) => {
+    // TODO: re-implement with mission system
+    setActionsHandled(true);
+    router.refresh();
   };
 
   return (

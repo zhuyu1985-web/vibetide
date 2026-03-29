@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
-import { addTeamMember } from "@/app/actions/teams";
+// TODO: re-implement with mission system
 import { Loader2, Bot, User } from "lucide-react";
 import type { AIEmployee } from "@/lib/types";
 
@@ -52,46 +52,20 @@ export function AddMemberDialog({
   };
 
   const handleAddAI = async () => {
+    // TODO: re-implement with mission system
     if (selectedAI.size === 0) return;
-    setLoading(true);
-    try {
-      for (const empId of selectedAI) {
-        const emp = availableEmployees.find((e) => e.id === empId);
-        if (!emp) continue;
-        await addTeamMember(teamId, {
-          memberType: "ai",
-          displayName: emp.id,
-          teamRole: emp.title,
-        });
-      }
-      setSelectedAI(new Set());
-      onOpenChange(false);
-      router.refresh();
-    } catch (err) {
-      console.error("Failed to add AI member:", err);
-    } finally {
-      setLoading(false);
-    }
+    setSelectedAI(new Set());
+    onOpenChange(false);
+    router.refresh();
   };
 
   const handleAddHuman = async () => {
+    // TODO: re-implement with mission system
     if (!humanName) return;
-    setLoading(true);
-    try {
-      await addTeamMember(teamId, {
-        memberType: "human",
-        displayName: humanName,
-        teamRole: humanRole || humanName,
-      });
-      setHumanName("");
-      setHumanRole("");
-      onOpenChange(false);
-      router.refresh();
-    } catch (err) {
-      console.error("Failed to add human member:", err);
-    } finally {
-      setLoading(false);
-    }
+    setHumanName("");
+    setHumanRole("");
+    onOpenChange(false);
+    router.refresh();
   };
 
   return (

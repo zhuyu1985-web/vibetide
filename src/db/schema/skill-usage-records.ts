@@ -22,8 +22,8 @@ export const skillUsageRecords = pgTable("skill_usage_records", {
   organizationId: uuid("organization_id").references(() => organizations.id),
 
   // Execution context
-  workflowInstanceId: uuid("workflow_instance_id"),
-  workflowStepId: uuid("workflow_step_id"),
+  missionId: uuid("mission_id"),
+  missionTaskId: uuid("mission_task_id"),
 
   // Result
   success: integer("success").notNull().default(1), // 1=success, 0=failure

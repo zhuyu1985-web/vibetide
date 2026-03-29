@@ -8,6 +8,17 @@ import {
   Radio,
   BarChart3,
   Brain,
+  Crown,
+  Zap,
+  Clock,
+  Mic,
+  FileSearch,
+  Layers,
+  Share2,
+  Globe,
+  Wand2,
+  Newspaper,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,7 +31,8 @@ export type EmployeeId =
   | "xiaoshen"
   | "xiaofa"
   | "xiaoshu"
-  | "advisor";
+  | "advisor"
+  | "leader";
 
 export interface EmployeeMeta {
   id: EmployeeId;
@@ -114,6 +126,15 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     color: "#ec4899",
     bgColor: "rgba(236,72,153,0.12)",
   },
+  leader: {
+    id: "leader",
+    name: "任务总监",
+    nickname: "小领",
+    title: "智能项目管理与任务调度",
+    icon: Crown,
+    color: "#e11d48",
+    bgColor: "rgba(225,29,72,0.12)",
+  },
 };
 
 export const WORKFLOW_STEPS = [
@@ -176,6 +197,22 @@ export const WORK_PREFERENCE_TEMPLATES = {
     },
   },
 } as const;
+
+// ---------------------------------------------------------------------------
+// Benchmarking: Preset Monitored Platforms
+// ---------------------------------------------------------------------------
+
+export const BENCHMARK_PRESET_PLATFORMS = [
+  // 央级
+  { name: "人民网", url: "people.com.cn", category: "central" as const, searchQuery: "site:people.com.cn" },
+  { name: "新华网", url: "xinhuanet.com", category: "central" as const, searchQuery: "site:xinhuanet.com" },
+  { name: "央视新闻", url: "news.cctv.com", category: "central" as const, searchQuery: "site:cctv.com 新闻" },
+  { name: "光明网", url: "gmw.cn", category: "central" as const, searchQuery: "site:gmw.cn" },
+  { name: "中国新闻网", url: "chinanews.com.cn", category: "central" as const, searchQuery: "site:chinanews.com.cn" },
+  // 省级
+  { name: "澎湃新闻", url: "thepaper.cn", category: "provincial" as const, province: "上海", searchQuery: "site:thepaper.cn" },
+  { name: "红星新闻", url: "cdsb.com", category: "provincial" as const, province: "四川", searchQuery: "site:cdsb.com" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Built-in Skill Definitions (28 skills, 6 categories)
@@ -642,4 +679,140 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   translation: "内容翻译",
   task_planning: "任务规划",
   angle_design: "选题角度设计",
+};
+
+// ---------------------------------------------------------------------------
+// Mission Scenario Templates
+// ---------------------------------------------------------------------------
+
+export const SCENARIO_CATEGORIES = [
+  { key: "news", label: "新闻快讯", icon: Newspaper },
+  { key: "deep", label: "深度内容", icon: BookOpen },
+  { key: "social", label: "社交传播", icon: Share2 },
+  { key: "custom", label: "自定义", icon: Wand2 },
+] as const;
+
+export interface ScenarioConfig {
+  label: string;
+  category: string;
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  description: string;
+  defaultPriority: number; // 0=紧急 1=重要 2=常规 3=低优
+  defaultTeam: EmployeeId[];
+  templateInstruction: string;
+}
+
+export const SCENARIO_CONFIG: Record<string, ScenarioConfig> = {
+  breaking_news: {
+    label: "突发新闻",
+    category: "news",
+    icon: Zap,
+    color: "#ef4444",
+    bgColor: "rgba(239,68,68,0.12)",
+    description: "紧急事件快速追踪、写作、审核、发布",
+    defaultPriority: 0,
+    defaultTeam: ["xiaolei", "xiaowen", "xiaoshen", "xiaofa"],
+    templateInstruction: "紧急追踪以下事件，完成快讯撰写、审核与发布：\n\n",
+  },
+  flash_report: {
+    label: "快讯速报",
+    category: "news",
+    icon: Clock,
+    color: "#f59e0b",
+    bgColor: "rgba(245,158,11,0.12)",
+    description: "单篇快讯，极速产出",
+    defaultPriority: 0,
+    defaultTeam: ["xiaolei", "xiaowen"],
+    templateInstruction: "快速产出一篇关于以下事件的速报：\n\n",
+  },
+  press_conference: {
+    label: "发布会追踪",
+    category: "news",
+    icon: Mic,
+    color: "#3b82f6",
+    bgColor: "rgba(59,130,246,0.12)",
+    description: "发布会要点提取、解读与报道",
+    defaultPriority: 1,
+    defaultTeam: ["xiaolei", "xiaoce", "xiaowen", "xiaoshen"],
+    templateInstruction: "追踪以下发布会，提取核心要点并撰写深度解读：\n\n",
+  },
+  deep_report: {
+    label: "深度报道",
+    category: "deep",
+    icon: FileSearch,
+    color: "#6366f1",
+    bgColor: "rgba(99,102,241,0.12)",
+    description: "多维度深度调查与长文报道",
+    defaultPriority: 1,
+    defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaoshen", "xiaofa"],
+    templateInstruction: "围绕以下主题进行深度报道，包含背景调查、多方观点和数据分析：\n\n",
+  },
+  series_content: {
+    label: "系列策划",
+    category: "deep",
+    icon: Layers,
+    color: "#8b5cf6",
+    bgColor: "rgba(139,92,246,0.12)",
+    description: "多期系列内容策划与生产",
+    defaultPriority: 2,
+    defaultTeam: ["xiaoce", "xiaowen", "xiaozi", "xiaoshen", "xiaofa", "xiaoshu"],
+    templateInstruction: "策划一组系列内容，围绕以下主题：\n\n",
+  },
+  data_journalism: {
+    label: "数据新闻",
+    category: "deep",
+    icon: BarChart3,
+    color: "#10b981",
+    bgColor: "rgba(16,185,129,0.12)",
+    description: "数据驱动的可视化新闻报道",
+    defaultPriority: 2,
+    defaultTeam: ["xiaolei", "xiaoshu", "xiaowen", "xiaoshen"],
+    templateInstruction: "基于数据分析，围绕以下主题产出数据新闻报道：\n\n",
+  },
+  social_media: {
+    label: "社交媒体",
+    category: "social",
+    icon: Share2,
+    color: "#14b8a6",
+    bgColor: "rgba(20,184,166,0.12)",
+    description: "社交平台内容创作与运营",
+    defaultPriority: 2,
+    defaultTeam: ["xiaoce", "xiaowen", "xiaofa", "xiaoshu"],
+    templateInstruction: "为以下主题创作社交媒体内容，覆盖主流平台：\n\n",
+  },
+  video_content: {
+    label: "视频内容",
+    category: "social",
+    icon: Film,
+    color: "#ef4444",
+    bgColor: "rgba(239,68,68,0.12)",
+    description: "视频脚本、制作与分发",
+    defaultPriority: 2,
+    defaultTeam: ["xiaoce", "xiaowen", "xiaojian", "xiaoshen", "xiaofa"],
+    templateInstruction: "围绕以下主题制作视频内容，包含脚本、拍摄方案和后期要求：\n\n",
+  },
+  multi_platform: {
+    label: "全平台分发",
+    category: "social",
+    icon: Globe,
+    color: "#3b82f6",
+    bgColor: "rgba(59,130,246,0.12)",
+    description: "一次生产，全渠道适配分发",
+    defaultPriority: 2,
+    defaultTeam: ["xiaoce", "xiaowen", "xiaojian", "xiaofa", "xiaoshu"],
+    templateInstruction: "为以下内容进行全平台适配和分发策略制定：\n\n",
+  },
+  custom: {
+    label: "自定义任务",
+    category: "custom",
+    icon: Wand2,
+    color: "#6b7280",
+    bgColor: "rgba(107,114,128,0.12)",
+    description: "完全自定义任务目标与团队",
+    defaultPriority: 2,
+    defaultTeam: [],
+    templateInstruction: "",
+  },
 };

@@ -21,8 +21,7 @@ import { signOut } from "@/app/actions/auth";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
 const pageTitles: Record<string, string> = {
-  "/team-hub": "团队工作台",
-  "/team-builder": "团队组建",
+  "/missions": "任务中心",
   "/channel-advisor": "频道顾问",
   "/inspiration": "灵感池",
   "/benchmarking": "同题对标",
@@ -44,8 +43,7 @@ const pageTitles: Record<string, string> = {
 };
 
 const pageGroups: Record<string, string> = {
-  "/team-hub": "工作空间",
-  "/team-builder": "工作空间",
+  "/missions": "工作空间",
   "/channel-advisor": "工作空间",
   "/employee-marketplace": "工作空间",
   "/inspiration": "创作者中心",
@@ -73,10 +71,11 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
 
   return (
     <header
-      className="h-14 border-b border-border/50 flex items-center px-4 gap-4 bg-background/60 backdrop-blur-[24px]"
+      className="h-14 border-b border-[var(--glass-border)] flex items-center px-4 gap-4 sticky top-0 z-30"
       style={{
-        WebkitBackdropFilter: "blur(24px) saturate(150%)",
-        backdropFilter: "blur(24px) saturate(150%)",
+        background: 'var(--glass-panel-bg)',
+        backdropFilter: 'blur(20px) saturate(130%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(130%)',
       }}
     >
       <SidebarTrigger />
@@ -84,7 +83,7 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink
-              href="/team-hub"
+              href="/missions"
               className="text-muted-foreground text-sm"
             >
               Vibe Media
@@ -118,7 +117,7 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
           <input
             type="text"
             placeholder="搜索..."
-            className="h-8 w-48 rounded-lg bg-muted/50 border border-border pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
+            className="h-8 w-48 rounded-lg bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] backdrop-blur-sm pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
           />
         </div>
         <ThemeSwitcher />
@@ -134,7 +133,7 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 gap-2 px-2">
-              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(10,132,255,0.85), rgba(56,189,248,0.85))" }}>
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.85), rgba(96,165,250,0.85))" }}>
                 <User size={12} className="text-white" />
               </div>
               <span className="text-sm text-foreground">{userName}</span>

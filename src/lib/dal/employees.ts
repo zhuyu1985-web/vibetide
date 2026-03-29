@@ -18,8 +18,16 @@ export async function getEmployees(): Promise<AIEmployee[]> {
 
   if (rows.length === 0) return [];
 
+  // Deduplicate by slug (keep the oldest record per slug)
+  const seen = new Set<string>();
+  const uniqueRows = rows.filter((r) => {
+    if (seen.has(r.slug)) return false;
+    seen.add(r.slug);
+    return true;
+  });
+
   // Batch-load all skills in one query instead of N+1
-  const empIds = rows.map((e) => e.id);
+  const empIds = uniqueRows.map((e) => e.id);
   const allSkillRows = await db
     .select({
       employeeId: employeeSkills.employeeId,
@@ -45,7 +53,7 @@ export async function getEmployees(): Promise<AIEmployee[]> {
     skillsByEmployee.set(row.employeeId, list);
   }
 
-  return rows.map((emp) => {
+  return uniqueRows.map((emp) => {
     const empSkills = skillsByEmployee.get(emp.id) || [];
     return {
       id: emp.slug as EmployeeId,

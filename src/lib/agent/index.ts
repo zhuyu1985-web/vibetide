@@ -2,8 +2,12 @@ export { assembleAgent } from "./assembly";
 export { executeAgent } from "./execution";
 export { parseStepOutput, serializeStepOutput, deserializeStepOutput, extractQualityScore } from "./step-io";
 export { resolveModelConfig, getLanguageModel } from "./model-router";
-export { resolveTools, toVercelTools } from "./tool-registry";
+export { resolveTools, toVercelTools, createMissionTools } from "./tool-registry";
 export { parseUserIntent } from "./intent-parser";
+export {
+  buildLeaderDecomposePrompt,
+  buildLeaderConsolidatePrompt,
+} from "./prompt-templates";
 export type {
   AssembledAgent,
   AgentExecutionInput,

@@ -59,7 +59,7 @@ export default function CaseLibraryClient({
     : null;
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="优秀案例库"
         description="效果评分>=80的内容自动入库，标注成功要素 (F3.3.02)"

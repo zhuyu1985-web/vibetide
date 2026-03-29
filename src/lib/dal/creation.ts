@@ -3,9 +3,7 @@ import {
   creationSessions,
   tasks,
   creationChatMessages,
-  workflowSteps,
   workflowTemplates,
-  teamMessages,
 } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import type { EmployeeId } from "@/lib/constants";
@@ -13,10 +11,8 @@ import type {
   CreationGoal,
   SuperCreationTask,
   ChatMessage,
-  PipelineNode,
   HitTemplate,
   EDLProject,
-  ActivityLog,
 } from "@/lib/types";
 
 export async function getActiveCreationGoal(
@@ -98,29 +94,6 @@ export async function getCreationChatMessages(
   }));
 }
 
-export async function getPipelineNodes(
-  workflowInstanceId: string
-): Promise<PipelineNode[]> {
-  const rows = await db.query.workflowSteps.findMany({
-    where: eq(workflowSteps.workflowInstanceId, workflowInstanceId),
-    with: {
-      employee: true,
-    },
-    orderBy: (s, { asc }) => [asc(s.stepOrder)],
-  });
-
-  return rows.map((row) => ({
-    id: row.id,
-    label: row.label,
-    employeeId: (row.employee?.slug || "xiaowen") as EmployeeId,
-    status: row.status as PipelineNode["status"],
-    progress: row.progress,
-    subTasks:
-      (row.structuredOutput as { name: string; done: boolean }[]) || [],
-    output: row.output || undefined,
-  }));
-}
-
 export async function getHitTemplates(
   orgId: string
 ): Promise<HitTemplate[]> {
@@ -186,26 +159,4 @@ export function getDefaultEDLProject(): EDLProject {
     ],
     formats: ["PR XML", "剪映 JSON", "快编 EDL", "Edius AAF"],
   };
-}
-
-export async function getActivityLogs(
-  orgId: string
-): Promise<ActivityLog[]> {
-  const rows = await db.query.teamMessages.findMany({
-    where: eq(teamMessages.senderType, "ai"),
-    with: {
-      aiEmployee: true,
-    },
-    orderBy: (m, { desc: d }) => [d(m.createdAt)],
-    limit: 10,
-  });
-
-  return rows.map((row) => ({
-    time: row.createdAt.toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    employeeId: (row.aiEmployee?.slug || "xiaowen") as EmployeeId,
-    action: row.content.substring(0, 80),
-  }));
 }

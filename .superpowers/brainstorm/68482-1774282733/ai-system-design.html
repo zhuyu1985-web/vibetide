@@ -1,0 +1,234 @@
+<h2>设计方案 Section 3：AI 系统 — 对话 + 解读 + 编辑器交互</h2>
+<p class="subtitle">左侧 AI 对话面板 + 右侧 AI 解读面板 + AI ↔ 编辑器双向操作</p>
+
+<div class="section">
+  <h3>💬 左侧：AI 对话面板 (Chat Panel)</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">阅读模式 — RAG 问答</div>
+      <div class="mockup-body" style="padding:0;background:#0d1117;font-size:11px">
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:1px solid #30363d">
+          <span style="flex:1;text-align:center;padding:8px;color:#8b949e;font-size:10px">大纲</span>
+          <span style="flex:1;text-align:center;padding:8px;color:#58a6ff;border-bottom:2px solid #1f6feb;font-size:10px">对话</span>
+          <span style="flex:1;text-align:center;padding:8px;color:#8b949e;font-size:10px">历史</span>
+        </div>
+        <!-- Messages -->
+        <div style="padding:10px;height:250px;overflow-y:auto">
+          <div style="background:#1c2128;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#8b949e;font-size:11px">
+            <div style="color:#58a6ff;font-size:10px;margin-bottom:4px">✦ AI 助手</div>
+            你好！我正在阅读这篇关于新能源政策的文章。你可以问我任何问题，我会基于文章内容回答。
+          </div>
+          <div style="background:#1f6feb22;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#c9d1d9;margin-left:24px;font-size:11px">
+            这篇文章的核心政策目标是什么？
+          </div>
+          <div style="background:#1c2128;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#c9d1d9;font-size:11px">
+            <div style="color:#58a6ff;font-size:10px;margin-bottom:4px">✦ AI 助手</div>
+            <div style="line-height:1.6">根据文章内容，核心政策目标有两个：
+
+<strong>1. 量化目标：</strong>到2030年新能源消费比重达25%以上
+
+<strong>2. 结构目标：</strong>非化石能源发电装机占比超50%
+
+<span style="color:#58a6ff;cursor:pointer;font-size:10px">[📍 定位到原文]</span></div>
+          </div>
+          <!-- User selected text context -->
+          <div style="background:#1f6feb22;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#c9d1d9;margin-left:24px;font-size:11px">
+            <div style="background:#21262d;border-left:2px solid #f0883e;padding:4px 8px;border-radius:0 4px 4px 0;margin-bottom:6px;font-size:10px;color:#8b949e">
+              选中文本：「到2030年，新能源消费比重达到25%以上」
+            </div>
+            这个目标是否可行？
+          </div>
+        </div>
+        <!-- Quick commands -->
+        <div style="padding:6px 10px;border-top:1px solid #30363d;display:flex;gap:4px;flex-wrap:wrap">
+          <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">总结全文</span>
+          <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">提取金句</span>
+          <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">分析立场</span>
+          <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">生成时间线</span>
+          <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">事实核查</span>
+        </div>
+        <!-- Input -->
+        <div style="padding:8px 10px;border-top:1px solid #30363d;display:flex;gap:6px;align-items:center">
+          <span style="color:#484f58">📎</span>
+          <div style="flex:1;background:#21262d;border-radius:6px;padding:5px 8px;font-size:10px;color:#484f58">基于文章内容提问...</div>
+          <span style="color:#1f6feb;font-size:11px">↑</span>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">编辑模式 — AI 操作卡片</div>
+      <div class="mockup-body" style="padding:0;background:#0d1117;font-size:11px">
+        <div style="display:flex;border-bottom:1px solid #30363d">
+          <span style="flex:1;text-align:center;padding:8px;color:#8b949e;font-size:10px">大纲</span>
+          <span style="flex:1;text-align:center;padding:8px;color:#58a6ff;border-bottom:2px solid #1f6feb;font-size:10px">对话</span>
+          <span style="flex:1;text-align:center;padding:8px;color:#8b949e;font-size:10px">历史</span>
+        </div>
+        <div style="padding:10px;height:250px;overflow-y:auto">
+          <div style="background:#1f6feb22;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#c9d1d9;margin-left:24px;font-size:11px">
+            <div style="background:#21262d;border-left:2px solid #58a6ff;padding:4px 8px;border-radius:0 4px 4px 0;margin-bottom:6px;font-size:10px;color:#8b949e">
+              选中段落：「业内专家分析指出，此次政策...」
+            </div>
+            帮我润色这段，使其更加专业
+          </div>
+          <!-- AI Action Card -->
+          <div style="background:#1c2128;border:1px solid #30363d;border-radius:8px;margin-bottom:8px;overflow:hidden">
+            <div style="padding:6px 10px;background:#21262d;display:flex;align-items:center;gap:4px;font-size:10px;color:#bc8cff">
+              ✦ AI 润色结果
+            </div>
+            <!-- Diff view -->
+            <div style="padding:8px 10px;font-size:11px;line-height:1.6">
+              <div style="background:#f8514922;padding:4px 8px;border-radius:4px;margin-bottom:4px;color:#f85149;text-decoration:line-through">
+                业内专家分析指出，此次政策的出台释放了三大信号
+              </div>
+              <div style="background:#23863622;padding:4px 8px;border-radius:4px;color:#3fb950">
+                多位行业权威专家研判认为，本轮政策组合拳释放了三大战略信号
+              </div>
+            </div>
+            <!-- Action buttons -->
+            <div style="padding:6px 10px;border-top:1px solid #30363d;display:flex;gap:6px">
+              <span style="font-size:10px;padding:3px 10px;background:#238636;color:#fff;border-radius:4px">应用到编辑器</span>
+              <span style="font-size:10px;padding:3px 10px;background:#21262d;color:#8b949e;border-radius:4px">复制</span>
+              <span style="font-size:10px;padding:3px 10px;background:#21262d;color:#8b949e;border-radius:4px">重新生成</span>
+            </div>
+          </div>
+          <!-- Full article polish -->
+          <div style="background:#1f6feb22;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#c9d1d9;margin-left:24px;font-size:11px">
+            帮我润色全文
+          </div>
+          <div style="background:#1c2128;border:1px solid #30363d;border-radius:8px;overflow:hidden">
+            <div style="padding:6px 10px;background:#21262d;display:flex;align-items:center;justify-content:space-between;font-size:10px">
+              <span style="color:#bc8cff">✦ 全文润色 (3/12 段)</span>
+              <span style="color:#3fb950">● 流式生成中...</span>
+            </div>
+            <div style="padding:8px 10px;font-size:11px">
+              <div style="padding:6px 8px;border:1px solid #30363d;border-radius:4px;margin-bottom:4px">
+                <div style="color:#484f58;font-size:9px;margin-bottom:2px">第 1 段</div>
+                <div style="color:#3fb950;font-size:10px">多位行业权威专家研判认为...</div>
+                <div style="display:flex;gap:4px;margin-top:4px">
+                  <span style="font-size:9px;padding:1px 6px;background:#23863644;color:#3fb950;border-radius:3px">✓ 接受</span>
+                  <span style="font-size:9px;padding:1px 6px;background:#f8514922;color:#f85149;border-radius:3px">✗ 拒绝</span>
+                </div>
+              </div>
+              <div style="padding:6px 8px;border:1px solid #30363d;border-radius:4px;margin-bottom:4px">
+                <div style="color:#484f58;font-size:9px;margin-bottom:2px">第 2 段</div>
+                <div style="color:#3fb950;font-size:10px">在碳达峰战略框架下...</div>
+                <div style="display:flex;gap:4px;margin-top:4px">
+                  <span style="font-size:9px;padding:1px 6px;background:#23863644;color:#3fb950;border-radius:3px">✓ 接受</span>
+                  <span style="font-size:9px;padding:1px 6px;background:#f8514922;color:#f85149;border-radius:3px">✗ 拒绝</span>
+                </div>
+              </div>
+            </div>
+            <div style="padding:6px 10px;border-top:1px solid #30363d;display:flex;gap:6px">
+              <span style="font-size:10px;padding:3px 10px;background:#238636;color:#fff;border-radius:4px">全部接受</span>
+              <span style="font-size:10px;padding:3px 10px;background:#21262d;color:#8b949e;border-radius:4px">逐条审核</span>
+            </div>
+          </div>
+        </div>
+        <!-- Edit mode quick commands -->
+        <div style="padding:6px 10px;border-top:1px solid #30363d;display:flex;gap:4px;flex-wrap:wrap">
+          <span style="font-size:9px;padding:3px 8px;background:#bc8cff22;border-radius:12px;color:#bc8cff">润色选中</span>
+          <span style="font-size:9px;padding:3px 8px;background:#bc8cff22;border-radius:12px;color:#bc8cff">续写下文</span>
+          <span style="font-size:9px;padding:3px 8px;background:#bc8cff22;border-radius:12px;color:#bc8cff">生成标题</span>
+          <span style="font-size:9px;padding:3px 8px;background:#bc8cff22;border-radius:12px;color:#bc8cff">缩写摘要</span>
+        </div>
+        <div style="padding:8px 10px;border-top:1px solid #30363d;display:flex;gap:6px;align-items:center">
+          <span style="color:#484f58">📎</span>
+          <div style="flex:1;background:#21262d;border-radius:6px;padding:5px 8px;font-size:10px;color:#484f58">AI 编辑指令...</div>
+          <span style="color:#1f6feb;font-size:11px">↑</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>🔮 右侧：AI 解读面板 (Analysis Panel)</h3>
+  <div class="mockup">
+    <div class="mockup-header">多视角分析 — Dropdown 切换</div>
+    <div class="mockup-body" style="padding:0;background:#0d1117;display:flex;gap:0">
+      <!-- Perspective selector -->
+      <div style="width:140px;border-right:1px solid #21262d;padding:8px;font-size:10px">
+        <div style="color:#484f58;margin-bottom:6px;font-size:9px">分析视角</div>
+        <div style="padding:5px 8px;background:#1f6feb22;color:#58a6ff;border-radius:4px;margin-bottom:3px">📋 摘要 (TL;DR)</div>
+        <div style="padding:5px 8px;color:#8b949e;border-radius:4px;margin-bottom:3px">🎙 记者视点</div>
+        <div style="padding:5px 8px;color:#8b949e;border-radius:4px;margin-bottom:3px">💎 金句提取</div>
+        <div style="padding:5px 8px;color:#8b949e;border-radius:4px;margin-bottom:3px">📅 时间线</div>
+        <div style="padding:5px 8px;color:#8b949e;border-radius:4px;margin-bottom:3px">❓ 关键问答</div>
+        <div style="padding:5px 8px;color:#8b949e;border-radius:4px">🔬 深度剖析</div>
+      </div>
+      <!-- Content area -->
+      <div style="flex:1;padding:12px;font-size:11px;color:#c9d1d9;line-height:1.7">
+        <div style="display:flex;gap:4px;margin-bottom:10px">
+          <span style="font-size:9px;padding:2px 6px;background:#238636aa;color:#3fb950;border-radius:4px">客观中立</span>
+          <span style="font-size:9px;padding:2px 6px;background:#1f6feb22;color:#58a6ff;border-radius:4px">政策文件</span>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="font-weight:600;color:#f0f6fc;margin-bottom:4px">核心摘要</div>
+          <div style="color:#8b949e">国务院发布新能源产业指导意见，提出2030年新能源消费比重达25%以上的目标，标志"双碳"战略加速推进。</div>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="font-weight:600;color:#f0f6fc;margin-bottom:4px">关键要点 (Key Takeaways)</div>
+          <div style="padding:6px 10px;background:#1c2128;border-radius:6px;margin-bottom:4px;display:flex;gap:6px;align-items:flex-start">
+            <span style="color:#3fb950;font-size:12px;line-height:1.5">•</span>
+            <div><span style="color:#c9d1d9">光伏/风电将获更大规模财政支持和税收优惠</span> <span style="color:#58a6ff;font-size:9px;cursor:pointer">[→原文]</span></div>
+          </div>
+          <div style="padding:6px 10px;background:#1c2128;border-radius:6px;margin-bottom:4px;display:flex;gap:6px;align-items:flex-start">
+            <span style="color:#3fb950;font-size:12px;line-height:1.5">•</span>
+            <div><span style="color:#c9d1d9">储能技术研发被列为国家重点科技攻关方向</span> <span style="color:#58a6ff;font-size:9px;cursor:pointer">[→原文]</span></div>
+          </div>
+          <div style="padding:6px 10px;background:#1c2128;border-radius:6px;margin-bottom:4px;display:flex;gap:6px;align-items:flex-start">
+            <span style="color:#3fb950;font-size:12px;line-height:1.5">•</span>
+            <div><span style="color:#c9d1d9">新能源汽车充电网络加速建设</span> <span style="color:#58a6ff;font-size:9px;cursor:pointer">[→原文]</span></div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:#484f58;margin-top:8px">
+          由 DeepSeek 生成 · 缓存于 2026-03-24 10:00
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>🔗 AI 技术架构</h3>
+  <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:16px;font-size:12px;color:#c9d1d9;line-height:1.8">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <strong style="color:#58a6ff">AI 对话 (Server Action)</strong>
+        <pre style="background:#1c2128;padding:8px;border-radius:4px;font-size:10px;color:#8b949e;margin:6px 0;overflow-x:auto">"use server"
+// streamText + DeepSeek API
+// 上下文 = 文章全文 + 对话历史
+// OpenAI 兼容接口
+model: createOpenAI({
+  apiKey: OPENAI_API_KEY,
+  baseURL: OPENAI_API_BASE_URL,
+}).chat(OPENAI_MODEL)</pre>
+      </div>
+      <div>
+        <strong style="color:#bc8cff">AI 解读 (缓存策略)</strong>
+        <pre style="background:#1c2128;padding:8px;border-radius:4px;font-size:10px;color:#8b949e;margin:6px 0;overflow-x:auto">// 首次生成 → 存入 articles.aiAnalysis
+// 后续访问 → 读缓存，秒开
+// 不同视角独立缓存
+// 流式输出 → SSE → 前端渲染
+// 缓存键: articleId + perspective</pre>
+      </div>
+      <div>
+        <strong style="color:#f0883e">编辑器 AI 操作</strong>
+        <pre style="background:#1c2128;padding:8px;border-radius:4px;font-size:10px;color:#8b949e;margin:6px 0;overflow-x:auto">// 选中文本 + 指令 → streamText
+// 结果 → ActionCard 组件
+// "应用" → Tiptap insertContent
+//          / replaceRange
+// 支持 undo/redo (ProseMirror)</pre>
+      </div>
+      <div>
+        <strong style="color:#3fb950">上下文构建</strong>
+        <pre style="background:#1c2128;padding:8px;border-radius:4px;font-size:10px;color:#8b949e;margin:6px 0;overflow-x:auto">// system: 角色 + 文章全文
+// user: 对话消息 / 选中文本 + 指令
+// 限制: 文章 &lt; 8000 tokens 全量
+//        &gt; 8000 tokens 摘要 + 相关段落
+// 对话历史: 保留最近 20 轮</pre>
+      </div>
+    </div>
+  </div>
+</div>

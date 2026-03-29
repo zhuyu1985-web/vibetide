@@ -35,6 +35,6 @@ export async function takeAllSnapshots(): Promise<{
   await requireAuth();
   const count = await snapshotAllPerformance();
   revalidatePath("/employee");
-  revalidatePath("/team-builder");
+  revalidatePath("/missions");
   return { success: true, count };
 }

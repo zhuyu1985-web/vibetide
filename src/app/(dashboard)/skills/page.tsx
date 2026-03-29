@@ -4,6 +4,11 @@ import { SkillsClient } from "./skills-client";
 export const dynamic = "force-dynamic";
 
 export default async function SkillsPage() {
-  const skills = await getSkillsWithBindCount();
+  let skills: Awaited<ReturnType<typeof getSkillsWithBindCount>> = [];
+  try {
+    skills = await getSkillsWithBindCount();
+  } catch {
+    skills = [];
+  }
   return <SkillsClient skills={skills} />;
 }

@@ -197,7 +197,7 @@ export function EmployeeMarketplaceClient({
   }, [employees, statusFilter, searchText, sortBy]);
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="AI数字员工"
         description="浏览、管理和创建你的AI智能员工团队"

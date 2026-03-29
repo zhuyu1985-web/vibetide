@@ -64,7 +64,7 @@ export default function ContentExcellenceClient({
       : 0;
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="内容精品率提升"
         description="爆品指数预测 + 竞品爆款学习 + AI改进建议 (3.3)"

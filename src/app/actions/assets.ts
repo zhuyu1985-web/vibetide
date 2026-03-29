@@ -1,10 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { mediaAssets, assetTags } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { mediaAssets, assetTags, userProfiles } from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteObject } from "@/lib/volc-tos";
+import type { MediaAssetType, SecurityLevel } from "@/lib/types";
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -12,6 +14,28 @@ async function requireAuth() {
   if (!user) throw new Error("Unauthorized");
   return user;
 }
+
+async function getProfile(authUserId: string) {
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, authUserId),
+  });
+  if (!profile) throw new Error("Profile not found");
+  return profile;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+const REVALIDATE_PATHS = ["/media-assets", "/asset-intelligence"];
+function revalidateAll() {
+  for (const p of REVALIDATE_PATHS) revalidatePath(p);
+}
+
+// --- Original actions (kept) ---
 
 export async function createAsset(data: {
   organizationId: string;
@@ -31,8 +55,7 @@ export async function createAsset(data: {
 }) {
   await requireAuth();
   const [asset] = await db.insert(mediaAssets).values(data).returning();
-  revalidatePath("/media-assets");
-  revalidatePath("/asset-intelligence");
+  revalidateAll();
   return { assetId: asset.id };
 }
 
@@ -44,15 +67,13 @@ export async function updateAsset(assetId: string, data: {
 }) {
   await requireAuth();
   await db.update(mediaAssets).set({ ...data, updatedAt: new Date() }).where(eq(mediaAssets.id, assetId));
-  revalidatePath("/media-assets");
-  revalidatePath("/asset-intelligence");
+  revalidateAll();
 }
 
 export async function deleteAsset(assetId: string) {
   await requireAuth();
   await db.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
-  revalidatePath("/media-assets");
-  revalidatePath("/asset-intelligence");
+  revalidateAll();
 }
 
 export async function triggerUnderstanding(assetId: string) {
@@ -62,8 +83,7 @@ export async function triggerUnderstanding(assetId: string) {
     understandingProgress: 0,
     updatedAt: new Date(),
   }).where(eq(mediaAssets.id, assetId));
-  revalidatePath("/media-assets");
-  revalidatePath("/asset-intelligence");
+  revalidateAll();
 }
 
 export async function batchTriggerUnderstanding(assetIds: string[]) {
@@ -75,8 +95,7 @@ export async function batchTriggerUnderstanding(assetIds: string[]) {
       updatedAt: new Date(),
     }).where(eq(mediaAssets.id, id));
   }
-  revalidatePath("/media-assets");
-  revalidatePath("/asset-intelligence");
+  revalidateAll();
 }
 
 export async function correctTag(tagId: string, correctedLabel: string, correctedCategory?: string) {
@@ -90,4 +109,225 @@ export async function correctTag(tagId: string, correctedLabel: string, correcte
   }
   await db.update(assetTags).set(updates).where(eq(assetTags.id, tagId));
   revalidatePath("/asset-intelligence");
+}
+
+// --- Smart Media Asset module actions ---
+
+export async function confirmUpload(data: {
+  title: string;
+  type: MediaAssetType;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  tosObjectKey: string;
+  tosBucket: string;
+  libraryType: "personal" | "product";
+  categoryId?: string;
+  securityLevel?: SecurityLevel;
+  width?: number;
+  height?: number;
+  duration?: string;
+  durationSeconds?: number;
+}) {
+  const user = await requireAuth();
+  const profile = await getProfile(user.id);
+
+  const [asset] = await db.insert(mediaAssets).values({
+    organizationId: profile.organizationId!,
+    title: data.title,
+    type: data.type,
+    fileName: data.fileName,
+    fileSize: data.fileSize,
+    fileSizeDisplay: formatFileSize(data.fileSize),
+    mimeType: data.mimeType,
+    tosObjectKey: data.tosObjectKey,
+    tosBucket: data.tosBucket,
+    libraryType: data.libraryType,
+    categoryId: data.categoryId,
+    securityLevel: data.securityLevel || "public",
+    width: data.width,
+    height: data.height,
+    duration: data.duration,
+    durationSeconds: data.durationSeconds,
+    uploadedBy: profile.id,
+    source: "upload",
+    understandingStatus: "queued",
+  }).returning();
+
+  revalidateAll();
+  return { assetId: asset.id };
+}
+
+export async function moveToProductLibrary(assetId: string, categoryId: string) {
+  await requireAuth();
+  await db.update(mediaAssets).set({
+    libraryType: "product",
+    categoryId,
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function softDeleteAsset(assetId: string) {
+  const user = await requireAuth();
+  const profile = await getProfile(user.id);
+
+  const asset = await db.query.mediaAssets.findFirst({
+    where: eq(mediaAssets.id, assetId),
+  });
+
+  await db.update(mediaAssets).set({
+    isDeleted: true,
+    deletedAt: new Date(),
+    deletedBy: profile.id,
+    originalCategoryId: asset?.categoryId || undefined,
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function batchSoftDelete(assetIds: string[]) {
+  const user = await requireAuth();
+  const profile = await getProfile(user.id);
+
+  for (const id of assetIds) {
+    const asset = await db.query.mediaAssets.findFirst({
+      where: eq(mediaAssets.id, id),
+    });
+    await db.update(mediaAssets).set({
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedBy: profile.id,
+      originalCategoryId: asset?.categoryId || undefined,
+      updatedAt: new Date(),
+    }).where(eq(mediaAssets.id, id));
+  }
+  revalidateAll();
+}
+
+export async function restoreAsset(assetId: string, targetCategoryId?: string) {
+  await requireAuth();
+
+  const asset = await db.query.mediaAssets.findFirst({
+    where: eq(mediaAssets.id, assetId),
+  });
+  if (!asset) throw new Error("Asset not found");
+
+  await db.update(mediaAssets).set({
+    isDeleted: false,
+    deletedAt: null,
+    deletedBy: null,
+    categoryId: targetCategoryId || asset.originalCategoryId || null,
+    originalCategoryId: null,
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function permanentDelete(assetId: string) {
+  await requireAuth();
+
+  const asset = await db.query.mediaAssets.findFirst({
+    where: eq(mediaAssets.id, assetId),
+  });
+
+  if (asset?.tosObjectKey) {
+    try { await deleteObject(asset.tosObjectKey); } catch { /* TOS deletion is best-effort */ }
+  }
+
+  await db.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function emptyRecycleBin() {
+  const user = await requireAuth();
+  const profile = await getProfile(user.id);
+
+  const deletedAssets = await db.query.mediaAssets.findMany({
+    where: and(
+      eq(mediaAssets.organizationId, profile.organizationId!),
+      eq(mediaAssets.isDeleted, true),
+    ),
+  });
+
+  for (const asset of deletedAssets) {
+    if (asset.tosObjectKey) {
+      try { await deleteObject(asset.tosObjectKey); } catch { /* best-effort */ }
+    }
+    await db.delete(mediaAssets).where(eq(mediaAssets.id, asset.id));
+  }
+  revalidateAll();
+}
+
+export async function togglePublic(assetId: string) {
+  await requireAuth();
+  const asset = await db.query.mediaAssets.findFirst({
+    where: eq(mediaAssets.id, assetId),
+  });
+  if (!asset) throw new Error("Asset not found");
+
+  await db.update(mediaAssets).set({
+    isPublic: !asset.isPublic,
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function moveAsset(assetId: string, targetCategoryId: string) {
+  await requireAuth();
+  await db.update(mediaAssets).set({
+    categoryId: targetCategoryId,
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function batchMove(assetIds: string[], targetCategoryId: string) {
+  await requireAuth();
+  for (const id of assetIds) {
+    await db.update(mediaAssets).set({
+      categoryId: targetCategoryId,
+      updatedAt: new Date(),
+    }).where(eq(mediaAssets.id, id));
+  }
+  revalidateAll();
+}
+
+export async function renameAsset(assetId: string, newTitle: string) {
+  await requireAuth();
+  await db.update(mediaAssets).set({
+    title: newTitle,
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function updateCatalog(assetId: string, catalogData: Record<string, unknown>) {
+  await requireAuth();
+  await db.update(mediaAssets).set({
+    catalogData,
+    catalogStatus: "cataloged",
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function submitForReview(assetId: string) {
+  await requireAuth();
+  await db.update(mediaAssets).set({
+    reviewStatus: "pending",
+    updatedAt: new Date(),
+  }).where(eq(mediaAssets.id, assetId));
+  revalidateAll();
+}
+
+export async function batchSubmitForReview(assetIds: string[]) {
+  await requireAuth();
+  for (const id of assetIds) {
+    await db.update(mediaAssets).set({
+      reviewStatus: "pending",
+      updatedAt: new Date(),
+    }).where(eq(mediaAssets.id, id));
+  }
+  revalidateAll();
 }

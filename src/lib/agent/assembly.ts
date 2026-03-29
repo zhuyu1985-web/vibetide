@@ -110,16 +110,14 @@ export async function assembleAgent(
 
   // 4. Build tools (filtered by authority level)
   const readOnlyToolNames = new Set<string>(READ_ONLY_TOOL_NAMES);
+  const resolvedTools = resolveTools(skillNames);
 
-  let filteredSkillNames = skillNames;
+  let tools = resolvedTools;
   if (employee.authorityLevel === "observer") {
-    filteredSkillNames = []; // no tools
+    tools = [];
   } else if (employee.authorityLevel === "advisor") {
-    filteredSkillNames = skillNames.filter((n) => readOnlyToolNames.has(n));
+    tools = resolvedTools.filter((tool) => readOnlyToolNames.has(tool.name));
   }
-  // executor and coordinator get all bound tools
-
-  const tools = resolveTools(filteredSkillNames);
 
   // 4b. Build plugin configs map for plugin-type skills
   type PluginEntry = NonNullable<AssembledAgent["pluginConfigs"]> extends Map<string, infer V> ? V : never;

@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition, useMemo, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { seedBenchmarkTestData, generateBenchmarkForTopic } from "@/app/actions/benchmarking";
+import type { TopicCandidate } from "@/lib/dal/benchmarking";
 import { KPIComparisonBar } from "@/components/shared/kpi-comparison-bar";
 import { RealTimeIndicator } from "@/components/shared/realtime-indicator";
 import { CompareTable } from "@/components/shared/compare-table";
@@ -29,8 +32,33 @@ import {
   Shield,
   BarChart3,
   TrendingUp,
+  Activity,
+  Bell,
+  Settings,
+  Plus,
+  FileText,
+  Zap,
+  Loader2,
 } from "lucide-react";
-import type { BenchmarkTopic, MissedTopic, WeeklyReport } from "@/lib/types";
+import type {
+  BenchmarkTopic,
+  MissedTopic,
+  WeeklyReport,
+  MonitoredPlatformUI,
+  PlatformContentUI,
+  BenchmarkAlertUI,
+  PlatformComparisonRow,
+  CoverageOverview,
+} from "@/lib/types";
+import { PlatformConfigSheet } from "./platform-config-sheet";
+import { PlatformStatusTree } from "./platform-status-tree";
+import { CrawlFeedList } from "./crawl-feed-list";
+import { AlertCenter } from "./alert-center";
+import { ComparisonFilterBar } from "./comparison-filter-bar";
+import { AISuggestionPanel } from "./ai-suggestion-panel";
+import { MultiPlatformTable } from "./multi-platform-table";
+import { AIPredictionPanel } from "./ai-prediction-panel";
+import { ExportButtons } from "./export-buttons";
 
 const priorityColors: Record<string, string> = {
   high: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200",
@@ -62,6 +90,14 @@ interface BenchmarkingClientProps {
   weeklyReport: WeeklyReport | null;
   dimensions: string[];
   missedTypeDistribution: { name: string; value: number; color: string }[];
+  platforms: MonitoredPlatformUI[];
+  recentContent: PlatformContentUI[];
+  alerts: BenchmarkAlertUI[];
+  alertStats: { total: number; urgent: number; high: number; new: number; actioned: number };
+  unreadAlertCount: number;
+  coverageOverview: CoverageOverview;
+  multiPlatformComparison: PlatformComparisonRow[];
+  topicCandidates: TopicCandidate[];
 }
 
 export function BenchmarkingClient({
@@ -70,8 +106,58 @@ export function BenchmarkingClient({
   weeklyReport,
   dimensions,
   missedTypeDistribution,
+  platforms,
+  recentContent,
+  alerts,
+  alertStats,
+  unreadAlertCount,
+  coverageOverview,
+  multiPlatformComparison,
+  topicCandidates,
 }: BenchmarkingClientProps) {
+  const router = useRouter();
   const [selectedTopicId, setSelectedTopicId] = useState(benchmarkTopics[0]?.id || "");
+  const [platformConfigOpen, setPlatformConfigOpen] = useState(false);
+  const [selectedPlatformFilter, setSelectedPlatformFilter] = useState("all");
+  const [timeRange, setTimeRange] = useState("7d");
+  const [isSeedPending, startSeedTransition] = useTransition();
+  const [seedResult, setSeedResult] = useState<string | null>(null);
+
+  // Topic picker state
+  const [topicSearch, setTopicSearch] = useState("");
+  const [showTopicDropdown, setShowTopicDropdown] = useState(false);
+  const [isGenerating, startGenerateTransition] = useTransition();
+  const topicPickerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (topicPickerRef.current && !topicPickerRef.current.contains(e.target as Node)) {
+        setShowTopicDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCandidates = useMemo(() => {
+    if (!topicSearch.trim()) return topicCandidates.slice(0, 15);
+    const q = topicSearch.toLowerCase();
+    return topicCandidates
+      .filter((c) => c.title.toLowerCase().includes(q))
+      .slice(0, 15);
+  }, [topicSearch, topicCandidates]);
+
+  function handleGenerateBenchmark(title: string) {
+    setTopicSearch(title);
+    setShowTopicDropdown(false);
+    startGenerateTransition(async () => {
+      await generateBenchmarkForTopic(title);
+      router.refresh();
+    });
+  }
+
+  const hasData = recentContent.length > 0 || benchmarkTopics.length > 0 || missedTopics.length > 0;
 
   const selectedTopic = benchmarkTopics.find((t) => t.id === selectedTopicId) ?? benchmarkTopics[0];
 
@@ -106,28 +192,96 @@ export function BenchmarkingClient({
     gapList: [],
   };
 
+  // Filter content by selected platform or category
+  const filteredContent = (() => {
+    if (selectedPlatformFilter === "all") return recentContent;
+    if (selectedPlatformFilter.startsWith("cat:")) {
+      const cat = selectedPlatformFilter.slice(4);
+      const platformIdsInCat = new Set(
+        platforms.filter((p) => p.category === cat).map((p) => p.id)
+      );
+      return recentContent.filter((c) => platformIdsInCat.has(c.platformId));
+    }
+    return recentContent.filter((c) => c.platformId === selectedPlatformFilter);
+  })();
+
+  // Empty state helper
+  const EmptyState = ({ icon: Icon, title, description, action }: {
+    icon: React.ElementType;
+    title: string;
+    description: string;
+    action?: React.ReactNode;
+  }) => (
+    <GlassCard>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+          <Icon size={24} className="text-gray-400 dark:text-gray-500" />
+        </div>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{title}</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm">{description}</p>
+        {action && <div className="mt-4">{action}</div>}
+      </div>
+    </GlassCard>
+  );
+
   return (
     <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="同题对标"
-        description="竞品做了我没做的秒级预警 \u00b7 同题深度拆解"
+        description="竞品做了我没做的秒级预警 · 同题深度拆解"
+        actions={
+          <div className="flex items-center gap-2">
+            {!hasData && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                disabled={isSeedPending}
+                onClick={() => {
+                  startSeedTransition(async () => {
+                    const result = await seedBenchmarkTestData();
+                    setSeedResult(result.message);
+                    router.refresh();
+                  });
+                }}
+              >
+                {isSeedPending ? (
+                  <Activity size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <BarChart3 size={14} className="mr-1" />
+                )}
+                {isSeedPending ? "填充中..." : "填充测试数据"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => setPlatformConfigOpen(true)}
+            >
+              <Settings size={14} className="mr-1" />
+              平台配置
+            </Button>
+          </div>
+        }
       />
 
       <KPIComparisonBar
         items={[
           { label: "漏题率", before: "30%", after: "~0%", improvement: "-100%" },
           { label: "响应速度", before: "慢", after: "快", improvement: "+80%" },
-          { label: "对标覆盖", before: "3家", after: "20+家", improvement: "6x" },
+          { label: "对标覆盖", before: "3家", after: `${platforms.length}家`, improvement: `${Math.round(platforms.length / 3)}x` },
           { label: "分析深度", before: "基础", after: "四维度", improvement: "升级" },
         ]}
       />
 
-      <div className="flex items-center justify-between mb-6">
-        <RealTimeIndicator label="媒体" count={20} />
-      </div>
-
-      <Tabs defaultValue="compare" className="w-full">
-        <TabsList>
+      <Tabs defaultValue="dashboard" className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <TabsList>
+          <TabsTrigger value="dashboard">
+            <Activity size={14} className="mr-1" />
+            监控看板
+          </TabsTrigger>
           <TabsTrigger value="compare">
             <Target size={14} className="mr-1" />
             同题对标
@@ -136,33 +290,175 @@ export function BenchmarkingClient({
             <Shield size={14} className="mr-1" />
             漏题筛查
           </TabsTrigger>
+          <TabsTrigger value="alerts" className="relative">
+            <Bell size={14} className="mr-1" />
+            预警中心
+            {unreadAlertCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {unreadAlertCount > 9 ? "9+" : unreadAlertCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="report">
             <BarChart3 size={14} className="mr-1" />
             对标报告
           </TabsTrigger>
-        </TabsList>
+          </TabsList>
+          <RealTimeIndicator label="媒体" count={platforms.length || 20} />
+        </div>
 
-        {/* ====== Tab 1: 同题对标 ====== */}
+        {/* ====== Tab 1: 监控看板 ====== */}
+        <TabsContent value="dashboard">
+          {recentContent.length === 0 ? (
+            <EmptyState
+              icon={Activity}
+              title="暂无监控数据"
+              description="系统已配置监控平台，将在下次定时抓取后显示数据。你也可以手动触发一次抓取。"
+              action={
+                <Button variant="ghost" size="sm" onClick={() => setPlatformConfigOpen(true)}>
+                  <Settings size={14} className="mr-1" />
+                  查看平台配置
+                </Button>
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-3">
+                <div className="sticky top-4">
+                  <PlatformStatusTree
+                    platforms={platforms}
+                    selectedFilter={selectedPlatformFilter}
+                    onFilterChange={setSelectedPlatformFilter}
+                  />
+                </div>
+              </div>
+              <div className="col-span-9">
+                <GlassCard padding="none">
+                  <div className="flex items-center justify-between px-4 pt-4 pb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        内容动态
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        共 {filteredContent.length} 条内容
+                      </p>
+                    </div>
+                    <ComparisonFilterBar
+                      platforms={platforms}
+                      selectedPlatform={selectedPlatformFilter}
+                      onPlatformChange={setSelectedPlatformFilter}
+                      timeRange={timeRange}
+                      onTimeRangeChange={setTimeRange}
+                    />
+                  </div>
+                  <CrawlFeedList content={filteredContent} hideHeader />
+                </GlassCard>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ====== Tab 2: 同题对标 ====== */}
         <TabsContent value="compare">
-          {/* Topic selector */}
+          {/* Topic picker — always visible */}
           <div className="mb-4 flex items-center gap-3">
-            <Search size={14} className="text-gray-400 dark:text-gray-500" />
-            <select
-              value={selectedTopicId}
-              onChange={(e) => setSelectedTopicId(e.target.value)}
-              className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              {benchmarkTopics.map((topic) => (
-                <option key={topic.id} value={topic.id}>
-                  {topic.title}
-                </option>
-              ))}
-            </select>
+            <div ref={topicPickerRef} className="relative flex-1 max-w-lg">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              <input
+                type="text"
+                value={topicSearch}
+                onChange={(e) => {
+                  setTopicSearch(e.target.value);
+                  setShowTopicDropdown(true);
+                }}
+                onFocus={() => setShowTopicDropdown(true)}
+                placeholder="输入选题关键词，或从已有文章/热点中选取..."
+                className="w-full text-sm pl-9 pr-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 placeholder:text-gray-400"
+              />
+              {showTopicDropdown && (topicSearch.trim() || topicCandidates.length > 0) && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                  {topicSearch.trim().length >= 2 && (
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors text-blue-600 dark:text-blue-400"
+                      onClick={() => handleGenerateBenchmark(topicSearch.trim())}
+                    >
+                      <Plus size={14} />
+                      <span>对标「{topicSearch.trim()}」</span>
+                    </button>
+                  )}
+                  {filteredCandidates.length > 0 && (
+                    <>
+                      {topicSearch.trim().length >= 2 && (
+                        <div className="border-t border-gray-100 dark:border-gray-800" />
+                      )}
+                      {filteredCandidates.map((candidate) => (
+                        <button
+                          key={`${candidate.source}-${candidate.id}`}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          onClick={() => handleGenerateBenchmark(candidate.title)}
+                        >
+                          {candidate.source === "article" ? (
+                            <FileText size={13} className="text-green-500 shrink-0" />
+                          ) : (
+                            <Zap size={13} className="text-amber-500 shrink-0" />
+                          )}
+                          <span className="truncate text-gray-700 dark:text-gray-300">{candidate.title}</span>
+                          <span className="ml-auto text-[10px] text-gray-400 shrink-0">
+                            {candidate.source === "article" ? "文章" : "热点"}
+                          </span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {filteredCandidates.length === 0 && topicSearch.trim().length < 2 && (
+                    <div className="px-3 py-4 text-center text-xs text-gray-400">
+                      输入至少2个字符搜索，或直接输入选题名称
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Existing analysis selector */}
+            {benchmarkTopics.length > 0 && (
+              <select
+                value={selectedTopicId}
+                onChange={(e) => setSelectedTopicId(e.target.value)}
+                className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 max-w-xs"
+              >
+                {benchmarkTopics.map((topic) => (
+                  <option key={topic.id} value={topic.id}>
+                    {topic.title}
+                  </option>
+                ))}
+              </select>
+            )}
+
             {selectedTopic && (
               <Badge variant="secondary">{selectedTopic.category}</Badge>
             )}
           </div>
 
+          {/* Loading state */}
+          {isGenerating && (
+            <GlassCard>
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Loader2 size={24} className="text-blue-500 animate-spin mb-3" />
+                <p className="text-sm text-gray-600 dark:text-gray-400">正在生成对标分析...</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">系统正在匹配竞品内容并计算四维评分</p>
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Analysis results */}
+          {!isGenerating && benchmarkTopics.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="选择一个话题开始对标"
+              description="在上方搜索框中输入选题关键词，或从已有文章、热点话题中选取，系统将自动与竞品内容进行四维度对比分析。"
+            />
+          ) : !isGenerating && (
+          <>
           <div className="grid grid-cols-12 gap-5">
             {/* Left: Compare Table + Timeline */}
             <div className="col-span-8 space-y-4">
@@ -206,6 +502,16 @@ export function BenchmarkingClient({
                   </div>
                 </GlassCard>
               )}
+
+              {/* AI Suggestion Panel */}
+              <AISuggestionPanel
+                suggestions={
+                  selectedTopic?.improvements.map((imp) => ({
+                    title: "改进建议",
+                    description: imp,
+                  })) ?? []
+                }
+              />
             </div>
 
             {/* Right: Radar + Improvements */}
@@ -240,10 +546,19 @@ export function BenchmarkingClient({
               )}
             </div>
           </div>
+          </>
+          )}
         </TabsContent>
 
-        {/* ====== Tab 2: 漏题筛查 ====== */}
+        {/* ====== Tab 3: 漏题筛查 ====== */}
         <TabsContent value="missed">
+          {missedTopics.length === 0 ? (
+            <EmptyState
+              icon={Shield}
+              title="暂无漏题记录"
+              description="系统运行正常，未发现遗漏选题。AI 将持续监控竞品动态，发现漏题后实时提醒。"
+            />
+          ) : (
           <div className="grid grid-cols-12 gap-5">
             {/* Left: Gauge + Stats + Donut */}
             <div className="col-span-4 space-y-4">
@@ -360,11 +675,16 @@ export function BenchmarkingClient({
 
                         {topic.status === "missed" && (
                           <Button
+                            variant="ghost"
                             size="sm"
                             className="text-xs h-7 px-3"
+                            onClick={() => {
+                              const params = new URLSearchParams({ topic: topic.title, source: "benchmarking" });
+                              router.push(`/super-creation?${params.toString()}`);
+                            }}
                           >
                             <Crosshair size={12} className="mr-1" />
-                            启动追踪
+                            发起跟进
                           </Button>
                         )}
                       </div>
@@ -374,10 +694,31 @@ export function BenchmarkingClient({
               })}
             </div>
           </div>
+          )}
         </TabsContent>
 
-        {/* ====== Tab 3: 对标报告 ====== */}
+        {/* ====== Tab 4: 预警中心 ====== */}
+        <TabsContent value="alerts">
+          {alerts.length === 0 ? (
+            <EmptyState
+              icon={Bell}
+              title="暂无预警"
+              description="系统运行正常，当前没有需要关注的对标预警。AI 将持续监控外部平台，发现重要事项后自动生成预警。"
+            />
+          ) : (
+            <AlertCenter alerts={alerts} alertStats={alertStats} />
+          )}
+        </TabsContent>
+
+        {/* ====== Tab 5: 对标报告 ====== */}
         <TabsContent value="report">
+          {!weeklyReport && multiPlatformComparison.length === 0 ? (
+            <EmptyState
+              icon={BarChart3}
+              title="暂无报告数据"
+              description="系统需要积累一段时间的对标数据后才能生成报告。请先确保监控平台已配置并完成过至少一次爬取分析。"
+            />
+          ) : (
           <div className="space-y-5">
             {/* Weekly Overview */}
             <GlassCard>
@@ -389,6 +730,7 @@ export function BenchmarkingClient({
                 <Badge variant="outline" className="text-xs ml-auto">
                   {report.period}
                 </Badge>
+                <ExportButtons />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -448,6 +790,12 @@ export function BenchmarkingClient({
               </div>
             </div>
 
+            {/* Multi-Platform Comparison Table */}
+            <MultiPlatformTable data={multiPlatformComparison} />
+
+            {/* AI Prediction Panel */}
+            <AIPredictionPanel coverageOverview={coverageOverview} />
+
             {/* Gap List */}
             <GlassCard>
               <div className="flex items-center gap-2 mb-4">
@@ -495,8 +843,16 @@ export function BenchmarkingClient({
               </div>
             </GlassCard>
           </div>
+          )}
         </TabsContent>
       </Tabs>
+
+      {/* Platform Config Sheet */}
+      <PlatformConfigSheet
+        open={platformConfigOpen}
+        onOpenChange={setPlatformConfigOpen}
+        platforms={platforms}
+      />
     </div>
   );
 }

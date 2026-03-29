@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { deleteSkill, updateSkill, addSkillFile, updateSkillFile, deleteSkillFile, rollbackSkillVersion } from "@/app/actions/skills";
 import { testSkillExecution } from "@/app/actions/employee-advanced";
+import { DonutChartCard } from "@/components/charts/donut-chart-card";
 import type { SkillDetailWithFiles, PluginConfigData, SkillUsageStats, SkillRuntimeConfig } from "@/lib/dal/skills";
 import type { SkillCategory } from "@/lib/types";
 import type { SkillFileRow, SkillVersionRow } from "@/db/types";
@@ -579,7 +580,7 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
   const shortDesc = skill.description;
 
   return (
-    <div>
+    <div className="max-w-[1400px] mx-auto">
       {/* Compact header: breadcrumb + title + badges + actions */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="min-w-0">
@@ -1325,30 +1326,6 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
                   </span>
                 </div>
               )}
-              {usageStats && usageStats.totalUsages > 0 && (
-                <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 dark:text-gray-500">使用次数</span>
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">
-                      {usageStats.totalUsages}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 dark:text-gray-500">成功率</span>
-                    <span className={`font-semibold ${usageStats.successRate >= 80 ? "text-green-600 dark:text-green-400" : usageStats.successRate >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
-                      {usageStats.successRate}%
-                    </span>
-                  </div>
-                  {usageStats.avgQualityScore != null && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400 dark:text-gray-500">平均质量</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {usageStats.avgQualityScore}分
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
               <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
@@ -1370,6 +1347,76 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
                 </div>
               </div>
             </div>
+          </GlassCard>
+
+          {/* Usage Statistics (3.8) */}
+          <GlassCard padding="none">
+            <div className="px-4 py-2.5 border-b border-gray-200/50 dark:border-gray-700/50">
+              <div className="flex items-center gap-1.5">
+                <Zap size={12} className="text-orange-400" />
+                <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                  使用统计
+                </span>
+              </div>
+            </div>
+            {usageStats && usageStats.totalUsages > 0 ? (
+              <div className="px-4 py-3 space-y-3">
+                {/* Donut chart for success rate */}
+                <div className="flex items-center justify-center">
+                  <div className="relative">
+                    <DonutChartCard
+                      data={[
+                        { name: "成功", value: usageStats.successCount, color: "#22c55e" },
+                        { name: "失败", value: usageStats.failureCount, color: "#ef4444" },
+                      ]}
+                      height={140}
+                      innerRadius={40}
+                      outerRadius={60}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="text-center">
+                        <span className={`text-lg font-bold ${usageStats.successRate >= 80 ? "text-green-600 dark:text-green-400" : usageStats.successRate >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                          {usageStats.successRate}%
+                        </span>
+                        <span className="block text-[10px] text-gray-400 dark:text-gray-500">成功率</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-center p-2 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
+                    <span className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                      {usageStats.totalUsages}
+                    </span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">总使用次数</span>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
+                    <span className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                      {usageStats.avgQualityScore != null ? `${usageStats.avgQualityScore}分` : "--"}
+                    </span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">平均质量分</span>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
+                    <span className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                      {usageStats.avgExecutionTimeMs != null ? `${(usageStats.avgExecutionTimeMs / 1000).toFixed(1)}s` : "--"}
+                    </span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">平均耗时</span>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
+                    <span className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                      {usageStats.lastUsedAt ? formatDate(usageStats.lastUsedAt) : "--"}
+                    </span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">最后使用</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="px-4 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
+                暂无使用记录
+              </div>
+            )}
           </GlassCard>
 
           {/* Plugin Configuration (S2.15) */}

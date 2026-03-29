@@ -1,35 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/shared/page-header";
-import { GlassCard } from "@/components/shared/glass-card";
-import { StatCard } from "@/components/shared/stat-card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Plus,
   Search,
+  Plus,
+  Archive,
+  Filter,
+  ArrowUpDown,
+  LayoutGrid,
+  List,
   FileText,
   Edit3,
   Clock,
   CheckCircle,
   Globe,
-  CalendarDays,
-  User,
   FolderOpen,
-  Type,
+  Inbox,
+  ChevronDown,
+  ChevronRight,
+  Video,
+  Headphones,
+  Code2,
+  Image as ImageIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { ArticleListItem, ArticleStats, CategoryNode } from "@/lib/types";
 
 interface Props {
@@ -38,256 +33,500 @@ interface Props {
   categories: CategoryNode[];
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  draft: { label: "草稿", color: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" },
-  reviewing: { label: "审核中", color: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
-  approved: { label: "已通过", color: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
-  published: { label: "已发布", color: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" },
-  archived: { label: "已归档", color: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" },
+/* ── Sidebar status items ── */
+const statusItems = [
+  { key: "all", label: "全部", icon: Inbox, countKey: "totalCount" as const },
+  { key: "draft", label: "草稿", icon: Edit3, countKey: "draftCount" as const },
+  { key: "reviewing", label: "审核中", icon: Clock, countKey: "reviewingCount" as const },
+  { key: "approved", label: "已通过", icon: CheckCircle, countKey: "approvedCount" as const },
+  { key: "published", label: "已发布", icon: Globe, countKey: "publishedCount" as const },
+  { key: "archived", label: "已归档", icon: Archive, countKey: undefined },
+];
+
+const mediaTypeItems = [
+  { key: "article", label: "图文", icon: FileText },
+  { key: "video", label: "视频", icon: Video },
+  { key: "audio", label: "音频", icon: Headphones },
+  { key: "h5", label: "H5", icon: Code2 },
+];
+
+/* ── Colored dot for bottom-row source indicator ── */
+const statusDotColor: Record<string, string> = {
+  draft: "bg-gray-400",
+  reviewing: "bg-amber-400",
+  approved: "bg-blue-500",
+  published: "bg-green-500",
+  archived: "bg-gray-300",
 };
 
-const mediaTypeConfig: Record<string, { label: string; color: string }> = {
-  article: { label: "图文", color: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400" },
-  video: { label: "视频", color: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
-  audio: { label: "音频", color: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400" },
-  h5: { label: "H5", color: "bg-pink-100 dark:bg-pink-950/50 text-pink-700 dark:text-pink-400" },
+/* ── Thumbnail bg & icon per media type ── */
+const thumbConfig: Record<string, { bg: string; darkBg: string; iconColor: string }> = {
+  article: { bg: "bg-blue-50", darkBg: "dark:bg-blue-950/30", iconColor: "text-blue-400" },
+  video: { bg: "bg-indigo-50", darkBg: "dark:bg-indigo-950/30", iconColor: "text-indigo-400" },
+  audio: { bg: "bg-purple-50", darkBg: "dark:bg-purple-950/30", iconColor: "text-purple-400" },
+  h5: { bg: "bg-pink-50", darkBg: "dark:bg-pink-950/30", iconColor: "text-pink-400" },
+};
+
+const ThumbIcon: Record<string, typeof FileText> = {
+  article: ImageIcon,
+  video: Video,
+  audio: Headphones,
+  h5: Code2,
 };
 
 export default function ArticlesClient({ articles, stats, categories }: Props) {
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [mediaTypeFilter, setMediaTypeFilter] = useState("all");
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeStatus, setActiveStatus] = useState("all");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [activeMediaType, setActiveMediaType] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [categoryOpen, setCategoryOpen] = useState(true);
+  const [mediaTypeDropdownOpen, setMediaTypeDropdownOpen] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"updated" | "created" | "title">("updated");
 
-  const filteredArticles = articles.filter((article) => {
-    const matchesSearch =
-      !search ||
-      article.title.toLowerCase().includes(search.toLowerCase()) ||
-      article.headline?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || article.categoryId === categoryFilter;
-    const matchesMediaType =
-      mediaTypeFilter === "all" || article.mediaType === mediaTypeFilter;
-    const matchesTab =
-      activeTab === "all" || article.status === activeTab;
-    return matchesSearch && matchesCategory && matchesMediaType && matchesTab;
-  });
+  const archivedCount = useMemo(
+    () => articles.filter((a) => a.status === "archived").length,
+    [articles]
+  );
+
+  const filteredArticles = useMemo(() => {
+    let result = articles.filter((article) => {
+      const matchesSearch =
+        !search ||
+        article.title.toLowerCase().includes(search.toLowerCase()) ||
+        article.headline?.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus =
+        activeStatus === "all" || article.status === activeStatus;
+      const matchesCategory =
+        activeCategory === "all" || article.categoryId === activeCategory;
+      const matchesMediaType =
+        activeMediaType === "all" || article.mediaType === activeMediaType;
+      return matchesSearch && matchesStatus && matchesCategory && matchesMediaType;
+    });
+
+    if (sortBy === "created") {
+      result = [...result].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === "title") {
+      result = [...result].sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
+    }
+
+    return result;
+  }, [articles, search, activeStatus, activeCategory, activeMediaType, sortBy]);
+
+  const activeSectionLabel = useMemo(() => {
+    if (activeStatus !== "all") {
+      return statusItems.find((s) => s.key === activeStatus)?.label || "全部";
+    }
+    if (activeCategory !== "all") {
+      return categories.find((c) => c.id === activeCategory)?.name || "全部";
+    }
+    if (activeMediaType !== "all") {
+      return mediaTypeItems.find((m) => m.key === activeMediaType)?.label || "全部";
+    }
+    return "全部稿件";
+  }, [activeStatus, activeCategory, activeMediaType, categories]);
+
+  /* Sidebar item renderer */
+  const SidebarItem = ({
+    icon: Icon,
+    label,
+    count,
+    active,
+    onClick,
+  }: {
+    icon: typeof Inbox;
+    label: string;
+    count: number;
+    active: boolean;
+    onClick: () => void;
+  }) => (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[13px] transition-colors",
+        active
+          ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium"
+          : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5"
+      )}
+    >
+      <Icon
+        size={16}
+        className={active ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}
+      />
+      <span className="flex-1 text-left truncate">{label}</span>
+      <span
+        className={cn(
+          "text-xs tabular-nums",
+          active ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
 
   return (
-    <div className="max-w-[1400px] mx-auto">
-      <PageHeader
-        title="稿件管理"
-        description="创建、编辑和管理所有内容稿件"
-        actions={
-          <Button asChild>
-            <Link href="/articles/create">
-              <Plus size={16} className="mr-2" />
-              新建稿件
-            </Link>
-          </Button>
-        }
-      />
+    <div className="flex h-[calc(100vh-64px)] -m-6">
+      {/* ── Left Sidebar ── */}
+      <aside className="w-[220px] shrink-0 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-4 pt-5 pb-3">
+          <h2 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+            稿件管理
+          </h2>
+        </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        <StatCard
-          label="稿件总数"
-          value={stats.totalCount}
-          icon={<FileText size={18} />}
-        />
-        <StatCard
-          label="草稿"
-          value={stats.draftCount}
-          icon={<Edit3 size={18} />}
-        />
-        <StatCard
-          label="审核中"
-          value={stats.reviewingCount}
-          icon={<Clock size={18} />}
-        />
-        <StatCard
-          label="已通过"
-          value={stats.approvedCount}
-          icon={<CheckCircle size={18} />}
-        />
-        <StatCard
-          label="已发布"
-          value={stats.publishedCount}
-          icon={<Globe size={18} />}
-        />
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">
-            全部
-            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
-              {stats.totalCount}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="draft">
-            草稿
-            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
-              {stats.draftCount}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="reviewing">
-            审核中
-            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
-              {stats.reviewingCount}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            已通过
-            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
-              {stats.approvedCount}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="published">
-            已发布
-            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
-              {stats.publishedCount}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeTab}>
-          {/* Filter Bar */}
-          <GlassCard padding="md" className="mb-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <Search
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+        <nav className="px-2.5 flex-1 overflow-y-auto space-y-0.5 pb-4">
+          {/* ── 栏目分类 ── */}
+          <div className="!mb-1">
+            <button
+              onClick={() => setCategoryOpen(!categoryOpen)}
+              className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 tracking-wider hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+            >
+              <span>栏目分类</span>
+              {categoryOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          </div>
+          {categoryOpen && (
+            <>
+              <SidebarItem
+                icon={Inbox}
+                label="全部"
+                count={stats.totalCount}
+                active={activeCategory === "all"}
+                onClick={() => {
+                  setActiveCategory("all");
+                  setActiveStatus("all");
+                  setActiveMediaType("all");
+                }}
+              />
+              {categories.map((cat) => (
+                <SidebarItem
+                  key={cat.id}
+                  icon={FolderOpen}
+                  label={cat.name}
+                  count={cat.articleCount}
+                  active={activeCategory === cat.id}
+                  onClick={() => {
+                    setActiveCategory(cat.id);
+                    setActiveStatus("all");
+                    setActiveMediaType("all");
+                  }}
                 />
-                <Input
-                  placeholder="搜索稿件标题..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+              ))}
+              {categories.length === 0 && (
+                <p className="px-3 py-1.5 text-[11px] text-gray-400 dark:text-gray-500">暂无栏目</p>
+              )}
+            </>
+          )}
 
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="全部栏目" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部栏目</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        </nav>
+      </aside>
 
-              <Select value={mediaTypeFilter} onValueChange={setMediaTypeFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="全部类型" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部类型</SelectItem>
-                  <SelectItem value="article">图文</SelectItem>
-                  <SelectItem value="video">视频</SelectItem>
-                  <SelectItem value="audio">音频</SelectItem>
-                  <SelectItem value="h5">H5</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </GlassCard>
-
-          {/* Results count */}
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-            共 {filteredArticles.length} 篇稿件
-          </p>
-
-          {/* Article List */}
-          <div className="space-y-2">
-            {filteredArticles.map((article) => (
-              <ArticleRow key={article.id} article={article} />
-            ))}
+      {/* ── Main Content ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* ── Toolbar ── */}
+        <div className="flex items-center gap-3 px-5 h-12 border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl shrink-0 relative z-[100]">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="搜索 (⌘B)"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-8 pl-9 pr-3 rounded-lg bg-gray-100/60 dark:bg-white/5 text-[13px] text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 transition-shadow"
+            />
           </div>
 
-          {filteredArticles.length === 0 && (
-            <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-              <FileText size={48} className="mx-auto mb-3 opacity-50" />
+          {/* Action Buttons */}
+          <div className="flex items-center gap-0.5 ml-auto">
+            {/* Status dropdown */}
+            <div className="relative">
+              <ToolbarButton
+                icon={Filter}
+                label={activeStatus === "all" ? "状态" : statusItems.find((s) => s.key === activeStatus)?.label || "状态"}
+                onClick={() => { setStatusDropdownOpen(!statusDropdownOpen); setMediaTypeDropdownOpen(false); }}
+                active={activeStatus !== "all"}
+              />
+              {statusDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-[999]" onClick={() => setStatusDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-[1000] w-32 py-1.5 rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
+                    {[{ key: "all", label: "不限" }, ...statusItems.filter((s) => s.key !== "all")].map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => {
+                          setActiveStatus(item.key);
+                          setStatusDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] transition-colors",
+                          activeStatus === item.key
+                            ? "text-blue-600 dark:text-blue-400 font-medium"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5"
+                        )}
+                      >
+                        {activeStatus === item.key ? <CheckCircle size={14} className="text-blue-500 dark:text-blue-400" /> : <span className="w-3.5" />}
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Media type dropdown */}
+            <div className="relative">
+              <ToolbarButton
+                icon={FileText}
+                label={activeMediaType === "all" ? "类型" : mediaTypeItems.find((m) => m.key === activeMediaType)?.label || "类型"}
+                onClick={() => { setMediaTypeDropdownOpen(!mediaTypeDropdownOpen); setStatusDropdownOpen(false); }}
+                active={activeMediaType !== "all"}
+              />
+              {mediaTypeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-[999]" onClick={() => setMediaTypeDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-[1000] w-32 py-1.5 rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
+                    {[{ key: "all", label: "不限" }, ...mediaTypeItems].map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => {
+                          setActiveMediaType(item.key);
+                          setMediaTypeDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] transition-colors",
+                          activeMediaType === item.key
+                            ? "text-blue-600 dark:text-blue-400 font-medium"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5"
+                        )}
+                      >
+                        {activeMediaType === item.key ? <CheckCircle size={14} className="text-blue-500 dark:text-blue-400" /> : <span className="w-3.5" />}
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Sort dropdown */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="appearance-none h-8 pl-7 pr-8 rounded-lg bg-transparent text-[13px] text-gray-500 dark:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-white/5 cursor-pointer outline-none transition-colors"
+              >
+                <option value="updated">排序</option>
+                <option value="created">创建时间</option>
+                <option value="title">标题排序</option>
+              </select>
+              <ArrowUpDown size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* View toggle */}
+            <button
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-[13px] text-gray-500 dark:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-white/5 transition-colors"
+            >
+              {viewMode === "grid" ? <LayoutGrid size={14} /> : <List size={14} />}
+              <span>视图</span>
+            </button>
+
+            {/* New article */}
+            <Link
+              href="/articles/create"
+              className="ml-1 h-8 w-8 flex items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+            >
+              <Plus size={16} />
+            </Link>
+          </div>
+        </div>
+
+        {/* ── Content ── */}
+        <div className="flex-1 overflow-y-auto bg-[#f9fafb] dark:bg-transparent">
+          {/* Section Header */}
+          <div className="flex items-baseline justify-between px-6 pt-5 pb-3">
+            <h3 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+              {activeSectionLabel}
+            </h3>
+            <span className="text-[13px] text-gray-400 dark:text-gray-500 tabular-nums">
+              {filteredArticles.length} / {stats.totalCount}
+            </span>
+          </div>
+
+          {/* Grid / List */}
+          {filteredArticles.length > 0 ? (
+            viewMode === "grid" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-6 pb-6">
+                {filteredArticles.map((article) => (
+                  <ArticleCard key={article.id} article={article} />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2 px-6 pb-6">
+                {filteredArticles.map((article) => (
+                  <ArticleListRow key={article.id} article={article} />
+                ))}
+              </div>
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 text-gray-400 dark:text-gray-500">
+              <FileText size={48} className="mb-3 opacity-40" />
               <p className="text-sm">暂无匹配的稿件</p>
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }
 
-function ArticleRow({ article }: { article: ArticleListItem }) {
-  const statusCfg = statusConfig[article.status] || statusConfig.draft;
-  const mediaTypeCfg = mediaTypeConfig[article.mediaType] || mediaTypeConfig.article;
+/* ── Toolbar Button ── */
+function ToolbarButton({
+  icon: Icon,
+  label,
+  onClick,
+  active,
+}: {
+  icon: typeof Archive;
+  label: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-[13px] transition-colors",
+        active
+          ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30"
+          : "text-gray-500 dark:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-white/5"
+      )}
+    >
+      <Icon size={14} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+/* ── Article Card (Grid View) ── */
+function ArticleCard({ article }: { article: ArticleListItem }) {
+  const dotColor = statusDotColor[article.status] || "bg-gray-400";
+  const tc = thumbConfig[article.mediaType] || thumbConfig.article;
+  const TIcon = ThumbIcon[article.mediaType] || FileText;
 
   return (
-    <Link href={`/articles/${article.id}`}>
-      <GlassCard variant="interactive" padding="md">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+    <Link href={`/articles/${article.id}`} className="group block h-full">
+      <div className="glass-card-interactive p-4 h-full flex flex-col">
+        {/* Top: Title + Thumbnail side by side */}
+        <div className="flex gap-3 mb-2">
+          {/* Left: Title + Description */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <h4 className="relative z-10 text-[13px] font-semibold text-gray-900 dark:text-gray-100 leading-[1.45] line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
               {article.title}
-            </h3>
-            <div className="flex items-center gap-3 mt-1.5">
-              {article.assigneeName && (
-                <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                  <User size={11} />
-                  {article.assigneeName}
-                </span>
-              )}
-              {article.categoryName && (
-                <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                  <FolderOpen size={11} />
-                  {article.categoryName}
-                </span>
-              )}
-              <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                <Type size={11} />
-                {article.wordCount} 字
-              </span>
-            </div>
+            </h4>
+            <p className="relative z-10 mt-1.5 text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2">
+              {article.headline || article.title}
+            </p>
           </div>
 
-          <span
+          {/* Right: Thumbnail with glass effect */}
+          <div
             className={cn(
-              "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0",
-              mediaTypeCfg.color
+              "relative z-10 w-[72px] h-[72px] rounded-xl shrink-0 flex items-center justify-center",
+              "backdrop-blur-sm border border-white/40 dark:border-white/10",
+              "shadow-sm",
+              tc.bg,
+              tc.darkBg
             )}
           >
-            {mediaTypeCfg.label}
-          </span>
-
-          <span
-            className={cn(
-              "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0",
-              statusCfg.color
-            )}
-          >
-            {statusCfg.label}
-          </span>
-
-          {article.tags.length > 0 && (
-            <div className="flex items-center gap-1 shrink-0">
-              {article.tags.slice(0, 2).map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 flex items-center gap-1">
-            <CalendarDays size={12} />
-            {new Date(article.updatedAt).toLocaleDateString("zh-CN")}
-          </span>
+            <TIcon size={24} className={tc.iconColor} />
+          </div>
         </div>
-      </GlassCard>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Bottom: source dot + name · date + optional count badge */}
+        <div className="relative z-10 flex items-center justify-between mt-3 pt-2.5 border-t border-[var(--glass-border)]">
+          <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-gray-400 dark:text-gray-500">
+            <span className={cn("w-3.5 h-3.5 rounded-full shrink-0", dotColor)} />
+            <span className="truncate">
+              {article.assigneeName || article.categoryName || "未分配"}
+            </span>
+            <span>·</span>
+            <span className="shrink-0">{formatDate(article.updatedAt)}</span>
+          </div>
+
+          {/* Count badge */}
+          {article.tags.length > 0 && (
+            <span className={cn(
+              "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium text-white shrink-0 ml-2",
+              article.tags.length >= 3 ? "bg-blue-500" : article.tags.length >= 2 ? "bg-green-500" : "bg-amber-400"
+            )}>
+              {article.tags.length}
+            </span>
+          )}
+        </div>
+      </div>
     </Link>
   );
+}
+
+/* ── Article List Row ── */
+function ArticleListRow({ article }: { article: ArticleListItem }) {
+  const dotColor = statusDotColor[article.status] || "bg-gray-400";
+
+  return (
+    <Link href={`/articles/${article.id}`} className="group block">
+      <div className="glass-card-interactive flex items-center gap-4 px-5 py-3.5">
+        <div className="relative z-10 flex-1 min-w-0">
+          <h4 className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            {article.title}
+          </h4>
+          <p className="mt-0.5 text-[12px] text-gray-600 dark:text-gray-400 truncate">
+            {article.headline || article.title}
+          </p>
+        </div>
+
+        <div className="relative z-10 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500 shrink-0">
+          <span className={cn("w-3.5 h-3.5 rounded-full shrink-0", dotColor)} />
+          <span>{article.assigneeName || article.categoryName || "未分配"}</span>
+          <span>·</span>
+          <span>{formatDate(article.updatedAt)}</span>
+        </div>
+
+        {article.tags.length > 0 && (
+          <span className={cn(
+            "relative z-10 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium text-white shrink-0",
+            article.tags.length >= 3 ? "bg-blue-500" : article.tags.length >= 2 ? "bg-green-500" : "bg-amber-400"
+          )}>
+            {article.tags.length}
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+/* ── Helpers ── */
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "今天";
+  if (diffDays === 1) return "昨天";
+  if (diffDays < 7) return `${diffDays}天前`;
+
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${month}月${day}日`;
+  }
+  return `${d.getFullYear()}/${month}/${day}`;
 }

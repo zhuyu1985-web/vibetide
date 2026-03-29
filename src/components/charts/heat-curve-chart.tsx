@@ -33,10 +33,11 @@ export function HeatCurveChart({ data, height = 120 }: HeatCurveChartProps) {
         <YAxis hide domain={[0, 100]} />
         <Tooltip
           contentStyle={{
-            background: "rgba(255,255,255,0.9)",
-            border: "1px solid #e5e7eb",
+            background: "var(--color-gray-50, rgba(255,255,255,0.95))",
+            border: "1px solid var(--color-gray-200, #e5e7eb)",
             borderRadius: "8px",
             fontSize: "12px",
+            color: "var(--color-gray-700, #374151)",
           }}
           formatter={(value) => [`${value}`, "热度"]}
         />

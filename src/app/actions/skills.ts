@@ -2,11 +2,13 @@
 
 import { db } from "@/db";
 import { skills, skillFiles, skillVersions, skillUsageRecords } from "@/db/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
 import type { SkillCategory } from "@/lib/types";
+import { encrypt } from "@/lib/crypto";
+import { validatePluginUrl } from "@/lib/plugin-security";
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -23,21 +25,49 @@ async function requireCurrentOrgId() {
   return orgId;
 }
 
+function buildSkillAccessCondition(skillId: string, orgId: string) {
+  return and(
+    eq(skills.id, skillId),
+    or(eq(skills.organizationId, orgId), isNull(skills.organizationId))
+  );
+}
+
+function buildSkillVersionAccessCondition(versionId: string, orgId: string) {
+  return and(
+    eq(skillVersions.id, versionId),
+    or(eq(skillVersions.organizationId, orgId), isNull(skillVersions.organizationId))
+  );
+}
+
+function buildSkillVersionScopeCondition(skillId: string, orgId: string) {
+  return and(
+    eq(skillVersions.skillId, skillId),
+    or(eq(skillVersions.organizationId, orgId), isNull(skillVersions.organizationId))
+  );
+}
+
+function buildSkillFileAccessCondition(fileId: string, orgId: string) {
+  return and(
+    eq(skillFiles.id, fileId),
+    or(eq(skillFiles.organizationId, orgId), isNull(skillFiles.organizationId))
+  );
+}
+
 async function getSkillInOrg(skillId: string, orgId: string) {
   return db.query.skills.findFirst({
-    where: and(eq(skills.id, skillId), eq(skills.organizationId, orgId)),
+    where: buildSkillAccessCondition(skillId, orgId),
   });
 }
 
 async function getSkillVersionInOrg(versionId: string, orgId: string) {
   return db.query.skillVersions.findFirst({
-    where: and(eq(skillVersions.id, versionId), eq(skillVersions.organizationId, orgId)),
+    where: buildSkillVersionAccessCondition(versionId, orgId),
   });
 }
 
 async function getSkillFileInOrg(fileId: string, orgId: string) {
   return db.query.skillFiles.findFirst({
-    where: and(eq(skillFiles.id, fileId), eq(skillFiles.organizationId, orgId)),
+    where: buildSkillFileAccessCondition(fileId, orgId),
   });
 }
 
@@ -106,10 +136,13 @@ export async function registerPluginSkill(data: {
   if (!data.description.trim()) throw new Error("技能描述不能为空");
   if (!data.pluginConfig.endpoint.trim()) throw new Error("API 端点不能为空");
 
-  try {
-    new URL(data.pluginConfig.endpoint);
-  } catch {
-    throw new Error("API 端点 URL 格式无效");
+  const urlCheck = validatePluginUrl(data.pluginConfig.endpoint);
+  if (!urlCheck.valid) throw new Error(urlCheck.error!);
+
+  // 加密 authKey
+  const securedConfig = { ...data.pluginConfig };
+  if (securedConfig.authKey) {
+    securedConfig.authKey = encrypt(securedConfig.authKey);
   }
 
   const [newSkill] = await db
@@ -122,7 +155,7 @@ export async function registerPluginSkill(data: {
       version: data.version?.trim() || "1.0",
       description: data.description.trim(),
       compatibleRoles: data.compatibleRoles ?? [],
-      pluginConfig: data.pluginConfig,
+      pluginConfig: securedConfig,
     })
     .returning();
 
@@ -150,16 +183,19 @@ export async function updatePluginConfig(
   if (!existing) throw new Error("技能不存在");
   if (existing.type !== "plugin") throw new Error("只有插件技能才能更新插件配置");
 
-  try {
-    new URL(pluginConfig.endpoint);
-  } catch {
-    throw new Error("API 端点 URL 格式无效");
+  const urlCheck = validatePluginUrl(pluginConfig.endpoint);
+  if (!urlCheck.valid) throw new Error(urlCheck.error!);
+
+  // 加密 authKey
+  const securedConfig = { ...pluginConfig };
+  if (securedConfig.authKey) {
+    securedConfig.authKey = encrypt(securedConfig.authKey);
   }
 
   await db
     .update(skills)
-    .set({ pluginConfig, updatedAt: new Date() })
-    .where(and(eq(skills.id, skillId), eq(skills.organizationId, orgId)));
+    .set({ pluginConfig: securedConfig, updatedAt: new Date() })
+    .where(buildSkillAccessCondition(skillId, orgId));
 
   revalidatePath(`/skills/${skillId}`);
 }
@@ -187,7 +223,7 @@ export async function updateSkill(
   const [existing, latestVersion] = await Promise.all([
     getSkillInOrg(id, orgId),
     db.query.skillVersions.findFirst({
-      where: and(eq(skillVersions.skillId, id), eq(skillVersions.organizationId, orgId)),
+      where: buildSkillVersionScopeCondition(id, orgId),
       orderBy: [desc(skillVersions.versionNumber)],
     }),
   ]);
@@ -229,7 +265,7 @@ export async function updateSkill(
           : {}),
         updatedAt: new Date(),
       })
-      .where(and(eq(skills.id, id), eq(skills.organizationId, orgId)))
+      .where(buildSkillAccessCondition(id, orgId))
       .returning();
   });
 
@@ -277,10 +313,7 @@ export async function rollbackSkillVersion(skillId: string, versionId: string) {
     getSkillVersionInOrg(versionId, orgId),
     getSkillInOrg(skillId, orgId),
     db.query.skillVersions.findFirst({
-      where: and(
-        eq(skillVersions.skillId, skillId),
-        eq(skillVersions.organizationId, orgId)
-      ),
+      where: buildSkillVersionScopeCondition(skillId, orgId),
       orderBy: [desc(skillVersions.versionNumber)],
     }),
   ]);
@@ -345,7 +378,7 @@ export async function rollbackSkillVersion(skillId: string, versionId: string) {
           : {}),
         updatedAt: new Date(),
       })
-      .where(and(eq(skills.id, skillId), eq(skills.organizationId, orgId)));
+      .where(buildSkillAccessCondition(skillId, orgId));
   });
 
   revalidatePath(`/skills/${skillId}`);
@@ -361,7 +394,7 @@ export async function deleteSkill(id: string) {
 
   await db
     .delete(skills)
-    .where(and(eq(skills.id, id), eq(skills.organizationId, orgId)));
+    .where(buildSkillAccessCondition(id, orgId));
 
   revalidatePath("/skills");
 }
@@ -449,7 +482,7 @@ export async function updateSkillFile(
   await db
     .update(skillFiles)
     .set({ content: data.content, updatedAt: new Date() })
-    .where(and(eq(skillFiles.id, fileId), eq(skillFiles.organizationId, orgId)));
+    .where(buildSkillFileAccessCondition(fileId, orgId));
 
   revalidatePath(`/skills/${file.skillId}`);
 }
@@ -463,7 +496,7 @@ export async function deleteSkillFile(fileId: string) {
 
   await db
     .delete(skillFiles)
-    .where(and(eq(skillFiles.id, fileId), eq(skillFiles.organizationId, orgId)));
+    .where(buildSkillFileAccessCondition(fileId, orgId));
 
   revalidatePath(`/skills/${file.skillId}`);
 }
@@ -482,8 +515,8 @@ export async function recordSkillUsage(data: {
   errorMessage?: string;
   inputSummary?: string;
   outputSummary?: string;
-  workflowInstanceId?: string;
-  workflowStepId?: string;
+  missionId?: string;
+  missionTaskId?: string;
 }) {
   const orgId = await getCurrentUserOrg();
 
@@ -498,8 +531,8 @@ export async function recordSkillUsage(data: {
     errorMessage: data.errorMessage ?? null,
     inputSummary: data.inputSummary ?? null,
     outputSummary: data.outputSummary ?? null,
-    workflowInstanceId: data.workflowInstanceId ?? null,
-    workflowStepId: data.workflowStepId ?? null,
+    missionId: data.missionId ?? null,
+    missionTaskId: data.missionTaskId ?? null,
   });
 }
 
@@ -580,7 +613,7 @@ export async function getEmployeeSkillUsageStats(
       and(
         eq(skillUsageRecords.employeeId, employeeId),
         eq(skillUsageRecords.organizationId, orgId),
-        eq(skills.organizationId, orgId)
+        or(eq(skills.organizationId, orgId), isNull(skills.organizationId))
       )
     )
     .groupBy(skillUsageRecords.skillId, skills.name);
@@ -599,4 +632,38 @@ export async function getEmployeeSkillUsageStats(
     avgExecutionTimeMs: r.avgExecutionTimeMs,
     lastUsedAt: r.lastUsedAt,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Internal: Record Skill Usage (no auth required, for Inngest background tasks)
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal function for recording skill usage without user session.
+ * Used by Inngest background tasks (execute-mission-task).
+ */
+export async function recordSkillUsageInternal(data: {
+  skillId: string;
+  employeeId: string;
+  organizationId: string;
+  missionId?: string;
+  missionTaskId?: string;
+  success: boolean;
+  qualityScore?: number;
+  executionTimeMs?: number;
+  tokenUsage?: number;
+  errorMessage?: string;
+}) {
+  await db.insert(skillUsageRecords).values({
+    skillId: data.skillId,
+    employeeId: data.employeeId,
+    organizationId: data.organizationId,
+    missionId: data.missionId ?? null,
+    missionTaskId: data.missionTaskId ?? null,
+    success: data.success ? 1 : 0,
+    qualityScore: data.qualityScore ?? null,
+    executionTimeMs: data.executionTimeMs ?? null,
+    tokenUsage: data.tokenUsage ?? null,
+    errorMessage: data.errorMessage ?? null,
+  });
 }

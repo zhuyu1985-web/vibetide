@@ -7,11 +7,6 @@ export const teams: Team[] = [
     scenario: "breaking_news",
     members: ["xiaolei", "xiaoce", "xiaowen", "xiaoshen", "xiaofa"],
     humanMembers: ["张编辑"],
-    rules: {
-      approvalRequired: true,
-      reportFrequency: "实时",
-      sensitiveTopics: ["政治", "军事", "灾难"],
-    },
     createdAt: "2026-01-15T10:00:00Z",
   },
   {
@@ -20,11 +15,6 @@ export const teams: Team[] = [
     scenario: "deep_report",
     members: ["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaoshen", "xiaoshu"],
     humanMembers: ["李主编", "王记者"],
-    rules: {
-      approvalRequired: true,
-      reportFrequency: "每日",
-      sensitiveTopics: ["政治", "法律", "伦理"],
-    },
     createdAt: "2026-01-20T10:00:00Z",
   },
   {
@@ -33,11 +23,6 @@ export const teams: Team[] = [
     scenario: "social_media",
     members: ["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaojian", "xiaoshen", "xiaofa", "xiaoshu"],
     humanMembers: ["张编辑", "赵运营"],
-    rules: {
-      approvalRequired: false,
-      reportFrequency: "每4小时",
-      sensitiveTopics: ["政治", "低俗"],
-    },
     createdAt: "2026-02-01T10:00:00Z",
   },
 ];

@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { aiEmployees, employeeSkills, employeeKnowledgeBases, skills, teamMembers, teamMessages } from "@/db/schema";
+import { aiEmployees, employeeSkills, employeeKnowledgeBases, skills } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -17,12 +17,23 @@ async function requireAuth() {
   return user;
 }
 
+async function requireOwnedEmployee(employeeId: string) {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) throw new Error("无法获取组织信息");
+  const employee = await db.query.aiEmployees.findFirst({
+    where: and(eq(aiEmployees.id, employeeId), eq(aiEmployees.organizationId, orgId)),
+  });
+  if (!employee) throw new Error("员工不存在或无权操作");
+  return { employee, orgId };
+}
+
 export async function updateEmployeeStatus(
   employeeId: string,
   status: "working" | "idle" | "learning" | "reviewing",
   currentTask?: string
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   const statusLabels: Record<string, string> = {
     working: "工作中",
@@ -36,25 +47,7 @@ export async function updateEmployeeStatus(
     .set({ status, currentTask: currentTask || null, updatedAt: new Date() })
     .where(eq(aiEmployees.id, employeeId));
 
-  // Notify all teams this employee belongs to
-  const memberships = await db
-    .select({ teamId: teamMembers.teamId })
-    .from(teamMembers)
-    .where(eq(teamMembers.aiEmployeeId, employeeId));
-
-  for (const { teamId } of memberships) {
-    await db.insert(teamMessages).values({
-      teamId,
-      senderType: "ai",
-      aiEmployeeId: employeeId,
-      type: "status_update",
-      content: currentTask
-        ? `状态变更为「${statusLabels[status]}」：${currentTask}`
-        : `状态变更为「${statusLabels[status]}」`,
-    });
-  }
-
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 }
 
 export async function createEmployee(data: {
@@ -90,7 +83,7 @@ export async function createEmployee(data: {
     })
     .returning();
 
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   revalidatePath("/employee-marketplace");
   return employee;
 }
@@ -102,12 +95,7 @@ export async function bindSkillToEmployee(
   bindingType: "core" | "extended" | "knowledge" = "extended"
 ) {
   await requireAuth();
-
-  // Compatibility check: verify skill is compatible with employee's role
-  const employee = await db.query.aiEmployees.findFirst({
-    where: eq(aiEmployees.id, employeeId),
-  });
-  if (!employee) throw new Error("Employee not found");
+  const { employee } = await requireOwnedEmployee(employeeId);
 
   const skill = await db.query.skills.findFirst({
     where: eq(skills.id, skillId),
@@ -121,6 +109,17 @@ export async function bindSkillToEmployee(
     );
   }
 
+  // 检查是否已绑定
+  const existing = await db.query.employeeSkills.findFirst({
+    where: and(
+      eq(employeeSkills.employeeId, employeeId),
+      eq(employeeSkills.skillId, skillId)
+    ),
+  });
+  if (existing) {
+    throw new Error("该技能已绑定到此员工");
+  }
+
   await db.insert(employeeSkills).values({
     employeeId,
     skillId,
@@ -128,7 +127,7 @@ export async function bindSkillToEmployee(
     bindingType,
   });
 
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   revalidatePath("/employee");
 }
 
@@ -137,6 +136,7 @@ export async function unbindSkillFromEmployee(
   skillId: string
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   // Check if binding is core — core skills cannot be unbound
   const binding = await db.query.employeeSkills.findFirst({
@@ -159,7 +159,7 @@ export async function unbindSkillFromEmployee(
       )
     );
 
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   revalidatePath("/employee");
 }
 
@@ -174,13 +174,14 @@ export async function updateEmployeeProfile(
   }
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   await db
     .update(aiEmployees)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(aiEmployees.id, employeeId));
 
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   revalidatePath("/employee");
 }
 
@@ -195,6 +196,7 @@ export async function updateWorkPreferences(
   }
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   await db
     .update(aiEmployees)
@@ -212,6 +214,7 @@ export async function updateAuthorityLevel(
   level: "observer" | "advisor" | "executor" | "coordinator"
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   await db
     .update(aiEmployees)
@@ -248,6 +251,7 @@ export async function updateSkillLevel(
   level: number
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   await db
     .update(employeeSkills)
@@ -268,12 +272,7 @@ export async function cloneEmployee(
   newNickname: string
 ) {
   await requireAuth();
-
-  const source = await db.query.aiEmployees.findFirst({
-    where: eq(aiEmployees.id, sourceId),
-  });
-
-  if (!source) throw new Error("Source employee not found");
+  const { employee: source } = await requireOwnedEmployee(sourceId);
 
   const [newEmployee] = await db
     .insert(aiEmployees)
@@ -313,19 +312,15 @@ export async function cloneEmployee(
 
 export async function deleteEmployee(employeeId: string) {
   await requireAuth();
+  const { employee: emp } = await requireOwnedEmployee(employeeId);
 
-  const emp = await db.query.aiEmployees.findFirst({
-    where: eq(aiEmployees.id, employeeId),
-  });
-
-  if (!emp) throw new Error("Employee not found");
   if (emp.isPreset === 1) throw new Error("Cannot delete preset employee");
 
   await db.delete(employeeSkills).where(eq(employeeSkills.employeeId, employeeId));
   await db.delete(aiEmployees).where(eq(aiEmployees.id, employeeId));
 
   revalidatePath("/employee-marketplace");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 }
 
 export async function toggleEmployeeDisabled(
@@ -333,6 +328,7 @@ export async function toggleEmployeeDisabled(
   disabled: boolean
 ) {
   await requireAuth();
+  await requireOwnedEmployee(employeeId);
 
   await db
     .update(aiEmployees)
@@ -340,17 +336,13 @@ export async function toggleEmployeeDisabled(
     .where(eq(aiEmployees.id, employeeId));
 
   revalidatePath("/employee-marketplace");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   revalidatePath("/employee");
 }
 
 export async function exportEmployee(employeeId: string) {
   await requireAuth();
-
-  const emp = await db.query.aiEmployees.findFirst({
-    where: eq(aiEmployees.id, employeeId),
-  });
-  if (!emp) throw new Error("Employee not found");
+  const { employee: emp } = await requireOwnedEmployee(employeeId);
 
   const empSkills = await db
     .select({
@@ -435,7 +427,7 @@ export async function importEmployee(
   }
 
   revalidatePath("/employee-marketplace");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   return employee;
 }
 

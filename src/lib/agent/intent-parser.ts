@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { getLanguageModel } from "./model-router";
 import type { EmployeeId } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ ${employeeList}
 
   try {
     const result = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: getLanguageModel({ provider: "openai", model: process.env.OPENAI_MODEL || "deepseek-chat", temperature: 0.3, maxTokens: 2048 }),
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       maxOutputTokens: 2048,

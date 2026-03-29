@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { postTeamMessage } from "@/lib/dal/team-messages";
+// TODO: re-implement message notifications via mission system
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -123,30 +123,7 @@ export async function updatePublishPlanStatus(
     .set(updates)
     .where(eq(publishPlans.id, planId));
 
-  // Post team message per Section 七
-  if (status === "published" || status === "failed") {
-    const plan = await db.query.publishPlans.findFirst({
-      where: eq(publishPlans.id, planId),
-      with: { channel: true },
-    });
-
-    if (plan) {
-      const channelName = plan.channel?.name || "未知渠道";
-      if (status === "published") {
-        await postTeamMessage({
-          senderSlug: "xiaofa",
-          type: "work_output",
-          content: `已发布至${channelName}：${plan.title}`,
-        });
-      } else {
-        await postTeamMessage({
-          senderSlug: "xiaofa",
-          type: "alert",
-          content: `${channelName}发布失败：${plan.title}`,
-        });
-      }
-    }
-  }
+  // TODO: re-implement message notifications via mission system
 
   revalidatePath("/publishing");
   revalidatePath("/analytics");

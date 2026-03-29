@@ -32,7 +32,7 @@ const statusConfig = {
 
 export default function ChannelAdvisorClient({ advisors }: Props) {
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="频道顾问工坊"
         description="培养专属频道顾问，让每个渠道都有独特的声音"

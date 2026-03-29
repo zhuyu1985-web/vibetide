@@ -161,10 +161,14 @@ ${topicSummary}`,
             const freshnessBonus = ageMs < 2 * 3600000 ? 10 : ageMs < 4 * 3600000 ? 5 : 0;
             const aiScore = Math.min(100, Math.round(platformCoverage + heatComponent + sentimentScore + trendBonus + freshnessBonus));
 
+            // Validate AI-returned category against allowed list
+            const VALID_CATS = new Set(["要闻", "国际", "军事", "体育", "娱乐", "财经", "科技", "社会", "健康", "教育", "时政"]);
+            const validCategory = VALID_CATS.has(result.category) ? result.category : null;
+
             await db
               .update(hotTopics)
               .set({
-                category: result.category,
+                ...(validCategory ? { category: validCategory } : {}),
                 summary: result.summary,
                 aiScore,
                 ...(trendValue ? { trend: trendValue } : {}),

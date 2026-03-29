@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Send, AtSign } from "lucide-react";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { EmployeeAvatar } from "./employee-avatar";
-import { sendTeamMessage } from "@/app/actions/teams";
+// TODO: re-implement with mission message system
 import { cn } from "@/lib/utils";
 
 interface EmployeeInputBarProps {
@@ -133,17 +133,12 @@ export function EmployeeInputBar({ teamId }: EmployeeInputBarProps) {
   );
 
   async function handleSend() {
+    // TODO: re-implement with mission message system
     if (!input.trim() || !teamId) return;
-    setSending(true);
-    try {
-      await sendTeamMessage({ teamId, content: input.trim() });
-      setInput("");
-      setShowMention(false);
-      setMentionQuery("");
-      router.refresh();
-    } finally {
-      setSending(false);
-    }
+    setInput("");
+    setShowMention(false);
+    setMentionQuery("");
+    router.refresh();
   }
 
   return (

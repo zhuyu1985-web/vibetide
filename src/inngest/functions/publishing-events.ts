@@ -1,81 +1,100 @@
 import { inngest } from "../client";
-import { postTeamMessage } from "@/lib/dal/team-messages";
+import { db } from "@/db";
+import { organizations } from "@/db/schema";
+
+async function getDefaultOrgId(): Promise<string | null> {
+  const org = await db.query.organizations.findFirst({ orderBy: (o, { asc }) => [asc(o.createdAt)] });
+  return org?.id ?? null;
+}
 
 /**
- * F4.X.12: Handle review completion events from Module 3.
- * Posts a notification to the team when a content review is completed.
+ * Handle review completion events — create revision mission on rejection.
  */
 export const onReviewCompleted = inngest.createFunction(
   { id: "on-review-completed", name: "On Review Completed" },
   { event: "publishing/review-completed" },
-  async ({ event, step }) => {
-    const { status, score, reviewerEmployeeId, contentId } = event.data;
-
-    const statusLabels: Record<string, string> = {
-      approved: "通过",
-      rejected: "未通过",
-      escalated: "已升级",
+  async ({ event }) => {
+    const { status, articleTitle, articleId, reason } = event.data as {
+      status: string; articleTitle?: string; articleId?: string; reason?: string;
     };
 
-    await step.run("notify-team", async () => {
-      await postTeamMessage({
-        senderSlug: "xiaoshen",
-        type: status === "approved" ? "work_output" : "alert",
-        content: `内容审核${statusLabels[status]}${score !== null ? `，评分 ${score}/100` : ""}。内容ID：${contentId}`,
+    if (status === "rejected" || status === "revision_needed") {
+      const orgId = await getDefaultOrgId();
+      if (!orgId) return { status: "skipped", reason: "no org" };
+
+      const { startMissionFromModule } = await import("@/app/actions/missions");
+      await startMissionFromModule({
+        organizationId: orgId,
+        title: `内容修订：${articleTitle ?? "待修订稿件"}`,
+        scenario: "deep_report",
+        userInstruction: `审核未通过，需要修订。${reason ? `原因：${reason}` : ""}请根据审核意见进行修改。`,
+        sourceModule: "publishing",
+        sourceEntityId: articleId,
+        sourceEntityType: "review",
       });
-    });
+    }
 
     return { status: "notified" };
   }
 );
 
 /**
- * F4.X.12: Handle publishing plan status changes.
+ * Handle publishing plan status changes — create diagnosis mission on failure.
  */
 export const onPlanStatusChanged = inngest.createFunction(
   { id: "on-plan-status-changed", name: "On Plan Status Changed" },
   { event: "publishing/plan-status-changed" },
-  async ({ event, step }) => {
-    const { title, channelName, status } = event.data;
+  async ({ event }) => {
+    const { status, planTitle, planId, error } = event.data as {
+      status: string; planTitle?: string; planId?: string; error?: string;
+    };
 
-    await step.run("notify-team", async () => {
-      await postTeamMessage({
-        senderSlug: "xiaofa",
-        type: status === "published" ? "work_output" : "alert",
-        content:
-          status === "published"
-            ? `「${title}」已成功发布到「${channelName}」渠道。`
-            : `「${title}」发布到「${channelName}」失败，请检查。`,
+    if (status === "failed") {
+      const orgId = await getDefaultOrgId();
+      if (!orgId) return { status: "skipped" };
+
+      const { startMissionFromModule } = await import("@/app/actions/missions");
+      await startMissionFromModule({
+        organizationId: orgId,
+        title: `发布诊断：${planTitle ?? "发布失败"}`,
+        scenario: "multi_platform",
+        userInstruction: `发布计划执行失败。${error ? `错误信息：${error}` : ""}请分析失败原因并提出修复方案。`,
+        sourceModule: "publishing",
+        sourceEntityId: planId,
+        sourceEntityType: "publish_plan",
       });
-    });
+    }
 
     return { status: "notified" };
   }
 );
 
 /**
- * Handle anomaly detected events from analytics module.
+ * Handle anomaly detected events — create investigation mission for critical anomalies.
  */
 export const onAnomalyDetected = inngest.createFunction(
   { id: "on-anomaly-detected", name: "On Anomaly Detected" },
   { event: "analytics/anomaly-detected" },
-  async ({ event, step }) => {
-    const { channel, metric, severity, message, changePercent } = event.data;
+  async ({ event }) => {
+    const { severity, metric, channel, description } = event.data as {
+      severity: string; metric?: string; channel?: string; description?: string;
+    };
 
-    await step.run("notify-team", async () => {
-      await postTeamMessage({
-        senderSlug: "xiaoshu",
-        type: "alert",
-        content: `${severity === "critical" ? "严重" : ""}数据异常：${message}`,
-        attachments: [
-          {
-            type: "chart" as const,
-            title: `${channel} ${metric}异常`,
-            description: `变化幅度：${changePercent > 0 ? "+" : ""}${changePercent}%`,
-          },
-        ],
+    if (severity === "critical" || severity === "high") {
+      const orgId = await getDefaultOrgId();
+      if (!orgId) return { status: "skipped" };
+
+      const { startMissionFromModule } = await import("@/app/actions/missions");
+      await startMissionFromModule({
+        organizationId: orgId,
+        title: `数据异常分析：${metric ?? "关键指标"}异常`,
+        scenario: "data_journalism",
+        userInstruction: `检测到${severity === "critical" ? "严重" : "重要"}数据异常。${channel ? `渠道：${channel}` : ""}${description ? `\n详情：${description}` : ""}\n请分析异常原因并提出应对建议。`,
+        sourceModule: "analytics",
+        sourceEntityType: "anomaly",
+        sourceContext: { severity, metric, channel },
       });
-    });
+    }
 
     return { status: "alerted", severity };
   }

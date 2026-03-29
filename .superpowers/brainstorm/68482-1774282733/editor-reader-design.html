@@ -1,0 +1,235 @@
+<h2>设计方案 Section 2：阅读/编辑双模式 + Tiptap 编辑器</h2>
+<p class="subtitle">中间核心区域的两种形态 — 沉浸阅读 ↔ 富文本编辑</p>
+
+<div class="section">
+  <h3>📖 阅读模式 (Read Mode) — 默认</h3>
+  <div class="mockup">
+    <div class="mockup-header">纯净排版 + 划词交互</div>
+    <div class="mockup-body" style="padding:0;background:#0d1117">
+      <div style="max-width:680px;margin:0 auto;padding:28px 32px">
+        <!-- Meta Header -->
+        <div style="margin-bottom:24px">
+          <h1 style="font-size:24px;color:#f0f6fc;font-weight:700;line-height:1.35;margin:0 0 12px">国务院发布关于加快新能源产业高质量发展的指导意见</h1>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#8b949e;margin-bottom:10px">
+            <span style="width:18px;height:18px;background:#f85149;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff">新</span>
+            <span style="color:#c9d1d9">新华社</span>
+            <span style="color:#30363d">·</span>
+            <span>记者 张三</span>
+            <span style="color:#30363d">·</span>
+            <span>发布 2026-03-24 09:30</span>
+            <span style="color:#30363d">·</span>
+            <span>抓取 2026-03-24 09:45</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+            <span style="font-size:10px;padding:2px 8px;background:#1f6feb22;color:#58a6ff;border-radius:4px">新能源</span>
+            <span style="font-size:10px;padding:2px 8px;background:#238636aa;color:#3fb950;border-radius:4px">政策解读</span>
+            <span style="font-size:10px;padding:2px 8px;background:#da367022;color:#f85149;border-radius:4px">重要</span>
+            <span style="font-size:10px;padding:1px 6px;border:1px dashed #30363d;color:#484f58;border-radius:4px;cursor:pointer">+ 标签</span>
+          </div>
+          <div style="font-size:11px;color:#484f58">约 8 分钟读完 · 3,200 字</div>
+        </div>
+        <div style="height:1px;background:#21262d;margin-bottom:20px"></div>
+        <!-- Body -->
+        <div style="font-size:15px;color:#c9d1d9;line-height:1.9;font-family:Georgia,'Noto Serif SC',serif">
+          <p style="margin-bottom:16px;text-indent:2em">新华社北京3月24日电　国务院日前印发《关于加快新能源产业高质量发展的指导意见》（以下简称《意见》），对新能源产业未来五年发展作出全面部署。</p>
+          <p style="margin-bottom:16px;text-indent:2em">《意见》明确提出，<span style="background:#f0883e40;padding:1px 3px;border-radius:2px;border-bottom:2px solid #f0883e;position:relative">到2030年，新能源消费比重达到25%以上<span style="position:absolute;top:-28px;left:50%;transform:translateX(-50%);display:flex;gap:2px;background:#2d333b;border:1px solid #444c56;border-radius:6px;padding:3px 4px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.4)">
+            <span style="width:14px;height:14px;border-radius:3px;background:#f85149;display:inline-block"></span>
+            <span style="width:14px;height:14px;border-radius:3px;background:#f0883e;display:inline-block;outline:2px solid #58a6ff;outline-offset:1px"></span>
+            <span style="width:14px;height:14px;border-radius:3px;background:#3fb950;display:inline-block"></span>
+            <span style="width:14px;height:14px;border-radius:3px;background:#58a6ff;display:inline-block"></span>
+            <span style="width:14px;height:14px;border-radius:3px;background:#bc8cff;display:inline-block"></span>
+            <span style="width:1px;height:14px;background:#30363d;display:inline-block;margin:0 2px"></span>
+            <span style="font-size:10px;color:#8b949e;padding:0 4px;display:flex;align-items:center">🖊</span>
+            <span style="font-size:10px;color:#bc8cff;padding:0 4px;display:flex;align-items:center">✦</span>
+            <span style="font-size:10px;color:#8b949e;padding:0 4px;display:flex;align-items:center">🔍</span>
+            <span style="font-size:10px;color:#8b949e;padding:0 4px;display:flex;align-items:center">📋</span>
+          </span></span>，非化石能源发电装机占比超过50%。这标志着中国在"双碳"目标下，进一步加速能源结构转型步伐。</p>
+          <p style="margin-bottom:16px;text-indent:2em;color:#8b949e;font-style:italic;font-size:13px">▲ 划词后弹出气泡菜单：颜色选择 | 批注 | AI解释 | 搜索 | 复制</p>
+          <h2 style="font-size:18px;color:#f0f6fc;margin:28px 0 14px;font-weight:600">一、政策核心要点</h2>
+          <p style="margin-bottom:16px;text-indent:2em">业内专家分析指出，此次政策的出台释放了三大信号：一是光伏、风电等可再生能源将获得更大规模的财政支持和税收优惠；二是储能技术研发被列为国家重点科技攻关方向...</p>
+          <blockquote style="border-left:3px solid #1f6feb;padding:8px 16px;margin:16px 0;background:#1f6feb08;color:#8b949e;font-style:italic">
+            "新能源产业已经进入从'量'到'质'的关键转型期。" — 国家能源局副局长 李明
+          </blockquote>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>✏️ 编辑模式 (Edit Mode) — 点击编辑按钮切换</h3>
+  <div class="mockup">
+    <div class="mockup-header">Tiptap 富文本编辑器 + 浮动工具栏 + Slash 命令</div>
+    <div class="mockup-body" style="padding:0;background:#0d1117">
+      <!-- Fixed Toolbar -->
+      <div style="display:flex;align-items:center;gap:2px;padding:6px 12px;background:#161b22;border-bottom:1px solid #30363d;flex-wrap:wrap">
+        <div style="display:flex;gap:1px;padding:2px;background:#21262d;border-radius:4px">
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">H1</span>
+          <span style="font-size:10px;padding:3px 6px;color:#58a6ff;background:#1f6feb22;border-radius:3px">H2</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">H3</span>
+        </div>
+        <div style="width:1px;height:16px;background:#30363d;margin:0 4px"></div>
+        <div style="display:flex;gap:1px;padding:2px;background:#21262d;border-radius:4px">
+          <span style="font-size:10px;padding:3px 6px;color:#c9d1d9;font-weight:bold;border-radius:3px">B</span>
+          <span style="font-size:10px;padding:3px 6px;color:#c9d1d9;font-style:italic;border-radius:3px">I</span>
+          <span style="font-size:10px;padding:3px 6px;color:#c9d1d9;text-decoration:underline;border-radius:3px">U</span>
+          <span style="font-size:10px;padding:3px 6px;color:#c9d1d9;text-decoration:line-through;border-radius:3px">S</span>
+        </div>
+        <div style="width:1px;height:16px;background:#30363d;margin:0 4px"></div>
+        <div style="display:flex;gap:1px;padding:2px;background:#21262d;border-radius:4px">
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">≡</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">☰</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">☑</span>
+        </div>
+        <div style="width:1px;height:16px;background:#30363d;margin:0 4px"></div>
+        <div style="display:flex;gap:1px;padding:2px;background:#21262d;border-radius:4px">
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">❝</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">—</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">&lt;/&gt;</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">⊞</span>
+        </div>
+        <div style="width:1px;height:16px;background:#30363d;margin:0 4px"></div>
+        <div style="display:flex;gap:1px;padding:2px;background:#21262d;border-radius:4px">
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">🔗</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">🖼</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">📎</span>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:1px;padding:2px;background:#21262d;border-radius:4px">
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">↩</span>
+          <span style="font-size:10px;padding:3px 6px;color:#8b949e;border-radius:3px">↪</span>
+        </div>
+        <div style="width:1px;height:16px;background:#30363d;margin:0 4px"></div>
+        <span style="font-size:10px;padding:4px 10px;background:#238636;color:#fff;border-radius:4px">保存</span>
+        <span style="font-size:10px;padding:4px 10px;color:#8b949e;border-radius:4px">取消</span>
+      </div>
+      <!-- Editor content -->
+      <div style="padding:24px 32px;max-width:100%">
+        <!-- Editable meta -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:24px;color:#f0f6fc;font-weight:700;padding:4px 0;border-bottom:1px dashed #30363d44;outline:none;margin-bottom:8px">国务院发布关于加快新能源产业高质量发展的指导意见</div>
+          <div style="font-size:11px;color:#484f58;margin-bottom:10px">点击标题可直接编辑</div>
+        </div>
+        <!-- Editor body with cursor -->
+        <div style="font-size:15px;color:#c9d1d9;line-height:1.9;min-height:200px;position:relative">
+          <p style="margin-bottom:16px">新华社北京3月24日电　国务院日前印发《关于加快新能源产业高质量发展的指导意见》</p>
+
+          <!-- Slash command popup -->
+          <div style="position:relative;margin-bottom:16px">
+            <p><span style="color:#484f58">输入 </span><span style="color:#58a6ff">/</span><span style="color:#484f58"> 打开命令菜单</span></p>
+            <div style="position:absolute;top:28px;left:0;background:#2d333b;border:1px solid #444c56;border-radius:8px;padding:4px;width:240px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:10">
+              <div style="font-size:10px;color:#484f58;padding:4px 8px">插入块</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#1f6feb22;border-radius:4px;font-size:11px;color:#c9d1d9">
+                <span>📝</span> <span>段落</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#8b949e">
+                <span>H</span> <span>标题</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#8b949e">
+                <span>☰</span> <span>列表</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#8b949e">
+                <span>❝</span> <span>引用块</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#8b949e">
+                <span>&lt;/&gt;</span> <span>代码块</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#8b949e">
+                <span>🖼</span> <span>图片</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#8b949e">
+                <span>⊞</span> <span>表格</span>
+              </div>
+              <div style="height:1px;background:#30363d;margin:4px 0"></div>
+              <div style="font-size:10px;color:#484f58;padding:4px 8px">AI 指令</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#bc8cff">
+                <span>✦</span> <span>/ai 润色选中段落</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#bc8cff">
+                <span>✦</span> <span>/ai 续写下文</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bubble menu on selection -->
+          <p style="margin-bottom:16px;position:relative">
+            <span style="background:#264f7844;padding:1px 2px">《意见》明确提出，到2030年</span>
+            <span style="position:absolute;top:-30px;left:10px;display:flex;gap:1px;background:#2d333b;border:1px solid #444c56;border-radius:6px;padding:3px 4px;box-shadow:0 4px 12px rgba(0,0,0,0.3)">
+              <span style="font-size:10px;padding:2px 6px;color:#c9d1d9;font-weight:bold">B</span>
+              <span style="font-size:10px;padding:2px 6px;color:#c9d1d9;font-style:italic">I</span>
+              <span style="font-size:10px;padding:2px 6px;color:#c9d1d9;text-decoration:underline">U</span>
+              <span style="width:1px;height:12px;background:#30363d;margin:auto 2px"></span>
+              <span style="font-size:10px;padding:2px 6px;color:#8b949e">🔗</span>
+              <span style="font-size:10px;padding:2px 6px;color:#8b949e">A</span>
+              <span style="width:1px;height:12px;background:#30363d;margin:auto 2px"></span>
+              <span style="font-size:10px;padding:2px 6px;color:#bc8cff">✦ AI</span>
+            </span>
+          </p>
+        </div>
+        <!-- Status bar -->
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #21262d;font-size:10px;color:#484f58;margin-top:16px">
+          <span>3,200 字 · 5,600 字符</span>
+          <div style="display:flex;gap:8px">
+            <span style="color:#3fb950">● 自动保存于 10:32</span>
+            <span>Markdown 快捷键已启用</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>🔄 切换行为规则</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px">
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#58a6ff">阅读 → 编辑</strong>
+      <ul style="margin:8px 0 0;padding-left:14px;color:#8b949e;line-height:1.6">
+        <li>保持滚动位置</li>
+        <li>正文替换为 Tiptap 编辑器</li>
+        <li>顶部出现编辑器工具栏</li>
+        <li>左侧快捷指令切换为编辑集</li>
+        <li>标题/标签变为可编辑</li>
+        <li>底部出现字数统计栏</li>
+      </ul>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#3fb950">编辑 → 保存</strong>
+      <ul style="margin:8px 0 0;padding-left:14px;color:#8b949e;line-height:1.6">
+        <li>调用 updateArticle action</li>
+        <li>自动切回阅读模式</li>
+        <li>Toast 提示"保存成功"</li>
+        <li>防抖自动保存(3s)</li>
+        <li>⌘S 手动保存不切模式</li>
+      </ul>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#f85149">编辑 → 取消</strong>
+      <ul style="margin:8px 0 0;padding-left:14px;color:#8b949e;line-height:1.6">
+        <li>检测是否有未保存修改</li>
+        <li>有修改 → 弹确认对话框</li>
+        <li>确认丢弃 → 恢复原内容</li>
+        <li>切回阅读模式</li>
+        <li>页面关闭时 beforeunload 拦截</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>⚡ Tiptap 扩展清单</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px">
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:6px;padding:10px">
+      <strong style="color:#f0f6fc;font-size:12px">基础</strong>
+      <div style="color:#8b949e;margin-top:4px;line-height:1.6">StarterKit, Heading, Bold, Italic, Underline, Strike, Subscript, Superscript, TextAlign, TextStyle, Color, Highlight, FontSize</div>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:6px;padding:10px">
+      <strong style="color:#f0f6fc;font-size:12px">结构</strong>
+      <div style="color:#8b949e;margin-top:4px;line-height:1.6">BulletList, OrderedList, TaskList, Blockquote, HorizontalRule, CodeBlockLowlight, Table, TableRow, TableCell, TableHeader</div>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:6px;padding:10px">
+      <strong style="color:#f0f6fc;font-size:12px">富媒体 + 交互</strong>
+      <div style="color:#8b949e;margin-top:4px;line-height:1.6">Image, Link, Placeholder, CharacterCount, BubbleMenu, FloatingMenu, Dropcursor, Typography, Undo/Redo</div>
+    </div>
+  </div>
+</div>

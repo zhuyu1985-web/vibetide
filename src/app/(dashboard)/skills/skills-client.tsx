@@ -49,6 +49,15 @@ const categoryColors: Record<SkillCategory, string> = {
     "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
 };
 
+type SkillType = "all" | "builtin" | "custom" | "plugin";
+
+const typeLabels: Record<SkillType, string> = {
+  all: "全部类型",
+  builtin: "内置",
+  custom: "自定义",
+  plugin: "插件",
+};
+
 type SortKey = "bindCount" | "updatedAt" | "name";
 
 const sortOptions: { key: SortKey; label: string; icon: typeof Users }[] = [
@@ -75,6 +84,7 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortKey>("bindCount");
+  const [typeFilter, setTypeFilter] = useState<SkillType>("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<SkillWithBindCount | null>(
     null
@@ -122,6 +132,8 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
     const filtered = localSkills.filter((s) => {
       if (categoryFilter !== "all" && s.category !== categoryFilter)
         return false;
+      if (typeFilter !== "all" && s.type !== typeFilter)
+        return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         return (
@@ -144,7 +156,7 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
           return 0;
       }
     });
-  }, [localSkills, categoryFilter, search, sortBy]);
+  }, [localSkills, categoryFilter, typeFilter, search, sortBy]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -161,7 +173,7 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
   };
 
   return (
-    <div>
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="技能管理"
         description="管理 AI 员工可用的技能库，添加自定义技能或查看内置技能"
@@ -216,6 +228,20 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
           ))}
         </div>
 
+        <div className="flex gap-1.5 flex-wrap">
+          {(Object.keys(typeLabels) as SkillType[]).map((t) => (
+            <Button
+              key={t}
+              variant={typeFilter === t ? "default" : "ghost"}
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => setTypeFilter(t)}
+            >
+              {typeLabels[t]}
+            </Button>
+          ))}
+        </div>
+
         <div className="ml-auto flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
           <span className="mr-1">排序</span>
           {sortOptions.map((opt) => (
@@ -236,7 +262,7 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
       {/* Skills Grid */}
       {sorted.length === 0 ? (
         <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-          {search || categoryFilter !== "all"
+          {search || categoryFilter !== "all" || typeFilter !== "all"
             ? "没有匹配的技能"
             : "暂无技能，点击「添加技能」创建"}
         </div>
@@ -277,10 +303,12 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
                   className={`text-[10px] ${
                     skill.type === "builtin"
                       ? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                      : skill.type === "plugin"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                       : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                   }`}
                 >
-                  {skill.type === "builtin" ? "内置" : "自定义"}
+                  {skill.type === "builtin" ? "内置" : skill.type === "plugin" ? "插件" : "自定义"}
                 </Badge>
                 <Badge variant="outline" className="text-[10px]">
                   v{skill.version}

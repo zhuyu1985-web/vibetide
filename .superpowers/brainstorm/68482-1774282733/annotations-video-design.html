@@ -1,0 +1,307 @@
+<h2>设计方案 Section 4：批注系统 + 视频模式</h2>
+<p class="subtitle">划词高亮、双向联动、浮顶笔记 + 视频播放器、ASR 听记</p>
+
+<div class="section">
+  <h3>📝 批注系统 (Annotations)</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">右侧批注列表 — 按位置排序</div>
+      <div class="mockup-body" style="padding:0;background:#0d1117;font-size:11px">
+        <div style="display:flex;border-bottom:1px solid #30363d">
+          <span style="flex:1;text-align:center;padding:8px;color:#8b949e;font-size:10px">AI 解读</span>
+          <span style="flex:1;text-align:center;padding:8px;color:#58a6ff;border-bottom:2px solid #1f6feb;font-size:10px">批注 <span style="background:#1f6feb33;padding:0 5px;border-radius:8px;font-size:9px">3</span></span>
+          <span style="flex:1;text-align:center;padding:8px;color:#8b949e;font-size:10px">听记</span>
+        </div>
+        <div style="padding:10px;height:310px;overflow-y:auto">
+          <!-- Annotation card 1 -->
+          <div style="border:1px solid #30363d;border-radius:8px;margin-bottom:8px;overflow:hidden;background:#1c2128;cursor:pointer">
+            <div style="border-left:3px solid #f0883e;padding:8px 10px">
+              <div style="color:#f0883e;font-size:10px;line-height:1.5;margin-bottom:4px">
+                「到2030年，新能源消费比重达到25%以上」
+              </div>
+              <div style="color:#c9d1d9;font-size:11px;line-height:1.5;margin-bottom:6px">
+                这是核心量化指标，需要对比十四五规划中的目标值。当时提出的是20%，本次上调了5个百分点。
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <div style="display:flex;gap:2px">
+                  <span style="width:10px;height:10px;border-radius:2px;background:#f85149;display:inline-block;cursor:pointer"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#f0883e;display:inline-block;outline:1px solid #58a6ff;cursor:pointer"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#3fb950;display:inline-block;cursor:pointer"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#58a6ff;display:inline-block;cursor:pointer"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#bc8cff;display:inline-block;cursor:pointer"></span>
+                </div>
+                <span style="flex:1"></span>
+                <span style="font-size:9px;color:#484f58">📋</span>
+                <span style="font-size:9px;color:#484f58">🗑</span>
+                <span style="font-size:9px;color:#484f58">📌</span>
+              </div>
+            </div>
+          </div>
+          <!-- Annotation card 2 — highlight only, no note -->
+          <div style="border:1px solid #30363d;border-radius:8px;margin-bottom:8px;overflow:hidden;background:#1c2128;cursor:pointer">
+            <div style="border-left:3px solid #3fb950;padding:8px 10px">
+              <div style="color:#3fb950;font-size:10px;line-height:1.5;margin-bottom:4px">
+                「光伏、风电等可再生能源将获得更大规模的财政支持」
+              </div>
+              <div style="color:#484f58;font-size:10px;font-style:italic;margin-bottom:6px">仅高亮，无批注</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <div style="display:flex;gap:2px">
+                  <span style="width:10px;height:10px;border-radius:2px;background:#f85149"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#f0883e"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#3fb950;outline:1px solid #58a6ff"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#58a6ff"></span>
+                  <span style="width:10px;height:10px;border-radius:2px;background:#bc8cff"></span>
+                </div>
+                <span style="flex:1"></span>
+                <span style="font-size:9px;color:#484f58">📋</span>
+                <span style="font-size:9px;color:#484f58">🗑</span>
+                <span style="font-size:9px;color:#484f58">📌</span>
+              </div>
+            </div>
+          </div>
+          <!-- Annotation card 3 — pinned (floating) -->
+          <div style="border:1px solid #bc8cff44;border-radius:8px;margin-bottom:8px;overflow:hidden;background:#1c2128;cursor:pointer;box-shadow:0 0 0 1px #bc8cff33">
+            <div style="border-left:3px solid #58a6ff;padding:8px 10px">
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+                <span style="font-size:9px;padding:1px 5px;background:#bc8cff22;color:#bc8cff;border-radius:3px">📌 已浮顶</span>
+              </div>
+              <div style="color:#58a6ff;font-size:10px;line-height:1.5;margin-bottom:4px">
+                「储能技术研发被列为国家重点科技攻关方向」
+              </div>
+              <div style="color:#c9d1d9;font-size:11px;line-height:1.5;margin-bottom:6px">
+                对比工信部去年发布的储能白皮书，预算增幅超过200%
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="flex:1"></span>
+                <span style="font-size:9px;color:#bc8cff">取消浮顶</span>
+                <span style="font-size:9px;color:#484f58">📋</span>
+                <span style="font-size:9px;color:#484f58">🗑</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">浮顶笔记 — 悬浮窗</div>
+      <div class="mockup-body" style="padding:16px;background:#0d111766;min-height:300px;position:relative">
+        <div style="color:#484f58;font-size:11px;text-align:center;margin-bottom:20px">（主内容区域 — 正文阅读/编辑）</div>
+        <!-- Floating sticky note -->
+        <div style="position:absolute;top:60px;right:20px;width:260px;background:#2d333b;border:1px solid #444c56;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);overflow:hidden;font-size:11px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#21262d;cursor:move">
+            <div style="display:flex;align-items:center;gap:4px;color:#8b949e;font-size:10px">
+              <span>⠿</span> <span>浮顶笔记</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <span style="font-size:9px;color:#8b949e;cursor:pointer">归位</span>
+              <span style="font-size:9px;color:#484f58;cursor:pointer">×</span>
+            </div>
+          </div>
+          <div style="border-left:3px solid #58a6ff;padding:10px;margin:8px">
+            <div style="color:#58a6ff;font-size:10px;line-height:1.5;margin-bottom:6px">
+              「储能技术研发被列为国家重点科技攻关方向」
+            </div>
+            <div style="color:#c9d1d9;font-size:11px;line-height:1.5">
+              对比工信部去年发布的储能白皮书，预算增幅超过200%
+            </div>
+          </div>
+        </div>
+        <!-- Second floating note -->
+        <div style="position:absolute;bottom:30px;left:30px;width:240px;background:#2d333b;border:1px solid #444c56;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);overflow:hidden;font-size:11px;opacity:0.85">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#21262d;cursor:move">
+            <div style="display:flex;align-items:center;gap:4px;color:#8b949e;font-size:10px">
+              <span>⠿</span> <span>浮顶笔记</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <span style="font-size:9px;color:#8b949e">归位</span>
+              <span style="font-size:9px;color:#484f58">×</span>
+            </div>
+          </div>
+          <div style="border-left:3px solid #f0883e;padding:10px;margin:8px">
+            <div style="color:#f0883e;font-size:10px;line-height:1.5">
+              「2030年消费比重达25%」
+            </div>
+            <div style="color:#c9d1d9;font-size:11px">对比十四五：上调5%</div>
+          </div>
+        </div>
+        <div style="color:#484f58;font-size:10px;position:absolute;bottom:8px;right:8px">可拖拽到任意位置 · 全局驻留</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>🎬 视频模式 (Video Mode)</h3>
+  <div class="mockup">
+    <div class="mockup-header">智能播放器 + 工具栏 + ASR 听记面板</div>
+    <div class="mockup-body" style="padding:0;background:#0d1117">
+      <div style="display:flex;height:340px">
+        <!-- Left: AI Chat (same structure) -->
+        <div style="width:22%;background:#0d1117cc;border-right:1px solid #30363d;display:flex;flex-direction:column">
+          <div style="display:flex;border-bottom:1px solid #30363d;font-size:10px">
+            <span style="flex:1;text-align:center;padding:8px;color:#58a6ff;border-bottom:2px solid #1f6feb">章节</span>
+            <span style="flex:1;text-align:center;padding:8px;color:#8b949e">对话</span>
+            <span style="flex:1;text-align:center;padding:8px;color:#8b949e">历史</span>
+          </div>
+          <div style="flex:1;padding:10px;font-size:10px;color:#8b949e;overflow-y:auto">
+            <div style="padding:6px 8px;background:#1f6feb22;border-radius:4px;margin-bottom:4px;color:#58a6ff;display:flex;gap:6px">
+              <span style="color:#484f58;font-family:monospace">00:00</span>
+              <span>导语开场</span>
+            </div>
+            <div style="padding:6px 8px;border-radius:4px;margin-bottom:4px;display:flex;gap:6px">
+              <span style="color:#484f58;font-family:monospace">01:30</span>
+              <span>政策核心内容</span>
+            </div>
+            <div style="padding:6px 8px;border-radius:4px;margin-bottom:4px;display:flex;gap:6px">
+              <span style="color:#484f58;font-family:monospace">03:45</span>
+              <span>专家采访：李明院士</span>
+            </div>
+            <div style="padding:6px 8px;border-radius:4px;margin-bottom:4px;display:flex;gap:6px">
+              <span style="color:#484f58;font-family:monospace">06:20</span>
+              <span>行业反应</span>
+            </div>
+            <div style="padding:6px 8px;border-radius:4px;display:flex;gap:6px">
+              <span style="color:#484f58;font-family:monospace">08:10</span>
+              <span>总结展望</span>
+            </div>
+          </div>
+          <div style="padding:6px 10px;border-top:1px solid #30363d;display:flex;gap:4px;flex-wrap:wrap">
+            <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">总结视频</span>
+            <span style="font-size:9px;padding:3px 8px;background:#21262d;border-radius:12px;color:#8b949e">识别说话人</span>
+          </div>
+          <div style="padding:8px 10px;border-top:1px solid #30363d;display:flex;gap:6px;align-items:center">
+            <div style="flex:1;background:#21262d;border-radius:6px;padding:5px 8px;font-size:10px;color:#484f58">提问...</div>
+            <span style="color:#1f6feb;font-size:11px">↑</span>
+          </div>
+        </div>
+        <!-- Center: Video Player -->
+        <div style="flex:1;display:flex;flex-direction:column;background:#000">
+          <!-- Video area -->
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e,#16213e);position:relative">
+            <div style="font-size:48px;color:#ffffff44">▶</div>
+            <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:#00000088;padding:3px 10px;border-radius:4px;font-size:12px;color:#fff">
+              新华社北京报道：新能源产业迎来重大政策利好
+            </div>
+            <div style="position:absolute;top:8px;right:8px;background:#f8514988;padding:2px 6px;border-radius:3px;font-size:9px;color:#fff">LIVE</div>
+          </div>
+          <!-- Progress bar -->
+          <div style="height:3px;background:#21262d;position:relative">
+            <div style="width:25%;height:100%;background:#1f6feb"></div>
+            <!-- Loop markers -->
+            <div style="position:absolute;top:-1px;left:15%;width:20%;height:5px;border:1px solid #f0883e;border-radius:2px;background:#f0883e22"></div>
+          </div>
+          <!-- Controls toolbar -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#161b22;font-size:10px;color:#8b949e">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:#fff">⏸</span>
+              <span style="font-family:monospace">02:15 / 09:30</span>
+              <span style="color:#484f58">|</span>
+              <span>🔊</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="padding:2px 6px;background:#21262d;border-radius:3px;color:#58a6ff">1.5x</span>
+              <span style="color:#484f58">|</span>
+              <span title="截帧">📷</span>
+              <span title="画中画">⧉</span>
+              <span title="循环区间" style="color:#f0883e">🔁</span>
+              <span title="字幕">CC</span>
+              <span title="静音阅读">🔇</span>
+            </div>
+          </div>
+        </div>
+        <!-- Right: Transcript -->
+        <div style="width:28%;background:#0d1117cc;border-left:1px solid #30363d;display:flex;flex-direction:column">
+          <div style="display:flex;border-bottom:1px solid #30363d;font-size:10px">
+            <span style="flex:1;text-align:center;padding:8px;color:#8b949e">AI 解读</span>
+            <span style="flex:1;text-align:center;padding:8px;color:#8b949e">批注</span>
+            <span style="flex:1;text-align:center;padding:8px;color:#58a6ff;border-bottom:2px solid #1f6feb">听记</span>
+          </div>
+          <!-- Transcript content -->
+          <div style="flex:1;padding:10px;font-size:11px;overflow-y:auto">
+            <div style="display:flex;gap:6px;margin-bottom:8px;padding:4px 6px;border-radius:4px">
+              <span style="color:#484f58;font-family:monospace;font-size:9px;min-width:32px">00:00</span>
+              <div>
+                <span style="font-size:9px;color:#58a6ff;display:block;margin-bottom:2px">主持人</span>
+                <span style="color:#8b949e">各位观众大家好，欢迎收看今天的新闻特别报道。</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;padding:4px 6px;border-radius:4px">
+              <span style="color:#484f58;font-family:monospace;font-size:9px;min-width:32px">00:15</span>
+              <div>
+                <span style="font-size:9px;color:#58a6ff;display:block;margin-bottom:2px">主持人</span>
+                <span style="color:#8b949e">今天我们关注的是国务院刚刚发布的一项重要政策。</span>
+              </div>
+            </div>
+            <!-- Current playing - highlighted -->
+            <div style="display:flex;gap:6px;margin-bottom:8px;padding:4px 6px;border-radius:4px;background:#1f6feb11;border-left:2px solid #1f6feb">
+              <span style="color:#58a6ff;font-family:monospace;font-size:9px;min-width:32px">02:15</span>
+              <div>
+                <span style="font-size:9px;color:#3fb950;display:block;margin-bottom:2px">记者 张三</span>
+                <span style="color:#f0f6fc"><span style="background:#1f6feb44;padding:0 2px;border-radius:2px">《关于加快新能源</span>产业高质量发展的指导意见》正式发布，明确提出了...</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;padding:4px 6px;border-radius:4px">
+              <span style="color:#484f58;font-family:monospace;font-size:9px;min-width:32px">02:45</span>
+              <div>
+                <span style="font-size:9px;color:#f0883e;display:block;margin-bottom:2px">李明 院士</span>
+                <span style="color:#8b949e">新能源产业已经进入从"量"到"质"的关键转型期，这份文件的意义...</span>
+              </div>
+            </div>
+          </div>
+          <!-- Bottom input -->
+          <div style="padding:8px 10px;border-top:1px solid #30363d;display:flex;gap:6px;align-items:center">
+            <div style="flex:1;background:#21262d;border-radius:6px;padding:5px 8px;font-size:10px;color:#484f58">追问 AI...</div>
+            <span style="color:#1f6feb;font-size:11px">↑</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>📊 数据模型 & 状态管理总览</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#58a6ff">Zustand Store (全局协调)</strong>
+      <pre style="background:#1c2128;padding:8px;border-radius:4px;font-size:10px;color:#8b949e;margin:6px 0;line-height:1.5">interface ArticlePageStore {
+  // 模式状态
+  viewMode: 'read' | 'edit'
+  contentType: 'article' | 'video'
+  activeView: 'immersive' | 'web' | 'brief' | 'archive'
+
+  // 面板状态
+  leftPanelOpen: boolean
+  rightPanelOpen: boolean
+  leftTab: 'outline' | 'chat' | 'history'
+  rightTab: 'analysis' | 'annotations' | 'transcript'
+  zenMode: boolean
+
+  // 跨组件联动
+  selectedText: string | null
+  selectedRange: { from: number; to: number } | null
+  scrollToPosition: number | null
+  highlightAnnotationId: string | null
+
+  // 阅读外观
+  appearance: AppearanceSettings
+}</pre>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#3fb950">Feature Hooks (独立子系统)</strong>
+      <pre style="background:#1c2128;padding:8px;border-radius:4px;font-size:10px;color:#8b949e;margin:6px 0;line-height:1.5">// 各 feature 独立管理自己的状态
+useAIChat()        → 对话历史、流式状态
+useAIAnalysis()    → 解读缓存、当前视角
+useAnnotations()   → 批注列表、CRUD 操作
+useArticleEditor() → Tiptap 实例、脏检查
+useVideoPlayer()   → 播放状态、当前时间
+useTranscript()    → 听记数据、同步高亮
+useOutline()       → 大纲结构、滚动联动
+
+// 跨 feature 联动通过 Zustand
+// 例：选中文本 → store.setSelectedText
+//    → AI Chat 读取 → 显示上下文
+//    → Annotations 读取 → 创建高亮</pre>
+    </div>
+  </div>
+</div>

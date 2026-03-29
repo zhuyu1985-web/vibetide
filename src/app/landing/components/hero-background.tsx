@@ -485,7 +485,7 @@ export function HeroBackground() {
         ].map((s, i) => (
           <div
             key={i}
-            className="absolute h-1 w-1 rounded-full bg-[#0A84FF]/60 dark:bg-[#0A84FF]/80"
+            className="absolute h-1 w-1 rounded-full bg-primary/60 dark:bg-primary/80"
             style={{
               left: s.left,
               top: s.top,

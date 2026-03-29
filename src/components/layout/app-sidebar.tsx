@@ -249,7 +249,7 @@ function GroupLabel({
 }) {
   const styles = themeStyles[theme];
   return (
-    <div className="flex items-center gap-2 px-2 pt-1 pb-1.5">
+    <div className="flex items-center gap-2 px-2 pt-1 pb-1.5 overflow-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0">
       <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", styles.dot)} />
       <span className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground/70">
         {label}
@@ -269,7 +269,7 @@ function GroupLabel({
 function NavSeparator({ theme }: { theme: ThemeColor }) {
   const styles = themeStyles[theme];
   return (
-    <div className="px-3 py-0.5">
+    <div className="px-3 py-0.5 overflow-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-3 group-data-[collapsible=icon]:opacity-0">
       <div className={cn("h-px bg-gradient-to-r", styles.separator)} />
     </div>
   );
@@ -313,8 +313,9 @@ function NavSection({
               <ChevronRight
                 size={14}
                 className={cn(
-                  "transition-transform duration-200 text-muted-foreground/40",
-                  `group-data-[state=open]/${group.groupId}:rotate-90`
+                  "transition-all duration-200 text-muted-foreground/40",
+                  `group-data-[state=open]/${group.groupId}:rotate-90`,
+                  "group-data-[collapsible=icon]:opacity-0"
                 )}
               />
             </SidebarMenuButton>
@@ -453,30 +454,30 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar className="border-r border-border/50 glass-sidebar">
+    <Sidebar collapsible="icon" className="border-r border-border/50 glass-sidebar">
       {/* ── Brand Header ── */}
-      <SidebarHeader className="p-4 pb-3">
-        <Link href="/missions" className="flex items-center gap-2.5">
+      <SidebarHeader className="p-4 pb-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:p-2">
+        <Link href="/missions" className="flex items-center gap-2.5 overflow-hidden">
           <div
-            className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center"
+            className="shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center transition-all duration-200 ease-linear w-9 h-9 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8"
             style={{ boxShadow: "0 0 12px rgba(59, 130, 246, 0.3), 0 0 24px rgba(96, 165, 250, 0.15)", animation: "pulse-glow 3s ease-in-out infinite", willChange: "opacity" }}
           >
             <Sparkles size={18} className="text-white" />
           </div>
-          <div>
-            <h1 className="text-base font-bold leading-tight">
+          <div className="overflow-hidden transition-[opacity,width] duration-200 ease-linear group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
+            <h1 className="text-base font-bold leading-tight whitespace-nowrap">
               <span className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">
                 Vibe
               </span>
               <span className="text-foreground ml-0.5">Media</span>
             </h1>
-            <p className="text-[10px] text-muted-foreground/60 leading-tight tracking-wide">
+            <p className="text-[10px] text-muted-foreground/60 leading-tight tracking-wide whitespace-nowrap">
               数智全媒平台
             </p>
           </div>
         </Link>
         {/* Header gradient separator */}
-        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/15 to-transparent" />
+        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/15 to-transparent transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-0" />
       </SidebarHeader>
 
       {/* ── Scrollable Content ── */}
@@ -510,7 +511,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* ── Footer ── */}
-      <SidebarFooter className="p-3 pt-1">
+      <SidebarFooter className="p-3 pt-1 overflow-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-10 group-data-[collapsible=icon]:opacity-0">
         <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent mb-2" />
         <div className="flex items-center justify-between px-1">
           <span className="text-[10px] text-muted-foreground/40 tracking-wide">

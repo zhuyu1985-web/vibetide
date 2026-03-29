@@ -14,35 +14,35 @@ export function HeroSection() {
       <div className="relative z-10 flex flex-col items-center text-center max-w-4xl">
         {/* Trust badge */}
         <motion.div
-          className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#0A84FF]/15 bg-[#0A84FF]/5 px-4 py-1.5 text-sm font-medium text-[#0A84FF] dark:border-[#0A84FF]/30 dark:bg-[#0A84FF]/15"
+          className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary dark:border-primary/30 dark:bg-primary/15"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0A84FF] opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0A84FF]" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
           数智全媒平台 · AI内容生产新范式
         </motion.div>
 
         {/* Main title */}
         <motion.h1
-          className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.15] text-slate-900 dark:text-white"
+          className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.15] text-foreground"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
           2个编辑 + 1支AI团队
           <br />
-          <span className="bg-gradient-to-r from-[#0A84FF] to-[#22d3ee] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-primary to-[#22d3ee] bg-clip-text text-transparent">
             = 全能新媒体军团
           </span>
         </motion.h1>
 
         {/* Subtitle */}
         <motion.p
-          className="mt-6 text-lg text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed"
+          className="mt-6 text-lg text-muted-foreground max-w-2xl leading-relaxed"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
@@ -58,7 +58,7 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <ShimmerButton variant="primary" href="/team-hub">
+          <ShimmerButton variant="primary" href="/missions">
             免费开始使用
             <ArrowRight className="h-4 w-4" />
           </ShimmerButton>
@@ -69,7 +69,7 @@ export function HeroSection() {
         </motion.div>
 
         <motion.p
-          className="mt-4 text-sm text-slate-400 dark:text-slate-500"
+          className="mt-4 text-sm text-muted-foreground/70"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.7 }}
@@ -84,16 +84,16 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.6 }}
         >
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-2 shadow-[0_20px_60px_-10px_rgba(10,132,255,0.15),0_8px_20px_-6px_rgba(0,0,0,0.08)] dark:border-[#1e293b] dark:bg-[#111a2e] dark:shadow-[0_20px_60px_-10px_rgba(10,132,255,0.15)]">
+          <div className="rounded-2xl border border-border bg-card p-2 shadow-[0_20px_60px_-10px_rgba(10,132,255,0.15),0_8px_20px_-6px_rgba(0,0,0,0.08)]">
             {/* Mock window chrome */}
-            <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-[#1e293b]">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <div className="flex gap-1.5">
                 <div className="h-3 w-3 rounded-full bg-red-400/80" />
                 <div className="h-3 w-3 rounded-full bg-amber-400/80" />
                 <div className="h-3 w-3 rounded-full bg-green-400/80" />
               </div>
-              <div className="ml-4 flex-1 rounded-lg bg-slate-50 px-4 py-1.5 text-xs text-slate-400 dark:bg-white/5">
-                app.vibemedia.ai/team-hub
+              <div className="ml-4 flex-1 rounded-lg bg-muted px-4 py-1.5 text-xs text-muted-foreground">
+                app.vibemedia.ai/missions
               </div>
             </div>
             {/* Mock content area */}
@@ -104,13 +104,13 @@ export function HeroSection() {
                 { name: "小文", role: "内容创作", color: "#2dd4bf", status: "工作中" },
                 { name: "小发", role: "渠道分发", color: "#38bdf8", status: "就绪" },
               ].map((emp) => (
-                <div key={emp.name} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-center dark:border-[#1e293b] dark:bg-[#0c1222]">
+                <div key={emp.name} className="rounded-xl border border-border bg-muted/50 p-3 text-center">
                   <div
                     className="mx-auto mb-2 h-8 w-8 rounded-full"
                     style={{ backgroundColor: `${emp.color}20`, border: `2px solid ${emp.color}40` }}
                   />
-                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{emp.name}</p>
-                  <p className="text-[10px] text-slate-400">{emp.role}</p>
+                  <p className="text-xs font-semibold text-foreground">{emp.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{emp.role}</p>
                   <span
                     className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium"
                     style={{
@@ -138,7 +138,7 @@ export function HeroSection() {
           animate={{ y: [0, 8, 0] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
         >
-          <ChevronDown className="h-6 w-6 text-slate-300 dark:text-slate-600" />
+          <ChevronDown className="h-6 w-6 text-muted-foreground/50" />
         </motion.div>
       </motion.div>
     </section>

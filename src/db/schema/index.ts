@@ -52,3 +52,6 @@ export * from "./user-topic-reads";
 export * from "./article-annotations";
 export * from "./article-ai-analysis";
 export * from "./article-chat-history";
+
+// Smart Media Asset module (2026-03-26)
+export * from "./media-asset-shares";

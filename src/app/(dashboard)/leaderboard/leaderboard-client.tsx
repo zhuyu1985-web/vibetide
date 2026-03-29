@@ -94,7 +94,7 @@ export default function LeaderboardClient({
     : 0;
 
   return (
-    <div className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="效果激励看板"
         description="编辑个人积分排行榜，激励团队持续创作优质内容"

@@ -6,7 +6,6 @@ import {
   tasks,
   contentVersions,
   creationChatMessages,
-  workflowSteps,
 } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +26,6 @@ export async function createCreationSession(data: {
   goalTitle: string;
   goalDescription?: string;
   mediaTypes?: string[];
-  teamId?: string;
 }) {
   await requireAuth();
 
@@ -177,30 +175,3 @@ export async function getActiveCreationGoal() {
   };
 }
 
-export async function updatePipelineStep(
-  stepId: string,
-  data: {
-    status?: string;
-    progress?: number;
-    output?: string;
-  }
-) {
-  await requireAuth();
-
-  const updateData: Record<string, unknown> = {};
-  if (data.status !== undefined) updateData.status = data.status;
-  if (data.progress !== undefined) updateData.progress = data.progress;
-  if (data.output !== undefined) updateData.output = data.output;
-
-  if (data.status === "active" || data.status === "completed") {
-    if (data.status === "active") updateData.startedAt = new Date();
-    if (data.status === "completed") updateData.completedAt = new Date();
-  }
-
-  await db
-    .update(workflowSteps)
-    .set(updateData)
-    .where(eq(workflowSteps.id, stepId));
-
-  revalidatePath("/premium-content");
-}

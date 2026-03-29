@@ -5,6 +5,7 @@ import { getPerformanceTrend } from "@/lib/dal/performance";
 import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectAttributions } from "@/lib/dal/evolution";
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
+import { getScenariosByEmployeeSlug } from "@/lib/dal/scenarios";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { notFound } from "next/navigation";
 import { EmployeeProfileClient } from "./employee-profile-client";
@@ -62,9 +63,10 @@ export default async function EmployeeProfilePage({
     getSkillCombos(orgId).catch(() => []),
   ]);
 
-  const [recentMemories, unprocessedFeedbackCount] = await Promise.all([
+  const [recentMemories, unprocessedFeedbackCount, scenarios] = await Promise.all([
     getRecentMemories(employee.dbId, 20).catch(() => []),
     getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
+    getScenariosByEmployeeSlug(employee.id).catch(() => []),
   ]);
 
   return (
@@ -82,6 +84,7 @@ export default async function EmployeeProfilePage({
       skillCombos={skillCombos}
       recentMemories={recentMemories}
       unprocessedFeedbackCount={unprocessedFeedbackCount}
+      scenarios={scenarios}
     />
   );
 }

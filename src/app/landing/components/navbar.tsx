@@ -62,27 +62,13 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50">
-      {/* Glass background — light mode */}
+      {/* Glass background */}
       <motion.div
-        className="absolute inset-0 border-b dark:hidden"
+        className="absolute inset-0 border-b border-border"
         style={{
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          background: "rgba(255,255,255,0.6)",
-          borderColor: "rgba(0,0,0,0.06)",
-        }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: scrolled ? 1 : 0 }}
-        transition={{ duration: 0.3 }}
-      />
-      {/* Glass background — dark mode */}
-      <motion.div
-        className="absolute inset-0 border-b hidden dark:block"
-        style={{
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          background: "rgba(8,13,25,0.85)",
-          borderColor: "rgba(30,41,59,0.8)",
+          background: "var(--glass-panel-bg)",
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: scrolled ? 1 : 0 }}
@@ -93,12 +79,11 @@ export function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-xl shadow-sm"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary shadow-sm"
             style={{
-              background: "rgba(10,132,255,0.9)",
               backdropFilter: "blur(8px)",
               border: "1px solid rgba(255,255,255,0.2)",
-              boxShadow: "0 2px 12px rgba(10,132,255,0.25), inset 0 1px 0 rgba(255,255,255,0.2)",
+              boxShadow: "0 2px 12px color-mix(in srgb, var(--primary) 25%, transparent), inset 0 1px 0 rgba(255,255,255,0.2)",
             }}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-white" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -107,19 +92,19 @@ export function Navbar() {
               <path d="M2 12l10 5 10-5" />
             </svg>
           </div>
-          <span className="text-xl font-bold text-slate-900 dark:text-white">Vibe Media</span>
+          <span className="text-xl font-bold text-foreground">Vibe Media</span>
         </Link>
 
         {/* Desktop nav */}
         <div className="hidden items-center gap-4 md:flex">
           <div
-            className="flex items-center rounded-2xl p-1 dark:!bg-[#111a2e] dark:!border-[#1e293b] dark:!shadow-[0_1px_8px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.04)]"
+            className="flex items-center rounded-2xl p-1"
             style={{
-              background: "rgba(255,255,255,0.8)",
+              background: "var(--glass-bg)",
               backdropFilter: "blur(16px) saturate(150%)",
               WebkitBackdropFilter: "blur(16px) saturate(150%)",
-              border: "1px solid rgba(0,0,0,0.06)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              border: "1px solid var(--glass-border)",
+              boxShadow: "0 1px 3px var(--glass-shadow)",
             }}
           >
             {navLinks.map((link) => {
@@ -136,11 +121,10 @@ export function Navbar() {
                 >
                   {isActive && (
                     <motion.div
-                      className="absolute inset-0 rounded-xl shadow-md"
+                      className="absolute inset-0 rounded-xl bg-primary shadow-md"
                       style={{
-                        background: "#0A84FF",
                         border: "1px solid rgba(255,255,255,0.12)",
-                        boxShadow: "0 2px 12px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
+                        boxShadow: "0 2px 12px color-mix(in srgb, var(--primary) 35%, transparent), inset 0 1px 0 rgba(255,255,255,0.1)",
                       }}
                       layoutId="navbar-active-pill"
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
@@ -155,11 +139,10 @@ export function Navbar() {
           <ThemeSwitcher />
 
           <Link
-            href="/team-hub"
-            className="rounded-2xl px-5 py-2 text-sm font-medium text-white shadow-md transition-all hover:shadow-lg hover:brightness-110 cursor-pointer"
+            href="/missions"
+            className="rounded-2xl bg-primary px-5 py-2 text-sm font-medium text-primary-foreground shadow-md transition-all hover:shadow-lg hover:brightness-110 cursor-pointer"
             style={{
-              background: "#0A84FF",
-              boxShadow: "0 2px 8px rgba(10,132,255,0.3)",
+              boxShadow: "0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent)",
             }}
           >
             免费体验
@@ -184,12 +167,11 @@ export function Navbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            className="absolute inset-x-0 top-16 border-b md:hidden dark:!bg-[#080d19]/95 dark:!border-[#1e293b]"
+            className="absolute inset-x-0 top-16 border-b border-border md:hidden"
             style={{
               backdropFilter: "blur(24px) saturate(180%)",
               WebkitBackdropFilter: "blur(24px) saturate(180%)",
-              background: "rgba(255,255,255,0.75)",
-              borderColor: "rgba(0,0,0,0.06)",
+              background: "var(--glass-panel-bg)",
             }}
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -211,8 +193,8 @@ export function Navbar() {
                         : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}
                     style={isActive ? {
-                      background: "#0A84FF",
-                      boxShadow: "0 2px 12px rgba(10,132,255,0.3)",
+                      background: "var(--primary)",
+                      boxShadow: "0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)",
                     } : undefined}
                   >
                     {link.label}
@@ -224,11 +206,10 @@ export function Navbar() {
                 登录
               </Link>
               <Link
-                href="/team-hub"
-                className="rounded-xl px-3 py-2.5 text-center text-sm font-medium text-white"
+                href="/missions"
+                className="rounded-xl bg-primary px-3 py-2.5 text-center text-sm font-medium text-primary-foreground"
                 style={{
-                  background: "#0A84FF",
-                  boxShadow: "0 2px 12px rgba(10,132,255,0.3)",
+                  boxShadow: "0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)",
                 }}
                 onClick={() => setMobileOpen(false)}
               >

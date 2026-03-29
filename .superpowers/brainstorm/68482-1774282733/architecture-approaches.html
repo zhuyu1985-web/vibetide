@@ -1,0 +1,107 @@
+<h2>新闻稿件详情页 — 架构方案对比</h2>
+<p class="subtitle">三种不同的组件架构和状态管理策略，请选择你倾向的方案</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>🏗️ 方案 A：Feature-Sliced 垂直切片（推荐）</h3>
+      <p style="margin-bottom:12px">按功能域拆分为独立模块，每个模块自包含 UI + hooks + store slice</p>
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;color:#e0e0e0;line-height:1.6;white-space:pre">articles/[id]/
+├── page.tsx                    ← Server Component (数据获取)
+├── article-detail-client.tsx   ← Client 入口（组装三栏布局）
+├── store.ts                    ← Zustand 全局协调 store
+├── features/
+│   ├── header/                 ← 顶部导航 + 视图切换 + 工具栏
+│   ├── reader/                 ← 阅读模式（纯净排版 + 划词菜单）
+│   ├── editor/                 ← Tiptap 编辑器 + 工具栏 + Slash Commands
+│   ├── ai-chat/                ← 左侧 AI 对话面板 + 快捷指令
+│   ├── ai-analysis/            ← 右侧 AI 解读（多视角分析）
+│   ├── annotations/            ← 批注系统（高亮 + 卡片 + 浮顶）
+│   ├── video-player/           ← 视频播放器 + 控制栏
+│   ├── transcript/             ← ASR 听记 + 音文同步
+│   └── outline/                ← 智能大纲 / 视频章节
+└── hooks/
+    └── use-article-context.ts  ← 共享文章上下文 hook</div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>✅ 优势</h4><ul>
+          <li>每个功能域独立开发、测试、维护</li>
+          <li>并行开发友好 — 多 agent 可同时开发不同 feature</li>
+          <li>单个文件 &lt;300 行，可读性好</li>
+          <li>新增功能模块只需添加目录</li>
+        </ul></div>
+        <div class="cons"><h4>⚠️ 注意</h4><ul>
+          <li>目录层级较深</li>
+          <li>跨 feature 通信需通过 store</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>📦 方案 B：Panel-Based 面板架构</h3>
+      <p style="margin-bottom:12px">按三栏布局的物理面板拆分，每个面板是一个大组件</p>
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;color:#e0e0e0;line-height:1.6;white-space:pre">articles/[id]/
+├── page.tsx                    ← Server Component
+├── article-detail-client.tsx   ← Client 布局壳
+├── store.ts                    ← Zustand store
+├── panels/
+│   ├── left-panel.tsx          ← 整个左侧栏（大纲+对话+历史）
+│   ├── main-stage.tsx          ← 整个中间区域（阅读/编辑/视频）
+│   └── right-panel.tsx         ← 整个右侧栏（AI解读+批注+听记）
+├── components/                 ← 面板内子组件
+│   ├── tiptap-editor.tsx
+│   ├── video-player.tsx
+│   ├── annotation-card.tsx
+│   └── ...
+└── hooks/</div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>✅ 优势</h4><ul>
+          <li>结构简单直观，与布局一一对应</li>
+          <li>目录扁平，导航快</li>
+        </ul></div>
+        <div class="cons"><h4>⚠️ 注意</h4><ul>
+          <li>面板组件容易膨胀到 500+ 行</li>
+          <li>功能交叉时边界模糊（批注跨左中右三栏）</li>
+          <li>并行开发容易冲突</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>🧩 方案 C：Compound Component 复合组件</h3>
+      <p style="margin-bottom:12px">借鉴 Radix UI 复合组件模式，通过 Context Provider 树组装</p>
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;color:#e0e0e0;line-height:1.6;white-space:pre">articles/[id]/
+├── page.tsx
+├── article-workspace.tsx       ← Compound root + Context Provider
+├── article-header.tsx          ← 子组件（自动获取 context）
+├── article-reader.tsx
+├── article-editor.tsx
+├── article-ai-chat.tsx
+├── article-annotations.tsx
+├── article-video.tsx
+├── article-transcript.tsx
+├── article-outline.tsx
+├── article-analysis.tsx
+└── hooks/
+    └── use-workspace.ts        ← 共享 Context hook</div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>✅ 优势</h4><ul>
+          <li>组件间通信优雅（共享 Context）</li>
+          <li>扁平目录结构</li>
+          <li>组合灵活（像 Radix 一样嵌套）</li>
+        </ul></div>
+        <div class="cons"><h4>⚠️ 注意</h4><ul>
+          <li>Context 变化导致大范围 re-render（性能风险）</li>
+          <li>所有状态耦合在一个 Provider 中</li>
+          <li>功能越多 Context 越臃肿</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>

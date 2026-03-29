@@ -186,7 +186,9 @@ export function EmployeeListPanel({
                       <span
                         className={cn(
                           "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                          statusDot[emp.status] || "bg-gray-400"
+                          isSelected
+                            ? "bg-green-400 shadow-[0_0_6px_2px_rgba(74,222,128,0.6)] animate-[dot-pulse_2s_ease-in-out_infinite]"
+                            : statusDot[emp.status] || "bg-gray-400"
                         )}
                       />
                     </div>

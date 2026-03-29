@@ -7,6 +7,7 @@ import {
   buildPreviousStepDetailContext,
 } from "./prompt-templates";
 import { parseStepOutput } from "./step-io";
+import type { ToolSet } from "ai";
 import type {
   AssembledAgent,
   AgentExecutionInput,
@@ -26,7 +27,8 @@ import type {
 export async function executeAgent(
   agent: AssembledAgent,
   input: AgentExecutionInput,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  missionTools?: ToolSet
 ): Promise<AgentExecutionResult> {
   const startTime = Date.now();
 
@@ -60,8 +62,8 @@ export async function executeAgent(
 
   onProgress?.({ percent: 30, message: "正在调用 AI 模型..." });
 
-  // Prepare tools
-  const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
+  // Prepare tools (merge mission collaboration tools if provided)
+  const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs, missionTools);
 
   let toolCallCount = 0;
 

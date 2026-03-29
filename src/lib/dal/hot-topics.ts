@@ -72,6 +72,7 @@ export async function getInspirationTopics(
     return {
       id: row.id,
       title: row.title,
+      sourceUrl: row.sourceUrl || undefined,
       priority: row.priority,
       heatScore: row.heatScore,
       aiScore: row.aiScore ?? fallbackAiScore,
@@ -276,13 +277,13 @@ export function getEditorialMeeting(
   } else {
     const parts: string[] = [];
 
+    const lastTime = lastScanMonitor?.lastScan || "未知";
     if (activePlatforms === 0) {
       // No platforms online — clarify data is historical
-      const lastTime = lastScanMonitor?.lastScan || "未知";
       parts.push(`当前无平台在线，以下为历史数据（最后扫描：${lastTime}），共 ${topics.length} 条话题。`);
       parts.push("请点击「刷新热点」获取最新数据，或检查 API 配置。");
     } else {
-      parts.push(`本轮扫描覆盖 ${activePlatforms} 个平台，共发现 ${topics.length} 条热点话题。`);
+      parts.push(`覆盖 ${activePlatforms} 个平台，共 ${topics.length} 条热点话题（数据更新于${lastTime}）。`);
     }
 
     if (p0Count > 0) {
@@ -344,10 +345,12 @@ export function getEditorialMeeting(
     activePlatforms,
     topCategories,
     aiSummary,
-    generatedAt: new Date().toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    generatedAt: lastScanMonitor
+      ? lastScanMonitor.lastScan
+      : new Date().toLocaleTimeString("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
     delta,
   };
 }

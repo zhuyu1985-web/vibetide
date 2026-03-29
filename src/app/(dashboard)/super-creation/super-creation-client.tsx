@@ -99,7 +99,7 @@ export function SuperCreationClient({
   const assigneeMeta = selectedTask ? EMPLOYEE_META[selectedTask.assignee] : null;
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       {/* -- Page Header -- */}
       <PageHeader
         title="超级创作"

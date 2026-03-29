@@ -10,18 +10,17 @@ export function CtaSection() {
       {/* CTA area */}
       <div className="relative py-24 px-4">
         {/* Subtle background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white via-[#0A84FF]/[0.03] to-slate-50 dark:from-[#080d19] dark:via-[#0A84FF]/[0.08] dark:to-[#0c1222]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/[0.03] to-muted dark:via-primary/[0.08]" />
 
         {/* Subtle decorative blur */}
         <div
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[600px] rounded-full opacity-[0.04] blur-[100px]"
-          style={{ backgroundColor: "#0A84FF" }}
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[600px] rounded-full opacity-[0.04] blur-[100px] bg-primary"
         />
 
         {/* Content */}
         <div className="relative z-10 mx-auto max-w-3xl text-center">
           <motion.h2
-            className="text-3xl font-bold md:text-5xl text-slate-900 dark:text-white"
+            className="text-3xl font-bold md:text-5xl text-foreground"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ margin: "-50px" }}
@@ -31,7 +30,7 @@ export function CtaSection() {
           </motion.h2>
 
           <motion.p
-            className="mt-4 text-lg text-slate-500 dark:text-slate-400"
+            className="mt-4 text-lg text-muted-foreground"
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ margin: "-50px" }}
@@ -47,7 +46,7 @@ export function CtaSection() {
             viewport={{ margin: "-50px" }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <ShimmerButton variant="primary" href="/team-hub">
+            <ShimmerButton variant="primary" href="/missions">
               免费开始使用
               <ArrowRight className="h-4 w-4" />
             </ShimmerButton>
@@ -57,7 +56,7 @@ export function CtaSection() {
           </motion.div>
 
           <motion.p
-            className="mt-4 text-sm text-slate-400 dark:text-slate-500"
+            className="mt-4 text-sm text-muted-foreground/70"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ margin: "-50px" }}
@@ -69,15 +68,14 @@ export function CtaSection() {
       </div>
 
       {/* Professional dark footer */}
-      <footer className="relative bg-slate-900 dark:bg-[#060a14] text-white">
+      <footer className="relative bg-slate-900 dark:bg-background text-white">
         <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="flex flex-col gap-8 md:flex-row md:justify-between">
             {/* Brand */}
             <div className="max-w-xs">
               <div className="flex items-center gap-2.5">
                 <div
-                  className="flex h-8 w-8 items-center justify-center rounded-xl"
-                  style={{ background: "#0A84FF" }}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary"
                 >
                   <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-white" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 2L2 7l10 5 10-5-10-5z" />

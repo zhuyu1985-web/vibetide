@@ -8,7 +8,6 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
-import { teams } from "./teams";
 import { aiEmployees } from "./ai-employees";
 import { tasks } from "./tasks";
 import {
@@ -20,7 +19,6 @@ import {
 export const creationSessions = pgTable("creation_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id),
-  teamId: uuid("team_id").references(() => teams.id),
 
   goalTitle: text("goal_title").notNull(),
   goalDescription: text("goal_description"),
@@ -75,10 +73,6 @@ export const creationSessionsRelations = relations(
     organization: one(organizations, {
       fields: [creationSessions.organizationId],
       references: [organizations.id],
-    }),
-    team: one(teams, {
-      fields: [creationSessions.teamId],
-      references: [teams.id],
     }),
     chatMessages: many(creationChatMessages),
   })

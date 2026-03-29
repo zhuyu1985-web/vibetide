@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { competitors } from "@/db/schema/benchmarking";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { postTeamMessage } from "@/lib/dal/team-messages";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -100,52 +99,26 @@ export async function checkCompetitorAnomalies() {
     }
   }
 
-  // Send team message alerts for detected anomalies
+  // Create mission for high-severity anomalies
   let alertsSent = 0;
-
-  if (anomalies.length > 0) {
-    // Group by severity
-    const criticalAnomalies = anomalies.filter((a) => a.severity === "high");
-    const otherAnomalies = anomalies.filter((a) => a.severity !== "high");
-
-    // Send high-severity alerts immediately
-    for (const anomaly of criticalAnomalies) {
-      await postTeamMessage({
-        senderSlug: "xiaolei",
-        type: "alert",
-        content: `[竞品预警] ${anomaly.description}`,
-        attachments: [
-          {
-            type: "chart",
-            title: `${anomaly.competitorName} 异常指标`,
-            description: anomaly.type === "follower_spike"
-              ? "粉丝增长异常"
-              : anomaly.type === "engagement_spike"
-              ? "互动数据异常"
-              : "发布频率异常",
-          },
-        ],
-      });
-      alertsSent++;
-    }
-
-    // Send a summary for other anomalies
-    if (otherAnomalies.length > 0) {
-      const summaryList = otherAnomalies
-        .map((a) => `- ${a.competitorName}: ${a.description}`)
-        .join("\n");
-
-      await postTeamMessage({
-        senderSlug: "xiaolei",
-        type: "status_update",
-        content: `[竞品动态] 检测到 ${otherAnomalies.length} 项竞品异常：\n${summaryList}`,
-      });
-      alertsSent++;
-    }
+  const highSeverity = anomalies.filter((a) => a.severity === "high" || a.severity === "medium");
+  if (highSeverity.length > 0 && orgId) {
+    const { startMissionFromModule } = await import("@/app/actions/missions");
+    const summary = highSeverity.map((a) => `- ${a.competitorName}: ${a.description}`).join("\n");
+    await startMissionFromModule({
+      organizationId: orgId,
+      title: `竞品异动分析：${highSeverity[0].competitorName}等${highSeverity.length}项预警`,
+      scenario: "flash_report",
+      userInstruction: `对标监控检测到以下竞品异动，请分析影响并提出应对建议：\n${summary}`,
+      sourceModule: "benchmarking",
+      sourceEntityType: "benchmark_alert",
+      sourceContext: { anomalyCount: highSeverity.length, anomalies: highSeverity },
+    }).catch((err) => console.error("[competitor-alerts] mission trigger failed:", err));
+    alertsSent = highSeverity.length;
   }
 
   revalidatePath("/benchmarking");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 
   return { anomalies, alertsSent };
 }

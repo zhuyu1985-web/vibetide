@@ -16,6 +16,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -46,6 +54,7 @@ import {
   ChevronDown,
   ChevronUp,
   Wrench,
+  Pencil,
 } from "lucide-react";
 import {
   unbindSkillFromEmployee,
@@ -54,6 +63,7 @@ import {
   updateWorkPreferences,
   updateAuthorityLevel,
   updateAutoActions,
+  updateEmployeeProfile,
 } from "@/app/actions/employees";
 import { previewSystemPrompt } from "@/app/actions/employee-advanced";
 import { triggerLearningFromFeedback } from "@/app/actions/learning";
@@ -63,7 +73,8 @@ import { EvolutionTab } from "./evolution-tab";
 import { VersionHistory } from "./version-history";
 import { SkillTestDialog } from "./skill-test-dialog";
 import { SkillComboManager } from "./skill-combo-manager";
-import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo } from "@/lib/types";
+import { ScenarioWorkbench } from "./scenario-workbench";
+import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo, ScenarioCardData } from "@/lib/types";
 import type { SkillRecommendation } from "@/lib/dal/skills";
 
 const statusLabel: Record<string, string> = {
@@ -116,6 +127,7 @@ interface EmployeeProfileClientProps {
     createdAt: string;
   }>;
   unprocessedFeedbackCount?: number;
+  scenarios?: ScenarioCardData[];
 }
 
 export function EmployeeProfileClient({
@@ -132,6 +144,7 @@ export function EmployeeProfileClient({
   skillCombos = [],
   recentMemories = [],
   unprocessedFeedbackCount = 0,
+  scenarios = [],
 }: EmployeeProfileClientProps) {
   const router = useRouter();
   const [skillBrowserOpen, setSkillBrowserOpen] = useState(false);
@@ -145,6 +158,7 @@ export function EmployeeProfileClient({
   const [promptPreviewOpen, setPromptPreviewOpen] = useState(false);
   const [promptPreview, setPromptPreview] = useState<string | null>(null);
   const [promptLoading, setPromptLoading] = useState(false);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   // Preferences form state
   const [prefsEditing, setPrefsEditing] = useState(false);
@@ -241,7 +255,7 @@ export function EmployeeProfileClient({
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       {/* Profile Header */}
       <GlassCard className="mb-6">
         <div className="flex items-start gap-6">
@@ -263,9 +277,18 @@ export function EmployeeProfileClient({
                 {statusLabel[employee.status]}
               </Badge>
               {!employee.isPreset && (
-                <Badge variant="outline" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700/50">
-                  自定义
-                </Badge>
+                <>
+                  <Badge variant="outline" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700/50">
+                    自定义
+                  </Badge>
+                  <button
+                    onClick={() => setEditProfileOpen(true)}
+                    className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    title="编辑员工信息"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </>
               )}
               <Badge variant="secondary" className="text-xs ml-1">
                 {authorityLabels[employee.authorityLevel]}
@@ -322,9 +345,19 @@ export function EmployeeProfileClient({
         </div>
       </GlassCard>
 
+      {/* Scenario Workbench */}
+      {scenarios.length > 0 && (
+        <ScenarioWorkbench
+          scenarios={scenarios}
+          employeeDbId={employee.dbId}
+          employeeSlug={employee.id}
+          employeeNickname={employee.nickname}
+        />
+      )}
+
       {/* Tabs */}
       <Tabs defaultValue="skills">
-        <TabsList className="mb-4">
+        <TabsList className="mt-6 mb-4">
           <TabsTrigger value="skills" className="text-xs gap-1">
             <Settings size={14} />
             技能配置
@@ -1148,6 +1181,146 @@ export function EmployeeProfileClient({
         onOpenChange={setLearningNoteOpen}
         employeeId={employee.dbId}
       />
+
+      {!employee.isPreset && (
+        <EditProfileDialog
+          open={editProfileOpen}
+          onOpenChange={setEditProfileOpen}
+          employeeDbId={employee.dbId}
+          defaultValues={{
+            name: employee.name,
+            nickname: employee.nickname,
+            title: employee.title,
+            motto: employee.motto,
+          }}
+          onSaved={() => router.refresh()}
+        />
+      )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  EditProfileDialog — 编辑员工基本信息                                */
+/* ------------------------------------------------------------------ */
+
+function EditProfileDialog({
+  open,
+  onOpenChange,
+  employeeDbId,
+  defaultValues,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  employeeDbId: string;
+  defaultValues: { name: string; nickname: string; title: string; motto: string };
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(defaultValues.name);
+  const [nickname, setNickname] = useState(defaultValues.nickname);
+  const [title, setTitle] = useState(defaultValues.title);
+  const [motto, setMotto] = useState(defaultValues.motto);
+  const [saving, setSaving] = useState(false);
+
+  // 当 dialog 打开时重置为最新默认值
+  const handleOpenChange = (v: boolean) => {
+    if (v) {
+      setName(defaultValues.name);
+      setNickname(defaultValues.nickname);
+      setTitle(defaultValues.title);
+      setMotto(defaultValues.motto);
+    }
+    onOpenChange(v);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateEmployeeProfile(employeeDbId, { name, nickname, title, motto });
+      onOpenChange(false);
+      onSaved();
+    } catch (err) {
+      console.error("Failed to update profile:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>编辑员工信息</DialogTitle>
+          <DialogDescription>修改员工的基本信息，保存后立即生效。</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="edit-name" className="text-xs">名称</Label>
+            <Input
+              id="edit-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-8 text-sm border-none bg-white/60 dark:bg-white/5"
+              placeholder="员工名称"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="edit-nickname" className="text-xs">昵称</Label>
+            <Input
+              id="edit-nickname"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              className="h-8 text-sm border-none bg-white/60 dark:bg-white/5"
+              placeholder="员工昵称"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="edit-title" className="text-xs">职位</Label>
+            <Input
+              id="edit-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="h-8 text-sm border-none bg-white/60 dark:bg-white/5"
+              placeholder="职位头衔"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="edit-motto" className="text-xs">座右铭</Label>
+            <Input
+              id="edit-motto"
+              value={motto}
+              onChange={(e) => setMotto(e.target.value)}
+              className="h-8 text-sm border-none bg-white/60 dark:bg-white/5"
+              placeholder="座右铭"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
+            取消
+          </Button>
+          <Button
+            size="sm"
+            className="text-xs"
+            onClick={handleSave}
+            disabled={saving || !name.trim() || !nickname.trim()}
+          >
+            {saving ? (
+              <Loader2 size={14} className="mr-1 animate-spin" />
+            ) : (
+              <Save size={14} className="mr-1" />
+            )}
+            保存
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

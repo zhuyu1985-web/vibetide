@@ -83,6 +83,7 @@ export const mediaAssetTypeEnum = pgEnum("media_asset_type", [
   "image",
   "audio",
   "document",
+  "manuscript",
 ]);
 
 export const assetProcessingStatusEnum = pgEnum("asset_processing_status", [
@@ -413,4 +414,63 @@ export const aiSentimentEnum = pgEnum("ai_sentiment", [
   "bullish",
   "critical",
   "advertorial",
+]);
+
+// Smart Media Asset (智能媒资) module enums
+
+export const libraryTypeEnum = pgEnum("library_type", [
+  "personal",
+  "product",
+  "public",
+]);
+
+export const securityLevelEnum = pgEnum("security_level", [
+  "public",
+  "secret",
+  "private",
+  "top_secret",
+  "confidential",
+]);
+
+export const mediaCatalogStatusEnum = pgEnum("media_catalog_status", [
+  "uncataloged",
+  "cataloged",
+]);
+
+export const mediaTranscodeStatusEnum = pgEnum("media_transcode_status", [
+  "not_started",
+  "processing",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const mediaCdnStatusEnum = pgEnum("media_cdn_status", [
+  "not_started",
+  "processing",
+  "completed",
+  "failed",
+  "revoked",
+]);
+
+export const mediaCmsStatusEnum = pgEnum("media_cms_status", [
+  "not_started",
+  "processing",
+  "completed",
+  "failed",
+  "revoked",
+]);
+
+export const mediaReviewStatusEnum = pgEnum("media_review_status", [
+  "not_submitted",
+  "pending",
+  "reviewing",
+  "approved",
+  "rejected",
+]);
+
+export const shareStatusEnum = pgEnum("share_status", [
+  "active",
+  "expired",
+  "cancelled",
 ]);

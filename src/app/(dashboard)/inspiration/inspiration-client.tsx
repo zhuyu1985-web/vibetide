@@ -62,6 +62,15 @@ import {
   Star,
   Search,
   Sparkles,
+  Globe,
+  MessageCircle,
+  Music,
+  Newspaper,
+  Tv,
+  BookOpen,
+  MessageSquare,
+  Radio,
+  ExternalLink,
 } from "lucide-react";
 import { triggerHotTopicCrawl, startTopicMission } from "@/app/actions/hot-topics";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
@@ -93,17 +102,17 @@ interface InspirationClientProps {
   lastViewedAt?: string;
 }
 
-const PLATFORM_STYLE: Record<string, { bg: string; text: string; icon: string }> = {
-  微博: { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-600 dark:text-orange-400", icon: "📱" },
-  知乎: { bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-600 dark:text-sky-400", icon: "💡" },
-  百度: { bg: "bg-blue-50 dark:bg-blue-950/30", text: "text-blue-600 dark:text-blue-400", icon: "🔍" },
-  抖音: { bg: "bg-pink-50 dark:bg-pink-950/30", text: "text-pink-600 dark:text-pink-400", icon: "🎵" },
-  今日头条: { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-600 dark:text-red-400", icon: "📰" },
-  "36氪": { bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-600 dark:text-emerald-400", icon: "📊" },
-  哔哩哔哩: { bg: "bg-cyan-50 dark:bg-cyan-950/30", text: "text-cyan-600 dark:text-cyan-400", icon: "📺" },
-  小红书: { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-600 dark:text-rose-400", icon: "📕" },
-  澎湃: { bg: "bg-indigo-50 dark:bg-indigo-950/30", text: "text-indigo-600 dark:text-indigo-400", icon: "📰" },
-  微信: { bg: "bg-green-50 dark:bg-green-950/30", text: "text-green-600 dark:text-green-400", icon: "💬" },
+const PLATFORM_STYLE: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+  微博: { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-600 dark:text-orange-400", icon: <MessageCircle className="size-4" /> },
+  知乎: { bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-600 dark:text-sky-400", icon: <Lightbulb className="size-4" /> },
+  百度: { bg: "bg-blue-50 dark:bg-blue-950/30", text: "text-blue-600 dark:text-blue-400", icon: <Search className="size-4" /> },
+  抖音: { bg: "bg-pink-50 dark:bg-pink-950/30", text: "text-pink-600 dark:text-pink-400", icon: <Music className="size-4" /> },
+  今日头条: { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-600 dark:text-red-400", icon: <Newspaper className="size-4" /> },
+  "36氪": { bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-600 dark:text-emerald-400", icon: <BarChart3 className="size-4" /> },
+  哔哩哔哩: { bg: "bg-cyan-50 dark:bg-cyan-950/30", text: "text-cyan-600 dark:text-cyan-400", icon: <Tv className="size-4" /> },
+  小红书: { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-600 dark:text-rose-400", icon: <BookOpen className="size-4" /> },
+  澎湃: { bg: "bg-indigo-50 dark:bg-indigo-950/30", text: "text-indigo-600 dark:text-indigo-400", icon: <Newspaper className="size-4" /> },
+  微信: { bg: "bg-green-50 dark:bg-green-950/30", text: "text-green-600 dark:text-green-400", icon: <MessageSquare className="size-4" /> },
 };
 
 const PLATFORM_SIDEBAR_LIST: { name: string; subtitle: string }[] = [
@@ -160,7 +169,7 @@ function getPlatformShort(name: string): string {
 
 function getPlatformStyle(name: string) {
   const short = getPlatformShort(name);
-  return PLATFORM_STYLE[short] || { bg: "bg-gray-50 dark:bg-gray-800/50", text: "text-gray-600 dark:text-gray-400", icon: "📡" };
+  return PLATFORM_STYLE[short] || { bg: "bg-gray-50 dark:bg-gray-800/50", text: "text-gray-600 dark:text-gray-400", icon: <Radio className="size-4" /> };
 }
 
 function normalizeCategory(raw: string | undefined | null): string {
@@ -205,7 +214,7 @@ function PlatformTag({ name, size = "sm" }: { name: string; size?: "xs" | "sm" }
   const isXs = size === "xs";
   return (
     <span className={cn("inline-flex items-center gap-0.5 rounded-full font-medium", style.bg, style.text, isXs ? "px-1.5 py-0 text-[11px]" : "px-2 py-0.5 text-[11px]")}>
-      <span className={isXs ? "text-[8px]" : "text-[11px]"}>{style.icon}</span>
+      <span className="shrink-0">{style.icon}</span>
       {short}
     </span>
   );
@@ -434,8 +443,13 @@ export function InspirationClient({
 
   const handleRefresh = useCallback(() => {
     startRefreshTransition(async () => {
-      await triggerHotTopicCrawl();
-      router.refresh();
+      try {
+        const result = await triggerHotTopicCrawl();
+        console.log("[refresh]", result);
+        router.refresh();
+      } catch (err) {
+        console.error("[refresh] 抓取失败:", err);
+      }
     });
   }, [router, startRefreshTransition]);
 
@@ -499,8 +513,8 @@ export function InspirationClient({
                 const isAll = item.name === "综合榜单";
                 const isActive = isAll ? !selectedPlatform : selectedPlatform === item.name;
                 const style = isAll
-                  ? { icon: "🌐", bg: "", text: "" }
-                  : PLATFORM_STYLE[item.name] || { icon: "📡", bg: "", text: "" };
+                  ? { icon: <Globe className="size-[18px]" />, bg: "", text: "" }
+                  : PLATFORM_STYLE[item.name] || { icon: <Radio className="size-[18px]" />, bg: "", text: "" };
 
                 return (
                   <button
@@ -513,7 +527,7 @@ export function InspirationClient({
                         : "hover:bg-gray-100 dark:hover:bg-white/[0.04]"
                     )}
                   >
-                    <span className="text-base shrink-0">{style.icon}</span>
+                    <span className="shrink-0">{style.icon}</span>
                     <div className="min-w-0">
                       <div className={cn(
                         "text-xs font-medium truncate",
@@ -548,6 +562,13 @@ export function InspirationClient({
                 <span className="text-xs text-gray-500 dark:text-gray-400">订阅管理</span>
               </button>
               <button
+                onClick={() => setShowCalendarSheet(true)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
+              >
+                <CalendarPlus size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">日历事件</span>
+              </button>
+              <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
@@ -562,7 +583,7 @@ export function InspirationClient({
         </div>
 
         {/* ======================== Column 2: Main Content ======================== */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-x-hidden">
           {/* AI Summary Bar (thin, collapsible) */}
           <AISummaryBar
             delta={meeting.delta}
@@ -683,7 +704,7 @@ export function InspirationClient({
         </div>
 
         {/* ======================== Column 3: Right Panel ======================== */}
-        <div className="w-[380px] shrink-0 flex flex-col min-h-0 border-l border-gray-200 dark:border-white/5">
+        <div className="w-[380px] shrink-0 flex flex-col min-h-0 overflow-x-hidden border-l border-gray-200 dark:border-white/5">
           <ScrollArea className="h-full">
             <div className="p-5">
               <EditorialBriefing
@@ -694,6 +715,7 @@ export function InspirationClient({
                 p2Count={meeting.p2Count}
                 onTrackAllP0={handleTrackAllP0}
                 isTrackingAll={isTrackingAll}
+                onAddCalendarEvent={() => setShowCalendarSheet(true)}
               />
             </div>
           </ScrollArea>
@@ -890,8 +912,9 @@ function TopicList({
           <div
             key={topic.id}
             className={cn(
-              "py-4 transition-colors hover:bg-gray-50/50 dark:hover:bg-white/[0.02]",
-              index < topics.length - 1 && "border-b border-gray-100 dark:border-white/5"
+              "py-4 px-3 transition-all duration-150",
+              "hover:bg-blue-100/80 dark:hover:bg-blue-900/30",
+              index < topics.length - 1 && "border-b border-gray-200/80 dark:border-white/[0.06]"
             )}
             onMouseEnter={() => onMarkRead(topic.id)}
           >
@@ -911,14 +934,31 @@ function TopicList({
               <div className="flex-1 min-w-0">
                 {/* Title row */}
                 <div className="flex items-start gap-2 mb-1">
-                  <h4 className={cn(
-                    "text-base leading-snug flex-1",
-                    isRead
-                      ? "text-gray-500 dark:text-gray-500 font-normal"
-                      : "text-gray-900 dark:text-gray-100 font-semibold"
-                  )}>
-                    {topic.title}
-                  </h4>
+                  {topic.sourceUrl ? (
+                    <a
+                      href={topic.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "text-base leading-snug flex-1 group/link inline-flex items-start gap-1 hover:underline",
+                        isRead
+                          ? "text-gray-500 dark:text-gray-500 font-normal"
+                          : "text-gray-900 dark:text-gray-100 font-semibold"
+                      )}
+                    >
+                      {topic.title}
+                      <ExternalLink size={12} className="shrink-0 mt-1.5 opacity-0 group-hover/link:opacity-50 transition-opacity" />
+                    </a>
+                  ) : (
+                    <h4 className={cn(
+                      "text-base leading-snug flex-1",
+                      isRead
+                        ? "text-gray-500 dark:text-gray-500 font-normal"
+                        : "text-gray-900 dark:text-gray-100 font-semibold"
+                    )}>
+                      {topic.title}
+                    </h4>
+                  )}
                   {!isRead && (
                     <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0 mt-2" />
                   )}
@@ -1047,6 +1087,7 @@ function EditorialBriefing({
   p2Count,
   onTrackAllP0,
   isTrackingAll,
+  onAddCalendarEvent,
 }: {
   meeting: EditorialMeeting;
   calendarEvents: CalendarEvent[];
@@ -1055,6 +1096,7 @@ function EditorialBriefing({
   p2Count: number;
   onTrackAllP0: () => void;
   isTrackingAll: boolean;
+  onAddCalendarEvent: () => void;
 }) {
   const total = p0Count + p1Count + p2Count;
   const next3DaysEvents = useMemo(() => {
@@ -1146,12 +1188,20 @@ function EditorialBriefing({
       )}
 
       {/* Calendar Preview: next 3 days */}
-      {next3DaysEvents.length > 0 && (
-        <GlassCard variant="default" padding="md">
-          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+      <GlassCard variant="default" padding="md">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
             <Calendar size={12} />
             近3日事件
           </h3>
+          <button
+            onClick={onAddCalendarEvent}
+            className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <CalendarPlus size={14} />
+          </button>
+        </div>
+        {next3DaysEvents.length > 0 ? (
           <div className="space-y-1.5">
             {next3DaysEvents.map((ev) => (
               <div key={ev.id} className="flex items-center gap-2 text-xs">
@@ -1161,8 +1211,10 @@ function EditorialBriefing({
               </div>
             ))}
           </div>
-        </GlassCard>
-      )}
+        ) : (
+          <p className="text-xs text-gray-400 dark:text-gray-500">暂无近期事件，点击右上角添加</p>
+        )}
+      </GlassCard>
 
       {/* Track all P0 button */}
       {p0Count > 0 && (

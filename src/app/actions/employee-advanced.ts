@@ -263,68 +263,37 @@ export async function testSkillExecution(
 
   const systemPrompt = systemPromptParts.join("\n");
 
-  // Resolve model: pick the first provider with a configured API key
-  const providerKeys: Record<string, string> = {
-    anthropic: "ANTHROPIC_API_KEY",
-    zhipu: "ZHIPU_API_KEY",
-    openai: "OPENAI_API_KEY",
-  };
+  // Resolve model: use DeepSeek via OpenAI-compatible API
+  const resolvedProvider = "openai";
+  const resolvedModel = process.env.OPENAI_MODEL || "deepseek-chat";
 
-  const modelDep = runtimeConfig?.modelDependency || "";
-  let resolvedProvider: string;
-  let resolvedModel: string;
-
-  if (modelDep.includes(":")) {
-    [resolvedProvider, resolvedModel] = modelDep.split(":", 2) as [string, string];
-    // If the configured provider's key is missing, try fallbacks
-    const envKey = providerKeys[resolvedProvider];
-    if (envKey && !process.env[envKey]) {
-      const fallback = Object.entries(providerKeys).find(
-        ([, key]) => process.env[key]
-      );
-      if (fallback) {
-        resolvedProvider = fallback[0];
-        resolvedModel = resolvedProvider === "anthropic" ? "claude-sonnet-4-5-20250514" :
-                        resolvedProvider === "openai" ? "gpt-4o" : "glm-5";
-      }
-    }
-  } else {
-    // No model configured: pick first available provider
-    const fallback = Object.entries(providerKeys).find(
-      ([, key]) => process.env[key]
-    );
-    if (fallback) {
-      resolvedProvider = fallback[0];
-      resolvedModel = resolvedProvider === "anthropic" ? "claude-sonnet-4-5-20250514" :
-                      resolvedProvider === "zhipu" ? "glm-5" : "gpt-4o";
-    } else {
-      return {
-        skillName: skill.name,
-        skillCategory: skill.category,
-        skillVersion: skill.version,
-        description: skill.description,
-        testInput,
-        inputSchema,
-        outputSchema,
-        runtimeInfo: {
-          type: "无可用模型",
-          estimatedLatency: "N/A",
-          maxConcurrency: 0,
-          modelDependency: "无",
-        },
-        expectedBehavior: "",
-        executionResult: {
-          success: false,
-          error: "未配置任何 AI 模型 API 密钥。请在 .env.local 中配置 ANTHROPIC_API_KEY、ZHIPU_API_KEY 或 OPENAI_API_KEY。",
-          durationMs: 0,
-        },
-        validationChecks: [{
-          check: "API 密钥检查",
-          status: "fail",
-          detail: "未配置任何 AI 模型 API 密钥",
-        }],
-      };
-    }
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      skillName: skill.name,
+      skillCategory: skill.category,
+      skillVersion: skill.version,
+      description: skill.description,
+      testInput,
+      inputSchema,
+      outputSchema,
+      runtimeInfo: {
+        type: "无可用模型",
+        estimatedLatency: "N/A",
+        maxConcurrency: 0,
+        modelDependency: "无",
+      },
+      expectedBehavior: "",
+      executionResult: {
+        success: false,
+        error: "未配置 OPENAI_API_KEY。请在 .env.local 中配置。",
+        durationMs: 0,
+      },
+      validationChecks: [{
+        check: "API 密钥检查",
+        status: "fail",
+        detail: "未配置 OPENAI_API_KEY",
+      }],
+    };
   }
 
   let executionResult: {
@@ -337,21 +306,48 @@ export async function testSkillExecution(
   };
 
   try {
-    const { generateText } = await import("ai");
+    const { generateText, stepCountIs } = await import("ai");
     const { getLanguageModel } = await import("@/lib/agent/model-router");
+    const { resolveTools, toVercelTools } = await import("@/lib/agent/tool-registry");
 
     const model = getLanguageModel({
-      provider: resolvedProvider as "zhipu" | "anthropic" | "openai",
+      provider: resolvedProvider as "zhipu" | "openai",
       model: resolvedModel,
       temperature: 0.5,
       maxTokens: 4096,
     });
 
+    const agentTools = resolveTools([skill.name]);
+    const pluginConfigs =
+      skill.type === "plugin" && skill.pluginConfig
+        ? new Map([
+            [
+              skill.name,
+              {
+                description: skill.description,
+                config: skill.pluginConfig as {
+                  endpoint: string;
+                  method?: "GET" | "POST";
+                  headers?: Record<string, string>;
+                  authType?: "none" | "api_key" | "bearer";
+                  authKey?: string;
+                  requestTemplate?: string;
+                  responseMapping?: Record<string, string>;
+                  timeoutMs?: number;
+                },
+              },
+            ],
+          ])
+        : undefined;
+    const vercelTools = toVercelTools(agentTools, pluginConfigs);
+
     const startTime = Date.now();
     const result = await generateText({
       model,
-      system: systemPrompt,
-      messages: [{ role: "user", content: testInput }],
+      system: `${systemPrompt}\n\n# 工具调用要求\n- 如提供了可用工具，优先调用工具获取真实结果，不要凭空编造实时信息。\n- 若工具返回结构化结果，需基于工具结果整理中文 Markdown 输出。`,
+      messages: [{ role: "user", content: `请按技能要求执行以下任务：\n${testInput}` }],
+      tools: vercelTools,
+      stopWhen: stepCountIs(5),
       temperature: 0.5,
       maxOutputTokens: 4096,
     });
@@ -548,7 +544,7 @@ export async function applySkillCombo(
   }
 
   revalidatePath("/employee");
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
   return { success: true, bound, skipped: comboSkillIds.length - bound };
 }
 

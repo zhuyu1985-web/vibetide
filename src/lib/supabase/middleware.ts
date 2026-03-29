@@ -50,7 +50,7 @@ export async function updateSession(request: NextRequest) {
       request.nextUrl.pathname.startsWith("/register"))
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = "/team-hub";
+    url.pathname = "/missions";
     return NextResponse.redirect(url);
   }
 

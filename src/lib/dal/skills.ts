@@ -7,7 +7,7 @@ import {
   skillVersions,
   skillUsageRecords,
 } from "@/db/schema";
-import { and, count, desc, eq, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { Skill, SkillCategory } from "@/lib/types";
 import type { SkillFileRow, SkillVersionRow } from "@/db/types";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
@@ -118,6 +118,38 @@ function preferScopedSkillRows<T extends ScopedSkillRow>(rows: T[], orgId: strin
   );
 }
 
+async function findSkillRecord(
+  where: SQL<unknown> | undefined
+) {
+  try {
+    return await db.query.skills.findFirst({ where });
+  } catch {
+    const rows = await db
+      .select({
+        id: skills.id,
+        organizationId: skills.organizationId,
+        name: skills.name,
+        category: skills.category,
+        type: skills.type,
+        version: skills.version,
+        description: skills.description,
+        content: sql<string>`''`,
+        compatibleRoles: skills.compatibleRoles,
+        inputSchema: skills.inputSchema,
+        outputSchema: skills.outputSchema,
+        runtimeConfig: skills.runtimeConfig,
+        pluginConfig: sql<PluginConfigData | null>`null`,
+        createdAt: skills.createdAt,
+        updatedAt: skills.updatedAt,
+      })
+      .from(skills)
+      .where(where)
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+}
+
 export async function getSkills(category?: SkillCategory): Promise<Skill[]> {
   const orgId = await getCurrentUserOrg();
   const skillScope = buildSkillScopeCondition(orgId);
@@ -182,9 +214,7 @@ export async function getSkillsWithBindCount(): Promise<SkillWithBindCount[]> {
 export async function getSkillById(id: string) {
   const orgId = await getCurrentUserOrg();
 
-  const row = await db.query.skills.findFirst({
-    where: buildSkillAccessCondition(id, orgId),
-  });
+  const row = await findSkillRecord(buildSkillAccessCondition(id, orgId));
   if (!row) return null;
   return row;
 }
@@ -193,9 +223,7 @@ export async function getSkillDetail(id: string): Promise<SkillDetail | null> {
   const orgId = await getCurrentUserOrg();
 
   const [row, bindings] = await Promise.all([
-    db.query.skills.findFirst({
-      where: buildSkillAccessCondition(id, orgId),
-    }),
+    findSkillRecord(buildSkillAccessCondition(id, orgId)),
     db
       .select({
         employeeId: employeeSkills.employeeId,
@@ -476,9 +504,7 @@ export async function getSkillDetailPageData(
     p.catch(() => fallback);
 
   const [row, bindings, files, versions, usageStatsRows] = await Promise.all([
-    db.query.skills.findFirst({
-      where: buildSkillAccessCondition(id, orgId),
-    }),
+    findSkillRecord(buildSkillAccessCondition(id, orgId)),
     safe(
       db
         .select({

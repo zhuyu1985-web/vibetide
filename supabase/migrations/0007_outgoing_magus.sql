@@ -1,0 +1,2 @@
+ALTER TABLE "monitored_platforms" ALTER COLUMN "crawl_frequency_minutes" SET DEFAULT 1440;--> statement-breakpoint
+CREATE UNIQUE INDEX "ai_employees_org_slug_unique" ON "ai_employees" USING btree ("organization_id","slug");

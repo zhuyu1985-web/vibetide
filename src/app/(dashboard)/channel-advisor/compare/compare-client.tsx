@@ -98,7 +98,7 @@ export default function CompareClient({ advisors, history }: Props) {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-6">
+    <div className="max-w-[1400px] mx-auto space-y-6">
       {/* Input section */}
       <GlassCard>
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">

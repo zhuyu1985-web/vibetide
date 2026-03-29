@@ -28,6 +28,13 @@ export const categories = pgTable("categories", {
 
   isActive: boolean("is_active").notNull().default(true),
 
+  // Media asset library extensions
+  scope: text("scope").notNull().default("article"), // 'article' | 'media'
+  workflowId: uuid("workflow_id"),
+  videoTranscodeGroup: text("video_transcode_group"),
+  audioTranscodeGroup: text("audio_transcode_group"),
+  catalogTemplateId: text("catalog_template_id"),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

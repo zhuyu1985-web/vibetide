@@ -136,7 +136,7 @@ export default function AbTestClient({ advisors, tests }: Props) {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-6">
+    <div className="max-w-[1400px] mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

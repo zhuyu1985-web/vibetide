@@ -164,7 +164,7 @@ export default function PublishingClient({
   const activeChannels = channels.filter((c) => c.status === "active").length;
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="全渠道发布台"
         description="统一管理所有渠道的内容发布计划"

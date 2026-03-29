@@ -1,0 +1,238 @@
+<h2>设计方案 Section 1：三栏布局架构</h2>
+<p class="subtitle">核心骨架 — 响应式三栏布局 + 面板折叠 + 禅模式</p>
+
+<div class="section">
+  <h3>📐 布局线框图</h3>
+  <div class="mockup">
+    <div class="mockup-header">图文阅读模式 — 默认视图</div>
+    <div class="mockup-body" style="padding:0;background:#0d1117">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:#58a6ff">← 返回</span>
+          <span style="color:#484f58">/</span>
+          <span>稿件管理</span>
+          <span style="color:#484f58">/</span>
+          <span style="color:#c9d1d9">国务院发布新能源政策...</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="display:flex;background:#21262d;border-radius:6px;overflow:hidden;font-size:10px">
+            <span style="padding:4px 10px;background:#1f6feb;color:#fff">沉浸阅读</span>
+            <span style="padding:4px 10px;color:#8b949e">原始网页</span>
+            <span style="padding:4px 10px;color:#8b949e">AI 速览</span>
+            <span style="padding:4px 10px;color:#8b949e">网页存档</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;color:#8b949e">
+          <span style="padding:3px 8px;border-radius:4px;background:#1f6feb22;color:#58a6ff;font-size:10px">👁 阅读</span>
+          <span>Aa</span>
+          <span>✦</span>
+          <span style="position:relative">🖊<span style="position:absolute;top:-4px;right:-6px;background:#f85149;color:#fff;font-size:8px;padding:0 3px;border-radius:6px">3</span></span>
+          <span>⋯</span>
+        </div>
+      </div>
+      <!-- Three columns -->
+      <div style="display:flex;height:360px">
+        <!-- Left: AI Chat Panel -->
+        <div style="width:22%;min-width:180px;background:#0d1117cc;border-right:1px solid #30363d;display:flex;flex-direction:column;backdrop-filter:blur(20px)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #30363d;font-size:11px;color:#c9d1d9">
+            <span>✦ AI 助手</span>
+            <span style="color:#484f58;cursor:pointer">◀</span>
+          </div>
+          <div style="display:flex;gap:0;font-size:10px;border-bottom:1px solid #30363d">
+            <span style="flex:1;text-align:center;padding:6px;color:#8b949e">大纲</span>
+            <span style="flex:1;text-align:center;padding:6px;color:#58a6ff;border-bottom:2px solid #1f6feb">对话</span>
+            <span style="flex:1;text-align:center;padding:6px;color:#8b949e">历史</span>
+          </div>
+          <div style="flex:1;padding:10px;overflow-y:auto;font-size:10px">
+            <div style="background:#1c2128;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#8b949e">
+              <span style="color:#58a6ff">✦</span> 你好！我是你的 AI 助手。你可以问我关于这篇文章的任何问题。
+            </div>
+            <div style="background:#1f6feb22;border-radius:8px;padding:8px 10px;margin-bottom:8px;color:#c9d1d9;margin-left:20px">
+              这篇文章对房地产有何影响？
+            </div>
+            <div style="background:#1c2128;border-radius:8px;padding:8px 10px;color:#8b949e">
+              <span style="color:#58a6ff">✦</span> 根据文章分析，新能源政策将从三个维度影响房地产行业...
+            </div>
+          </div>
+          <!-- Quick commands -->
+          <div style="padding:6px 10px;border-top:1px solid #30363d;display:flex;gap:4px;flex-wrap:wrap">
+            <span style="font-size:9px;padding:2px 6px;background:#21262d;border-radius:10px;color:#8b949e">总结全文</span>
+            <span style="font-size:9px;padding:2px 6px;background:#21262d;border-radius:10px;color:#8b949e">提取金句</span>
+            <span style="font-size:9px;padding:2px 6px;background:#21262d;border-radius:10px;color:#8b949e">分析立场</span>
+          </div>
+          <!-- Input -->
+          <div style="padding:8px 10px;border-top:1px solid #30363d;display:flex;gap:6px;align-items:center">
+            <span style="color:#484f58">📎</span>
+            <div style="flex:1;background:#21262d;border-radius:6px;padding:4px 8px;font-size:10px;color:#484f58">输入问题...</div>
+            <span style="color:#1f6feb;font-size:10px">发送</span>
+          </div>
+        </div>
+        <!-- Center: Main Stage -->
+        <div style="flex:1;overflow-y:auto;display:flex;justify-content:center;background:#0d1117">
+          <div style="max-width:680px;width:100%;padding:24px 32px">
+            <!-- Meta header -->
+            <div style="margin-bottom:20px">
+              <h1 style="font-size:22px;color:#f0f6fc;font-weight:700;line-height:1.3;margin:0 0 10px 0">国务院发布关于加快新能源产业高质量发展的指导意见</h1>
+              <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#8b949e;margin-bottom:8px">
+                <span style="width:16px;height:16px;background:#f85149;border-radius:4px;display:inline-block"></span>
+                <span>新华社</span>
+                <span style="color:#484f58">·</span>
+                <span>记者 张三</span>
+                <span style="color:#484f58">·</span>
+                <span>2026-03-24 09:30</span>
+                <span style="color:#484f58">·</span>
+                <span>约 8 分钟读完</span>
+              </div>
+              <div style="display:flex;gap:4px">
+                <span style="font-size:10px;padding:2px 8px;background:#1f6feb22;color:#58a6ff;border-radius:4px">新能源</span>
+                <span style="font-size:10px;padding:2px 8px;background:#238636aa;color:#3fb950;border-radius:4px">政策解读</span>
+                <span style="font-size:10px;padding:2px 8px;background:#da367022;color:#f85149;border-radius:4px">重要</span>
+              </div>
+            </div>
+            <!-- Body -->
+            <div style="font-size:14px;color:#c9d1d9;line-height:1.8">
+              <p style="margin-bottom:14px">新华社北京3月24日电　国务院日前印发《关于加快新能源产业高质量发展的指导意见》（以下简称《意见》），对新能源产业未来五年发展作出全面部署。</p>
+              <p style="margin-bottom:14px"><span style="background:#f0883e33;padding:1px 2px;border-radius:2px;border-bottom:2px solid #f0883e">《意见》明确提出，到2030年，新能源消费比重达到25%以上</span>，非化石能源发电装机占比超过50%。这标志着中国在"双碳"目标下，进一步加速能源结构转型步伐。</p>
+              <p style="margin-bottom:14px">业内专家分析指出，此次政策的出台释放了三大信号：一是光伏、风电等可再生能源将获得更大规模的财政支持和税收优惠；二是储能技术研发被列为国家重点科技攻关方向...</p>
+              <p style="color:#484f58;font-style:italic;font-size:12px">（正文持续...纯净排版，无毛玻璃效果）</p>
+            </div>
+          </div>
+        </div>
+        <!-- Right: Intelligence Panel -->
+        <div style="width:27%;min-width:200px;background:#0d1117cc;border-left:1px solid #30363d;display:flex;flex-direction:column;backdrop-filter:blur(20px)">
+          <div style="display:flex;gap:0;font-size:10px;border-bottom:1px solid #30363d">
+            <span style="flex:1;text-align:center;padding:8px 4px;color:#58a6ff;border-bottom:2px solid #1f6feb">AI 解读</span>
+            <span style="flex:1;text-align:center;padding:8px 4px;color:#8b949e">批注 <span style="background:#30363d;padding:0 4px;border-radius:8px;font-size:9px">3</span></span>
+            <span style="flex:1;text-align:center;padding:8px 4px;color:#8b949e">听记</span>
+          </div>
+          <div style="padding:10px;font-size:10px;color:#8b949e;border-bottom:1px solid #21262d">
+            <select style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:3px 6px;font-size:10px;width:100%">
+              <option>📋 摘要模式 (TL;DR)</option>
+            </select>
+          </div>
+          <div style="flex:1;padding:12px;overflow-y:auto;font-size:11px;color:#c9d1d9;line-height:1.6">
+            <div style="margin-bottom:12px">
+              <div style="display:flex;gap:4px;margin-bottom:8px">
+                <span style="font-size:9px;padding:2px 6px;background:#238636aa;color:#3fb950;border-radius:4px">客观中立</span>
+                <span style="font-size:9px;padding:2px 6px;background:#1f6feb22;color:#58a6ff;border-radius:4px">政策文件</span>
+              </div>
+              <p style="color:#f0f6fc;font-weight:600;margin-bottom:6px">核心摘要</p>
+              <p style="margin-bottom:10px">国务院发布新能源产业指导意见，提出2030年新能源消费比重达25%以上的目标。</p>
+              <p style="color:#f0f6fc;font-weight:600;margin-bottom:6px">关键要点</p>
+              <ul style="padding-left:16px;margin:0">
+                <li style="margin-bottom:4px">光伏/风电将获更大财政支持</li>
+                <li style="margin-bottom:4px">储能技术列为重点攻关方向</li>
+                <li style="margin-bottom:4px">新能源汽车充电网络加速建设</li>
+                <li style="margin-bottom:4px">碳交易市场进一步扩容</li>
+              </ul>
+            </div>
+          </div>
+          <!-- Bottom AI input -->
+          <div style="padding:8px 10px;border-top:1px solid #30363d;display:flex;gap:6px;align-items:center">
+            <div style="flex:1;background:#21262d;border-radius:6px;padding:4px 8px;font-size:10px;color:#484f58">追问 AI...</div>
+            <span style="color:#1f6feb;font-size:10px">发送</span>
+          </div>
+        </div>
+      </div>
+      <!-- Reading progress bar -->
+      <div style="height:2px;background:#21262d">
+        <div style="width:35%;height:100%;background:linear-gradient(90deg,#1f6feb,#58a6ff);border-radius:1px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>📱 响应式行为</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="mockup">
+      <div class="mockup-header">禅模式 — 收起左右侧栏</div>
+      <div class="mockup-body" style="padding:0;background:#0d1117">
+        <div style="display:flex;align-items:center;justify-content:center;padding:6px 16px;background:#161b22;border-bottom:1px solid #30363d;font-size:10px;color:#8b949e">
+          <span style="color:#58a6ff">退出禅模式 (⌘\)</span>
+        </div>
+        <div style="display:flex;height:200px;position:relative">
+          <!-- Collapsed left -->
+          <div style="width:28px;background:#0d1117;border-right:1px solid #30363d;display:flex;align-items:flex-start;justify-content:center;padding-top:12px">
+            <span style="color:#58a6ff;font-size:12px">✦</span>
+          </div>
+          <!-- Full width center -->
+          <div style="flex:1;display:flex;justify-content:center;padding:20px">
+            <div style="max-width:680px;width:100%">
+              <p style="font-size:12px;color:#c9d1d9;line-height:1.8">国务院日前印发《关于加快新能源产业高质量发展的指导意见》，对新能源产业未来五年发展作出全面部署...</p>
+            </div>
+          </div>
+          <!-- Collapsed right -->
+          <div style="width:28px;background:#0d1117;border-left:1px solid #30363d;display:flex;align-items:flex-start;justify-content:center;padding-top:12px">
+            <span style="color:#8b949e;font-size:10px">📝</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">移动端 — 底部抽屉</div>
+      <div class="mockup-body" style="padding:0;background:#0d1117">
+        <div style="padding:6px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:10px;display:flex;justify-content:space-between;color:#8b949e">
+          <span style="color:#58a6ff">← 返回</span>
+          <span>✦  🖊  ⋯</span>
+        </div>
+        <div style="height:160px;padding:12px;font-size:11px;color:#c9d1d9;line-height:1.7;overflow:hidden">
+          <h3 style="font-size:16px;color:#f0f6fc;margin:0 0 6px">国务院发布新能源政策指导意见</h3>
+          <p>新华社北京3月24日电 国务院日前印发...</p>
+        </div>
+        <!-- Bottom sheet peek -->
+        <div style="background:#161b22;border-top:1px solid #30363d;border-radius:12px 12px 0 0;padding:8px 16px">
+          <div style="width:32px;height:3px;background:#30363d;border-radius:2px;margin:0 auto 8px"></div>
+          <div style="display:flex;gap:8px;font-size:10px;color:#8b949e">
+            <span style="color:#58a6ff">✦ AI 对话</span>
+            <span>AI 解读</span>
+            <span>批注(3)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>🔑 布局核心规则</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#f0f6fc">左侧栏 (20-25%)</strong>
+      <ul style="margin:6px 0 0;padding-left:16px;color:#8b949e;font-size:12px">
+        <li>Glass UI 面板背景 (backdrop-filter)</li>
+        <li>可折叠，折叠后显示 AI 图标</li>
+        <li>3 个 Tab：大纲 / 对话 / 历史</li>
+        <li>底部固定输入框</li>
+      </ul>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#f0f6fc">中间核心区 (45-55%)</strong>
+      <ul style="margin:6px 0 0;padding-left:16px;color:#8b949e;font-size:12px">
+        <li>纯净排版（无 Glass 效果）</li>
+        <li>阅读区 max-width: 680px 居中</li>
+        <li>编辑模式：Tiptap 全宽</li>
+        <li>视频模式：自适应画幅播放器</li>
+      </ul>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#f0f6fc">右侧栏 (25-30%)</strong>
+      <ul style="margin:6px 0 0;padding-left:16px;color:#8b949e;font-size:12px">
+        <li>Glass UI 面板背景</li>
+        <li>可折叠，折叠后显示批注图标</li>
+        <li>动态 Tab：AI解读 / 批注 / 听记(视频)</li>
+        <li>底部共享 AI 追问输入框</li>
+      </ul>
+    </div>
+    <div style="background:#161b2266;border:1px solid #30363d;border-radius:8px;padding:12px">
+      <strong style="color:#f0f6fc">顶部导航栏 (h-12)</strong>
+      <ul style="margin:6px 0 0;padding-left:16px;color:#8b949e;font-size:12px">
+        <li>面包屑 | 视图切换器 | 工具栏</li>
+        <li>阅读进度条（顶部极细线）</li>
+        <li>阅读/编辑模式切换按钮</li>
+        <li>外观设置 / AI解读 / 批注 / 更多菜单</li>
+      </ul>
+    </div>
+  </div>
+</div>

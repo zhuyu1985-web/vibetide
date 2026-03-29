@@ -19,7 +19,6 @@ export async function createArticle(data: {
   mediaType?: string;
   categoryId?: string;
   assigneeId?: string;
-  teamId?: string;
   body?: string;
   summary?: string;
   tags?: string[];

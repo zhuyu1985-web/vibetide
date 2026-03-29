@@ -9,10 +9,10 @@ import {
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
-import { workflowInstances, workflowSteps } from "./workflows";
+import { missions, missionTasks } from "./missions";
 
 /**
- * F4.3.01: Execution logs — records every Agent execution for learning and debugging.
+ * Execution logs — records every Agent execution for learning and debugging.
  */
 export const executionLogs = pgTable("execution_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -22,10 +22,8 @@ export const executionLogs = pgTable("execution_logs", {
   employeeId: uuid("employee_id")
     .references(() => aiEmployees.id)
     .notNull(),
-  workflowInstanceId: uuid("workflow_instance_id").references(
-    () => workflowInstances.id
-  ),
-  workflowStepKey: text("workflow_step_key"),
+  missionId: uuid("mission_id").references(() => missions.id),
+  missionTaskId: uuid("mission_task_id").references(() => missionTasks.id),
 
   // Input context
   stepLabel: text("step_label"),
@@ -47,7 +45,7 @@ export const executionLogs = pgTable("execution_logs", {
   temperature: jsonb("temperature").$type<number>(),
 
   // Outcome
-  status: text("status").notNull().default("success"), // success | failed | needs_approval
+  status: text("status").notNull().default("success"), // success | failed
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -59,9 +57,13 @@ export const executionLogsRelations = relations(executionLogs, ({ one }) => ({
     fields: [executionLogs.employeeId],
     references: [aiEmployees.id],
   }),
-  workflowInstance: one(workflowInstances, {
-    fields: [executionLogs.workflowInstanceId],
-    references: [workflowInstances.id],
+  mission: one(missions, {
+    fields: [executionLogs.missionId],
+    references: [missions.id],
+  }),
+  missionTask: one(missionTasks, {
+    fields: [executionLogs.missionTaskId],
+    references: [missionTasks.id],
   }),
   organization: one(organizations, {
     fields: [executionLogs.organizationId],

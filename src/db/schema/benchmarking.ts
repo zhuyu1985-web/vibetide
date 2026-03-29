@@ -13,7 +13,13 @@ import {
   missedTopicPriorityEnum,
   missedTopicTypeEnum,
   missedTopicStatusEnum,
+  platformCategoryEnum,
+  crawlStatusEnum,
+  benchmarkAlertPriorityEnum,
+  benchmarkAlertTypeEnum,
+  benchmarkAlertStatusEnum,
 } from "./enums";
+import { aiEmployees } from "./ai-employees";
 
 export const competitors = pgTable("competitors", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -131,3 +137,142 @@ export const weeklyReportsRelations = relations(weeklyReports, ({ one }) => ({
     references: [organizations.id],
   }),
 }));
+
+// ---------------------------------------------------------------------------
+// Benchmarking Deep-Dive Tables
+// ---------------------------------------------------------------------------
+
+export const monitoredPlatforms = pgTable("monitored_platforms", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").references(() => organizations.id),
+
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  category: platformCategoryEnum("category").notNull().default("central"),
+  province: text("province"),
+  crawlFrequencyMinutes: integer("crawl_frequency_minutes").default(1440),
+  status: crawlStatusEnum("status").notNull().default("active"),
+  crawlConfig: jsonb("crawl_config")
+    .$type<{
+      rssUrl?: string;
+      searchQuery?: string;
+      urlPatterns?: string[];
+      categories?: string[];
+    }>()
+    .default({}),
+  lastCrawledAt: timestamp("last_crawled_at", { withTimezone: true }),
+  lastErrorMessage: text("last_error_message"),
+  totalContentCount: integer("total_content_count").default(0),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const platformContent = pgTable("platform_content", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").references(() => organizations.id),
+  platformId: uuid("platform_id")
+    .references(() => monitoredPlatforms.id, { onDelete: "cascade" })
+    .notNull(),
+
+  title: text("title").notNull(),
+  summary: text("summary"),
+  body: text("body"),
+  sourceUrl: text("source_url").notNull(),
+  author: text("author"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  topics: jsonb("topics").$type<string[]>().default([]),
+  category: text("category"),
+  sentiment: text("sentiment"),
+  importance: real("importance").default(0),
+  contentHash: text("content_hash"),
+  coverageStatus: text("coverage_status"),
+  gapAnalysis: text("gap_analysis"),
+
+  crawledAt: timestamp("crawled_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
+});
+
+export const benchmarkAlerts = pgTable("benchmark_alerts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").references(() => organizations.id),
+
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  priority: benchmarkAlertPriorityEnum("priority").notNull().default("medium"),
+  type: benchmarkAlertTypeEnum("type").notNull(),
+  status: benchmarkAlertStatusEnum("status").notNull().default("new"),
+  platformContentIds: jsonb("platform_content_ids")
+    .$type<string[]>()
+    .default([]),
+  relatedPlatforms: jsonb("related_platforms").$type<string[]>().default([]),
+  relatedTopics: jsonb("related_topics").$type<string[]>().default([]),
+  analysisData: jsonb("analysis_data")
+    .$type<{
+      heatScore?: number;
+      coverageGap?: string;
+      competitorCount?: number;
+      suggestedAngle?: string;
+      suggestedAction?: string;
+      estimatedUrgencyHours?: number;
+      sourceExcerpts?: string[];
+    }>()
+    .default({}),
+  actionedBy: uuid("actioned_by"),
+  actionNote: text("action_note"),
+  workflowInstanceId: uuid("workflow_instance_id"),
+  generatedBy: uuid("generated_by").references(() => aiEmployees.id),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+// Relations for new tables
+export const monitoredPlatformsRelations = relations(
+  monitoredPlatforms,
+  ({ one, many }) => ({
+    organization: one(organizations, {
+      fields: [monitoredPlatforms.organizationId],
+      references: [organizations.id],
+    }),
+    content: many(platformContent),
+  })
+);
+
+export const platformContentRelations = relations(
+  platformContent,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [platformContent.organizationId],
+      references: [organizations.id],
+    }),
+    platform: one(monitoredPlatforms, {
+      fields: [platformContent.platformId],
+      references: [monitoredPlatforms.id],
+    }),
+  })
+);
+
+export const benchmarkAlertsRelations = relations(
+  benchmarkAlerts,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [benchmarkAlerts.organizationId],
+      references: [organizations.id],
+    }),
+    generator: one(aiEmployees, {
+      fields: [benchmarkAlerts.generatedBy],
+      references: [aiEmployees.id],
+    }),
+  })
+);

@@ -61,6 +61,27 @@ const STEP_INSTRUCTIONS: Record<string, string> = {
 - 趋势分析和对比
 - 优化建议
 - 下一步行动建议`,
+
+  benchmark_monitor: `你是对标监控专家。分析外部媒体平台抓取的内容，提取关键信息。
+输出要求：
+- 为每条内容提取话题标签（≤5个），简短精准
+- 评估内容重要性（0-100分），考虑时效性、影响力、与行业相关度
+- 判断情感倾向（positive/neutral/negative）
+- 识别跨平台共同话题，标注多家媒体同时关注的热点`,
+
+  benchmark_compare: `你是对标分析专家。对比外部媒体内容与我方发布内容的覆盖情况。
+输出要求：
+- 逐条判断覆盖状态：covered（已覆盖）、partially_covered（部分覆盖）、missed（未覆盖）
+- 对 missed 内容评估紧急程度和跟进价值
+- 生成差距分析说明，指出我方缺失的角度或深度
+- 提供具体可操作的跟进建议`,
+
+  benchmark_report: `你是对标报告专家。基于对标分析数据生成综合报告和评分。
+输出要求：
+- 计算对标综合得分（0-100），维度包含覆盖率、响应速度、内容质量、话题敏感度
+- 生成雷达图数据（各维度得分）
+- 分析覆盖率趋势变化
+- 输出可执行的改进建议列表，按优先级排序`,
 };
 
 // ---------------------------------------------------------------------------
@@ -196,6 +217,78 @@ ${memoryLines.join("\n")}`);
 
 export function buildStepInstruction(stepKey: string): string {
   return STEP_INSTRUCTIONS[stepKey] ?? `请按照你的专业能力完成当前步骤的任务。`;
+}
+
+// ---------------------------------------------------------------------------
+// Leader-specific prompt for task decomposition
+// ---------------------------------------------------------------------------
+
+export function buildLeaderDecomposePrompt(
+  userInstruction: string,
+  scenario: string,
+  availableEmployees: { slug: string; name: string; title: string; skills: string[] }[]
+): string {
+  const empList = availableEmployees
+    .filter((e) => e.slug !== "leader" && e.slug !== "advisor")
+    .map((e) => `- ${e.slug}（${e.name}）：${e.title}。技能：${e.skills.join("、") || "通用"}`)
+    .join("\n");
+
+  return `你是任务总监。用户下达了一个${scenario}场景的任务，你需要：
+
+1. 分析任务需求，确定需要哪些团队成员参与
+2. 将大任务拆解为具体的小任务（3-8个）
+3. 为每个小任务指定负责的员工
+4. 设置任务之间的依赖关系（哪些可以并行，哪些必须等前置任务完成）
+
+## 用户指令
+${userInstruction}
+
+## 可用团队成员
+${empList}
+
+## 任务拆解原则
+- MECE原则：任务之间不重叠、不遗漏
+- 尽量并行：无依赖的任务应该同时执行
+- 粒度适中：每个任务一个员工能在合理时间内完成
+- 依赖最小化：减少任务间的串行等待
+
+## 输出要求
+请使用 create_task 工具逐个创建任务。每个任务需要指定：
+- title: 简短任务名
+- description: 详细描述，包含具体要求和输出格式
+- assignedEmployeeSlug: 负责员工的slug
+- dependencyTitles: 依赖的其他任务标题列表（如果有）
+- priority: 优先级（0-10，越大越优先）
+
+先分析任务，然后逐一调用 create_task 创建所有子任务。`;
+}
+
+// ---------------------------------------------------------------------------
+// Leader consolidation prompt
+// ---------------------------------------------------------------------------
+
+export function buildLeaderConsolidatePrompt(
+  missionTitle: string,
+  taskOutputs: { title: string; employeeSlug: string; summary: string }[]
+): string {
+  const outputSections = taskOutputs
+    .map((t) => `### ${t.title}（${t.employeeSlug}）\n${t.summary}`)
+    .join("\n\n");
+
+  return `所有子任务已完成。请综合整理所有任务的输出，生成一份完整的最终报告。
+
+## 任务主题
+${missionTitle}
+
+## 各子任务输出
+${outputSections}
+
+## 汇总要求
+1. 提供一个整体摘要（200字以内）
+2. 按逻辑顺序整合各任务的核心产出
+3. 标注关键结论和建议
+4. 如有任务间的矛盾或不一致，指出并给出建议
+5. 使用清晰的Markdown格式`;
 }
 
 // ---------------------------------------------------------------------------

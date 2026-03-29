@@ -11,22 +11,22 @@ import { CtaSection } from "./sections/cta-section";
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen scroll-smooth bg-white dark:bg-[#080d19]">
+    <div className="min-h-screen scroll-smooth bg-background">
       <Navbar />
       <section id="hero">
         <HeroSection />
       </section>
-      <section id="team" className="bg-slate-50/80 dark:bg-[#0c1222]">
+      <section id="team" className="bg-muted/80">
         <TeamSection />
       </section>
       <section id="capabilities">
         <CapabilitiesSection />
       </section>
-      <section id="workflow" className="bg-slate-50/80 dark:bg-[#0c1222]">
+      <section id="workflow" className="bg-muted/80">
         <WorkflowSection />
       </section>
       <StatsSection />
-      <section id="scenarios" className="bg-slate-50/80 dark:bg-[#0c1222]">
+      <section id="scenarios" className="bg-muted/80">
         <ScenariosSection />
       </section>
       <section id="cta">

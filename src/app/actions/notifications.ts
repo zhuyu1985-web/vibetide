@@ -23,13 +23,13 @@ async function requireAuth() {
 export async function markMessageRead(messageId: string) {
   const user = await requireAuth();
   await markAsRead(user.id, messageId);
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 }
 
 export async function markAllMessagesRead(teamId: string) {
   const user = await requireAuth();
   await markAllAsRead(user.id, teamId);
-  revalidatePath("/team-hub");
+  revalidatePath("/missions");
 }
 
 export async function fetchUnreadCount(): Promise<number> {
