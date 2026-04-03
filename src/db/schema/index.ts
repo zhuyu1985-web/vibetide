@@ -59,3 +59,6 @@ export * from "./category-permissions";
 
 // Intent recognition system (2026-04-02)
 export * from "./intent-logs";
+
+// RBAC system (2026-04-03)
+export * from "./roles";

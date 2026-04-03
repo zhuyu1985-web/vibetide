@@ -1734,6 +1734,65 @@ async function seed() {
   }
   console.log();
 
+  // ── RBAC: Seed system roles and assign to existing users ──
+  console.log("Seeding RBAC roles...");
+  const { DEFAULT_ROLES, ALL_PERMISSIONS } = await import("../lib/rbac");
+
+  const roleMap = new Map<string, string>(); // slug -> role id
+  for (const [slug, def] of Object.entries(DEFAULT_ROLES)) {
+    const existing = await db.query.roles.findFirst({
+      where: (r, { eq, and, isNull }) =>
+        and(isNull(r.organizationId), eq(r.slug, slug)),
+    });
+    if (existing) {
+      roleMap.set(slug, existing.id);
+      console.log(`   Role exists: ${def.name}`);
+    } else {
+      const [created] = await db
+        .insert(schema.roles)
+        .values({
+          organizationId: null,
+          name: def.name,
+          slug,
+          description: def.description,
+          isSystem: true,
+          permissions: [...def.permissions],
+        })
+        .returning();
+      roleMap.set(slug, created.id);
+      console.log(`   Created role: ${def.name}`);
+    }
+  }
+
+  // Assign roles to existing users based on their legacy role field
+  const allUsers = await db.query.userProfiles.findMany({
+    where: (p, { eq }) => eq(p.organizationId, org.id),
+  });
+  for (const user of allUsers) {
+    const roleSlug = user.role || "editor";
+    const roleId = roleMap.get(roleSlug) || roleMap.get("editor")!;
+    await db
+      .insert(schema.userRoles)
+      .values({
+        userId: user.id,
+        roleId,
+        organizationId: org.id,
+      })
+      .onConflictDoNothing();
+    console.log(`   Assigned ${roleSlug} to ${user.displayName}`);
+  }
+
+  // Mark first admin as super admin
+  const firstAdmin = allUsers.find((u) => u.role === "admin");
+  if (firstAdmin) {
+    await db
+      .update(schema.userProfiles)
+      .set({ isSuperAdmin: true })
+      .where(eq(schema.userProfiles.id, firstAdmin.id));
+    console.log(`   Marked ${firstAdmin.displayName} as super admin`);
+  }
+  console.log();
+
   console.log("Seed complete!");
   process.exit(0);
 }

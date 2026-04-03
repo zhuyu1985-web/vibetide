@@ -58,14 +58,17 @@ export async function getCategoryTree(): Promise<CategoryNode[]> {
 }
 
 export async function getCategory(id: string): Promise<CategoryNode | undefined> {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return undefined;
+
   const row = await db.query.categories.findFirst({
-    where: eq(categories.id, id),
+    where: and(eq(categories.id, id), eq(categories.organizationId, orgId)),
   });
 
   if (!row) return undefined;
 
   const allArticles = await db.query.articles.findMany({
-    where: eq(articles.categoryId, id),
+    where: and(eq(articles.categoryId, id), eq(articles.organizationId, orgId)),
     columns: { id: true },
   });
 

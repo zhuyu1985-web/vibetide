@@ -28,6 +28,9 @@ import {
   ClipboardCheck,
   LayoutTemplate,
   MessageSquare,
+  Shield,
+  Building2,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -59,7 +62,7 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-type ThemeColor = "blue" | "purple" | "emerald" | "amber" | "indigo";
+type ThemeColor = "blue" | "purple" | "emerald" | "amber" | "indigo" | "rose";
 
 interface NavGroupConfig {
   label: string;
@@ -162,6 +165,21 @@ const themeStyles: Record<
     subLine: "from-indigo-500/20 to-transparent",
     separator: "from-transparent via-indigo-500/15 to-transparent",
   },
+  rose: {
+    dot: "bg-gradient-to-br from-rose-400/70 to-pink-400/70",
+    line: "from-rose-500/30 via-pink-500/15 to-transparent",
+    activeBg:
+      "bg-gradient-to-r from-rose-500/8 via-pink-500/4 to-transparent",
+    activeBar: "bg-gradient-to-b from-rose-400/80 to-pink-400/80",
+    activeIcon: "text-rose-400/80 dark:text-rose-300/80",
+    activeText: "text-foreground font-semibold",
+    hoverBg: "hover:bg-rose-500/4 dark:hover:bg-rose-400/4",
+    hoverIcon:
+      "group-hover/nav-item:text-rose-400/80 dark:group-hover/nav-item:text-rose-300/80",
+    headerActive: "text-rose-500/80 dark:text-rose-400/80",
+    subLine: "from-rose-500/20 to-transparent",
+    separator: "from-transparent via-rose-500/15 to-transparent",
+  },
 };
 
 /* ─── Navigation Data ─── */
@@ -227,6 +245,18 @@ const navGroups: NavGroupConfig[] = [
     ],
   },
 ];
+
+const adminGroup: NavGroupConfig = {
+  label: "系统管理",
+  icon: Shield,
+  theme: "rose",
+  groupId: "admin",
+  items: [
+    { label: "组织管理", href: "/admin/organizations", icon: Building2 },
+    { label: "用户管理", href: "/admin/users", icon: Users },
+    { label: "角色权限", href: "/admin/roles", icon: Shield },
+  ],
+};
 
 /* ─── Helper ─── */
 
@@ -450,8 +480,12 @@ function NavMenuItem({
 
 /* ─── Main Sidebar ─── */
 
-export function AppSidebar() {
+export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
   const pathname = usePathname();
+  const canAccessAdmin =
+    permissions.includes("system:manage_users") ||
+    permissions.includes("system:manage_orgs") ||
+    permissions.includes("system:manage_roles");
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50 glass-sidebar">
@@ -502,12 +536,20 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* 可折叠分组 */}
-        {navGroups.map((group, idx) => (
+        {navGroups.map((group) => (
           <div key={group.groupId}>
             <NavSeparator theme={group.theme} />
             <NavSection group={group} pathname={pathname} />
           </div>
         ))}
+
+        {/* 系统管理 - 仅管理员可见 */}
+        {canAccessAdmin && (
+          <div>
+            <NavSeparator theme={adminGroup.theme} />
+            <NavSection group={adminGroup} pathname={pathname} />
+          </div>
+        )}
       </SidebarContent>
 
       {/* ── Footer ── */}

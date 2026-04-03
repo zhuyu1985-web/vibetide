@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
+import { PermissionGate } from "@/components/shared/permission-gate";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,6 +115,7 @@ export default function CategoriesClient({ categoryTree }: Props) {
         title="栏目管理"
         description="管理内容栏目的层级结构"
         actions={
+          <PermissionGate permission="content:manage">
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -192,6 +194,7 @@ export default function CategoriesClient({ categoryTree }: Props) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </PermissionGate>
         }
       />
 

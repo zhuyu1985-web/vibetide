@@ -40,6 +40,10 @@ const pageTitles: Record<string, string> = {
   "/hot-topics": "热点看板",
   "/creation": "创作中心",
   "/competitive": "竞品对标",
+  // 系统管理
+  "/admin/organizations": "组织管理",
+  "/admin/users": "用户管理",
+  "/admin/roles": "角色权限",
 };
 
 const pageGroups: Record<string, string> = {
@@ -57,6 +61,9 @@ const pageGroups: Record<string, string> = {
   "/asset-revive": "智能媒资",
   "/publishing": "运营分析",
   "/analytics": "运营分析",
+  "/admin/organizations": "系统管理",
+  "/admin/users": "系统管理",
+  "/admin/roles": "系统管理",
 };
 
 interface TopbarProps {

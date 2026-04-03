@@ -1,4 +1,11 @@
-import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  jsonb,
+  boolean,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const organizations = pgTable("organizations", {
@@ -18,7 +25,8 @@ export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey(), // matches Supabase auth.users.id
   organizationId: uuid("organization_id").references(() => organizations.id),
   displayName: text("display_name").notNull(),
-  role: text("role").notNull().default("editor"), // admin, editor, viewer
+  role: text("role").notNull().default("editor"), // legacy: admin, editor, viewer
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

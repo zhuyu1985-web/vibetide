@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { articles, categories, aiEmployees } from "@/db/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { getCurrentUserOrg } from "./auth";
 import type { ArticleListItem, ArticleDetail, ArticleStats } from "@/lib/types";
 
@@ -53,8 +53,11 @@ export async function getArticleStats(): Promise<ArticleStats> {
 }
 
 export async function getArticle(id: string): Promise<ArticleDetail | undefined> {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return undefined;
+
   const row = await db.query.articles.findFirst({
-    where: eq(articles.id, id),
+    where: and(eq(articles.id, id), eq(articles.organizationId, orgId)),
     with: { category: true, assignee: true },
   });
 
@@ -84,8 +87,11 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
 }
 
 export async function getArticlesByCategory(categoryId: string): Promise<ArticleListItem[]> {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return [];
+
   const rows = await db.query.articles.findMany({
-    where: eq(articles.categoryId, categoryId),
+    where: and(eq(articles.categoryId, categoryId), eq(articles.organizationId, orgId)),
     orderBy: [desc(articles.updatedAt)],
     with: { category: true, assignee: true },
   });

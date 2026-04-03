@@ -11,6 +11,7 @@ import { ResourceList } from "@/components/media-assets/resource-list";
 import { BatchActionBar } from "@/components/media-assets/batch-action-bar";
 import { UploadDialog } from "@/components/media-assets/upload-dialog";
 import { MoveToDialog } from "@/components/media-assets/move-to-dialog";
+import { PermissionGate } from "@/components/shared/permission-gate";
 import { CategoryPermissionDialog } from "@/components/media-assets/category-permission-dialog";
 import {
   softDeleteAsset, batchSoftDelete, moveToProductLibrary,
@@ -337,12 +338,14 @@ export default function MediaAssetsModuleClient({
       </div>
 
       {/* Upload dialog */}
+      <PermissionGate permission="content:write">
       <UploadDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         libraryType={library === "product" ? "product" : "personal"}
         categoryId={activeCategoryId || undefined}
       />
+      </PermissionGate>
 
       {/* Move dialog */}
       <MoveToDialog

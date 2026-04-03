@@ -2,8 +2,8 @@
 
 import { cache } from "react";
 import { db } from "@/db";
-import { userProfiles, organizations } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { userProfiles, organizations, userRoles, roles } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 
 // Auto-provision a user_profiles record linked to the default org.
@@ -94,6 +94,72 @@ export const getCurrentUserOrg = cache(
       return ensureUserProfile(user.id, name);
     } catch (err) {
       console.error("[auth] user_profiles query failed:", err);
+      return null;
+    }
+  }
+);
+
+/**
+ * Full user context including permissions. Used by layout/sidebar to decide
+ * which navigation items to show.
+ */
+export type UserContext = {
+  userId: string;
+  organizationId: string;
+  displayName: string;
+  role: string;
+  isSuperAdmin: boolean;
+  permissions: string[];
+};
+
+export const getCurrentUserProfile = cache(
+  async (): Promise<UserContext | null> => {
+    try {
+      const ctx = await getCurrentUserAndOrg();
+      if (!ctx) return null;
+
+      const profile = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, ctx.userId),
+      });
+      if (!profile) return null;
+
+      // Fetch permissions from role assignments
+      let permissions: string[] = [];
+
+      if (profile.isSuperAdmin) {
+        // Lazy import to avoid circular dependency
+        const { ALL_PERMISSIONS } = await import("@/lib/rbac");
+        permissions = [...ALL_PERMISSIONS];
+      } else {
+        const assignments = await db
+          .select({ permissions: roles.permissions })
+          .from(userRoles)
+          .innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .where(
+            and(
+              eq(userRoles.userId, ctx.userId),
+              eq(userRoles.organizationId, ctx.organizationId)
+            )
+          );
+
+        const permSet = new Set<string>();
+        for (const row of assignments) {
+          const perms = row.permissions as string[];
+          if (perms) perms.forEach((p) => permSet.add(p));
+        }
+        permissions = [...permSet];
+      }
+
+      return {
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        displayName: profile.displayName,
+        role: profile.role,
+        isSuperAdmin: profile.isSuperAdmin,
+        permissions,
+      };
+    } catch {
+      console.warn("[auth] getCurrentUserProfile failed");
       return null;
     }
   }

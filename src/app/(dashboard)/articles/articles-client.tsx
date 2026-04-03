@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { PermissionGate } from "@/components/shared/permission-gate";
 import {
   Search,
   Plus,
@@ -336,12 +337,14 @@ export default function ArticlesClient({ articles, stats, categories }: Props) {
             </button>
 
             {/* New article */}
+            <PermissionGate permission="content:write">
             <Link
               href="/articles/create"
               className="ml-1 h-8 w-8 flex items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors"
             >
               <Plus size={16} />
             </Link>
+            </PermissionGate>
           </div>
         </div>
 

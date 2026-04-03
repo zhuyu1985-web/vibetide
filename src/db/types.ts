@@ -2,6 +2,8 @@ import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import type {
   organizations,
   userProfiles,
+  roles,
+  userRoles,
   aiEmployees,
   employeeMemories,
   workflowArtifacts,
@@ -69,6 +71,12 @@ import type {
   hotTopicCrawlLogs,
   savedConversations,
 } from "./schema";
+
+// RBAC
+export type RoleRow = InferSelectModel<typeof roles>;
+export type UserRoleRow = InferSelectModel<typeof userRoles>;
+export type NewRole = InferInsertModel<typeof roles>;
+export type NewUserRole = InferInsertModel<typeof userRoles>;
 
 // Select types (query results)
 export type Organization = InferSelectModel<typeof organizations>;

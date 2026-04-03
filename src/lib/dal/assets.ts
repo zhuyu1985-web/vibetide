@@ -60,8 +60,12 @@ export async function getAssetStats(): Promise<MediaAssetStats> {
 }
 
 export async function getAssetDetail(assetId: string): Promise<IntelligentAsset | undefined> {
+  const orgId = await getCurrentUserOrg();
+
   const row = await db.query.mediaAssets.findFirst({
-    where: eq(mediaAssets.id, assetId),
+    where: orgId
+      ? and(eq(mediaAssets.id, assetId), eq(mediaAssets.organizationId, orgId))
+      : eq(mediaAssets.id, assetId),
   });
   if (!row) return undefined;
 

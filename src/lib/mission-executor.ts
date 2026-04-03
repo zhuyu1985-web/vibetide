@@ -305,9 +305,23 @@ export async function executeAllTasksDirect(missionId: string) {
     const check = await db
       .select({ status: missions.status, tokensUsed: missions.tokensUsed, tokenBudget: missions.tokenBudget })
       .from(missions).where(eq(missions.id, missionId)).limit(1);
-    if (check[0]?.status === "cancelled") break;
+    if (check[0]?.status === "cancelled") {
+      await db.update(missionTasks)
+        .set({ status: "failed", errorMessage: "任务已取消" })
+        .where(and(
+          eq(missionTasks.missionId, missionId),
+          inArray(missionTasks.status, ["pending", "ready"]),
+        ));
+      break;
+    }
     if (check[0] && check[0].tokensUsed >= check[0].tokenBudget) {
       console.warn(`[mission-executor] Token budget exceeded (${check[0].tokensUsed}/${check[0].tokenBudget}), stopping execution`);
+      await db.update(missionTasks)
+        .set({ status: "failed", errorMessage: `Token 预算已耗尽（${check[0].tokensUsed}/${check[0].tokenBudget}）` })
+        .where(and(
+          eq(missionTasks.missionId, missionId),
+          inArray(missionTasks.status, ["pending", "ready"]),
+        ));
       break;
     }
 
@@ -315,7 +329,16 @@ export async function executeAllTasksDirect(missionId: string) {
     const readyTasks = await db.select().from(missionTasks)
       .where(and(eq(missionTasks.missionId, missionId), eq(missionTasks.status, "ready")));
 
-    if (readyTasks.length === 0) break;
+    if (readyTasks.length === 0) {
+      // Mark any remaining pending tasks as failed — they're stuck due to broken dependency chains
+      await db.update(missionTasks)
+        .set({ status: "failed", errorMessage: "依赖链中断，无法继续执行" })
+        .where(and(
+          eq(missionTasks.missionId, missionId),
+          eq(missionTasks.status, "pending"),
+        ));
+      break;
+    }
 
     // Group by employee for conflict-free parallelism
     const employeeGroups = new Map<string, typeof readyTasks>();
@@ -572,6 +595,17 @@ export async function executeMissionDirect(
     return { status: "completed", taskCount: plan.taskCount, degradationLevel: 3, failedCount };
   } else {
     // Level 4: <30% 完成，标记失败
+    // Collect failure reasons for diagnosis
+    const failedTasks = await db
+      .select({ title: missionTasks.title, errorMessage: missionTasks.errorMessage })
+      .from(missionTasks)
+      .where(and(eq(missionTasks.missionId, missionId), eq(missionTasks.status, "failed")));
+
+    const failureReasons = failedTasks
+      .filter((t) => t.errorMessage)
+      .map((t) => `${t.title}: ${t.errorMessage}`)
+      .slice(0, 5);
+
     await db
       .update(missions)
       .set({
@@ -582,6 +616,7 @@ export async function executeMissionDirect(
           message: `任务完成率过低（${completedCount}/${totalCount}），${failedCount} 个子任务失败`,
           degradation_level: 4,
           failedAt: new Date().toISOString(),
+          failureReasons,
         },
       })
       .where(eq(missions.id, missionId));
