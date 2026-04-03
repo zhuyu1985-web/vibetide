@@ -1,3 +1,4 @@
+import { verify } from "@/lib/cognitive/verify-learner";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { aiEmployees, userProfiles, intentLogs } from "@/db/schema";
@@ -254,6 +255,32 @@ export async function POST(req: Request) {
 
             // Save step output as context for next step
             priorStepOutput = stepText;
+
+            // --- Cognitive Engine: verify step output (non-blocking) ---
+            if (stepText.length > 50) {
+              verify({
+                output: stepText,
+                taskTitle: step.taskDescription,
+                taskDescription: step.taskDescription,
+                employeeId: emp.id,
+                employeeSlug: step.employeeSlug,
+                organizationId: orgId,
+                intentType: intent.intentType,
+              })
+                .then((vr) => {
+                  send("verification", {
+                    stepIndex: i,
+                    qualityScore: vr.qualityScore,
+                    passed: vr.passed,
+                    feedback: vr.feedback,
+                    issueCount: vr.issues.length,
+                    memoriesGenerated: vr.memoriesGenerated.length,
+                  });
+                })
+                .catch((err) =>
+                  console.error("[intent-execute] Verification failed:", err)
+                );
+            }
 
             // Notify step complete
             send("step-complete", {

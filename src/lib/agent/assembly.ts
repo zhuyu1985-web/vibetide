@@ -7,7 +7,7 @@ import {
   knowledgeBases,
   employeeMemories,
 } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, gt, sql } from "drizzle-orm";
 import { READ_ONLY_TOOL_NAMES, type EmployeeId } from "@/lib/constants";
 import type { SkillCategory } from "@/lib/types";
 import { buildSystemPrompt } from "./prompt-templates";
@@ -58,18 +58,38 @@ export async function assembleAgent(
       .where(eq(employeeKnowledgeBases.employeeId, employeeId)),
     db
       .select({
+        id: employeeMemories.id,
         content: employeeMemories.content,
         memoryType: employeeMemories.memoryType,
         importance: employeeMemories.importance,
+        confidence: employeeMemories.confidence,
+        decayRate: employeeMemories.decayRate,
       })
       .from(employeeMemories)
-      .where(eq(employeeMemories.employeeId, employeeId))
+      .where(and(eq(employeeMemories.employeeId, employeeId), gt(employeeMemories.confidence, 0.3)))
       .orderBy(desc(employeeMemories.importance))
       .limit(10),
   ]);
 
   if (!employee) {
     throw new Error(`Employee not found: ${employeeId}`);
+  }
+
+  // Update access stats for loaded memories (fire-and-forget)
+  if (memoryRows.length > 0) {
+    Promise.all(
+      memoryRows.map((m) =>
+        db
+          .update(employeeMemories)
+          .set({
+            accessCount: sql`${employeeMemories.accessCount} + 1`,
+            lastAccessedAt: new Date(),
+          })
+          .where(eq(employeeMemories.id, m.id))
+      )
+    ).catch((err) =>
+      console.error("[assembly] Memory access update failed:", err)
+    );
   }
 
   const skillNames = empSkills.map((s) => s.skillName);

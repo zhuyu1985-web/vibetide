@@ -17,8 +17,11 @@ import {
   missionMessages,
   missionArtifacts,
   aiEmployees,
+  employeeSkills,
 } from "@/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { verify } from "@/lib/cognitive/verify-learner";
+import { updateSkillStats } from "@/lib/cognitive/skill-manager";
 import { assembleAgent, executeAgent } from "@/lib/agent";
 import { createMissionTools } from "@/lib/agent/tool-registry";
 import {
@@ -260,6 +263,52 @@ async function executeTaskDirect(
         });
       }
     }
+
+    // --- Cognitive Engine: verify + learn (fire-and-forget, don't block) ---
+    const verifyAndLearn = async () => {
+      try {
+        const outputText = result.output.summary || result.output.artifacts?.[0]?.content || "";
+        if (!outputText || !task.assignedEmployeeId) return;
+
+        const missionRow = await db
+          .select({ orgId: missions.organizationId })
+          .from(missions).where(eq(missions.id, missionId)).limit(1);
+        const orgId = missionRow[0]?.orgId;
+        if (!orgId) return;
+
+        const verification = await verify({
+          output: outputText,
+          taskTitle: task.title,
+          taskDescription: task.description,
+          expectedOutput: task.expectedOutput ?? undefined,
+          employeeId: task.assignedEmployeeId,
+          employeeSlug: "",
+          missionId,
+          taskId,
+          organizationId: orgId,
+          intentType: mission.scenario,
+        });
+
+        const empSkillRows = await db
+          .select({ skillId: employeeSkills.skillId })
+          .from(employeeSkills)
+          .where(eq(employeeSkills.employeeId, task.assignedEmployeeId));
+
+        if (empSkillRows.length > 0) {
+          await updateSkillStats({
+            employeeId: task.assignedEmployeeId,
+            skillIds: empSkillRows.map((r) => r.skillId),
+            qualityScore: verification.qualityScore,
+            passed: verification.passed,
+            taskId,
+            organizationId: orgId,
+          });
+        }
+      } catch (err) {
+        console.error("[mission-executor] Verify+learn failed (non-blocking):", err);
+      }
+    };
+    verifyAndLearn(); // fire-and-forget
 
     return { status: "completed" as const, taskId, durationMs: result.durationMs };
   } catch (error) {
