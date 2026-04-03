@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   real,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
@@ -67,7 +68,9 @@ export const hotTopics = pgTable("hot_topics", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => [
+  uniqueIndex("hot_topics_org_title_hash_uniq").on(table.organizationId, table.titleHash),
+]);
 
 export const topicAngles = pgTable("topic_angles", {
   id: uuid("id").defaultRandom().primaryKey(),

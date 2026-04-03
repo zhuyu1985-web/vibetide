@@ -1,23 +1,29 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HardDrive } from "lucide-react";
 import { LibrarySidebar } from "@/components/media-assets/library-sidebar";
 import { ResourceToolbar } from "@/components/media-assets/resource-toolbar";
 import { ResourceGrid } from "@/components/media-assets/resource-grid";
 import { ResourceList } from "@/components/media-assets/resource-list";
-import { ResourcePagination } from "@/components/media-assets/resource-pagination";
+// Pagination removed — using infinite scroll
 import { BatchActionBar } from "@/components/media-assets/batch-action-bar";
 import { UploadDialog } from "@/components/media-assets/upload-dialog";
 import { MoveToDialog } from "@/components/media-assets/move-to-dialog";
+import { CategoryPermissionDialog } from "@/components/media-assets/category-permission-dialog";
 import {
   softDeleteAsset, batchSoftDelete, moveToProductLibrary,
   batchMove, batchSubmitForReview, batchTriggerUnderstanding,
+  fetchMoreAssets,
 } from "@/app/actions/assets";
+import {
+  createMediaCategory, renameMediaCategory, deleteMediaCategory,
+  fetchCategoryPermissions, fetchOrgUsers,
+} from "@/app/actions/categories";
 import type {
   MediaLibraryType, MediaAssetFull, MediaAssetStats,
-  MediaCategoryNode, PaginatedAssets,
+  MediaCategoryNode, PaginatedAssets, CategoryPermissionItem,
 } from "@/lib/types";
 
 interface Props {
@@ -35,6 +41,9 @@ export default function MediaAssetsModuleClient({
 
   // State
   const [library, setLibrary] = useState<MediaLibraryType>(initialLibrary);
+  const [localCategories, setLocalCategories] = useState<MediaCategoryNode[]>(categories);
+  // Sync from server when props update (after router.refresh)
+  useEffect(() => { setLocalCategories(categories); }, [categories]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -49,27 +58,52 @@ export default function MediaAssetsModuleClient({
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [moveDialogMode, setMoveDialogMode] = useState<"moveToProduct" | "move">("moveToProduct");
 
-  // Data (initially from server, refreshes via router.refresh)
-  const assets = initialAssets;
+  // Permission dialog
+  const [permDialogOpen, setPermDialogOpen] = useState(false);
+  const [permCategoryId, setPermCategoryId] = useState("");
+  const [permCategoryName, setPermCategoryName] = useState("");
+  const [permList, setPermList] = useState<CategoryPermissionItem[]>([]);
+  const [orgUsers, setOrgUsers] = useState<{ id: string; displayName: string; role: string }[]>([]);
+
+  // Infinite scroll state
+  const [allAssets, setAllAssets] = useState<MediaAssetFull[]>(initialAssets.items);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(initialAssets.page < initialAssets.totalPages);
+  const [loadingMore, setLoadingMore] = useState(false);
   const stats = initialStats;
+
+  // Load more handler
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const result = await fetchMoreAssets(library, activeCategoryId, nextPage, 20, search, typeFilter);
+    setAllAssets((prev) => [...prev, ...result.items]);
+    setPage(nextPage);
+    setHasMore(nextPage < result.totalPages);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, page, library, activeCategoryId, search, typeFilter]);
+
+  // Reset scroll state when library/category/filters change
+  const resetAndRefresh = useCallback((lib: MediaLibraryType, catId: string | null) => {
+    setAllAssets([]);
+    setPage(0);
+    setHasMore(true);
+    setLoadingMore(false);
+    setSelectedIds(new Set());
+  }, []);
 
   // Navigation
   const changeLibrary = useCallback((lib: MediaLibraryType) => {
     setLibrary(lib);
-    setSelectedIds(new Set());
     setSearch("");
     setTypeFilter("all");
     setActiveCategoryId(null);
+    resetAndRefresh(lib, null);
     startTransition(() => {
       router.push(`/media-assets?library=${lib}`);
     });
-  }, [router]);
-
-  const changePage = useCallback((page: number) => {
-    startTransition(() => {
-      router.refresh();
-    });
-  }, [router]);
+  }, [router, resetAndRefresh]);
 
   // Selection
   const toggleSelect = useCallback((id: string) => {
@@ -81,8 +115,8 @@ export default function MediaAssetsModuleClient({
   }, []);
 
   const selectAll = useCallback(() => {
-    setSelectedIds(new Set(assets.items.map((a) => a.id)));
-  }, [assets.items]);
+    setSelectedIds(new Set(allAssets.map((a) => a.id)));
+  }, [allAssets]);
 
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
@@ -131,10 +165,79 @@ export default function MediaAssetsModuleClient({
     router.refresh();
   };
 
+  // Category management — optimistic updates
+  const handleCreateCategory = async (name: string, parentId?: string) => {
+    const tempId = `temp-${Date.now()}`;
+    const tempNode: MediaCategoryNode = {
+      id: tempId,
+      name,
+      slug: "",
+      sortOrder: 999,
+      articleCount: 0,
+      children: [],
+      mediaAssetCount: 0,
+    };
+
+    // Optimistic: add to local state immediately
+    setLocalCategories((prev) => {
+      if (!parentId) {
+        return [...prev, tempNode];
+      }
+      return addChildToTree(prev, parentId, tempNode);
+    });
+
+    // Fire server action in background
+    createMediaCategory({ name, parentId }).then(() => {
+      router.refresh();
+    });
+  };
+
+  const handleRenameCategory = async (categoryId: string, newName: string) => {
+    // Optimistic: rename in local state immediately
+    setLocalCategories((prev) => renameInTree(prev, categoryId, newName));
+
+    // Fire server action in background
+    renameMediaCategory(categoryId, newName).then(() => {
+      router.refresh();
+    });
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    const result = await deleteMediaCategory(categoryId);
+    if (result?.error) {
+      return { error: result.error };
+    }
+    // Optimistic: remove from local state immediately
+    setLocalCategories((prev) => removeFromTree(prev, categoryId));
+    if (activeCategoryId === categoryId) {
+      setActiveCategoryId(null);
+    }
+    router.refresh();
+    return {};
+  };
+
+  // Permission management
+  const handlePermissionClick = async (categoryId: string, categoryName: string) => {
+    setPermCategoryId(categoryId);
+    setPermCategoryName(categoryName);
+    const [perms, users] = await Promise.all([
+      fetchCategoryPermissions(categoryId),
+      fetchOrgUsers(),
+    ]);
+    setPermList(perms);
+    setOrgUsers(users);
+    setPermDialogOpen(true);
+  };
+
+  const handlePermRefresh = async () => {
+    const perms = await fetchCategoryPermissions(permCategoryId);
+    setPermList(perms);
+  };
+
   const selectable = library !== "public";
 
-  // Client-side filtering (supplements server-side pagination)
-  let displayAssets = assets.items;
+  // Client-side filtering
+  let displayAssets = allAssets;
   if (search) {
     const q = search.toLowerCase();
     displayAssets = displayAssets.filter(
@@ -151,10 +254,14 @@ export default function MediaAssetsModuleClient({
       <LibrarySidebar
         activeLibrary={library}
         activeCategoryId={activeCategoryId}
-        categories={categories}
+        categories={localCategories}
         storageDisplay={stats.totalStorageDisplay}
         onLibraryChange={changeLibrary}
         onCategorySelect={setActiveCategoryId}
+        onCreateCategory={handleCreateCategory}
+        onRenameCategory={handleRenameCategory}
+        onDeleteCategory={handleDeleteCategory}
+        onPermissionClick={handlePermissionClick}
       />
 
       {/* Main content */}
@@ -193,15 +300,15 @@ export default function MediaAssetsModuleClient({
 
           {/* Stats summary */}
           <div className="flex items-center gap-4 mb-4 text-[12px] text-gray-400 dark:text-gray-500">
-            <span>共 {assets.total} 项</span>
+            <span>共 {initialAssets.total} 项</span>
             {stats.videoCount > 0 && <span>视频 {stats.videoCount}</span>}
             {stats.imageCount > 0 && <span>图片 {stats.imageCount}</span>}
             {stats.audioCount > 0 && <span>音频 {stats.audioCount}</span>}
             {stats.documentCount > 0 && <span>文档 {stats.documentCount}</span>}
           </div>
 
-          {/* Content */}
-          {displayAssets.length === 0 ? (
+          {/* Content — infinite scroll */}
+          {displayAssets.length === 0 && !loadingMore ? (
             <div className="text-center py-20 text-gray-400 dark:text-gray-500">
               <HardDrive size={48} className="mx-auto mb-3 opacity-50" />
               <p className="text-[13px]">
@@ -214,6 +321,9 @@ export default function MediaAssetsModuleClient({
               selectedIds={selectedIds}
               selectable={selectable}
               onSelect={toggleSelect}
+              hasMore={hasMore}
+              loading={loadingMore}
+              onLoadMore={handleLoadMore}
             />
           ) : (
             <ResourceList
@@ -223,16 +333,6 @@ export default function MediaAssetsModuleClient({
               onSelect={toggleSelect}
             />
           )}
-
-          {/* Pagination */}
-          <ResourcePagination
-            total={assets.total}
-            page={assets.page}
-            pageSize={assets.pageSize}
-            totalPages={assets.totalPages}
-            onPageChange={changePage}
-            onPageSizeChange={() => {}}
-          />
         </div>
       </div>
 
@@ -257,6 +357,63 @@ export default function MediaAssetsModuleClient({
         categories={categories}
         onConfirm={handleMoveConfirm}
       />
+
+      {/* Permission dialog */}
+      <CategoryPermissionDialog
+        open={permDialogOpen}
+        onOpenChange={setPermDialogOpen}
+        categoryId={permCategoryId}
+        categoryName={permCategoryName}
+        permissions={permList}
+        orgUsers={orgUsers}
+        onRefresh={handlePermRefresh}
+      />
     </div>
   );
+}
+
+// ── Tree manipulation helpers ──────────────────────
+
+function addChildToTree(
+  nodes: MediaCategoryNode[],
+  parentId: string,
+  child: MediaCategoryNode,
+): MediaCategoryNode[] {
+  return nodes.map((n) => {
+    if (n.id === parentId) {
+      return { ...n, children: [...(n.children || []), child] };
+    }
+    if (n.children && n.children.length > 0) {
+      return { ...n, children: addChildToTree(n.children as MediaCategoryNode[], parentId, child) };
+    }
+    return n;
+  });
+}
+
+function renameInTree(
+  nodes: MediaCategoryNode[],
+  id: string,
+  newName: string,
+): MediaCategoryNode[] {
+  return nodes.map((n) => {
+    if (n.id === id) return { ...n, name: newName };
+    if (n.children && n.children.length > 0) {
+      return { ...n, children: renameInTree(n.children as MediaCategoryNode[], id, newName) };
+    }
+    return n;
+  });
+}
+
+function removeFromTree(
+  nodes: MediaCategoryNode[],
+  id: string,
+): MediaCategoryNode[] {
+  return nodes
+    .filter((n) => n.id !== id)
+    .map((n) => {
+      if (n.children && n.children.length > 0) {
+        return { ...n, children: removeFromTree(n.children as MediaCategoryNode[], id) };
+      }
+      return n;
+    });
 }

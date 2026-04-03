@@ -55,12 +55,30 @@ export function parseSSE(buffer: string): {
   return { events, remaining };
 }
 
+/** Step switch info from multi-step intent execution. */
+export interface StepInfo {
+  stepIndex: number;
+  totalSteps: number;
+  employeeSlug: string;
+  employeeName: string;
+  taskDescription: string;
+}
+
+export interface StepCompleteInfo {
+  stepIndex: number;
+  employeeSlug: string;
+  employeeName: string;
+  summary: string;
+}
+
 /** Callbacks for streaming chat events. */
 export interface StreamingChatCallbacks {
   onThinking?: (step: ThinkingStep) => void;
   onSkillUsed?: (skill: SkillUsed) => void;
   onSource?: (sources: string[], totalReferences: number) => void;
   onTextDelta?: (text: string, accumulated: string) => void;
+  onStepStart?: (step: StepInfo) => void;
+  onStepComplete?: (step: StepCompleteInfo) => void;
   onDone?: (result: {
     sources: string[];
     referenceCount: number;
@@ -87,11 +105,19 @@ export async function executeStreamingChat(
   let refCount = 0;
   let accumulated = "";
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (fetchErr) {
+    // Network-level failure (server unreachable, connection reset, etc.)
+    throw new Error(
+      `网络请求失败，请检查网络连接后重试。(${fetchErr instanceof Error ? fetchErr.message : "unknown"})`
+    );
+  }
 
   if (!res.ok) {
     const errText = (await res.text()) || `HTTP ${res.status}`;
@@ -148,6 +174,25 @@ export async function executeStreamingChat(
           case "text-delta": {
             accumulated += payload.text;
             callbacks.onTextDelta?.(payload.text, accumulated);
+            break;
+          }
+          case "step-start": {
+            callbacks.onStepStart?.({
+              stepIndex: payload.stepIndex,
+              totalSteps: payload.totalSteps,
+              employeeSlug: payload.employeeSlug,
+              employeeName: payload.employeeName,
+              taskDescription: payload.taskDescription,
+            });
+            break;
+          }
+          case "step-complete": {
+            callbacks.onStepComplete?.({
+              stepIndex: payload.stepIndex,
+              employeeSlug: payload.employeeSlug,
+              employeeName: payload.employeeName,
+              summary: payload.summary,
+            });
             break;
           }
           case "done": {

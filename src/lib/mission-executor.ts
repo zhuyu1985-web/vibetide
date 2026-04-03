@@ -301,9 +301,15 @@ export async function executeAllTasksDirect(missionId: string) {
   while (rounds < maxRounds) {
     rounds++;
 
-    // Cancellation checkpoint (lightweight — only status column)
-    const check = await db.select({ status: missions.status }).from(missions).where(eq(missions.id, missionId)).limit(1);
+    // Cancellation + budget checkpoint (re-read actual values from DB each round)
+    const check = await db
+      .select({ status: missions.status, tokensUsed: missions.tokensUsed, tokenBudget: missions.tokenBudget })
+      .from(missions).where(eq(missions.id, missionId)).limit(1);
     if (check[0]?.status === "cancelled") break;
+    if (check[0] && check[0].tokensUsed >= check[0].tokenBudget) {
+      console.warn(`[mission-executor] Token budget exceeded (${check[0].tokensUsed}/${check[0].tokenBudget}), stopping execution`);
+      break;
+    }
 
     // Find ready tasks
     const readyTasks = await db.select().from(missionTasks)
@@ -497,6 +503,12 @@ export async function executeMissionDirect(
   missionId: string,
   organizationId: string
 ) {
+  // Transition from queued → planning (signals execution has started)
+  await db
+    .update(missions)
+    .set({ status: "planning", startedAt: new Date() })
+    .where(eq(missions.id, missionId));
+
   // Phase 1: Leader planning
   const plan = await leaderPlanDirect(missionId, organizationId);
 
@@ -529,20 +541,31 @@ export async function executeMissionDirect(
       .where(eq(missions.id, missionId));
     return { status: "completed", taskCount: plan.taskCount, degradationLevel: 2, failedCount };
   } else if (completionRate >= 0.3) {
-    // Level 3: 30%+ 完成，部分交付
-    const completedTaskIds = allTasks
-      .filter((t) => t.status === "completed")
-      .map((t) => t.id);
+    // Level 3: 30%+ 完成，降级汇总（仅用已完成任务的输出）+ 标注部分交付
+    try {
+      await leaderConsolidateDirect(missionId, organizationId);
+    } catch (err) {
+      // Consolidation failed — fall back to a summary message instead of raw IDs
+      const completedTaskTitles = await db
+        .select({ title: missionTasks.title })
+        .from(missionTasks)
+        .where(and(eq(missionTasks.missionId, missionId), eq(missionTasks.status, "completed")));
+      await db
+        .update(missions)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          finalOutput: {
+            degradation_level: 3,
+            message: `${completedCount}/${totalCount} 个子任务完成，部分交付（汇总失败：${err instanceof Error ? err.message : String(err)}）`,
+            completedTasks: completedTaskTitles.map((t) => t.title),
+          },
+        })
+        .where(eq(missions.id, missionId));
+    }
     await db
       .update(missions)
       .set({
-        status: "completed",
-        completedAt: new Date(),
-        finalOutput: {
-          degradation_level: 3,
-          message: `${completedCount}/${totalCount} 个子任务完成，部分交付`,
-          completedTaskIds,
-        },
         config: sql`jsonb_set(COALESCE(${missions.config}, '{}'::jsonb), '{degradation_level}', '3')`,
       })
       .where(eq(missions.id, missionId));
@@ -551,7 +574,16 @@ export async function executeMissionDirect(
     // Level 4: <30% 完成，标记失败
     await db
       .update(missions)
-      .set({ status: "failed", completedAt: new Date() })
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        finalOutput: {
+          error: true,
+          message: `任务完成率过低（${completedCount}/${totalCount}），${failedCount} 个子任务失败`,
+          degradation_level: 4,
+          failedAt: new Date().toISOString(),
+        },
+      })
       .where(eq(missions.id, missionId));
     return { status: "failed", taskCount: plan.taskCount, failedCount };
   }

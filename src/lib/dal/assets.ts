@@ -1,11 +1,12 @@
 import { db } from "@/db";
-import { mediaAssets, assetSegments, assetTags, detectedFaces, knowledgeNodes, knowledgeRelations_, categories } from "@/db/schema";
-import { eq, desc, and, count, sql, asc, like, or, ilike } from "drizzle-orm";
+import { mediaAssets, assetSegments, assetTags, detectedFaces, knowledgeNodes, knowledgeRelations_, categories, categoryPermissions, userProfiles } from "@/db/schema";
+import { eq, desc, and, count, sql, asc, like, or, ilike, inArray } from "drizzle-orm";
 import { getCurrentUserOrg } from "./auth";
 import type {
   MediaAssetListItem, MediaAssetStats, IntelligentAsset, VideoSegment, AssetTag, DetectedFace,
   ProcessingQueueItem, QueueStats, TagDistributionItem, KnowledgeGraphNode, KnowledgeGraphEdge,
   MediaAssetFull, PaginatedAssets, MediaCategoryNode, AssetDetailFull, MediaLibraryType,
+  CategoryPermissionItem,
 } from "@/lib/types";
 
 export async function getAssets(): Promise<MediaAssetListItem[]> {
@@ -579,4 +580,63 @@ export async function getKnowledgeGraph(): Promise<{ nodes: KnowledgeGraphNode[]
         relation: e.relationType,
       })),
   };
+}
+
+// ── Category Permissions ──────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "管理员",
+  editor: "编辑",
+  viewer: "查看者",
+};
+
+export async function getCategoryPermissions(categoryId: string): Promise<CategoryPermissionItem[]> {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return [];
+
+  const rows = await db
+    .select()
+    .from(categoryPermissions)
+    .where(and(
+      eq(categoryPermissions.categoryId, categoryId),
+      eq(categoryPermissions.organizationId, orgId),
+    ));
+
+  // Resolve user display names for user-type grantees
+  const userIds = rows
+    .filter((r) => r.granteeType === "user")
+    .map((r) => r.granteeId);
+
+  const userMap = new Map<string, string>();
+  if (userIds.length > 0) {
+    const users = await db
+      .select({ id: userProfiles.id, displayName: userProfiles.displayName })
+      .from(userProfiles)
+      .where(inArray(userProfiles.id, userIds));
+    for (const u of users) userMap.set(u.id, u.displayName);
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    categoryId: r.categoryId,
+    granteeType: r.granteeType,
+    granteeId: r.granteeId,
+    granteeLabel:
+      r.granteeType === "role"
+        ? ROLE_LABELS[r.granteeId] || r.granteeId
+        : userMap.get(r.granteeId) || "未知用户",
+    permissionType: r.permissionType,
+    inherited: r.inherited,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+export async function getOrgUsers(): Promise<{ id: string; displayName: string; role: string }[]> {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return [];
+
+  return db
+    .select({ id: userProfiles.id, displayName: userProfiles.displayName, role: userProfiles.role })
+    .from(userProfiles)
+    .where(eq(userProfiles.organizationId, orgId));
 }

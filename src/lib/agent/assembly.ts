@@ -24,67 +24,64 @@ import type { AssembledAgent, ModelConfig } from "./types";
 export async function assembleAgent(
   employeeId: string,
   modelOverride?: Partial<ModelConfig>,
-  context?: { sensitiveTopics?: string[] }
+  context?: { sensitiveTopics?: string[]; skillOverrides?: string[] }
 ): Promise<AssembledAgent> {
-  // 1. Load employee
-  const employee = await db.query.aiEmployees.findFirst({
-    where: eq(aiEmployees.id, employeeId),
-  });
+  // 1. Load employee + skills + knowledge bases + memories in parallel
+  const [employee, empSkills, empKBs, memoryRows] = await Promise.all([
+    db.query.aiEmployees.findFirst({
+      where: eq(aiEmployees.id, employeeId),
+    }),
+    db
+      .select({
+        skillName: skills.name,
+        skillCategory: skills.category,
+        skillDescription: skills.description,
+        skillContent: skills.content,
+        skillType: skills.type,
+        pluginConfig: skills.pluginConfig,
+        level: employeeSkills.level,
+      })
+      .from(employeeSkills)
+      .innerJoin(skills, eq(employeeSkills.skillId, skills.id))
+      .where(eq(employeeSkills.employeeId, employeeId)),
+    db
+      .select({
+        kbName: knowledgeBases.name,
+        kbDescription: knowledgeBases.description,
+        kbType: knowledgeBases.type,
+      })
+      .from(employeeKnowledgeBases)
+      .innerJoin(
+        knowledgeBases,
+        eq(employeeKnowledgeBases.knowledgeBaseId, knowledgeBases.id)
+      )
+      .where(eq(employeeKnowledgeBases.employeeId, employeeId)),
+    db
+      .select({
+        content: employeeMemories.content,
+        memoryType: employeeMemories.memoryType,
+        importance: employeeMemories.importance,
+      })
+      .from(employeeMemories)
+      .where(eq(employeeMemories.employeeId, employeeId))
+      .orderBy(desc(employeeMemories.importance))
+      .limit(10),
+  ]);
+
   if (!employee) {
     throw new Error(`Employee not found: ${employeeId}`);
   }
-
-  // 2. Load skills (including plugin config for plugin-type skills)
-  const empSkills = await db
-    .select({
-      skillName: skills.name,
-      skillCategory: skills.category,
-      skillDescription: skills.description,
-      skillContent: skills.content,
-      skillType: skills.type,
-      pluginConfig: skills.pluginConfig,
-      level: employeeSkills.level,
-    })
-    .from(employeeSkills)
-    .innerJoin(skills, eq(employeeSkills.skillId, skills.id))
-    .where(eq(employeeSkills.employeeId, employeeId));
 
   const skillNames = empSkills.map((s) => s.skillName);
   const skillCategories = [
     ...new Set(empSkills.map((s) => s.skillCategory)),
   ] as SkillCategory[];
 
-  // 3. Load knowledge bases
-  const empKBs = await db
-    .select({
-      kbName: knowledgeBases.name,
-      kbDescription: knowledgeBases.description,
-      kbType: knowledgeBases.type,
-    })
-    .from(employeeKnowledgeBases)
-    .innerJoin(
-      knowledgeBases,
-      eq(employeeKnowledgeBases.knowledgeBaseId, knowledgeBases.id)
-    )
-    .where(eq(employeeKnowledgeBases.employeeId, employeeId));
-
   const knowledgeContext = empKBs.length > 0
     ? empKBs
         .map((kb) => `- ${kb.kbName}${kb.kbDescription ? `：${kb.kbDescription}` : ""}`)
         .join("\n")
     : "";
-
-  // 3b. Load top-10 high-importance memories
-  const memoryRows = await db
-    .select({
-      content: employeeMemories.content,
-      memoryType: employeeMemories.memoryType,
-      importance: employeeMemories.importance,
-    })
-    .from(employeeMemories)
-    .where(eq(employeeMemories.employeeId, employeeId))
-    .orderBy(desc(employeeMemories.importance))
-    .limit(10);
 
   const memories = memoryRows.map((m) => ({
     content: m.content,
@@ -117,6 +114,12 @@ export async function assembleAgent(
     tools = [];
   } else if (employee.authorityLevel === "advisor") {
     tools = resolvedTools.filter((tool) => readOnlyToolNames.has(tool.name));
+  }
+
+  // Intent-based skill override: restrict tools to the specified set
+  if (context?.skillOverrides && context.skillOverrides.length > 0) {
+    const overrideSet = new Set(context.skillOverrides);
+    tools = tools.filter((tool) => overrideSet.has(tool.name));
   }
 
   // 4b. Build plugin configs map for plugin-type skills

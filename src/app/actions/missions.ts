@@ -65,7 +65,7 @@ export async function startMission(data: {
     leader = created;
   }
 
-  // Create mission record
+  // Create mission record (queued → planning → executing lifecycle)
   const [mission] = await db
     .insert(missions)
     .values({
@@ -74,7 +74,7 @@ export async function startMission(data: {
       scenario: data.scenario,
       userInstruction: data.userInstruction,
       leaderEmployeeId: leader.id,
-      status: "planning",
+      status: "queued",
     })
     .returning();
 
@@ -94,8 +94,13 @@ export async function startMission(data: {
         await executeMissionDirect(mission.id, organizationId);
         console.log(`[mission] ${mission.id} completed successfully`);
       } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(`[mission] ${mission.id} failed:`, err);
-        await db.update(missions).set({ status: "failed" }).where(eq(missions.id, mission.id)).catch(() => {});
+        await db.update(missions).set({
+          status: "failed",
+          completedAt: new Date(),
+          finalOutput: { error: true, message: errorMsg, failedAt: new Date().toISOString() },
+        }).where(eq(missions.id, mission.id)).catch(() => {});
       }
     }
   });
@@ -157,7 +162,7 @@ export async function startMissionFromModule(data: {
       scenario: data.scenario,
       userInstruction: instruction,
       leaderEmployeeId: leader.id,
-      status: "planning",
+      status: "queued",
       sourceModule: data.sourceModule,
       sourceEntityId: data.sourceEntityId,
       sourceEntityType: data.sourceEntityType,
@@ -175,8 +180,13 @@ export async function startMissionFromModule(data: {
         await executeMissionDirect(mission.id, data.organizationId);
         console.log(`[mission:${data.sourceModule}] ${mission.id} completed`);
       } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(`[mission:${data.sourceModule}] ${mission.id} failed:`, err);
-        await db.update(missions).set({ status: "failed" }).where(eq(missions.id, mission.id)).catch(() => {});
+        await db.update(missions).set({
+          status: "failed",
+          completedAt: new Date(),
+          finalOutput: { error: true, message: errorMsg, failedAt: new Date().toISOString() },
+        }).where(eq(missions.id, mission.id)).catch(() => {});
       }
     }
   });
@@ -224,7 +234,7 @@ export async function deleteMission(missionId: string) {
     where: and(eq(missions.id, missionId), eq(missions.organizationId, orgId)),
   });
   if (!mission) throw new Error("任务不存在或无权操作");
-  if (["planning", "executing", "consolidating", "coordinating", "queued"].includes(mission.status)) {
+  if (["queued", "planning", "executing", "consolidating", "coordinating"].includes(mission.status)) {
     throw new Error("不能删除运行中的任务，请先取消");
   }
 
@@ -301,9 +311,10 @@ export async function cancelMission(missionId: string) {
  */
 export async function retryStuckMissions(missionId: string) {
   const mission = await db.query.missions.findFirst({
-    where: and(eq(missions.id, missionId), eq(missions.status, "planning")),
+    where: eq(missions.id, missionId),
   });
-  if (!mission || mission.tokensUsed > 0) return; // Not stuck or already running
+  if (!mission || !["queued", "planning"].includes(mission.status)) return;
+  if (mission.tokensUsed > 0) return; // Already running
 
   console.log(`[mission:auto-retry] ${missionId} retrying stuck mission`);
   try {

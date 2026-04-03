@@ -65,7 +65,8 @@ const SOURCE_MODULE_LABEL: Record<string, { label: string; cls: string }> = {
 // ── Status config ───────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
-  planning:      { label: "排队中", color: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" },
+  queued:        { label: "排队中", color: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" },
+  planning:      { label: "规划中", color: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
   executing:     { label: "执行中", color: "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400" },
   consolidating: { label: "协调中", color: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
   completed:     { label: "已完成", color: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" },
@@ -74,14 +75,14 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
 };
 
 const PHASE_LABEL: Record<string, string> = {
-  planning: "排队中", executing: "并行执行", consolidating: "协调收口",
+  queued: "排队中", planning: "任务规划", executing: "并行执行", consolidating: "协调收口",
   completed: "已交付", failed: "异常中断", cancelled: "已取消",
 };
 
 const PHASES = ["组队", "拆解", "执行", "协调", "交付"];
 
 const PROGRESS_CLASS: Record<string, string> = {
-  planning: "bg-gray-400", executing: "bg-cyan-500", consolidating: "bg-blue-500",
+  queued: "bg-gray-400", planning: "bg-amber-500", executing: "bg-cyan-500", consolidating: "bg-blue-500",
   completed: "bg-emerald-500", failed: "bg-red-500", cancelled: "bg-gray-400",
 };
 
@@ -91,7 +92,7 @@ function statusToFilter(s: string): FilterKey {
   if (s === "executing" || s === "consolidating") return "running";
   if (s === "completed") return "done";
   if (s === "failed") return "error";
-  if (s === "planning") return "queued";
+  if (s === "queued" || s === "planning") return "queued";
   return "all";
 }
 
@@ -112,6 +113,7 @@ function formatDate(dateStr: string): string {
 
 function getPhaseIndex(status: string, hasTasks: boolean): number {
   switch (status) {
+    case "queued": return 0;
     case "planning": return hasTasks ? 2 : 1;
     case "executing": return 3;
     case "consolidating": return 4;
@@ -146,7 +148,7 @@ export function MissionsClient({
 
   // Auto-refresh
   const hasActive = missions.some((m) =>
-    ["planning", "executing", "consolidating"].includes(m.status)
+    ["queued", "planning", "executing", "consolidating"].includes(m.status)
   );
   useEffect(() => {
     if (!hasActive) return;
@@ -160,7 +162,7 @@ export function MissionsClient({
     running: missions.filter((m) => ["executing", "consolidating"].includes(m.status)).length,
     done: missions.filter((m) => m.status === "completed").length,
     error: missions.filter((m) => m.status === "failed").length,
-    queued: missions.filter((m) => m.status === "planning").length,
+    queued: missions.filter((m) => m.status === "queued" || m.status === "planning").length,
   }), [missions]);
 
   // Filter
@@ -397,10 +399,18 @@ function MissionRow({
   const scCfg = SCENARIO_CONFIG[m.scenario];
   const isActive = ["executing", "consolidating"].includes(m.status);
 
+  // Extract error message from finalOutput for failed missions
+  const errorInfo = m.status === "failed" && m.finalOutput && typeof m.finalOutput === "object"
+    ? (m.finalOutput as { error?: boolean; message?: string })
+    : null;
+
   const fromMeta = m.latestActivityFromSlug ? EMPLOYEE_META[m.latestActivityFromSlug as EmployeeId] : null;
   const activity = m.latestActivityText
     ? `${fromMeta?.nickname ?? ""}: ${m.latestActivityText}`
-    : m.status === "planning" ? "等待资源分配..." : null;
+    : m.status === "queued" ? "等待资源分配..."
+    : m.status === "planning" ? "任务规划中..."
+    : errorInfo?.message ? errorInfo.message
+    : null;
 
   return (
     <div className={cn(
@@ -426,7 +436,7 @@ function MissionRow({
         {/* Status */}
         <div className="w-16 shrink-0">
           <Badge className={cn("text-[10px] font-semibold gap-1 px-2 py-0.5", sc.color)}>
-            {isActive && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+            {(isActive || m.status === "planning") && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
             {sc.label}
           </Badge>
         </div>
@@ -614,6 +624,19 @@ function MissionRow({
                   </Link>
                 </div>
               </div>
+
+              {/* Error details for failed missions */}
+              {errorInfo?.message && (
+                <div className="mt-3 p-3 rounded-lg bg-red-50/80 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/30">
+                  <div className="flex items-start gap-2">
+                    <XCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-red-700 dark:text-red-400">异常原因</p>
+                      <p className="text-[11px] text-red-600/80 dark:text-red-400/70 mt-0.5">{errorInfo.message}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
           </div>
         </div>
       </div>

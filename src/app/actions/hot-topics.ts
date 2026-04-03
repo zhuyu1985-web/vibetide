@@ -358,6 +358,7 @@ export async function triggerHotTopicCrawl() {
         set: {
           heatScore,
           platforms: platformsArray,
+          discoveredAt: now,
           updatedAt: now,
         },
       })
@@ -373,6 +374,10 @@ export async function triggerHotTopicCrawl() {
 
   revalidatePath("/inspiration");
   return { success: true, newTopics: newCount, updatedTopics: updatedCount };
+}
+
+export async function refreshInspirationData() {
+  revalidatePath("/inspiration");
 }
 
 const AUTO_TRIGGER_HEAT_THRESHOLD = 80;

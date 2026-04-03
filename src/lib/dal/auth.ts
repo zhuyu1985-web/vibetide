@@ -92,8 +92,8 @@ export const getCurrentUserOrg = cache(
 
       const name = user.user_metadata?.display_name || user.email || "用户";
       return ensureUserProfile(user.id, name);
-    } catch {
-      console.warn("[auth] user_profiles query failed, returning null org");
+    } catch (err) {
+      console.error("[auth] user_profiles query failed:", err);
       return null;
     }
   }

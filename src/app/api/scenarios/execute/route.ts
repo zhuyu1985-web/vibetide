@@ -67,183 +67,204 @@ function extractSources(toolResult: unknown): string[] {
 }
 
 export async function POST(req: Request) {
-  // Auth
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  const body = await req.json();
-  const {
-    employeeDbId,
-    scenarioId,
-    userInputs,
-    conversationHistory,
-  } = body as {
-    employeeDbId: string;
-    scenarioId: string;
-    userInputs: Record<string, string>;
-    conversationHistory?: { role: "user" | "assistant"; content: string }[];
-  };
-
-  // Look up org directly from user profile — avoids getCurrentUserOrg()+cache()
-  // which can return null in Route Handler context
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-  });
-  if (!profile?.organizationId) {
-    return new Response("Organization not found", { status: 403 });
-  }
-
-  // Verify employee belongs to this organization
-  const employeeRecord = await db.query.aiEmployees.findFirst({
-    where: and(
-      eq(aiEmployees.id, employeeDbId),
-      eq(aiEmployees.organizationId, profile.organizationId)
-    ),
-  });
-  if (!employeeRecord) {
-    return new Response("员工不存在或无权操作", { status: 403 });
-  }
-
-  const scenario = await db.query.employeeScenarios.findFirst({
-    where: and(
-      eq(employeeScenarios.id, scenarioId),
-      eq(employeeScenarios.organizationId, profile.organizationId)
-    ),
-  });
-  if (!scenario) {
-    return new Response("Scenario not found", { status: 404 });
-  }
-
-  let agent;
   try {
-    agent = await assembleAgent(employeeDbId);
-  } catch (err) {
-    console.error("[scenario/execute] assembleAgent failed:", err);
-    return new Response(
-      `Agent assembly failed: ${err instanceof Error ? err.message : String(err)}`,
-      { status: 500 }
+    // Auth
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      employeeDbId,
+      scenarioId,
+      userInputs,
+      conversationHistory,
+    } = body as {
+      employeeDbId: string;
+      scenarioId: string;
+      userInputs: Record<string, string>;
+      conversationHistory?: { role: "user" | "assistant"; content: string }[];
+    };
+
+    // Look up org directly from user profile — avoids getCurrentUserOrg()+cache()
+    // which can return null in Route Handler context
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+    });
+    if (!profile?.organizationId) {
+      return new Response("Organization not found", { status: 403 });
+    }
+
+    // Verify employee belongs to this organization
+    const employeeRecord = await db.query.aiEmployees.findFirst({
+      where: and(
+        eq(aiEmployees.id, employeeDbId),
+        eq(aiEmployees.organizationId, profile.organizationId)
+      ),
+    });
+    if (!employeeRecord) {
+      return new Response("员工不存在或无权操作", { status: 403 });
+    }
+
+    const scenario = await db.query.employeeScenarios.findFirst({
+      where: and(
+        eq(employeeScenarios.id, scenarioId),
+        eq(employeeScenarios.organizationId, profile.organizationId)
+      ),
+    });
+    if (!scenario) {
+      return new Response("Scenario not found", { status: 404 });
+    }
+
+    let agent;
+    try {
+      agent = await assembleAgent(employeeDbId);
+    } catch (err) {
+      console.error("[scenario/execute] assembleAgent failed:", err);
+      return new Response(
+        `Agent assembly failed: ${err instanceof Error ? err.message : String(err)}`,
+        { status: 500 }
+      );
+    }
+
+    const resolvedInstruction = resolveTemplate(
+      scenario.systemInstruction,
+      userInputs
     );
-  }
 
-  const resolvedInstruction = resolveTemplate(
-    scenario.systemInstruction,
-    userInputs
-  );
+    const messages: { role: "user" | "assistant"; content: string }[] = [];
+    if (conversationHistory && conversationHistory.length > 0) {
+      messages.push(...conversationHistory.slice(-10));
+    } else {
+      messages.push({ role: "user", content: resolvedInstruction });
+    }
 
-  const messages: { role: "user" | "assistant"; content: string }[] = [];
-  if (conversationHistory && conversationHistory.length > 0) {
-    messages.push(...conversationHistory.slice(-10));
-  } else {
-    messages.push({ role: "user", content: resolvedInstruction });
-  }
+    let model;
+    try {
+      model = getLanguageModel(agent.modelConfig);
+    } catch (err) {
+      console.error("[scenario/execute] getLanguageModel failed:", err);
+      return new Response(
+        `Model init failed: ${err instanceof Error ? err.message : String(err)}`,
+        { status: 500 }
+      );
+    }
 
-  let model;
-  try {
-    model = getLanguageModel(agent.modelConfig);
-  } catch (err) {
-    console.error("[scenario/execute] getLanguageModel failed:", err);
-    return new Response(
-      `Model init failed: ${err instanceof Error ? err.message : String(err)}`,
-      { status: 500 }
-    );
-  }
+    const toolsHint = (scenario.toolsHint ?? []) as string[];
+    const agentTools =
+      toolsHint.length > 0 ? resolveTools(toolsHint) : agent.tools;
+    const vercelTools = toVercelTools(agentTools, agent.pluginConfigs);
 
-  const toolsHint = (scenario.toolsHint ?? []) as string[];
-  const agentTools =
-    toolsHint.length > 0 ? resolveTools(toolsHint) : agent.tools;
-  const vercelTools = toVercelTools(agentTools, agent.pluginConfigs);
+    const result = streamText({
+      model,
+      system: `${agent.systemPrompt}\n\n# 当前场景任务\n${resolvedInstruction}`,
+      messages,
+      tools: vercelTools,
+      stopWhen: stepCountIs(10),
+      maxOutputTokens: 8192,
+      temperature: 0.5,
+    });
 
-  const result = streamText({
-    model,
-    system: `${agent.systemPrompt}\n\n# 当前场景任务\n${resolvedInstruction}`,
-    messages,
-    tools: vercelTools,
-    stopWhen: stepCountIs(10),
-    maxOutputTokens: 8192,
-    temperature: 0.5,
-  });
+    // Custom SSE stream with structured events
+    const encoder = new TextEncoder();
+    const allSources: string[] = [];
+    let referenceCount = 0;
+    const usedSkills: { tool: string; skillName: string }[] = [];
+    const usedToolSet = new Set<string>();
 
-  // Custom SSE stream with structured events
-  const encoder = new TextEncoder();
-  const allSources: string[] = [];
-  let referenceCount = 0;
-  const usedSkills: { tool: string; skillName: string }[] = [];
-  const usedToolSet = new Set<string>();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (event: string, data: Record<string, unknown>) => {
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+              )
+            );
+          } catch {
+            // Controller already closed (client disconnected)
+          }
+        };
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (event: string, data: Record<string, unknown>) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-        );
-      };
-
-      try {
-        for await (const part of result.fullStream) {
-          switch (part.type) {
-            case "tool-call": {
-              const label =
-                TOOL_LABELS[part.toolName] ?? `正在执行${part.toolName}`;
-              const skillName = TOOL_TO_SKILL[part.toolName] ?? part.toolName;
-              // Track unique skills used
-              if (!usedToolSet.has(part.toolName)) {
-                usedToolSet.add(part.toolName);
-                usedSkills.push({ tool: part.toolName, skillName });
-              }
-              send("thinking", { tool: part.toolName, label, skillName });
-              break;
-            }
-            case "tool-result": {
-              const sources = extractSources(part.output);
-              if (sources.length > 0) {
-                for (const s of sources) {
-                  if (!allSources.includes(s)) allSources.push(s);
+        try {
+          for await (const part of result.fullStream) {
+            switch (part.type) {
+              case "tool-call": {
+                const label =
+                  TOOL_LABELS[part.toolName] ?? `正在执行${part.toolName}`;
+                const skillName =
+                  TOOL_TO_SKILL[part.toolName] ?? part.toolName;
+                // Track unique skills used
+                if (!usedToolSet.has(part.toolName)) {
+                  usedToolSet.add(part.toolName);
+                  usedSkills.push({ tool: part.toolName, skillName });
                 }
-                referenceCount += sources.length;
-                send("source", {
-                  tool: part.toolName,
-                  sources,
-                  totalSources: allSources.length,
-                  totalReferences: referenceCount,
-                });
+                send("thinking", { tool: part.toolName, label, skillName });
+                break;
               }
-              break;
-            }
-            case "text-delta": {
-              send("text-delta", { text: part.text });
-              break;
-            }
-            case "finish": {
-              send("done", {
-                sources: allSources,
-                referenceCount,
-                finishReason: part.finishReason,
-                skillsUsed: usedSkills,
-              });
-              break;
+              case "tool-result": {
+                const sources = extractSources(part.output);
+                if (sources.length > 0) {
+                  for (const s of sources) {
+                    if (!allSources.includes(s)) allSources.push(s);
+                  }
+                  referenceCount += sources.length;
+                  send("source", {
+                    tool: part.toolName,
+                    sources,
+                    totalSources: allSources.length,
+                    totalReferences: referenceCount,
+                  });
+                }
+                break;
+              }
+              case "text-delta": {
+                send("text-delta", { text: part.text });
+                break;
+              }
+              case "finish": {
+                send("done", {
+                  sources: allSources,
+                  referenceCount,
+                  finishReason: part.finishReason,
+                  skillsUsed: usedSkills,
+                });
+                break;
+              }
             }
           }
+        } catch (err) {
+          send("error", {
+            message: err instanceof Error ? err.message : "未知错误",
+          });
+        } finally {
+          try {
+            controller.close();
+          } catch {
+            // Already closed
+          }
         }
-      } catch (err) {
-        send("error", {
-          message: err instanceof Error ? err.message : "未知错误",
-        });
-      } finally {
-        controller.close();
-      }
-    },
-  });
+      },
+    });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (err) {
+    console.error("[scenario/execute] Unhandled route error:", err);
+    return new Response(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : "Internal Server Error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 }

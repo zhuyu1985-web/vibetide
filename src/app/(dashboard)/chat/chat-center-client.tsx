@@ -6,9 +6,11 @@ import { EmployeeListPanel } from "./employee-list-panel";
 import { ChatPanel } from "./chat-panel";
 import {
   executeStreamingChat,
+  parseSSE,
   type ChatMessage,
   type ThinkingStep,
   type SkillUsed,
+  type StepInfo,
 } from "@/lib/chat-utils";
 import {
   saveConversation,
@@ -16,6 +18,8 @@ import {
 } from "@/app/actions/conversations";
 import type { AIEmployee, ScenarioCardData } from "@/lib/types";
 import type { SavedConversationRow } from "@/db/types";
+import type { IntentResult } from "@/lib/agent/intent-recognition";
+import type { IntentProgress } from "@/components/chat/intent-bubble";
 
 interface ChatCenterClientProps {
   employees: AIEmployee[];
@@ -64,6 +68,13 @@ export function ChatCenterClient({
   const [currentSources, setCurrentSources] = useState<string[]>([]);
   const [currentRefCount, setCurrentRefCount] = useState(0);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // Intent recognition state
+  const [pendingIntent, setPendingIntent] = useState<IntentResult | null>(null);
+  const [pendingMessage, setPendingMessage] = useState("");
+  const [intentLoading, setIntentLoading] = useState(false);
+  const [intentProgress, setIntentProgress] = useState<IntentProgress[]>([]);
+  const [currentStep, setCurrentStep] = useState<StepInfo | null>(null);
 
   // Keep messagesMap in sync and mark current employee as fully read
   useEffect(() => {
@@ -214,6 +225,9 @@ export function ChatCenterClient({
     setInlineScenario(null);
     setViewingSaved(null);
     setIsSaved(false);
+    setPendingIntent(null);
+    setPendingMessage("");
+    setIntentProgress([]);
     scenarioInputsRef.current = {};
     // Clear stored messages for current employee
     delete messagesMapRef.current[selectedSlug];
@@ -286,6 +300,24 @@ export function ChatCenterClient({
         .join("，");
       const userContent = inputSummary || `请执行「${scenario.name}」`;
 
+      // Build intent display from scenario metadata
+      const scenarioIntent: IntentResult = {
+        intentType: "content_creation",
+        summary: `场景：${scenario.name}${inputSummary ? ` — ${inputSummary}` : ""}`,
+        confidence: 1.0,
+        steps: [
+          {
+            employeeSlug: selectedEmployee.id as import("@/lib/constants").EmployeeId,
+            employeeName: selectedEmployee.nickname,
+            skills: scenario.toolsHint.length > 0 ? scenario.toolsHint : ["content_generate"],
+            taskDescription: scenario.description,
+          },
+        ],
+        reasoning: `用户选择了预设场景「${scenario.name}」`,
+      };
+      setPendingIntent(scenarioIntent);
+      setPendingMessage(userContent);
+
       await executeChat(userContent, [], "/api/scenarios/execute", {
         employeeDbId: selectedEmployee.dbId,
         scenarioId: scenario.id,
@@ -296,22 +328,150 @@ export function ChatCenterClient({
     [selectedEmployee]
   );
 
-  /* ── Send free chat message ── */
+  /* ── Execute confirmed intent ── */
+  const executeIntent = useCallback(
+    async (text: string, intent: IntentResult, edited: boolean) => {
+      // Keep pendingIntent alive so hint bar stays visible during execution
+      setPendingIntent(intent);
+      setPendingMessage(text);
+      // Collect history WITHOUT the pending user message (executeChat re-adds it)
+      const history = messages.filter(
+        (m, i) => !(m.role === "user" && m.content === text && i === messages.length - 1)
+      );
+
+      await executeChat(text, history, "/api/chat/intent-execute", {
+        message: text,
+        intent,
+        conversationHistory: [...history, { role: "user" as const, content: text }].slice(-10),
+        userEdited: edited,
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages]
+  );
+
+  /* ── Handle intent card confirm ── */
+  const handleIntentConfirm = useCallback(
+    (editedIntent: IntentResult) => {
+      executeIntent(pendingMessage, editedIntent, true);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pendingMessage, executeIntent]
+  );
+
+  /* ── Handle intent cancel → fall back to free chat ── */
+  const handleIntentCancel = useCallback(() => {
+    setPendingIntent(null);
+    setPendingMessage("");
+    setIntentLoading(false);
+  }, []);
+
+  /* ── Send free chat message (with intent recognition) ── */
   const handleSendMessage = useCallback(
     async (text: string) => {
       if (!selectedEmployee) return;
 
-      const history = [...messages];
+      // Clear previous intent when sending a new message
+      setPendingIntent(null);
+      setPendingMessage("");
 
-      // If we had a scenario but are now in follow-up mode, use chat/stream
-      await executeChat(text, history, "/api/chat/stream", {
-        employeeSlug: selectedSlug,
-        message: text,
-        conversationHistory: [...history, { role: "user" as const, content: text }].slice(-10),
-      });
+      // Immediately show the user message in the chat
+      const historyBeforeSend = [...messages];
+      const userMsg: ChatMessage = { role: "user", content: text };
+      setMessages((prev) => [...prev, userMsg]);
+
+      const fallbackToFreeChat = async () => {
+        setIntentLoading(false);
+        setIntentProgress([]);
+        // Remove the user message we added (executeChat will re-add it)
+        setMessages(historyBeforeSend);
+        await executeChat(text, historyBeforeSend, "/api/chat/stream", {
+          employeeSlug: selectedSlug,
+          message: text,
+          conversationHistory: [...historyBeforeSend, { role: "user" as const, content: text }].slice(-10),
+        });
+      };
+
+      // Step 1: Call intent recognition API (SSE stream)
+      setIntentLoading(true);
+      setIntentProgress([]);
+      try {
+        const res = await fetch("/api/chat/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, employeeSlug: selectedSlug }),
+        });
+
+        if (!res.ok || !res.body) {
+          console.warn("[intent] API failed, falling back to free chat");
+          await fallbackToFreeChat();
+          return;
+        }
+
+        // Parse SSE stream for progress events
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = "";
+        let intentResult: IntentResult | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+
+          const { events, remaining } = parseSSE(sseBuffer);
+          sseBuffer = remaining;
+
+          for (const evt of events) {
+            try {
+              const payload = JSON.parse(evt.data);
+              if (evt.event === "progress") {
+                setIntentProgress((prev) => [
+                  ...prev,
+                  { phase: payload.phase, label: payload.label },
+                ]);
+              } else if (evt.event === "result") {
+                intentResult = payload as IntentResult;
+              } else if (evt.event === "error") {
+                console.warn("[intent] Stream error:", payload.message);
+                await fallbackToFreeChat();
+                return;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+
+        setIntentLoading(false);
+
+        if (!intentResult) {
+          await fallbackToFreeChat();
+          return;
+        }
+
+        // Step 2: Route based on intent
+        if (intentResult.intentType === "general_chat" || intentResult.steps.length === 0) {
+          setIntentProgress([]);
+          await fallbackToFreeChat();
+        } else if (intentResult.confidence >= 0.8) {
+          // High confidence — auto-execute
+          // Remove the user message we added (executeIntent→executeChat will re-add it)
+          setMessages(historyBeforeSend);
+          setPendingIntent(intentResult);
+          setPendingMessage(text);
+          await executeIntent(text, intentResult, false);
+        } else {
+          // Low confidence — show editable intent card (keep user message visible)
+          setPendingIntent(intentResult);
+          setPendingMessage(text);
+        }
+      } catch {
+        await fallbackToFreeChat();
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedEmployee, selectedSlug, messages]
+    [selectedEmployee, selectedSlug, messages, executeIntent]
   );
 
   /* ── Core streaming execution ── */
@@ -352,6 +512,12 @@ export function ChatCenterClient({
           onSource: (sources, totalReferences) => {
             setCurrentSources([...sources]);
             setCurrentRefCount(totalReferences);
+          },
+          onStepStart: (step) => {
+            setCurrentStep(step);
+          },
+          onStepComplete: () => {
+            setCurrentStep(null);
           },
           onTextDelta: (_delta, acc) => {
             setIsStreaming(true);
@@ -429,6 +595,9 @@ export function ChatCenterClient({
       setCurrentThinking([]);
       setCurrentSkillsUsed([]);
       setCurrentSources([]);
+      // Keep pendingIntent visible after execution completes
+      setCurrentStep(null);
+      setIntentProgress([]);
       setCurrentRefCount(0);
     }
   };
@@ -470,6 +639,12 @@ export function ChatCenterClient({
         currentSkillsUsed={currentSkillsUsed}
         currentSources={currentSources}
         currentRefCount={currentRefCount}
+        pendingIntent={pendingIntent}
+        intentLoading={intentLoading}
+        intentProgress={intentProgress}
+        currentStep={currentStep}
+        onIntentConfirm={handleIntentConfirm}
+        onIntentCancel={handleIntentCancel}
         isStreaming={isStreaming}
       />
     </div>

@@ -38,14 +38,18 @@ export async function getInspirationTopics(
   orgId: string,
   userId?: string
 ): Promise<InspirationTopic[]> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const rows = await db.query.hotTopics.findMany({
-    where: eq(hotTopics.organizationId, orgId),
+    where: and(
+      eq(hotTopics.organizationId, orgId),
+      gt(hotTopics.discoveredAt, sevenDaysAgo)
+    ),
     with: {
       angles: true,
       competitorResponses: true,
       commentInsights: true,
     },
-    orderBy: [desc(hotTopics.heatScore)],
+    orderBy: [desc(hotTopics.discoveredAt), desc(hotTopics.heatScore)],
   });
 
   let readTopicIds: Set<string> = new Set();

@@ -14,7 +14,7 @@ export default async function MissionsPage() {
   // Auto-detect and retry stuck missions (planning with 0 tasks for > 2 min)
   if (orgId) {
     const stuck = missions.filter(
-      (m) => m.status === "planning" && m.totalTaskCount === 0 &&
+      (m) => ["queued", "planning"].includes(m.status) && m.totalTaskCount === 0 &&
         Date.now() - new Date(m.createdAt).getTime() > 2 * 60 * 1000
     );
     if (stuck.length > 0) {

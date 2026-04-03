@@ -6,7 +6,8 @@ import { eq, and, inArray } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { deleteObject } from "@/lib/volc-tos";
-import type { MediaAssetType, SecurityLevel } from "@/lib/types";
+import { getAssetsByLibrary } from "@/lib/dal/assets";
+import type { MediaAssetType, SecurityLevel, MediaLibraryType } from "@/lib/types";
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -330,4 +331,22 @@ export async function batchSubmitForReview(assetIds: string[]) {
     }).where(eq(mediaAssets.id, id));
   }
   revalidateAll();
+}
+
+// ── Infinite scroll fetch ──────────────────────
+
+export async function fetchMoreAssets(
+  library: MediaLibraryType,
+  categoryId: string | null,
+  page: number,
+  pageSize: number,
+  search?: string,
+  typeFilter?: string,
+) {
+  await requireAuth();
+  const filters = {
+    search: search || undefined,
+    type: typeFilter && typeFilter !== "all" ? typeFilter : undefined,
+  };
+  return getAssetsByLibrary(library, categoryId, page, pageSize, filters);
 }

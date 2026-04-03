@@ -474,3 +474,15 @@ export const shareStatusEnum = pgEnum("share_status", [
   "expired",
   "cancelled",
 ]);
+
+// Category permission enums
+export const categoryPermissionTypeEnum = pgEnum("category_permission_type", [
+  "read",   // 查看栏目及资源
+  "write",  // 上传、编辑、删除资源
+  "manage", // 管理栏目设置和权限
+]);
+
+export const permissionGranteeTypeEnum = pgEnum("permission_grantee_type", [
+  "user",  // 指定用户
+  "role",  // 按角色（admin/editor/viewer）
+]);

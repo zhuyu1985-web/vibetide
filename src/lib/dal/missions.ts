@@ -467,7 +467,7 @@ export async function getEmployeeTaskLoad(
     .where(
       and(
         eq(missions.organizationId, organizationId),
-        inArray(missions.status, ["planning", "executing", "consolidating"])
+        inArray(missions.status, ["queued", "planning", "executing", "consolidating"])
       )
     )
     .groupBy(missionTasks.assignedEmployeeId);

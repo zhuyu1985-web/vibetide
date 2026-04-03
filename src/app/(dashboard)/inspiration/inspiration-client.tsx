@@ -72,7 +72,7 @@ import {
   Radio,
   ExternalLink,
 } from "lucide-react";
-import { triggerHotTopicCrawl, startTopicMission } from "@/app/actions/hot-topics";
+import { triggerHotTopicCrawl, startTopicMission, refreshInspirationData } from "@/app/actions/hot-topics";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
 import { updateSubscriptionsAction } from "@/app/actions/topic-subscriptions";
 import {
@@ -381,15 +381,15 @@ export function InspirationClient({
       );
     }
 
-    // Sort: priority > subscribed-first > heatScore desc
+    // Sort: discoveredAt desc > priority > heatScore desc
     const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
     return [...result].sort((a, b) => {
+      const timeA = new Date(a.discoveredAt).getTime();
+      const timeB = new Date(b.discoveredAt).getTime();
+      if (timeA !== timeB) return timeB - timeA;
       const pa = priorityOrder[a.priority] ?? 3;
       const pb = priorityOrder[b.priority] ?? 3;
       if (pa !== pb) return pa - pb;
-      const aSub = subscribedCategories.has(normalizeCategory(a.category)) ? 0 : 1;
-      const bSub = subscribedCategories.has(normalizeCategory(b.category)) ? 0 : 1;
-      if (aSub !== bSub) return aSub - bSub;
       return b.heatScore - a.heatScore;
     });
   }, [baseTopics, subscribedCategories, selectedPriority, selectedPlatform, dateFilter, searchQuery]);
@@ -453,9 +453,10 @@ export function InspirationClient({
     });
   }, [router, startRefreshTransition]);
 
-  const handleNewTopicClick = useCallback(() => {
+  const handleNewTopicClick = useCallback(async () => {
     setNewTopicCount(0);
     pageLoadTimeRef.current = new Date().toISOString();
+    await refreshInspirationData();
     router.refresh();
   }, [router]);
 
@@ -867,6 +868,8 @@ function AISummaryBar({
 // Column 2: Topic List (clean numbered list, no expand/collapse)
 // ========================
 
+const PAGE_SIZE = 20;
+
 function TopicList({
   topics,
   readIds,
@@ -884,6 +887,30 @@ function TopicList({
   onMarkRead: (id: string) => void;
   subscribedCategories: Set<string>;
 }) {
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset to first page when filter changes (topics array identity changes)
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [topics]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setDisplayCount((prev) => Math.min(prev + PAGE_SIZE, topics.length));
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [topics.length]);
+
   if (topics.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -893,9 +920,12 @@ function TopicList({
     );
   }
 
+  const visibleTopics = topics.slice(0, displayCount);
+  const hasMore = displayCount < topics.length;
+
   return (
     <div className="space-y-0">
-      {topics.map((topic, index) => {
+      {visibleTopics.map((topic, index) => {
         const isRead = readIds.has(topic.id);
         const isTracked = trackedIds.has(topic.id);
         const isMissionPending = missionPendingId === topic.id;
@@ -1047,6 +1077,13 @@ function TopicList({
           </div>
         );
       })}
+      {/* Sentinel for infinite scroll */}
+      <div ref={sentinelRef} className="h-1" />
+      {hasMore && (
+        <div className="flex justify-center py-4">
+          <span className="text-xs text-gray-400 dark:text-gray-500">加载更多...</span>
+        </div>
+      )}
     </div>
   );
 }

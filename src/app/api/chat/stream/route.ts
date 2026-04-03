@@ -60,158 +60,179 @@ function extractSources(toolResult: unknown): string[] {
 }
 
 export async function POST(req: Request) {
-  // Auth
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  const body = await req.json();
-  const { employeeSlug, conversationHistory } = body as {
-    employeeSlug: string;
-    conversationHistory: { role: "user" | "assistant"; content: string }[];
-  };
-
-  if (!employeeSlug || !conversationHistory?.length) {
-    return new Response("缺少必要参数", { status: 400 });
-  }
-
-  // Look up org from user profile
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-  });
-  if (!profile?.organizationId) {
-    return new Response("Organization not found", { status: 403 });
-  }
-
-  // Find employee by slug + org
-  const employeeRecord = await db.query.aiEmployees.findFirst({
-    where: and(
-      eq(aiEmployees.slug, employeeSlug),
-      eq(aiEmployees.organizationId, profile.organizationId)
-    ),
-  });
-  if (!employeeRecord) {
-    return new Response("员工不存在或无权操作", { status: 403 });
-  }
-
-  // Assemble agent
-  let agent;
   try {
-    agent = await assembleAgent(employeeRecord.id);
-  } catch (err) {
-    console.error("[chat/stream] assembleAgent failed:", err);
-    return new Response(
-      `Agent assembly failed: ${err instanceof Error ? err.message : String(err)}`,
-      { status: 500 }
-    );
-  }
+    // Auth
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
-  // Use the last 10 messages as context
-  const messages = conversationHistory.slice(-10);
+    const body = await req.json();
+    const { employeeSlug, conversationHistory } = body as {
+      employeeSlug: string;
+      conversationHistory: { role: "user" | "assistant"; content: string }[];
+    };
 
-  let model;
-  try {
-    model = getLanguageModel(agent.modelConfig);
-  } catch (err) {
-    console.error("[chat/stream] getLanguageModel failed:", err);
-    return new Response(
-      `Model init failed: ${err instanceof Error ? err.message : String(err)}`,
-      { status: 500 }
-    );
-  }
+    if (!employeeSlug || !conversationHistory?.length) {
+      return new Response("缺少必要参数", { status: 400 });
+    }
 
-  // Free chat: use agent's own tools (no scenario-specific toolsHint)
-  const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
+    // Look up org from user profile
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+    });
+    if (!profile?.organizationId) {
+      return new Response("Organization not found", { status: 403 });
+    }
 
-  const result = streamText({
-    model,
-    system: agent.systemPrompt,
-    messages,
-    tools: vercelTools,
-    stopWhen: stepCountIs(10),
-    maxOutputTokens: 8192,
-    temperature: 0.5,
-  });
+    // Find employee by slug + org
+    const employeeRecord = await db.query.aiEmployees.findFirst({
+      where: and(
+        eq(aiEmployees.slug, employeeSlug),
+        eq(aiEmployees.organizationId, profile.organizationId)
+      ),
+    });
+    if (!employeeRecord) {
+      return new Response("员工不存在或无权操作", { status: 403 });
+    }
 
-  // Custom SSE stream with structured events (same protocol as /api/scenarios/execute)
-  const encoder = new TextEncoder();
-  const allSources: string[] = [];
-  let referenceCount = 0;
-  const usedSkills: { tool: string; skillName: string }[] = [];
-  const usedToolSet = new Set<string>();
+    // Assemble agent
+    let agent;
+    try {
+      agent = await assembleAgent(employeeRecord.id);
+    } catch (err) {
+      console.error("[chat/stream] assembleAgent failed:", err);
+      return new Response(
+        `Agent assembly failed: ${err instanceof Error ? err.message : String(err)}`,
+        { status: 500 }
+      );
+    }
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (event: string, data: Record<string, unknown>) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-        );
-      };
+    // Use the last 10 messages as context
+    const messages = conversationHistory.slice(-10);
 
-      try {
-        for await (const part of result.fullStream) {
-          switch (part.type) {
-            case "tool-call": {
-              const label =
-                TOOL_LABELS[part.toolName] ?? `正在执行${part.toolName}`;
-              const skillName = TOOL_TO_SKILL[part.toolName] ?? part.toolName;
-              if (!usedToolSet.has(part.toolName)) {
-                usedToolSet.add(part.toolName);
-                usedSkills.push({ tool: part.toolName, skillName });
-              }
-              send("thinking", { tool: part.toolName, label, skillName });
-              break;
-            }
-            case "tool-result": {
-              const sources = extractSources(part.output);
-              if (sources.length > 0) {
-                for (const s of sources) {
-                  if (!allSources.includes(s)) allSources.push(s);
+    let model;
+    try {
+      model = getLanguageModel(agent.modelConfig);
+    } catch (err) {
+      console.error("[chat/stream] getLanguageModel failed:", err);
+      return new Response(
+        `Model init failed: ${err instanceof Error ? err.message : String(err)}`,
+        { status: 500 }
+      );
+    }
+
+    // Free chat: use agent's own tools (no scenario-specific toolsHint)
+    const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
+
+    const result = streamText({
+      model,
+      system: agent.systemPrompt,
+      messages,
+      tools: vercelTools,
+      stopWhen: stepCountIs(10),
+      maxOutputTokens: 8192,
+      temperature: 0.5,
+    });
+
+    // Custom SSE stream with structured events (same protocol as /api/scenarios/execute)
+    const encoder = new TextEncoder();
+    const allSources: string[] = [];
+    let referenceCount = 0;
+    const usedSkills: { tool: string; skillName: string }[] = [];
+    const usedToolSet = new Set<string>();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (event: string, data: Record<string, unknown>) => {
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+              )
+            );
+          } catch {
+            // Controller already closed (client disconnected)
+          }
+        };
+
+        try {
+          for await (const part of result.fullStream) {
+            switch (part.type) {
+              case "tool-call": {
+                const label =
+                  TOOL_LABELS[part.toolName] ?? `正在执行${part.toolName}`;
+                const skillName =
+                  TOOL_TO_SKILL[part.toolName] ?? part.toolName;
+                if (!usedToolSet.has(part.toolName)) {
+                  usedToolSet.add(part.toolName);
+                  usedSkills.push({ tool: part.toolName, skillName });
                 }
-                referenceCount += sources.length;
-                send("source", {
-                  tool: part.toolName,
-                  sources,
-                  totalSources: allSources.length,
-                  totalReferences: referenceCount,
-                });
+                send("thinking", { tool: part.toolName, label, skillName });
+                break;
               }
-              break;
-            }
-            case "text-delta": {
-              send("text-delta", { text: part.text });
-              break;
-            }
-            case "finish": {
-              send("done", {
-                sources: allSources,
-                referenceCount,
-                finishReason: part.finishReason,
-                skillsUsed: usedSkills,
-              });
-              break;
+              case "tool-result": {
+                const sources = extractSources(part.output);
+                if (sources.length > 0) {
+                  for (const s of sources) {
+                    if (!allSources.includes(s)) allSources.push(s);
+                  }
+                  referenceCount += sources.length;
+                  send("source", {
+                    tool: part.toolName,
+                    sources,
+                    totalSources: allSources.length,
+                    totalReferences: referenceCount,
+                  });
+                }
+                break;
+              }
+              case "text-delta": {
+                send("text-delta", { text: part.text });
+                break;
+              }
+              case "finish": {
+                send("done", {
+                  sources: allSources,
+                  referenceCount,
+                  finishReason: part.finishReason,
+                  skillsUsed: usedSkills,
+                });
+                break;
+              }
             }
           }
+        } catch (err) {
+          send("error", {
+            message: err instanceof Error ? err.message : "未知错误",
+          });
+        } finally {
+          try {
+            controller.close();
+          } catch {
+            // Already closed
+          }
         }
-      } catch (err) {
-        send("error", {
-          message: err instanceof Error ? err.message : "未知错误",
-        });
-      } finally {
-        controller.close();
-      }
-    },
-  });
+      },
+    });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (err) {
+    console.error("[chat/stream] Unhandled route error:", err);
+    return new Response(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : "Internal Server Error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 }

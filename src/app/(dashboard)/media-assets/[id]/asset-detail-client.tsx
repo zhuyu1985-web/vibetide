@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Share2, Download, Heart, MoreHorizontal,
   Video, Image as ImageIcon, Headphones, FileText, FileEdit,
-  Save, Tag, X,
+  Save, Tag, X, Tags, ScanFace, AudioLines, Subtitles, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -29,12 +29,19 @@ const statusLabels: Record<string, { label: string; color: string }> = {
   rejected: { label: "已打回", color: "text-red-500" },
 };
 
-type TabKey = "catalog" | "mediaProps" | "basicInfo";
+type TabKey = "catalog" | "mediaProps" | "basicInfo" | "aiTags" | "aiFaces" | "aiSpeech" | "aiSubtitles";
 
-const tabs: { key: TabKey; label: string }[] = [
+const baseTabs: { key: TabKey; label: string }[] = [
   { key: "catalog", label: "编目" },
   { key: "mediaProps", label: "媒体属性" },
   { key: "basicInfo", label: "基本信息" },
+];
+
+const aiTabs: { key: TabKey; label: string; icon: typeof Tags }[] = [
+  { key: "aiTags", label: "标签", icon: Tags },
+  { key: "aiFaces", label: "人脸", icon: ScanFace },
+  { key: "aiSpeech", label: "语音", icon: AudioLines },
+  { key: "aiSubtitles", label: "字幕", icon: Subtitles },
 ];
 
 interface Props {
@@ -104,9 +111,9 @@ export default function AssetDetailClient({ asset }: Props) {
 
         {/* Right: Info tabs (45%) */}
         <div className="flex-1 min-w-0">
-          {/* Tab bar */}
-          <div className="flex items-center gap-0.5 bg-gray-100/60 dark:bg-white/5 rounded-lg p-0.5 mb-4">
-            {tabs.map((tab) => (
+          {/* Tab bar — base tabs */}
+          <div className="flex items-center gap-0.5 bg-gray-100/60 dark:bg-white/5 rounded-lg p-0.5 mb-2">
+            {baseTabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -122,10 +129,37 @@ export default function AssetDetailClient({ asset }: Props) {
             ))}
           </div>
 
+          {/* Tab bar — AI info tabs */}
+          <div className="flex items-center gap-0.5 bg-gray-100/60 dark:bg-white/5 rounded-lg p-0.5 mb-4">
+            <span className="text-[11px] text-gray-400 dark:text-gray-500 px-2 shrink-0">AI</span>
+            {aiTabs.map((tab) => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    "flex-1 px-2 py-1.5 rounded-md text-[12px] transition-colors text-center flex items-center justify-center gap-1",
+                    activeTab === tab.key
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm font-medium"
+                      : "text-gray-500 dark:text-gray-400"
+                  )}
+                >
+                  <TabIcon size={12} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
           <GlassCard padding="md" className="min-h-[400px]">
             {activeTab === "catalog" && <CatalogTab asset={asset} />}
             {activeTab === "mediaProps" && <MediaPropsTab asset={asset} />}
             {activeTab === "basicInfo" && <BasicInfoTab asset={asset} />}
+            {activeTab === "aiTags" && <AITagsTab asset={asset} />}
+            {activeTab === "aiFaces" && <AIFacesTab asset={asset} />}
+            {activeTab === "aiSpeech" && <AISpeechTab asset={asset} />}
+            {activeTab === "aiSubtitles" && <AISubtitlesTab asset={asset} />}
           </GlassCard>
         </div>
       </div>
@@ -292,6 +326,223 @@ function BasicInfoTab({ asset }: { asset: AssetDetailFull }) {
           asset.transcodeStatus === "completed" ? "已完成" :
           asset.transcodeStatus === "processing" ? "转码中" : "未开始" },
       ]} />
+    </div>
+  );
+}
+
+// --- AI Tags Tab ---
+function AITagsTab({ asset }: { asset: AssetDetailFull }) {
+  // Aggregate all tags from all segments
+  const allTags = (asset.segments || []).flatMap((s) => s.tags);
+  // Deduplicate by label
+  const tagMap = new Map<string, { label: string; category: string; confidence: number; count: number }>();
+  for (const tag of allTags) {
+    const existing = tagMap.get(tag.label);
+    if (existing) {
+      existing.count += 1;
+      existing.confidence = Math.max(existing.confidence, tag.confidence);
+    } else {
+      tagMap.set(tag.label, { label: tag.label, category: tag.category, confidence: tag.confidence, count: 1 });
+    }
+  }
+  const uniqueTags = Array.from(tagMap.values()).sort((a, b) => b.confidence - a.confidence);
+
+  // Also include manual tags
+  const manualTags = asset.tags.filter((t) => !tagMap.has(t));
+
+  const categoryLabels: Record<string, string> = {
+    topic: "主题", event: "事件", emotion: "情绪", person: "人物",
+    location: "地点", shotType: "镜头", quality: "质量", object: "物体", action: "动作",
+  };
+  const categoryColors: Record<string, string> = {
+    topic: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400",
+    event: "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400",
+    emotion: "bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400",
+    person: "bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400",
+    location: "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400",
+    object: "bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400",
+    action: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400",
+    shotType: "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400",
+    quality: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
+  };
+
+  if (uniqueTags.length === 0 && manualTags.length === 0) {
+    return <EmptyState text="暂无AI标签数据" />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+        AI识别标签
+        <span className="ml-2 text-[11px] text-gray-400 font-normal">{uniqueTags.length} 个</span>
+      </h3>
+      <div className="flex flex-wrap gap-1.5">
+        {uniqueTags.map((tag) => (
+          <span
+            key={tag.label}
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px]",
+              categoryColors[tag.category] || "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+            )}
+          >
+            <span className="text-[10px] opacity-70">{categoryLabels[tag.category] || tag.category}</span>
+            {tag.label}
+            <span className="text-[10px] opacity-50">{Math.round(tag.confidence * 100)}%</span>
+          </span>
+        ))}
+      </div>
+
+      {manualTags.length > 0 && (
+        <>
+          <h3 className="text-[13px] font-medium text-gray-700 dark:text-gray-300 mt-4">
+            手动标签
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {manualTags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[12px]"
+              >
+                <Tag size={10} />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// --- AI Faces Tab ---
+function AIFacesTab({ asset }: { asset: AssetDetailFull }) {
+  const allFaces = (asset.segments || []).flatMap((s) => s.detectedFaces);
+  // Deduplicate by name
+  const faceMap = new Map<string, { name: string; role: string; confidence: number; appearances: number }>();
+  for (const face of allFaces) {
+    const existing = faceMap.get(face.name);
+    if (existing) {
+      existing.appearances += face.appearances;
+      existing.confidence = Math.max(existing.confidence, face.confidence);
+    } else {
+      faceMap.set(face.name, { ...face });
+    }
+  }
+  const uniqueFaces = Array.from(faceMap.values()).sort((a, b) => b.appearances - a.appearances);
+
+  if (uniqueFaces.length === 0) {
+    return <EmptyState text="暂无人脸识别数据" />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+        AI人脸识别
+        <span className="ml-2 text-[11px] text-gray-400 font-normal">{uniqueFaces.length} 人</span>
+      </h3>
+      <div className="space-y-2">
+        {uniqueFaces.map((face) => (
+          <div
+            key={face.name}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-white/[0.03]"
+          >
+            <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+              <ScanFace size={16} className="text-purple-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium text-gray-700 dark:text-gray-300 truncate">
+                {face.name}
+              </p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                {face.role && <span>{face.role} · </span>}
+                出现 {face.appearances} 次 · 置信度 {Math.round(face.confidence * 100)}%
+              </p>
+            </div>
+            <ChevronRight size={14} className="text-gray-300 dark:text-gray-600 shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- AI Speech Tab ---
+function AISpeechTab({ asset }: { asset: AssetDetailFull }) {
+  const segments = (asset.segments || []).filter((s) => s.transcript);
+
+  if (segments.length === 0) {
+    return <EmptyState text="暂无语音转文字数据" />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+        语音转文字
+        <span className="ml-2 text-[11px] text-gray-400 font-normal">{segments.length} 段</span>
+      </h3>
+      <div className="space-y-1">
+        {segments.map((seg) => (
+          <div
+            key={seg.id}
+            className="flex gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors group"
+          >
+            <span className="text-[11px] tabular-nums text-blue-500 dark:text-blue-400 shrink-0 pt-0.5 w-24">
+              {seg.startTime} → {seg.endTime}
+            </span>
+            <p className="text-[13px] text-gray-700 dark:text-gray-300 flex-1 leading-relaxed">
+              {seg.transcript}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- AI Subtitles Tab ---
+function AISubtitlesTab({ asset }: { asset: AssetDetailFull }) {
+  const segments = (asset.segments || []).filter((s) => s.ocrTexts && s.ocrTexts.length > 0);
+
+  if (segments.length === 0) {
+    return <EmptyState text="暂无OCR字幕数据" />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+        OCR字幕识别
+        <span className="ml-2 text-[11px] text-gray-400 font-normal">{segments.length} 段</span>
+      </h3>
+      <div className="space-y-1">
+        {segments.map((seg) => (
+          <div
+            key={seg.id}
+            className="flex gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
+          >
+            <span className="text-[11px] tabular-nums text-amber-500 dark:text-amber-400 shrink-0 pt-0.5 w-24">
+              {seg.startTime} → {seg.endTime}
+            </span>
+            <div className="flex-1 space-y-0.5">
+              {seg.ocrTexts.map((text, i) => (
+                <p key={i} className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {text}
+                </p>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- Empty state ---
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
+      <Tags size={32} className="mb-2 opacity-50" />
+      <p className="text-[13px]">{text}</p>
+      <p className="text-[11px] mt-1">资源入库后自动发起AI分析</p>
     </div>
   );
 }

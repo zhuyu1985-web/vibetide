@@ -55,7 +55,7 @@ export default async function DashboardLayout({
       <AppSidebar />
       <SidebarInset>
         <Topbar userName={displayName} unreadCount={unreadCount} />
-        <main className="flex-1 overflow-auto bg-page bg-glow">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-page bg-glow">
           <div className="relative z-10 p-6">{children}</div>
         </main>
       </SidebarInset>

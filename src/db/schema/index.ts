@@ -55,3 +55,7 @@ export * from "./article-chat-history";
 
 // Smart Media Asset module (2026-03-26)
 export * from "./media-asset-shares";
+export * from "./category-permissions";
+
+// Intent recognition system (2026-04-02)
+export * from "./intent-logs";

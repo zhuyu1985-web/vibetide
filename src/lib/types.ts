@@ -801,6 +801,20 @@ export interface MediaCategoryNode extends CategoryNode {
   mediaAssetCount: number;
 }
 
+export type CategoryPermissionType = "read" | "write" | "manage";
+export type PermissionGranteeType = "user" | "role";
+
+export interface CategoryPermissionItem {
+  id: string;
+  categoryId: string;
+  granteeType: PermissionGranteeType;
+  granteeId: string;
+  granteeLabel: string;
+  permissionType: CategoryPermissionType;
+  inherited: boolean;
+  createdAt: string;
+}
+
 export interface AssetDetailFull {
   id: string;
   title: string;

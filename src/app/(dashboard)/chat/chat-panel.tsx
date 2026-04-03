@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
+import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import {
   CollapsibleMessageContent,
@@ -52,6 +52,11 @@ import type { AIEmployee, ScenarioCardData } from "@/lib/types";
 import type { ChatMessage, ThinkingStep, SkillUsed } from "@/lib/chat-utils";
 import type { SavedConversationRow } from "@/db/types";
 import { cn } from "@/lib/utils";
+import {
+  IntentAnalyzing,
+  IntentResultBubble,
+  IntentConfirmCard,
+} from "@/components/chat/intent-bubble";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Radar,
@@ -213,6 +218,12 @@ interface ChatPanelProps {
   currentSources: string[];
   currentRefCount: number;
   isStreaming: boolean;
+  pendingIntent?: import("@/lib/agent/intent-recognition").IntentResult | null;
+  intentLoading?: boolean;
+  intentProgress?: import("@/components/chat/intent-bubble").IntentProgress[];
+  currentStep?: import("@/lib/chat-utils").StepInfo | null;
+  onIntentConfirm?: (intent: import("@/lib/agent/intent-recognition").IntentResult) => void;
+  onIntentCancel?: () => void;
 }
 
 export function ChatPanel({
@@ -235,6 +246,12 @@ export function ChatPanel({
   currentSources,
   currentRefCount,
   isStreaming,
+  pendingIntent,
+  intentLoading,
+  intentProgress,
+  currentStep,
+  onIntentConfirm,
+  onIntentCancel,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
   const [scenarioInputs, setScenarioInputs] = useState<Record<string, string>>({});
@@ -338,7 +355,7 @@ export function ChatPanel({
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, loading, currentThinking]);
+  }, [messages, loading, currentThinking, intentLoading, intentProgress, pendingIntent]);
 
   const scrollToBottom = () => {
     const el = chatBodyRef.current;
@@ -466,12 +483,12 @@ export function ChatPanel({
 
               {/* Scenario suggestions */}
               {!viewingSaved && scenarios.length > 0 && (
-                <div className="w-full max-w-lg space-y-2">
+                <div className="w-full max-w-2xl space-y-2">
                   <p className="text-xs text-gray-400 mb-2 text-center">
                     试试以下场景，或直接输入你的问题
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {scenarios.slice(0, 4).map((s) => {
+                  <div className="grid grid-cols-3 gap-2">
+                    {scenarios.slice(0, 6).map((s) => {
                       const Icon = ICON_MAP[s.icon] || Sparkles;
                       return (
                         <button
@@ -508,13 +525,48 @@ export function ChatPanel({
           ) : (
             /* ── Messages ── */
             <>
-              {messages.map((msg, i) =>
-                msg.role === "user" ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[75%] bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed shadow-sm shadow-blue-500/20">
-                      {msg.content}
+              {messages.map((msg, i) => {
+                // Check if this user message is the last one before the assistant response
+                const isLastUserBeforeAssistant =
+                  msg.role === "user" &&
+                  i < messages.length - 1 &&
+                  messages[i + 1]?.role === "assistant";
+                // Also handle user message as the very last message (intent analyzing phase)
+                const isLastUserMsg =
+                  msg.role === "user" && i === messages.length - 1;
+
+                const showIntentHere =
+                  (isLastUserBeforeAssistant || isLastUserMsg) &&
+                  (intentLoading || pendingIntent);
+
+                return msg.role === "user" ? (
+                  <React.Fragment key={i}>
+                    <div className="flex justify-end">
+                      <div className="max-w-[75%] bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm leading-relaxed shadow-sm shadow-blue-500/20">
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
+                    {/* Intent bubbles — after user message, before assistant response */}
+                    {showIntentHere && intentLoading && (
+                      <IntentAnalyzing steps={intentProgress ?? []} />
+                    )}
+                    {showIntentHere && pendingIntent && !intentLoading && (
+                      pendingIntent.confidence < 0.8 && !loading && !isStreaming ? (
+                        <IntentConfirmCard
+                          intent={pendingIntent}
+                          onConfirm={(edited) => onIntentConfirm?.(edited)}
+                          onCancel={() => onIntentCancel?.()}
+                        />
+                      ) : (
+                        <IntentResultBubble
+                          intent={pendingIntent}
+                          executing={loading || isStreaming}
+                          currentStep={currentStep}
+                          onCancel={() => onIntentCancel?.()}
+                        />
+                      )
+                    )}
+                  </React.Fragment>
                 ) : !msg.content && !msg.durationMs ? null : (
                   <div key={i} className="flex gap-3">
                     <EmployeeAvatar
@@ -627,7 +679,7 @@ export function ChatPanel({
                                 >
                                   <ReactMarkdown
                                     remarkPlugins={remarkPlugins}
-                                    components={{ ...markdownComponents, li: InteractiveLi }}
+                                    components={markdownComponents}
                                   >
                                     {msg.content}
                                   </ReactMarkdown>
@@ -647,8 +699,8 @@ export function ChatPanel({
                       )}
                     </div>
                   </div>
-                )
-              )}
+                );
+              })}
 
               {/* ── Thinking indicator (before text arrives) ── */}
               {loading &&

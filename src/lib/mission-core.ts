@@ -48,15 +48,19 @@ export interface ParsedTaskDef {
 export async function loadAvailableEmployees(
   organizationId: string
 ): Promise<EmployeeWithSkills[]> {
-  const employees = await db
+  // Single query with LEFT JOIN to fetch employees + skills together (replaces N+1 pattern)
+  const rows = await db
     .select({
       id: aiEmployees.id,
       slug: aiEmployees.slug,
       name: aiEmployees.name,
       title: aiEmployees.title,
       nickname: aiEmployees.nickname,
+      skillName: skills.name,
     })
     .from(aiEmployees)
+    .leftJoin(employeeSkills, eq(employeeSkills.employeeId, aiEmployees.id))
+    .leftJoin(skills, eq(employeeSkills.skillId, skills.id))
     .where(
       and(
         eq(aiEmployees.organizationId, organizationId),
@@ -64,16 +68,20 @@ export async function loadAvailableEmployees(
       )
     );
 
-  return Promise.all(
-    employees.map(async (emp) => {
-      const empSkills = await db
-        .select({ skillName: skills.name })
-        .from(employeeSkills)
-        .innerJoin(skills, eq(employeeSkills.skillId, skills.id))
-        .where(eq(employeeSkills.employeeId, emp.id));
-      return { ...emp, skills: empSkills.map((s) => s.skillName) };
-    })
-  );
+  // Group rows by employee
+  const empMap = new Map<string, EmployeeWithSkills>();
+  for (const row of rows) {
+    let emp = empMap.get(row.id);
+    if (!emp) {
+      emp = { id: row.id, slug: row.slug, name: row.name, title: row.title, nickname: row.nickname, skills: [] };
+      empMap.set(row.id, emp);
+    }
+    if (row.skillName) {
+      emp.skills.push(row.skillName);
+    }
+  }
+
+  return [...empMap.values()];
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +155,9 @@ ${employeeListText}
 注意：
 - dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务
 - priority 数值越大越重要
-- 确保不要产生循环依赖`;
+- 确保不要产生循环依赖
+- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务
+- 不要为同一类型的工作创建多个子任务（如"信息搜集"只需一个任务，不要拆成多个）`;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +202,19 @@ export function parseLeaderOutput(
 
   if (!parsed.tasks || parsed.tasks.length === 0) {
     throw new Error("Leader did not produce any tasks");
+  }
+
+  // Cap at 10 tasks — truncate excess and fix broken dependency refs
+  const MAX_TASKS = 10;
+  if (parsed.tasks.length > MAX_TASKS) {
+    console.warn(`[mission-core] Leader produced ${parsed.tasks.length} tasks, truncating to ${MAX_TASKS}`);
+    parsed.tasks = parsed.tasks.slice(0, MAX_TASKS);
+    // Remove dependency refs that point beyond the truncated array
+    for (const task of parsed.tasks) {
+      if (task.dependsOn) {
+        task.dependsOn = task.dependsOn.filter((idx) => idx >= 0 && idx < MAX_TASKS);
+      }
+    }
   }
 
   return parsed;

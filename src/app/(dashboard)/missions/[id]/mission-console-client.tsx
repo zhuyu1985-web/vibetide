@@ -93,6 +93,7 @@ function getPhaseIdx(status: string, phase?: string): number {
     const idx = PHASE_STEPS.findIndex((p) => p.key === phase);
     if (idx >= 0) return idx;
   }
+  if (status === "queued") return 0;
   if (status === "planning") return 1;
   if (status === "executing") return 2;
   if (status === "consolidating") return 3;
@@ -134,7 +135,7 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
   );
 
   const isTerminated = ["completed", "failed", "cancelled"].includes(mission.status);
-  const isActive = ["planning", "executing", "consolidating"].includes(mission.status);
+  const isActive = ["queued", "planning", "executing", "consolidating"].includes(mission.status);
   const hasFinalOutput = mission.finalOutput != null;
 
   const completedCount = mission.tasks.filter((t) => t.status === "completed").length;
@@ -348,9 +349,9 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
             <TabsContent value="kanban" className="mt-0">
               {totalCount === 0 ? (
                 <GlassCard className="p-16 text-center">
-                  {mission.status === "planning" ? (
+                  {mission.status === "queued" || mission.status === "planning" ? (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 size={16} className="animate-spin" /> 队长正在分析任务并制定计划...
+                      <Loader2 size={16} className="animate-spin" /> {mission.status === "queued" ? "任务排队中，等待资源分配..." : "队长正在分析任务并制定计划..."}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">暂无任务</p>
@@ -826,7 +827,7 @@ function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
     coordinating: "协调汇总", delivering: "交付中",
   };
   const statusLabels: Record<string, string> = {
-    planning: "规划中", executing: "并行执行", consolidating: "协调汇总",
+    queued: "排队中", planning: "规划中", executing: "并行执行", consolidating: "协调汇总",
     completed: "已完成", failed: "异常中断", cancelled: "已取消",
   };
   const currentPhaseLabel = mission.phase
@@ -834,7 +835,7 @@ function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
     : statusLabels[mission.status] ?? mission.status;
 
   const statusColor: Record<string, string> = {
-    planning: "text-blue-600 dark:text-blue-400", executing: "text-cyan-600 dark:text-cyan-400", consolidating: "text-purple-600 dark:text-purple-400",
+    queued: "text-gray-500 dark:text-gray-400", planning: "text-amber-600 dark:text-amber-400", executing: "text-cyan-600 dark:text-cyan-400", consolidating: "text-purple-600 dark:text-purple-400",
     completed: "text-emerald-600 dark:text-emerald-400", failed: "text-red-600 dark:text-red-400", cancelled: "text-gray-500 dark:text-gray-400",
   };
 
