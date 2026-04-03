@@ -5,11 +5,12 @@ import {
   timestamp,
   jsonb,
   integer,
+  real,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
-import { skillCategoryEnum, skillTypeEnum, skillBindingTypeEnum } from "./enums";
+import { skillCategoryEnum, skillTypeEnum, skillBindingTypeEnum, learningSourceEnum } from "./enums";
 
 export const skills = pgTable("skills", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -66,6 +67,11 @@ export const employeeSkills = pgTable("employee_skills", {
     .notNull(),
   level: integer("level").notNull().default(50), // proficiency 0-100
   bindingType: skillBindingTypeEnum("binding_type").notNull().default("extended"),
+  usageCount: integer("usage_count").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  lastQualityAvg: real("last_quality_avg"),
+  learnedAt: timestamp("learned_at", { withTimezone: true }),
+  learningSource: learningSourceEnum("learning_source").notNull().default("assigned"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

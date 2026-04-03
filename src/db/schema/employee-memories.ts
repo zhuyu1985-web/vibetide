@@ -9,6 +9,7 @@ import {
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
+import { missionTasks } from "./missions";
 import { memoryTypeEnum } from "./enums";
 
 export const employeeMemories = pgTable("employee_memories", {
@@ -27,6 +28,10 @@ export const employeeMemories = pgTable("employee_memories", {
   accessCount: integer("access_count").notNull().default(0),
   lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
 
+  sourceTaskId: uuid("source_task_id"),  // no FK constraint to avoid circular deps
+  confidence: real("confidence").notNull().default(1.0),
+  decayRate: real("decay_rate").notNull().default(0.01),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -42,6 +47,10 @@ export const employeeMemoriesRelations = relations(
     organization: one(organizations, {
       fields: [employeeMemories.organizationId],
       references: [organizations.id],
+    }),
+    sourceTask: one(missionTasks, {
+      fields: [employeeMemories.sourceTaskId],
+      references: [missionTasks.id],
     }),
   })
 );

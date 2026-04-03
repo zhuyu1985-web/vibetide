@@ -342,6 +342,10 @@ export const memoryTypeEnum = pgEnum("memory_type", [
   "feedback",
   "pattern",
   "preference",
+  "success_pattern",
+  "failure_lesson",
+  "user_preference",
+  "skill_insight",
 ]);
 
 export const artifactTypeEnum = pgEnum("artifact_type", [
@@ -485,4 +489,24 @@ export const categoryPermissionTypeEnum = pgEnum("category_permission_type", [
 export const permissionGranteeTypeEnum = pgEnum("permission_grantee_type", [
   "user",  // 指定用户
   "role",  // 按角色（admin/editor/viewer）
+]);
+
+// Cognitive Engine enums
+
+export const verificationLevelEnum = pgEnum("verification_level", [
+  "simple",
+  "important",
+  "critical",
+]);
+
+export const verifierTypeEnum = pgEnum("verifier_type", [
+  "self_eval",
+  "cross_review",
+  "human",
+]);
+
+export const learningSourceEnum = pgEnum("learning_source", [
+  "assigned",
+  "discovered",
+  "recommended",
 ]);

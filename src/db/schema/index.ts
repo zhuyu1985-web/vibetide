@@ -62,3 +62,6 @@ export * from "./intent-logs";
 
 // RBAC system (2026-04-03)
 export * from "./roles";
+
+// Cognitive Engine (2026-04-03)
+export * from "./verification-records";
