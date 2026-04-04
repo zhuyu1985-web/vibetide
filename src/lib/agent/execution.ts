@@ -15,6 +15,8 @@ import type {
   ProgressCallback,
 } from "./types";
 
+const AGENT_TIMEOUT_MS = 3 * 60 * 1000; // 3 分钟（整个 agent 多步执行上限）
+
 /**
  * Execute an assembled agent for a specific workflow step.
  *
@@ -77,6 +79,7 @@ export async function executeAgent(
     stopWhen: stepCountIs(20),
     temperature: agent.modelConfig.temperature,
     maxOutputTokens: agent.modelConfig.maxTokens,
+    abortSignal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
     onStepFinish: ({ toolCalls }) => {
       if (toolCalls && toolCalls.length > 0) {
         toolCallCount += toolCalls.length;
