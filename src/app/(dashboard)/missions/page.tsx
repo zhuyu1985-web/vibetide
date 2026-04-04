@@ -1,7 +1,7 @@
 import { getMissionsWithActiveTasks } from "@/lib/dal/missions";
 import { MissionsClient } from "./missions-client";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { retryStuckMissions } from "@/app/actions/missions";
+import { cleanupStuckMissions } from "@/app/actions/missions";
 import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -11,19 +11,11 @@ export default async function MissionsPage() {
 
   const missions = orgId ? await getMissionsWithActiveTasks(orgId) : [];
 
-  // Auto-detect and retry stuck missions (planning with 0 tasks for > 2 min)
+  // 页面加载时自动清理卡住的任务和员工
   if (orgId) {
-    const stuck = missions.filter(
-      (m) => ["queued", "planning"].includes(m.status) && m.totalTaskCount === 0 &&
-        Date.now() - new Date(m.createdAt).getTime() > 2 * 60 * 1000
-    );
-    if (stuck.length > 0) {
-      after(async () => {
-        for (const m of stuck) {
-          await retryStuckMissions(m.id).catch(() => {});
-        }
-      });
-    }
+    after(async () => {
+      await cleanupStuckMissions().catch(() => {});
+    });
   }
 
   return (

@@ -1,12 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { missions, aiEmployees } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { missions, aiEmployees, missionTasks } from "@/db/schema";
+import { eq, and, lt, inArray, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
-import { inngest } from "@/inngest/client";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { executeMissionDirect } from "@/lib/mission-executor";
 
@@ -78,34 +76,23 @@ export async function startMission(data: {
     })
     .returning();
 
-  // Dual execution strategy: try Inngest (event-driven, with retries) first,
-  // fall back to direct execution if Inngest is unavailable.
-  after(async () => {
-    try {
-      await inngest.send({
-        name: "mission/created",
-        data: { missionId: mission.id, organizationId },
-      });
-      console.log(`[mission] ${mission.id} dispatched to Inngest`);
-    } catch {
-      // Inngest not available — fall back to direct execution
-      console.log(`[mission] ${mission.id} Inngest unavailable, using direct execution`);
-      try {
-        await executeMissionDirect(mission.id, organizationId);
-        console.log(`[mission] ${mission.id} completed successfully`);
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        console.error(`[mission] ${mission.id} failed:`, err);
-        await db.update(missions).set({
-          status: "failed",
-          completedAt: new Date(),
-          finalOutput: { error: true, message: errorMsg, failedAt: new Date().toISOString() },
-        }).where(eq(missions.id, mission.id)).catch(() => {});
-      }
-    }
-  });
-
   revalidatePath("/missions");
+
+  // Fire-and-forget: start execution without blocking the response.
+  // Using a detached promise instead of after() — after() is unreliable for
+  // long-running work (LLM calls can take minutes, exceeding callback limits).
+  executeMissionDirect(mission.id, organizationId)
+    .then(() => console.log(`[mission] ${mission.id} completed successfully`))
+    .catch(async (err) => {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[mission] ${mission.id} failed:`, err);
+      await db.update(missions).set({
+        status: "failed",
+        completedAt: new Date(),
+        finalOutput: { error: true, message: errorMsg, failedAt: new Date().toISOString() },
+      }).where(eq(missions.id, mission.id)).catch(() => {});
+    });
+
   return mission;
 }
 
@@ -169,29 +156,20 @@ export async function startMissionFromModule(data: {
     })
     .returning();
 
-  after(async () => {
-    try {
-      await inngest.send({
-        name: "mission/created",
-        data: { missionId: mission.id, organizationId: data.organizationId },
-      });
-    } catch {
-      try {
-        await executeMissionDirect(mission.id, data.organizationId);
-        console.log(`[mission:${data.sourceModule}] ${mission.id} completed`);
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        console.error(`[mission:${data.sourceModule}] ${mission.id} failed:`, err);
-        await db.update(missions).set({
-          status: "failed",
-          completedAt: new Date(),
-          finalOutput: { error: true, message: errorMsg, failedAt: new Date().toISOString() },
-        }).where(eq(missions.id, mission.id)).catch(() => {});
-      }
-    }
-  });
-
   revalidatePath("/missions");
+
+  executeMissionDirect(mission.id, data.organizationId)
+    .then(() => console.log(`[mission:${data.sourceModule}] ${mission.id} completed`))
+    .catch(async (err) => {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[mission:${data.sourceModule}] ${mission.id} failed:`, err);
+      await db.update(missions).set({
+        status: "failed",
+        completedAt: new Date(),
+        finalOutput: { error: true, message: errorMsg, failedAt: new Date().toISOString() },
+      }).where(eq(missions.id, mission.id)).catch(() => {});
+    });
+
   return mission;
 }
 
@@ -288,39 +266,224 @@ export async function cancelMission(missionId: string) {
     })
     .where(eq(missions.id, missionId));
 
-  // Also fire Inngest event in case Inngest is running
-  try {
-    await inngest.send({
-      name: "mission/cancelled",
-      data: {
-        missionId,
-        cancelledBy: user.id,
-      },
-    });
-  } catch {
-    // Inngest not available, cancellation is handled by DB status update
-  }
-
   revalidatePath("/missions");
   revalidatePath(`/missions/${missionId}`);
 }
 
 /**
- * Auto-retry a stuck mission (planning with 0 tasks for > 2 min).
- * Called from the missions list page on load as a self-healing mechanism.
+ * 重置卡在 working 状态超过 10 分钟的员工，并将其 in_progress 任务标记为失败。
  */
-export async function retryStuckMissions(missionId: string) {
-  const mission = await db.query.missions.findFirst({
-    where: eq(missions.id, missionId),
-  });
-  if (!mission || !["queued", "planning"].includes(mission.status)) return;
-  if (mission.tokensUsed > 0) return; // Already running
+async function resetStaleEmployees(orgId: string) {
+  const staleThreshold = new Date(Date.now() - 10 * 60 * 1000); // 10 分钟
 
-  console.log(`[mission:auto-retry] ${missionId} retrying stuck mission`);
-  try {
-    await executeMissionDirect(missionId, mission.organizationId);
-  } catch (err) {
-    console.error(`[mission:auto-retry] ${missionId} failed:`, err);
-    await db.update(missions).set({ status: "failed" }).where(eq(missions.id, missionId)).catch(() => {});
+  const staleEmployees = await db
+    .select({ id: aiEmployees.id })
+    .from(aiEmployees)
+    .where(
+      and(
+        eq(aiEmployees.organizationId, orgId),
+        eq(aiEmployees.status, "working"),
+        lt(aiEmployees.updatedAt, staleThreshold)
+      )
+    );
+
+  if (staleEmployees.length === 0) return 0;
+
+  const staleEmpIds = staleEmployees.map((e) => e.id);
+
+  // 将 in_progress 的子任务标记为失败
+  await db
+    .update(missionTasks)
+    .set({
+      status: "failed",
+      errorMessage: "任务执行超时，已被系统自动终止",
+    })
+    .where(
+      and(
+        inArray(missionTasks.assignedEmployeeId, staleEmpIds),
+        eq(missionTasks.status, "in_progress")
+      )
+    );
+
+  // 重置员工状态
+  for (const emp of staleEmployees) {
+    await db
+      .update(aiEmployees)
+      .set({ status: "idle", currentTask: null, updatedAt: new Date() })
+      .where(eq(aiEmployees.id, emp.id));
+  }
+
+  return staleEmployees.length;
+}
+
+/**
+ * 检测并恢复卡住的任务（页面加载时自动调用）。
+ * 执行顺序：先清理员工 → 再清理 mission。
+ */
+export async function cleanupStuckMissions() {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return;
+
+  // Step 1: 清理卡住的员工和子任务
+  await resetStaleEmployees(orgId);
+
+  const now = new Date();
+
+  // Step 2: Planning 卡住 — status=planning, 无子任务, 创建超过 3 分钟
+  const planningThreshold = new Date(now.getTime() - 3 * 60 * 1000);
+  const stuckPlanning = await db
+    .select({ id: missions.id })
+    .from(missions)
+    .where(
+      and(
+        eq(missions.organizationId, orgId),
+        eq(missions.status, "planning"),
+        lt(missions.createdAt, planningThreshold)
+      )
+    );
+
+  for (const m of stuckPlanning) {
+    const taskCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(missionTasks)
+      .where(eq(missionTasks.missionId, m.id));
+
+    if (Number(taskCount[0]?.count ?? 0) === 0) {
+      await db
+        .update(missions)
+        .set({
+          status: "failed",
+          completedAt: now,
+          finalOutput: { error: true, message: "任务规划超时，未能生成子任务", failedAt: now.toISOString() },
+        })
+        .where(eq(missions.id, m.id));
+    }
+  }
+
+  // Step 3: Executing 卡住 — 子任务最后活动超过 18 分钟
+  const executingThreshold = new Date(now.getTime() - 18 * 60 * 1000);
+  const stuckExecuting = await db
+    .select({ id: missions.id })
+    .from(missions)
+    .where(
+      and(
+        eq(missions.organizationId, orgId),
+        eq(missions.status, "executing")
+      )
+    );
+
+  for (const m of stuckExecuting) {
+    // 取子任务的最后活动时间
+    const lastActivity = await db
+      .select({
+        lastTime: sql<Date>`MAX(COALESCE(${missionTasks.completedAt}, ${missionTasks.startedAt}))`,
+      })
+      .from(missionTasks)
+      .where(eq(missionTasks.missionId, m.id));
+
+    const lastTime = lastActivity[0]?.lastTime;
+    if (!lastTime || new Date(lastTime) < executingThreshold) {
+      // 将剩余活跃子任务标记失败
+      await db
+        .update(missionTasks)
+        .set({ status: "failed", errorMessage: "任务执行超时，已被系统清理终止" })
+        .where(
+          and(
+            eq(missionTasks.missionId, m.id),
+            inArray(missionTasks.status, ["pending", "ready", "in_progress"])
+          )
+        );
+
+      // 走降级汇总
+      const allTasks = await db
+        .select({ status: missionTasks.status, title: missionTasks.title })
+        .from(missionTasks)
+        .where(eq(missionTasks.missionId, m.id));
+
+      const completedCount = allTasks.filter((t) => t.status === "completed").length;
+      const totalCount = allTasks.length;
+
+      await db
+        .update(missions)
+        .set({
+          status: completedCount > 0 ? "completed" : "failed",
+          completedAt: now,
+          finalOutput: completedCount > 0
+            ? {
+                degradation_level: completedCount / totalCount >= 0.3 ? 3 : 4,
+                message: `${completedCount}/${totalCount} 个子任务完成（执行超时，系统自动清理）`,
+                completedTasks: allTasks.filter((t) => t.status === "completed").map((t) => t.title),
+              }
+            : {
+                error: true,
+                message: `所有子任务均未完成（执行超时，系统自动清理）`,
+                failedAt: now.toISOString(),
+              },
+        })
+        .where(eq(missions.id, m.id));
+    }
+  }
+
+  // Step 4: Consolidating 卡住 — 子任务最后完成超过 5 分钟
+  const consolidatingThreshold = new Date(now.getTime() - 5 * 60 * 1000);
+  const stuckConsolidating = await db
+    .select({ id: missions.id })
+    .from(missions)
+    .where(
+      and(
+        eq(missions.organizationId, orgId),
+        eq(missions.status, "consolidating")
+      )
+    );
+
+  for (const m of stuckConsolidating) {
+    const lastCompletion = await db
+      .select({ lastTime: sql<Date>`MAX(${missionTasks.completedAt})` })
+      .from(missionTasks)
+      .where(eq(missionTasks.missionId, m.id));
+
+    const lastTime = lastCompletion[0]?.lastTime;
+    if (!lastTime || new Date(lastTime) < consolidatingThreshold) {
+      const completedTasks = await db
+        .select({ title: missionTasks.title })
+        .from(missionTasks)
+        .where(and(eq(missionTasks.missionId, m.id), eq(missionTasks.status, "completed")));
+
+      await db
+        .update(missions)
+        .set({
+          status: "completed",
+          completedAt: now,
+          finalOutput: {
+            degradation_level: 3,
+            message: `${completedTasks.length} 个子任务完成（汇总超时，系统自动生成摘要）`,
+            completedTasks: completedTasks.map((t) => t.title),
+          },
+        })
+        .where(eq(missions.id, m.id));
+    }
+  }
+
+  // Step 5: Queued 卡住 — status=queued, 创建超过 3 分钟
+  const stuckQueued = await db
+    .select({ id: missions.id })
+    .from(missions)
+    .where(
+      and(
+        eq(missions.organizationId, orgId),
+        eq(missions.status, "queued"),
+        lt(missions.createdAt, planningThreshold)
+      )
+    );
+
+  for (const m of stuckQueued) {
+    await db
+      .update(missions)
+      .set({
+        status: "failed",
+        completedAt: now,
+        finalOutput: { error: true, message: "任务排队超时，未能启动执行", failedAt: now.toISOString() },
+      })
+      .where(eq(missions.id, m.id));
   }
 }
