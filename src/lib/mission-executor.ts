@@ -36,6 +36,8 @@ import {
   checkTokenBudget,
 } from "@/lib/mission-core";
 
+const MISSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 分钟
+
 // ---------------------------------------------------------------------------
 // 1. Leader Planning — decompose mission into tasks
 // ---------------------------------------------------------------------------
@@ -334,7 +336,7 @@ async function executeTaskDirect(
 // 3. Execute all ready tasks, then check dependencies, repeat until done
 // ---------------------------------------------------------------------------
 
-export async function executeAllTasksDirect(missionId: string) {
+export async function executeAllTasksDirect(missionId: string, missionStartTime: number = Date.now()) {
   // Pre-load mission ONCE (shared across all task executions)
   const mission = await db.query.missions.findFirst({ where: eq(missions.id, missionId) });
   if (!mission) throw new Error(`Mission not found: ${missionId}`);
@@ -367,6 +369,18 @@ export async function executeAllTasksDirect(missionId: string) {
       console.warn(`[mission-executor] Token budget exceeded (${check[0].tokensUsed}/${check[0].tokenBudget}), stopping execution`);
       await db.update(missionTasks)
         .set({ status: "failed", errorMessage: `Token 预算已耗尽（${check[0].tokensUsed}/${check[0].tokenBudget}）` })
+        .where(and(
+          eq(missionTasks.missionId, missionId),
+          inArray(missionTasks.status, ["pending", "ready"]),
+        ));
+      break;
+    }
+
+    // Mission-level timeout check
+    if (Date.now() - missionStartTime > MISSION_TIMEOUT_MS) {
+      console.warn(`[mission-executor] Mission timeout after ${Math.round((Date.now() - missionStartTime) / 1000)}s`);
+      await db.update(missionTasks)
+        .set({ status: "failed", errorMessage: "任务整体执行超时（超过 15 分钟）" })
         .where(and(
           eq(missionTasks.missionId, missionId),
           inArray(missionTasks.status, ["pending", "ready"]),
@@ -575,6 +589,12 @@ export async function executeMissionDirect(
   missionId: string,
   organizationId: string
 ) {
+  const missionStartTime = Date.now();
+
+  function isMissionTimedOut() {
+    return Date.now() - missionStartTime > MISSION_TIMEOUT_MS;
+  }
+
   // Transition from queued → planning (signals execution has started)
   await db
     .update(missions)
@@ -584,8 +604,18 @@ export async function executeMissionDirect(
   // Phase 1: Leader planning
   const plan = await leaderPlanDirect(missionId, organizationId);
 
-  // Phase 2: Execute all tasks
-  await executeAllTasksDirect(missionId);
+  // Phase 2: Execute all tasks (pass start time for timeout check)
+  if (!isMissionTimedOut()) {
+    await executeAllTasksDirect(missionId, missionStartTime);
+  } else {
+    console.warn(`[mission-executor] Mission ${missionId} timed out before task execution`);
+    await db.update(missionTasks)
+      .set({ status: "failed", errorMessage: "任务整体执行超时（超过 15 分钟）" })
+      .where(and(
+        eq(missionTasks.missionId, missionId),
+        inArray(missionTasks.status, ["pending", "ready"]),
+      ));
+  }
 
   // Phase 3: 4-level degradation strategy
   const allTasks = await db
@@ -603,8 +633,28 @@ export async function executeMissionDirect(
     await leaderConsolidateDirect(missionId, organizationId);
     return { status: "completed", taskCount: plan.taskCount };
   } else if (completionRate >= 0.7) {
-    // Level 2: 70%+ 完成，降级汇总（仅用已完成任务的输出）
-    await leaderConsolidateDirect(missionId, organizationId);
+    // Level 2: 70%+ 完成，降级汇总
+    if (!isMissionTimedOut()) {
+      await leaderConsolidateDirect(missionId, organizationId);
+    } else {
+      // Timeout — use fallback consolidation
+      const completedTaskTitles = await db
+        .select({ title: missionTasks.title })
+        .from(missionTasks)
+        .where(and(eq(missionTasks.missionId, missionId), eq(missionTasks.status, "completed")));
+      await db
+        .update(missions)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          finalOutput: {
+            degradation_level: 2,
+            message: `${completedCount}/${totalCount} 个子任务完成（汇总因超时跳过）`,
+            completedTasks: completedTaskTitles.map((t) => t.title),
+          },
+        })
+        .where(eq(missions.id, missionId));
+    }
     await db
       .update(missions)
       .set({
@@ -613,11 +663,11 @@ export async function executeMissionDirect(
       .where(eq(missions.id, missionId));
     return { status: "completed", taskCount: plan.taskCount, degradationLevel: 2, failedCount };
   } else if (completionRate >= 0.3) {
-    // Level 3: 30%+ 完成，降级汇总（仅用已完成任务的输出）+ 标注部分交付
+    // Level 3: 30%+ 完成，降级汇总 + 部分交付
     try {
+      if (isMissionTimedOut()) throw new Error("任务整体超时，跳过汇总");
       await leaderConsolidateDirect(missionId, organizationId);
     } catch (err) {
-      // Consolidation failed — fall back to a summary message instead of raw IDs
       const completedTaskTitles = await db
         .select({ title: missionTasks.title })
         .from(missionTasks)
@@ -629,7 +679,7 @@ export async function executeMissionDirect(
           completedAt: new Date(),
           finalOutput: {
             degradation_level: 3,
-            message: `${completedCount}/${totalCount} 个子任务完成，部分交付（汇总失败：${err instanceof Error ? err.message : String(err)}）`,
+            message: `${completedCount}/${totalCount} 个子任务完成，部分交付（${err instanceof Error ? err.message : String(err)}）`,
             completedTasks: completedTaskTitles.map((t) => t.title),
           },
         })
@@ -644,7 +694,6 @@ export async function executeMissionDirect(
     return { status: "completed", taskCount: plan.taskCount, degradationLevel: 3, failedCount };
   } else {
     // Level 4: <30% 完成，标记失败
-    // Collect failure reasons for diagnosis
     const failedTasks = await db
       .select({ title: missionTasks.title, errorMessage: missionTasks.errorMessage })
       .from(missionTasks)
