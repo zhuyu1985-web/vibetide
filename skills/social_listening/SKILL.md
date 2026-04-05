@@ -1,6 +1,26 @@
 ---
 name: social_listening
-description: "监测社交媒体舆情和用户讨论"
+displayName: 社交聆听
+description: 监测社交媒体舆情和用户讨论
+category: perception
+version: "1.8"
+inputSchema:
+  topic: 监听话题
+  platforms: 监听平台
+  sentiment: 情感筛选
+outputSchema:
+  overview: 舆情概览
+  opinions: 核心观点列表
+  kolTracking: KOL追踪
+  risks: 风险预警
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 10000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - trending_scout
+  - content_strategist
 ---
 
 # 社交聆听

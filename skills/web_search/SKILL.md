@@ -1,6 +1,26 @@
 ---
 name: web_search
-description: "全网信息获取系统：精准搜索 + 网页深读 + 热榜聚合"
+displayName: 全网搜索
+description: 搜索互联网获取最新信息和热点话题
+category: perception
+version: "3.2"
+inputSchema:
+  query: 搜索查询词
+  timeRange: 时间范围:1h/24h/7d/30d/all
+  sources: 限定搜索源
+  maxResults: 返回条数
+outputSchema:
+  results: 搜索结果列表
+  totalCount: 结果总数
+  searchTime: 搜索耗时
+runtimeConfig:
+  type: api_call
+  avgLatencyMs: 3000
+  maxConcurrency: 5
+compatibleRoles:
+  - trending_scout
+  - content_strategist
+  - asset_manager
 ---
 
 # 全网搜索

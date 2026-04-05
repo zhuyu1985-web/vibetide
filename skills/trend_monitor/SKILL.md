@@ -1,6 +1,24 @@
 ---
 name: trend_monitor
-description: "实时监控30+平台热点趋势变化"
+displayName: 趋势监控
+description: 实时监控30+平台热点趋势变化
+category: perception
+version: "2.1"
+inputSchema:
+  domain: 监控领域
+  platforms: 指定平台列表
+  timeWindow: 监控窗口
+outputSchema:
+  hotTopics: 热点列表
+  trendAlerts: 趋势拐点预警
+  summary: 概览统计
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - trending_scout
 ---
 
 # 趋势监控

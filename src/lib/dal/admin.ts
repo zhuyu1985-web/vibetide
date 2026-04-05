@@ -148,16 +148,18 @@ export const getAllUsers = cache(async (): Promise<UserWithRoles[]> => {
 
 export const getOrgRoles = cache(async (orgId: string) => {
   // System-wide roles (organizationId IS NULL) + org-specific roles
-  return db.query.roles.findMany({
-    where: or(isNull(roles.organizationId), eq(roles.organizationId, orgId)),
-    orderBy: [desc(roles.isSystem), roles.name],
-  });
+  return db
+    .select()
+    .from(roles)
+    .where(or(isNull(roles.organizationId), eq(roles.organizationId, orgId)))
+    .orderBy(desc(roles.isSystem), roles.name);
 });
 
 export const getAllRoles = cache(async () => {
-  return db.query.roles.findMany({
-    orderBy: [desc(roles.isSystem), roles.name],
-  });
+  return db
+    .select()
+    .from(roles)
+    .orderBy(desc(roles.isSystem), roles.name);
 });
 
 // ---------------------------------------------------------------------------

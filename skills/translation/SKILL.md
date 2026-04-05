@@ -1,6 +1,26 @@
 ---
 name: translation
-description: "支持中英双语互译及本地化"
+displayName: 多语翻译
+description: 支持中英双语互译及本地化
+category: generation
+version: "1.5"
+inputSchema:
+  text: 待翻译文本
+  sourceLang: 源语言
+  targetLang: 目标语言
+  domain: 领域
+outputSchema:
+  translated: 翻译结果
+  notes: 翻译笔记
+  localization: 本地化说明
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 8000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_creator
+  - channel_operator
 ---
 
 # 多语翻译

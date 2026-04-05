@@ -17,6 +17,7 @@ export const skills = pgTable("skills", {
   organizationId: uuid("organization_id").references(() => organizations.id),
 
   name: text("name").notNull(),
+  slug: text("slug"), // e.g. "web_search"; nullable for legacy custom skills
   category: skillCategoryEnum("category").notNull(),
   type: skillTypeEnum("type").notNull().default("builtin"),
   version: text("version").notNull().default("1.0"),

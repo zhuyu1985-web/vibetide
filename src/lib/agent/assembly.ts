@@ -10,6 +10,7 @@ import {
 import { eq, desc, and, gt, sql } from "drizzle-orm";
 import { READ_ONLY_TOOL_NAMES, type EmployeeId } from "@/lib/constants";
 import type { SkillCategory } from "@/lib/types";
+import { loadSkillContent, getBuiltinSkillNameToSlug } from "@/lib/skill-loader";
 import { buildSystemPrompt } from "./prompt-templates";
 import { resolveModelConfig } from "./model-router";
 import { resolveTools } from "./tool-registry";
@@ -34,6 +35,7 @@ export async function assembleAgent(
     db
       .select({
         skillName: skills.name,
+        skillSlug: skills.slug,
         skillCategory: skills.category,
         skillDescription: skills.description,
         skillContent: skills.content,
@@ -118,9 +120,18 @@ export async function assembleAgent(
       : 50;
 
   // 3d. Build skill contents map for prompt injection
+  // Builtin skills: load content from SKILL.md files (file system)
+  // Custom/plugin skills: load content from DB
+  const nameToSlug = getBuiltinSkillNameToSlug();
   const skillContents: Record<string, string> = {};
   for (const s of empSkills) {
-    if (s.skillContent) {
+    if (s.skillType === "builtin") {
+      const slug = s.skillSlug ?? nameToSlug.get(s.skillName) ?? s.skillName;
+      const fileContent = loadSkillContent(slug);
+      if (fileContent) {
+        skillContents[s.skillName] = fileContent;
+      }
+    } else if (s.skillContent) {
       skillContents[s.skillName] = s.skillContent;
     }
   }

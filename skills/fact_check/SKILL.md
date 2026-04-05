@@ -1,6 +1,26 @@
 ---
 name: fact_check
-description: "多源交叉验证事实准确性，确保内容中每个关键事实经得起检验"
+displayName: 事实核查
+description: 多源交叉验证事实准确性
+category: analysis
+version: "3.5"
+inputSchema:
+  content: 待核查文本
+  focusAreas: 重点核查领域
+  strictLevel: 严格程度
+outputSchema:
+  totalChecks: 核查总数
+  passed: 通过数
+  issues: 问题列表
+  credibility: 整体可信度
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 10000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - quality_reviewer
+  - content_strategist
 ---
 
 # 事实核查

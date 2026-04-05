@@ -277,8 +277,20 @@ export const executeMissionTask = inngest.createFunction(
       return { status: "failed", error: errorMessage };
     }
 
-    // 7. Save output and mark task completed
-    await step.run("save-output", async () => {
+    // 7. Save output and mark task completed (only if still in_progress)
+    // Guard against race condition: resetStaleEmployees may have already
+    // marked this task as "failed" while the agent was still running.
+    const saved = await step.run("save-output", async () => {
+      const current = await db.query.missionTasks.findFirst({
+        where: eq(missionTasks.id, taskId),
+        columns: { status: true },
+      });
+
+      if (current?.status !== "in_progress") {
+        // Task was already marked failed/cancelled by cleanup — do not overwrite
+        return false;
+      }
+
       await db
         .update(missionTasks)
         .set({
@@ -307,7 +319,31 @@ export const executeMissionTask = inngest.createFunction(
       const allTasks = await db.select({ status: missionTasks.status }).from(missionTasks).where(eq(missionTasks.missionId, missionId));
       const pct = allTasks.length > 0 ? Math.round(allTasks.filter(t => t.status === "completed").length / allTasks.length * 100) : 0;
       await db.update(missions).set({ progress: pct }).where(eq(missions.id, missionId));
+
+      return true;
     });
+
+    // If task was already failed by cleanup, skip remaining steps
+    if (!saved) {
+      // Still record token usage even for late-arriving results
+      await step.run("update-token-usage-late", async () => {
+        const totalTokens =
+          executionResult.tokensUsed.input + executionResult.tokensUsed.output;
+        await db
+          .update(missions)
+          .set({
+            tokensUsed: sql`${missions.tokensUsed} + ${totalTokens}`,
+          })
+          .where(eq(missions.id, missionId));
+      });
+
+      return {
+        status: "aborted",
+        reason: "task_already_failed_by_cleanup",
+        taskId,
+        durationMs: executionResult.durationMs,
+      };
+    }
 
     // 8. Reset employee status
     await step.run("reset-employee-status", async () => {

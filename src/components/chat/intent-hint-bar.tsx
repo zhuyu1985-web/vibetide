@@ -2,8 +2,8 @@
 
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { Loader2, X, ChevronRight } from "lucide-react";
-import type { IntentResult } from "@/lib/agent/intent-recognition";
-import { INTENT_TYPE_LABELS } from "@/lib/agent/intent-recognition";
+import type { IntentResult } from "@/lib/agent/types";
+import { INTENT_TYPE_LABELS } from "@/lib/agent/types";
 
 interface IntentHintBarProps {
   intent: IntentResult;

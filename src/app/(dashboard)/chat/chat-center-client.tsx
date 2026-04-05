@@ -18,7 +18,7 @@ import {
 } from "@/app/actions/conversations";
 import type { AIEmployee, ScenarioCardData } from "@/lib/types";
 import type { SavedConversationRow } from "@/db/types";
-import type { IntentResult } from "@/lib/agent/intent-recognition";
+import type { IntentResult } from "@/lib/agent/types";
 import type { IntentProgress } from "@/components/chat/intent-bubble";
 
 interface ChatCenterClientProps {

@@ -1,6 +1,26 @@
 ---
 name: data_report
-description: "汇总多渠道传播数据，生成结构化分析报告并提供优化建议"
+displayName: 数据报告
+description: 生成数据分析报告，汇总传播数据
+category: knowledge
+version: "2.6"
+inputSchema:
+  reportType: 报告类型
+  dateRange: 数据范围
+  channels: 数据渠道
+  focus: 关注指标
+outputSchema:
+  kpiOverview: 核心指标
+  contentRanking: 内容排行
+  channelComparison: 渠道对比
+  recommendations: 优化建议
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 10000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - data_analyst
 ---
 
 # 数据报告

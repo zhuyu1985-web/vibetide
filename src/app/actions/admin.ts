@@ -223,9 +223,11 @@ export async function updateRole(
   await requirePermission(PERMISSIONS.SYSTEM_MANAGE_ROLES);
 
   // Prevent editing system role metadata (but allow permission updates)
-  const role = await db.query.roles.findFirst({
-    where: eq(roles.id, roleId),
-  });
+  const [role] = await db
+    .select()
+    .from(roles)
+    .where(eq(roles.id, roleId))
+    .limit(1);
   if (!role) throw new Error("角色不存在");
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -242,9 +244,11 @@ export async function updateRole(
 export async function deleteRole(roleId: string) {
   await requirePermission(PERMISSIONS.SYSTEM_MANAGE_ROLES);
 
-  const role = await db.query.roles.findFirst({
-    where: eq(roles.id, roleId),
-  });
+  const [role] = await db
+    .select()
+    .from(roles)
+    .where(eq(roles.id, roleId))
+    .limit(1);
   if (!role) throw new Error("角色不存在");
   if (role.isSystem) throw new Error("系统角色不可删除");
 

@@ -22,7 +22,6 @@ import { ALL_PERMISSIONS } from "./rbac-constants";
 export const isSuperAdmin = cache(
   async (userId: string): Promise<boolean> => {
     const profile = await db.query.userProfiles.findFirst({
-      columns: { isSuperAdmin: true },
       where: eq(userProfiles.id, userId),
     });
     return profile?.isSuperAdmin === true;

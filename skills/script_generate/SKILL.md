@@ -1,6 +1,27 @@
 ---
 name: script_generate
-description: "生成视频/音频脚本和分镜"
+displayName: 脚本生成
+description: 生成视频/音频脚本和分镜
+category: generation
+version: "1.8"
+inputSchema:
+  topic: 视频主题
+  content: 参考文章
+  duration: 目标时长
+  type: 脚本类型
+  style: 风格
+outputSchema:
+  script: 分镜脚本表
+  musicPlan: 配乐建议
+  materialList: 素材需求
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 10000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_creator
+  - video_producer
 ---
 
 # 脚本生成

@@ -1,4 +1,6 @@
 import JSZip from "jszip";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import type { SkillCategory } from "./types";
 
 export interface ParsedSkillFile {
   fileType: "reference" | "script";
@@ -7,10 +9,28 @@ export interface ParsedSkillFile {
   content: string;
 }
 
+export interface ParsedSkillMeta {
+  name: string; // slug or display name
+  displayName?: string; // Chinese display name
+  description: string;
+  category?: SkillCategory;
+  version?: string;
+  inputSchema?: Record<string, string>;
+  outputSchema?: Record<string, string>;
+  runtimeConfig?: {
+    type: string;
+    avgLatencyMs: number;
+    maxConcurrency: number;
+    modelDependency?: string;
+  };
+  compatibleRoles?: string[];
+}
+
 export interface ParsedSkillPackage {
   name: string;
   description: string;
   content: string; // SKILL.md body (without frontmatter)
+  meta: ParsedSkillMeta; // full parsed metadata
   files: ParsedSkillFile[];
 }
 
@@ -23,34 +43,60 @@ export interface ValidationError {
 const MAX_FILES = 20;
 const MAX_ZIP_SIZE = 10 * 1024 * 1024; // 10MB
 
+/**
+ * Parse SKILL.md frontmatter. Supports both simple (name/description only)
+ * and enriched (full YAML with category, schemas, etc.) formats.
+ */
 export function parseFrontmatter(raw: string): {
   name: string;
   description: string;
   body: string;
+  meta: ParsedSkillMeta;
 } {
   const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
   if (!match) {
-    return { name: "", description: "", body: raw };
+    return {
+      name: "",
+      description: "",
+      body: raw,
+      meta: { name: "", description: "" },
+    };
   }
 
-  const frontmatter = match[1];
-  const body = match[2];
+  const body = match[2].trim();
 
-  let name = "";
-  let description = "";
+  try {
+    const parsed = parseYaml(match[1]) as Record<string, unknown>;
+    const meta: ParsedSkillMeta = {
+      name: String(parsed.name || ""),
+      displayName: parsed.displayName ? String(parsed.displayName) : undefined,
+      description: String(parsed.description || ""),
+      category: parsed.category as SkillCategory | undefined,
+      version: parsed.version ? String(parsed.version) : undefined,
+      inputSchema: parsed.inputSchema as Record<string, string> | undefined,
+      outputSchema: parsed.outputSchema as Record<string, string> | undefined,
+      runtimeConfig: parsed.runtimeConfig as ParsedSkillMeta["runtimeConfig"],
+      compatibleRoles: parsed.compatibleRoles as string[] | undefined,
+    };
 
-  for (const line of frontmatter.split("\n")) {
-    const nameMatch = line.match(/^name:\s*(.+)/);
-    if (nameMatch) {
-      name = nameMatch[1].replace(/^["']|["']$/g, "").trim();
+    return {
+      name: meta.displayName || meta.name,
+      description: meta.description,
+      body,
+      meta,
+    };
+  } catch {
+    // Fallback to simple regex parsing if YAML fails
+    let name = "";
+    let description = "";
+    for (const line of match[1].split("\n")) {
+      const nameMatch = line.match(/^name:\s*(.+)/);
+      if (nameMatch) name = nameMatch[1].replace(/^["']|["']$/g, "").trim();
+      const descMatch = line.match(/^description:\s*(.+)/);
+      if (descMatch) description = descMatch[1].replace(/^["']|["']$/g, "").trim();
     }
-    const descMatch = line.match(/^description:\s*(.+)/);
-    if (descMatch) {
-      description = descMatch[1].replace(/^["']|["']$/g, "").trim();
-    }
+    return { name, description, body, meta: { name, description } };
   }
-
-  return { name, description, body: body.trim() };
 }
 
 function isUnsafePath(path: string): boolean {
@@ -80,7 +126,7 @@ export async function parseSkillZip(
       type: "file_too_large",
       message: `文件大小不能超过 10MB（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）`,
     });
-    return { package: { name: "", description: "", content: "", files: [] }, errors };
+    return { package: { name: "", description: "", content: "", meta: { name: "", description: "" }, files: [] }, errors };
   }
 
   const zip = await JSZip.loadAsync(file);
@@ -118,7 +164,7 @@ export async function parseSkillZip(
       type: "missing_skill_md",
       message: "技能包必须包含 SKILL.md 文件",
     });
-    return { package: { name: "", description: "", content: "", files: [] }, errors };
+    return { package: { name: "", description: "", content: "", meta: { name: "", description: "" }, files: [] }, errors };
   }
 
   // File count check
@@ -127,7 +173,7 @@ export async function parseSkillZip(
       type: "too_many_files",
       message: `文件数量不能超过 ${MAX_FILES} 个（当前 ${normalizedFiles.length} 个）`,
     });
-    return { package: { name: "", description: "", content: "", files: [] }, errors };
+    return { package: { name: "", description: "", content: "", meta: { name: "", description: "" }, files: [] }, errors };
   }
 
   // Path safety check
@@ -149,7 +195,7 @@ export async function parseSkillZip(
 
   // Read SKILL.md
   const skillMdRaw = await zip.files[skillMdEntry.originalPath].async("string");
-  const { name, description, body } = parseFrontmatter(cleanContent(skillMdRaw));
+  const { name, description, body, meta } = parseFrontmatter(cleanContent(skillMdRaw));
 
   // Read other files
   const parsedFiles: ParsedSkillFile[] = [];
@@ -185,6 +231,7 @@ export async function parseSkillZip(
       name,
       description,
       content: body,
+      meta,
       files: parsedFiles,
     },
     errors,
@@ -194,7 +241,23 @@ export async function parseSkillZip(
 export function generateSkillMd(
   name: string,
   description: string,
-  content: string
+  content: string,
+  meta?: Partial<ParsedSkillMeta>
 ): string {
+  if (meta?.category) {
+    // Enriched format with full metadata
+    const fm: Record<string, unknown> = {
+      name: meta.name || name,
+      ...(meta.displayName && { displayName: meta.displayName }),
+      description,
+      category: meta.category,
+      ...(meta.version && { version: meta.version }),
+      ...(meta.inputSchema && { inputSchema: meta.inputSchema }),
+      ...(meta.outputSchema && { outputSchema: meta.outputSchema }),
+      ...(meta.runtimeConfig && { runtimeConfig: meta.runtimeConfig }),
+      ...(meta.compatibleRoles?.length && { compatibleRoles: meta.compatibleRoles }),
+    };
+    return `---\n${stringifyYaml(fm).trim()}\n---\n\n${content}`;
+  }
   return `---\nname: ${name}\ndescription: "${description.replace(/"/g, '\\"')}"\n---\n\n${content}`;
 }

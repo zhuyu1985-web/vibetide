@@ -1,6 +1,26 @@
 ---
 name: publish_strategy
-description: "制定多渠道发布时间、格式适配和互动运营策略方案"
+displayName: 发布策略
+description: 制定多渠道发布时间和策略
+category: management
+version: "3.0"
+inputSchema:
+  content: 内容摘要
+  channels: 目标渠道
+  contentType: 内容类型
+  schedulePeriod: 规划周期
+outputSchema:
+  schedule: 发布时间表
+  adaptations: 渠道适配方案
+  rhythm: 发布节奏
+  operations: 互动运营
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - channel_operator
 ---
 
 # 发布策略

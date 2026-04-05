@@ -7,6 +7,7 @@ import {
   UserX,
   Shield,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -60,22 +71,41 @@ export default function UsersClient({
   isSuperAdmin: boolean;
   currentOrgId: string;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
-  const [selectedRoleId, setSelectedRoleId] = useState("");
-  const [form, setForm] = useState({
+  // Create dialog
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
     email: "",
     password: "",
     displayName: "",
     organizationId: currentOrgId,
     roleId: "",
   });
+
+  // Edit dialog
+  const [editOpen, setEditOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserWithRoles | null>(null);
+  const [editForm, setEditForm] = useState({ displayName: "", organizationId: "" });
+
+  // Assign role dialog
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [roleUser, setRoleUser] = useState<UserWithRoles | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState("");
+
+  // Confirm dialogs
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "deactivate" | "removeRole";
+    title: string;
+    description: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
 
+  // ── Create ──
   function openCreate() {
-    setForm({
+    setCreateForm({
       email: "",
       password: "",
       displayName: "",
@@ -83,7 +113,7 @@ export default function UsersClient({
       roleId: roles.find((r) => r.slug === "editor")?.id || roles[0]?.id || "",
     });
     setError("");
-    setDialogOpen(true);
+    setCreateOpen(true);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -91,8 +121,8 @@ export default function UsersClient({
     setLoading(true);
     setError("");
     try {
-      await createUser(form);
-      setDialogOpen(false);
+      await createUser(createForm);
+      setCreateOpen(false);
     } catch (err: any) {
       setError(err.message || "创建失败");
     } finally {
@@ -100,45 +130,94 @@ export default function UsersClient({
     }
   }
 
-  function openRoleDialog(user: UserWithRoles) {
-    setSelectedUser(user);
-    setSelectedRoleId("");
-    setRoleDialogOpen(true);
+  // ── Edit ──
+  function openEdit(user: UserWithRoles) {
+    setEditUser(user);
+    setEditForm({
+      displayName: user.displayName,
+      organizationId: user.organizationId || currentOrgId,
+    });
+    setError("");
+    setEditOpen(true);
   }
 
-  async function handleAssignRole(e: React.FormEvent) {
+  async function handleEdit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedUser || !selectedRoleId) return;
+    if (!editUser) return;
     setLoading(true);
+    setError("");
     try {
-      await assignUserRole(
-        selectedUser.id,
-        selectedRoleId,
-        selectedUser.organizationId || currentOrgId
-      );
-      setRoleDialogOpen(false);
+      await updateUser(editUser.id, editForm);
+      setEditOpen(false);
     } catch (err: any) {
-      alert(err.message || "分配失败");
+      setError(err.message || "更新失败");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleRemoveRole(userId: string, roleId: string) {
-    if (!confirm("确定移除该角色吗？")) return;
+  // ── Assign role ──
+  function openRoleDialog(user: UserWithRoles) {
+    setRoleUser(user);
+    setSelectedRoleId("");
+    setActionError("");
+    setRoleDialogOpen(true);
+  }
+
+  async function handleAssignRole(e: React.FormEvent) {
+    e.preventDefault();
+    if (!roleUser || !selectedRoleId) return;
+    setLoading(true);
+    setActionError("");
     try {
-      await removeUserRole(userId, roleId);
+      await assignUserRole(
+        roleUser.id,
+        selectedRoleId,
+        roleUser.organizationId || currentOrgId
+      );
+      setRoleDialogOpen(false);
     } catch (err: any) {
-      alert(err.message || "移除失败");
+      setActionError(err.message || "分配失败");
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function handleDeactivate(user: UserWithRoles) {
-    if (!confirm(`确定停用用户「${user.displayName}」吗？`)) return;
+  // ── Remove role (with confirmation) ──
+  function confirmRemoveRole(user: UserWithRoles, role: { id: string; name: string }) {
+    setConfirmAction({
+      type: "removeRole",
+      title: "移除角色",
+      description: `确定移除「${user.displayName}」的「${role.name}」角色吗？`,
+      onConfirm: async () => {
+        await removeUserRole(user.id, role.id);
+      },
+    });
+  }
+
+  // ── Deactivate (with confirmation) ──
+  function confirmDeactivate(user: UserWithRoles) {
+    setConfirmAction({
+      type: "deactivate",
+      title: "停用用户",
+      description: `确定停用用户「${user.displayName}」吗？停用后该用户将无法登录系统。`,
+      onConfirm: async () => {
+        await deactivateUser(user.id);
+      },
+    });
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+    setLoading(true);
     try {
-      await deactivateUser(user.id);
+      await confirmAction.onConfirm();
+      setConfirmAction(null);
     } catch (err: any) {
-      alert(err.message || "停用失败");
+      setActionError(err.message || "操作失败");
+      setConfirmAction(null);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -161,6 +240,21 @@ export default function UsersClient({
         </Button>
       </div>
 
+      {/* Action error toast */}
+      {actionError && (
+        <div className="flex items-center gap-2 text-sm text-red-500 bg-red-50 dark:bg-red-950/50 rounded-lg px-4 py-3">
+          <span className="flex-1">{actionError}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-red-400 hover:text-red-600"
+            onClick={() => setActionError("")}
+          >
+            <X size={14} />
+          </Button>
+        </div>
+      )}
+
       {/* User List */}
       <div className="space-y-3">
         {users.map((user) => (
@@ -182,33 +276,41 @@ export default function UsersClient({
                   {user.displayName}
                 </span>
                 {user.isSuperAdmin && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-rose-500/10 text-rose-400">
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1.5 py-0 bg-rose-500/10 text-rose-400"
+                  >
                     <ShieldCheck size={10} className="mr-0.5" />
                     超管
                   </Badge>
                 )}
               </div>
               <div className="text-xs text-muted-foreground flex items-center gap-3 mt-0.5">
-                {user.organizationName && (
-                  <span>{user.organizationName}</span>
-                )}
+                {user.organizationName && <span>{user.organizationName}</span>}
                 <span>
-                  加入于 {new Date(user.createdAt).toLocaleDateString("zh-CN")}
+                  加入于{" "}
+                  {new Date(user.createdAt).toLocaleDateString("zh-CN")}
                 </span>
               </div>
             </div>
 
             {/* Roles */}
             <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] text-indigo-400/80 font-medium mr-0.5">角色</span>
               {user.roles.map((role) => (
                 <Badge
                   key={role.id}
                   variant="outline"
-                  className="text-[11px] cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 hover:border-red-300 transition-colors"
-                  onClick={() => handleRemoveRole(user.id, role.id)}
-                  title="点击移除角色"
+                  className="text-[11px] gap-1 pr-1"
                 >
                   {role.name}
+                  <button
+                    className="ml-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 p-0.5 transition-colors"
+                    onClick={() => confirmRemoveRole(user, role)}
+                    title="移除角色"
+                  >
+                    <X size={10} />
+                  </button>
                 </Badge>
               ))}
               <Button
@@ -224,12 +326,21 @@ export default function UsersClient({
 
             {/* Actions */}
             <div className="flex gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => openEdit(user)}
+                title="编辑用户"
+              >
+                <Pencil size={14} />
+              </Button>
               {!user.isSuperAdmin && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                  onClick={() => handleDeactivate(user)}
+                  onClick={() => confirmDeactivate(user)}
                   title="停用用户"
                 >
                   <UserX size={14} />
@@ -246,8 +357,8 @@ export default function UsersClient({
         </div>
       )}
 
-      {/* Create User Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* ── Create User Dialog ── */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>添加用户</DialogTitle>
@@ -256,9 +367,9 @@ export default function UsersClient({
             <div className="space-y-2">
               <label className="text-sm font-medium">姓名</label>
               <Input
-                value={form.displayName}
+                value={createForm.displayName}
                 onChange={(e) =>
-                  setForm({ ...form, displayName: e.target.value })
+                  setCreateForm({ ...createForm, displayName: e.target.value })
                 }
                 placeholder="用户姓名"
                 required
@@ -268,8 +379,10 @@ export default function UsersClient({
               <label className="text-sm font-medium">邮箱</label>
               <Input
                 type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                value={createForm.email}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, email: e.target.value })
+                }
                 placeholder="user@example.com"
                 required
               />
@@ -278,8 +391,10 @@ export default function UsersClient({
               <label className="text-sm font-medium">密码</label>
               <Input
                 type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                value={createForm.password}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, password: e.target.value })
+                }
                 placeholder="至少 6 位"
                 minLength={6}
                 required
@@ -289,9 +404,9 @@ export default function UsersClient({
               <div className="space-y-2">
                 <label className="text-sm font-medium">所属组织</label>
                 <Select
-                  value={form.organizationId}
+                  value={createForm.organizationId}
                   onValueChange={(v) =>
-                    setForm({ ...form, organizationId: v })
+                    setCreateForm({ ...createForm, organizationId: v })
                   }
                 >
                   <SelectTrigger>
@@ -310,8 +425,10 @@ export default function UsersClient({
             <div className="space-y-2">
               <label className="text-sm font-medium">角色</label>
               <Select
-                value={form.roleId}
-                onValueChange={(v) => setForm({ ...form, roleId: v })}
+                value={createForm.roleId}
+                onValueChange={(v) =>
+                  setCreateForm({ ...createForm, roleId: v })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="选择角色" />
@@ -341,12 +458,68 @@ export default function UsersClient({
         </DialogContent>
       </Dialog>
 
-      {/* Assign Role Dialog */}
+      {/* ── Edit User Dialog ── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑用户 — {editUser?.displayName}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">姓名</label>
+              <Input
+                value={editForm.displayName}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, displayName: e.target.value })
+                }
+                placeholder="用户姓名"
+                required
+              />
+            </div>
+            {isSuperAdmin && organizations.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">所属组织</label>
+                <Select
+                  value={editForm.organizationId}
+                  onValueChange={(v) =>
+                    setEditForm({ ...editForm, organizationId: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择组织" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {error && (
+              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/50 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-primary text-primary-foreground hover:brightness-110"
+            >
+              {loading ? "保存中..." : "保存修改"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Assign Role Dialog ── */}
       <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              分配角色 - {selectedUser?.displayName}
+              分配角色 — {roleUser?.displayName}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAssignRole} className="space-y-4">
@@ -362,8 +535,7 @@ export default function UsersClient({
                 <SelectContent>
                   {roles
                     .filter(
-                      (r) =>
-                        !selectedUser?.roles.some((ur) => ur.id === r.id)
+                      (r) => !roleUser?.roles.some((ur) => ur.id === r.id)
                     )
                     .map((role) => (
                       <SelectItem key={role.id} value={role.id}>
@@ -373,6 +545,11 @@ export default function UsersClient({
                 </SelectContent>
               </Select>
             </div>
+            {actionError && (
+              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/50 rounded-lg px-3 py-2">
+                {actionError}
+              </p>
+            )}
             <Button
               type="submit"
               disabled={loading || !selectedRoleId}
@@ -383,6 +560,31 @@ export default function UsersClient({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Confirm AlertDialog ── */}
+      <AlertDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmAction?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAction}
+              disabled={loading}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              {loading ? "处理中..." : "确认"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

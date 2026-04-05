@@ -1,6 +1,27 @@
 ---
 name: audience_analysis
-description: "分析目标受众画像、偏好和行为模式，提供精准的内容适配建议"
+displayName: 受众分析
+description: 分析目标受众画像、偏好和行为
+category: analysis
+version: "1.9"
+inputSchema:
+  topic: 分析主题
+  platform: 目标平台
+  existingData: 已有数据
+outputSchema:
+  profile: 受众画像
+  segments: 受众分群
+  behaviors: 行为模式
+  recommendations: 适配建议
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_strategist
+  - channel_operator
+  - data_analyst
 ---
 
 # 受众分析

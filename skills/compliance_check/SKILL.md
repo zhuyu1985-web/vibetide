@@ -1,6 +1,24 @@
 ---
 name: compliance_check
-description: "检测政治、法律、伦理敏感内容，确保符合法律法规和平台规范"
+displayName: 合规检查
+description: 检测政治、法律、伦理敏感内容
+category: management
+version: "4.0"
+inputSchema:
+  content: 待检查内容
+  checkLevel: 检查级别
+  publishRegion: 发布地区
+outputSchema:
+  verdict: 合规结论
+  categories: 各类别检查结果
+  issues: 问题详情列表
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - quality_reviewer
 ---
 
 # 合规检查

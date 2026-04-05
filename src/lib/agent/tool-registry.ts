@@ -2,7 +2,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod/v4";
 import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
-import { BUILTIN_SKILLS } from "@/lib/constants";
+import { getBuiltinSkillNameToSlug } from "@/lib/skill-loader";
 import {
   searchViaTavily,
   fetchViaJinaReader,
@@ -714,7 +714,7 @@ function createToolDefinitions(): ToolSet {
 }
 
 const ALL_TOOLS = createToolDefinitions();
-const BUILTIN_SKILL_NAME_TO_SLUG = new Map(BUILTIN_SKILLS.map((skill) => [skill.name, skill.slug]));
+const BUILTIN_SKILL_NAME_TO_SLUG = getBuiltinSkillNameToSlug();
 
 // ---------------------------------------------------------------------------
 // Resolve skill names to AgentTool descriptors

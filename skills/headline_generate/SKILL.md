@@ -1,6 +1,26 @@
 ---
 name: headline_generate
-description: "生成多版本吸引力标题"
+displayName: 标题生成
+description: 生成多版本吸引力标题
+category: generation
+version: "2.3"
+inputSchema:
+  content: 文章内容
+  platform: 目标平台
+  count: 生成数量
+  constraints: 约束条件
+outputSchema:
+  headlines: 标题列表
+  recommended: 推荐标题
+  strategies: 策略说明
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 5000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_creator
+  - content_strategist
 ---
 
 # 标题生成

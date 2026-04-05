@@ -1,13 +1,13 @@
 // sync-skills-from-md.ts
 // Reads skills/*/SKILL.md files and syncs content to the database skills table.
-// Maps via BUILTIN_SKILLS slug -> name to find DB records, then updates content.
+// Maps via skill-loader slug -> name to find DB records, then updates content.
 // Usage: npx tsx scripts/sync-skills-from-md.ts
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, and } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "../src/db/schema";
-import { BUILTIN_SKILLS } from "../src/lib/constants";
+import { getBuiltinSkillSlugToName } from "../src/lib/skill-loader";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -17,11 +17,8 @@ config();
 
 const SKILLS_DIR = path.resolve(__dirname, "../skills");
 
-// Build slug -> name map from BUILTIN_SKILLS
-const slugToName = new Map<string, string>();
-for (const s of BUILTIN_SKILLS) {
-  slugToName.set(s.slug, s.name);
-}
+// Build slug -> name map from skill-loader
+const slugToName = getBuiltinSkillSlugToName();
 
 // Parse SKILL.md: strip YAML frontmatter, return body content
 function parseSkillMd(filePath: string): { name: string | null; description: string | null; content: string } {
@@ -91,7 +88,7 @@ async function main() {
     // Find the Chinese name for this slug
     const chineseName = slugToName.get(slug);
     if (!chineseName) {
-      console.log(`  SKIP  ${slug} — not in BUILTIN_SKILLS`);
+      console.log(`  SKIP  ${slug} — not a builtin skill`);
       skipped++;
       continue;
     }

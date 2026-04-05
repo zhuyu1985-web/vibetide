@@ -1,6 +1,7 @@
 ---
 name: page-qa-fix
 description: "Automated page quality inspection and error repair for web projects. Scan all page routes, detect compilation/runtime/HTTP errors, diagnose root causes, and auto-fix issues in a continuous loop until all pages work. Use when: (1) user says 'check all pages', 'fix page errors', 'page QA', '页面质检', '页面检查', '路由检查', '修复页面', (2) after build completes and pages have routing errors or blank screens, (3) user reports multiple pages are broken or showing errors, (4) user wants to verify all routes are accessible and error-free. Supports Next.js, Nuxt, SvelteKit, Remix, Vite, and other frameworks."
+builtin: false
 ---
 
 # Page QA & Auto-Fix

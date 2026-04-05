@@ -24,8 +24,16 @@ export async function GET(
 
   const zip = new JSZip();
 
-  // Add SKILL.md with frontmatter
-  const skillMd = generateSkillMd(skill.name, skill.description, skill.content);
+  // Add SKILL.md with enriched frontmatter (category, schemas, runtimeConfig, etc.)
+  const skillMd = generateSkillMd(skill.name, skill.description, skill.content, {
+    name: skill.name,
+    category: skill.category,
+    version: skill.version,
+    inputSchema: skill.inputSchema ?? undefined,
+    outputSchema: skill.outputSchema ?? undefined,
+    runtimeConfig: skill.runtimeConfig ?? undefined,
+    compatibleRoles: skill.compatibleRoles ?? undefined,
+  });
   zip.file("SKILL.md", skillMd);
 
   // Add files

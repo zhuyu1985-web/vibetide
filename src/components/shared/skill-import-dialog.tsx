@@ -20,9 +20,9 @@ import {
   Loader2,
   Check,
 } from "lucide-react";
-import { parseSkillZip } from "@/lib/skill-package";
+import { parseSkillZip, parseFrontmatter } from "@/lib/skill-package";
 import type { ParsedSkillPackage, ValidationError } from "@/lib/skill-package";
-import { importSkillPackage } from "@/app/actions/skills";
+import { importSkillPackage, importSkillMd } from "@/app/actions/skills";
 import type { SkillCategory } from "@/lib/types";
 
 const categoryOptions: { value: SkillCategory; label: string }[] = [
@@ -50,6 +50,7 @@ export function SkillImportDialog({
   const [importing, setImporting] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [pkg, setPkg] = useState<ParsedSkillPackage | null>(null);
+  const [mdRawContent, setMdRawContent] = useState<string | null>(null);
 
   // Editable fields
   const [name, setName] = useState("");
@@ -61,6 +62,7 @@ export function SkillImportDialog({
     setImporting(false);
     setErrors([]);
     setPkg(null);
+    setMdRawContent(null);
     setName("");
     setDescription("");
     setCategory("knowledge");
@@ -70,27 +72,54 @@ export function SkillImportDialog({
     setParsing(true);
     setErrors([]);
     setPkg(null);
+    setMdRawContent(null);
 
     try {
-      const result = await parseSkillZip(file);
-      setErrors(result.errors);
+      if (file.name.endsWith(".md")) {
+        // Single SKILL.md file import
+        const raw = await file.text();
+        const { name: parsedName, description: parsedDesc, body, meta } = parseFrontmatter(raw);
 
-      const blockingErrors = result.errors.filter(
-        (e) => e.type !== "unsafe_path"
-      );
-      if (blockingErrors.length > 0) {
-        setParsing(false);
-        return;
+        if (!body.trim()) {
+          setErrors([{ type: "missing_skill_md", message: "SKILL.md 文件内容为空" }]);
+          setParsing(false);
+          return;
+        }
+
+        setMdRawContent(raw);
+        setPkg({
+          name: parsedName,
+          description: parsedDesc,
+          content: body,
+          meta,
+          files: [],
+        });
+        setName(parsedName);
+        setDescription(parsedDesc);
+        if (meta.category) setCategory(meta.category);
+      } else {
+        // ZIP package import
+        const result = await parseSkillZip(file);
+        setErrors(result.errors);
+
+        const blockingErrors = result.errors.filter(
+          (e) => e.type !== "unsafe_path"
+        );
+        if (blockingErrors.length > 0) {
+          setParsing(false);
+          return;
+        }
+
+        setPkg(result.package);
+        setName(result.package.name);
+        setDescription(result.package.description);
+        if (result.package.meta.category) setCategory(result.package.meta.category);
       }
-
-      setPkg(result.package);
-      setName(result.package.name);
-      setDescription(result.package.description);
     } catch {
       setErrors([
         {
           type: "file_too_large",
-          message: "无法解析 zip 文件，请检查文件格式",
+          message: "无法解析文件，请检查文件格式",
         },
       ]);
     } finally {
@@ -102,7 +131,7 @@ export function SkillImportDialog({
     (e: React.DragEvent) => {
       e.preventDefault();
       const file = e.dataTransfer.files[0];
-      if (file && file.name.endsWith(".zip")) {
+      if (file && (file.name.endsWith(".zip") || file.name.endsWith(".md"))) {
         handleFile(file);
       }
     },
@@ -113,13 +142,22 @@ export function SkillImportDialog({
     if (!pkg || !name.trim()) return;
     setImporting(true);
     try {
-      await importSkillPackage({
-        name: name.trim(),
-        description: description.trim(),
-        category,
-        content: pkg.content,
-        files: pkg.files,
-      });
+      if (mdRawContent) {
+        // Single SKILL.md import
+        await importSkillMd({
+          rawContent: mdRawContent,
+          category,
+        });
+      } else {
+        // ZIP package import
+        await importSkillPackage({
+          name: name.trim(),
+          description: description.trim(),
+          category,
+          content: pkg.content,
+          files: pkg.files,
+        });
+      }
       router.refresh();
       onOpenChange(false);
       reset();
@@ -184,7 +222,7 @@ export function SkillImportDialog({
             <input
               ref={fileRef}
               type="file"
-              accept=".zip"
+              accept=".zip,.md"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -205,10 +243,10 @@ export function SkillImportDialog({
                   className="text-gray-400 dark:text-gray-500"
                 />
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  拖放 .zip 文件到此处，或点击选择文件
+                  拖放文件到此处，或点击选择文件
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500">
-                  技能包需包含 SKILL.md 文件，最大 10MB
+                  支持 .md（单文件）或 .zip（技能包），最大 10MB
                 </p>
               </div>
             )}

@@ -1,6 +1,25 @@
 ---
 name: angle_design
-description: "基于热点设计多个差异化内容角度"
+displayName: 角度设计
+description: 基于热点设计多个差异化内容角度
+category: generation
+version: "2.5"
+inputSchema:
+  topic: 热点话题
+  context: 话题背景
+  targetAudience: 目标受众
+  count: 角度数量
+outputSchema:
+  angles: 角度列表
+  comparison: 对比矩阵
+  recommendation: 组合建议
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_strategist
 ---
 
 # 角度设计

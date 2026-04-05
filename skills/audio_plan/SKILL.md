@@ -1,6 +1,26 @@
 ---
 name: audio_plan
-description: "为视频和音频内容设计配音配乐方案，生成完整的音频制作时间轴"
+displayName: 音频方案
+description: 配音配乐方案和语音合成计划
+category: production
+version: "1.3"
+inputSchema:
+  script: 旁白脚本
+  duration: 总时长
+  mood: 情绪基调
+  voiceType: 配音类型
+outputSchema:
+  voicePlan: 配音脚本
+  musicPlan: 配乐方案
+  sfxPlan: 音效设计
+  mixGuide: 混音参考
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - video_producer
 ---
 
 # 音频方案

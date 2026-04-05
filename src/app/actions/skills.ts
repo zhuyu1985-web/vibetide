@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
 import type { SkillCategory } from "@/lib/types";
+import { parseFrontmatter } from "@/lib/skill-package";
 import { encrypt } from "@/lib/crypto";
 import { validatePluginUrl } from "@/lib/plugin-security";
 
@@ -445,6 +446,50 @@ export async function importSkillPackage(data: {
   });
 
   revalidatePath("/skills");
+}
+
+/**
+ * Import a single SKILL.md file as a custom skill.
+ * Parses enriched frontmatter for metadata, stores content in DB.
+ */
+export async function importSkillMd(data: {
+  rawContent: string;
+  category?: SkillCategory;
+}) {
+  await requireAuth();
+  const orgId = await requireCurrentOrgId();
+
+  if (data.rawContent.length > 500_000) {
+    throw new Error("文件内容过大（最大 500KB）");
+  }
+
+  const { name, description, body, meta } = parseFrontmatter(data.rawContent);
+
+  if (!name.trim()) throw new Error("SKILL.md 缺少 name 字段");
+  if (!body.trim()) throw new Error("SKILL.md 内容为空");
+
+  const category = meta.category ?? data.category;
+  if (!category) throw new Error("请指定技能分类（SKILL.md 中缺少 category 字段）");
+
+  const [newSkill] = await db
+    .insert(skills)
+    .values({
+      organizationId: orgId,
+      name: meta.displayName || name,
+      category,
+      type: "custom",
+      version: meta.version?.trim() || "1.0",
+      description: description || name,
+      content: body,
+      inputSchema: meta.inputSchema ?? null,
+      outputSchema: meta.outputSchema ?? null,
+      runtimeConfig: meta.runtimeConfig ?? null,
+      compatibleRoles: meta.compatibleRoles ?? [],
+    })
+    .returning({ id: skills.id });
+
+  revalidatePath("/skills");
+  return { skillId: newSkill.id };
 }
 
 export async function addSkillFile(

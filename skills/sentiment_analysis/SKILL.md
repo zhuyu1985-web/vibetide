@@ -1,6 +1,27 @@
 ---
 name: sentiment_analysis
-description: "分析文本情感倾向（正面/负面/中性），识别情绪强度和情感触发因素"
+displayName: 情感分析
+description: 分析文本情感倾向（正面/负面/中性）
+category: analysis
+version: "2.5"
+inputSchema:
+  text: 待分析文本
+  granularity: 分析粒度
+  aspects: 方面维度列表
+outputSchema:
+  sentiment: 情感倾向
+  confidence: 置信度
+  intensity: 情绪强度
+  sentences: 句子级分析
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 5000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - trending_scout
+  - quality_reviewer
+  - data_analyst
 ---
 
 # 情感分析

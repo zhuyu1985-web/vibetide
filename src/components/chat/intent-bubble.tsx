@@ -12,8 +12,8 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
-import type { IntentResult, IntentStep } from "@/lib/agent/intent-recognition";
-import { INTENT_TYPE_LABELS } from "@/lib/agent/intent-recognition";
+import type { IntentResult, IntentStep } from "@/lib/agent/types";
+import { INTENT_TYPE_LABELS } from "@/lib/agent/types";
 import type { StepInfo } from "@/lib/chat-utils";
 
 // ---------------------------------------------------------------------------

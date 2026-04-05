@@ -53,6 +53,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
 
 /* ─── Types ─── */
 
@@ -194,6 +195,22 @@ const workspaceItems: NavItem[] = [
 
 const navGroups: NavGroupConfig[] = [
   {
+    label: "创作者中心",
+    icon: PenTool,
+    theme: "amber",
+    groupId: "creator",
+    items: [
+      { label: "灵感池", href: "/inspiration", icon: Lightbulb },
+      { label: "同题对标", href: "/benchmarking", icon: Target },
+      { label: "超级创作", href: "/super-creation", icon: Wand2 },
+      { label: "精品聚合", href: "/premium-content", icon: Gem },
+      { label: "短视频工厂", href: "/video-batch", icon: Video },
+      { label: "节赛会展", href: "/event-auto", icon: CalendarCheck },
+      { label: "批量审核", href: "/batch-review", icon: ClipboardCheck },
+      { label: "生产模板", href: "/production-templates", icon: LayoutTemplate },
+    ],
+  },
+  {
     label: "内容管理",
     icon: Archive,
     theme: "purple",
@@ -213,22 +230,6 @@ const navGroups: NavGroupConfig[] = [
       { label: "媒资智能理解", href: "/asset-intelligence", icon: Layers },
       { label: "频道知识库", href: "/channel-knowledge", icon: BookOpen },
       { label: "资产盘活中心", href: "/asset-revive", icon: RefreshCw },
-    ],
-  },
-  {
-    label: "创作者中心",
-    icon: PenTool,
-    theme: "amber",
-    groupId: "creator",
-    items: [
-      { label: "灵感池", href: "/inspiration", icon: Lightbulb },
-      { label: "同题对标", href: "/benchmarking", icon: Target },
-      { label: "超级创作", href: "/super-creation", icon: Wand2 },
-      { label: "精品聚合", href: "/premium-content", icon: Gem },
-      { label: "短视频工厂", href: "/video-batch", icon: Video },
-      { label: "节赛会展", href: "/event-auto", icon: CalendarCheck },
-      { label: "批量审核", href: "/batch-review", icon: ClipboardCheck },
-      { label: "生产模板", href: "/production-templates", icon: LayoutTemplate },
     ],
   },
   {
@@ -482,10 +483,21 @@ function NavMenuItem({
 
 export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
   const pathname = usePathname();
+  const hasAllPerms = permissions.length === 0; // no permissions = demo mode, show all
   const canAccessAdmin =
     permissions.includes("system:manage_users") ||
     permissions.includes("system:manage_orgs") ||
     permissions.includes("system:manage_roles");
+
+  function canSeeItem(href: string) {
+    if (hasAllPerms) return true;
+    const perm = MENU_PERMISSION_MAP[href];
+    return !perm || permissions.includes(perm);
+  }
+
+  function filterItems(items: NavItem[]) {
+    return items.filter((item) => canSeeItem(item.href));
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50 glass-sidebar">
@@ -517,11 +529,12 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
       {/* ── Scrollable Content ── */}
       <SidebarContent className="sidebar-scroll">
         {/* 工作空间 - 平铺一级菜单 */}
+        {filterItems(workspaceItems).length > 0 && (
         <SidebarGroup className="py-0.5 px-2">
           <GroupLabel label="工作空间" theme="blue" />
           <SidebarGroupContent>
             <SidebarMenu>
-              {workspaceItems.map((item) => (
+              {filterItems(workspaceItems).map((item) => (
                 <NavMenuItem
                   key={item.href}
                   href={item.href}
@@ -534,14 +547,20 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
 
         {/* 可折叠分组 */}
-        {navGroups.map((group) => (
-          <div key={group.groupId}>
-            <NavSeparator theme={group.theme} />
-            <NavSection group={group} pathname={pathname} />
-          </div>
-        ))}
+        {navGroups.map((group) => {
+          const visibleItems = filterItems(group.items);
+          if (visibleItems.length === 0) return null;
+          const filteredGroup = { ...group, items: visibleItems };
+          return (
+            <div key={group.groupId}>
+              <NavSeparator theme={group.theme} />
+              <NavSection group={filteredGroup} pathname={pathname} />
+            </div>
+          );
+        })}
 
         {/* 系统管理 - 仅管理员可见 */}
         {canAccessAdmin && (

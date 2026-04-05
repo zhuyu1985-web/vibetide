@@ -1,6 +1,26 @@
 ---
 name: layout_design
-description: "为不同类型的内容提供专业版式设计方案，支持跨平台自适应排版"
+displayName: 排版设计
+description: 自动排版和版式设计建议
+category: production
+version: "1.5"
+inputSchema:
+  content: 待排版内容
+  contentType: 内容类型
+  platform: 平台
+  imageCount: 配图数
+outputSchema:
+  layout: 版式方案
+  typography: 字体层级
+  imageRules: 图片规则
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 6000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - video_producer
+  - content_creator
 ---
 
 # 排版设计

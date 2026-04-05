@@ -406,13 +406,15 @@ export async function cleanupStuckMissions() {
       await db
         .update(missions)
         .set({
-          status: completedCount > 0 ? "completed" : "failed",
+          status: "failed",
           completedAt: now,
           finalOutput: completedCount > 0
             ? {
+                error: true,
                 degradation_level: completedCount / totalCount >= 0.3 ? 3 : 4,
                 message: `${completedCount}/${totalCount} 个子任务完成（执行超时，系统自动清理）`,
                 completedTasks: allTasks.filter((t) => t.status === "completed").map((t) => t.title),
+                failedAt: now.toISOString(),
               }
             : {
                 error: true,
@@ -452,12 +454,14 @@ export async function cleanupStuckMissions() {
       await db
         .update(missions)
         .set({
-          status: "completed",
+          status: "failed",
           completedAt: now,
           finalOutput: {
+            error: true,
             degradation_level: 3,
             message: `${completedTasks.length} 个子任务完成（汇总超时，系统自动生成摘要）`,
             completedTasks: completedTasks.map((t) => t.title),
+            failedAt: now.toISOString(),
           },
         })
         .where(eq(missions.id, m.id));

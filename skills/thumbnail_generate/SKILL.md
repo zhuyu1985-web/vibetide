@@ -1,6 +1,25 @@
 ---
 name: thumbnail_generate
-description: "根据内容自动生成高点击率的封面设计方案，支持多平台多尺寸适配"
+displayName: 封面生成
+description: 根据内容自动生成封面设计方案
+category: production
+version: "1.6"
+inputSchema:
+  title: 内容标题
+  content: 内容摘要
+  platform: 目标平台
+  brandColor: 品牌色
+outputSchema:
+  designs: 设计方案列表
+  sizeAdaptation: 尺寸适配方案
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 6000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - video_producer
+  - content_creator
 ---
 
 # 封面生成

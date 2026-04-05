@@ -1,6 +1,25 @@
 ---
 name: knowledge_retrieval
-description: "从组织知识库中精准检索相关知识片段，提供语义匹配与上下文关联"
+displayName: 知识检索
+description: 从知识库中检索相关知识片段
+category: knowledge
+version: "2.0"
+inputSchema:
+  query: 检索查询
+  kbTypes: 知识库类型
+  topK: 返回条数
+outputSchema:
+  results: 检索结果列表
+  knowledgeGraph: 知识图谱
+  totalMatches: 匹配总数
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 5000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - asset_manager
+  - content_creator
 ---
 
 # 知识检索

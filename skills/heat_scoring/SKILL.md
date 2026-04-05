@@ -1,6 +1,26 @@
 ---
 name: heat_scoring
-description: "基于四维数据模型计算话题热度指数，预测走势并输出操作建议"
+displayName: 热度评分
+description: 基于多维数据计算话题热度指数
+category: analysis
+version: "2.1"
+inputSchema:
+  topic: 待评分话题
+  context: 背景信息
+  compareTopics: 对比话题
+outputSchema:
+  score: 综合热度分
+  grade: 等级S/A/B/C
+  dimensions: 四维明细
+  trend: 趋势预测
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 6000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - trending_scout
+  - data_analyst
 ---
 
 # 热度评分

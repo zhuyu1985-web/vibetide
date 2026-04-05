@@ -3,7 +3,8 @@
  * Validates all 29 skills' constants data without DB connection.
  * Checks: content quality, schema completeness, SKILL.md files existence.
  */
-import { BUILTIN_SKILLS, EMPLOYEE_CORE_SKILLS } from "../src/lib/constants";
+import { EMPLOYEE_CORE_SKILLS } from "../src/lib/constants";
+import { getAllBuiltinSkills, type BuiltinSkillDef } from "../src/lib/skill-loader";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 
@@ -14,7 +15,7 @@ interface ValidationResult {
   checks: { name: string; pass: boolean; detail: string }[];
 }
 
-function validateSkill(skill: (typeof BUILTIN_SKILLS)[0]): ValidationResult {
+function validateSkill(skill: BuiltinSkillDef): ValidationResult {
   const checks: ValidationResult["checks"] = [];
 
   // 1. Content length
@@ -141,7 +142,7 @@ function main() {
   console.log("=".repeat(70));
   console.log("🔍 Vibetide 技能数据完整性验证");
   console.log("=".repeat(70));
-  console.log(`\n📋 技能总数: ${BUILTIN_SKILLS.length}\n`);
+  console.log(`\n📋 技能总数: ${getAllBuiltinSkills().length}\n`);
 
   const allResults: ValidationResult[] = [];
   const categories = ["perception", "analysis", "generation", "production", "management", "knowledge"];
@@ -155,7 +156,7 @@ function main() {
   let totalFail = 0;
 
   for (const category of categories) {
-    const skills = BUILTIN_SKILLS.filter((s) => s.category === category);
+    const skills = getAllBuiltinSkills().filter((s) => s.category === category);
     console.log(`\n${"─".repeat(50)}`);
     console.log(`📂 ${categoryNames[category]} (${skills.length}个)`);
     console.log(`${"─".repeat(50)}`);
@@ -210,7 +211,7 @@ function main() {
   console.log("👥 员工-技能覆盖检查");
   console.log(`${"─".repeat(50)}`);
   for (const [emp, skills] of Object.entries(EMPLOYEE_CORE_SKILLS)) {
-    const missing = skills.filter((s) => !BUILTIN_SKILLS.find((b) => b.slug === s));
+    const missing = skills.filter((s) => !getAllBuiltinSkills().find((b) => b.slug === s));
     if (missing.length > 0) {
       console.log(`  ⚠️ ${emp}: 绑定了不存在的技能: ${missing.join(", ")}`);
     } else {
@@ -220,7 +221,7 @@ function main() {
 
   // Check for orphan skills (not bound to any employee)
   const allBoundSlugs = new Set(Object.values(EMPLOYEE_CORE_SKILLS).flat());
-  const orphans = BUILTIN_SKILLS.filter((s) => !allBoundSlugs.has(s.slug));
+  const orphans = getAllBuiltinSkills().filter((s) => !allBoundSlugs.has(s.slug));
   if (orphans.length > 0) {
     console.log(`\n  ⚠️ 未绑定到任何员工的技能: ${orphans.map((s) => s.slug).join(", ")}`);
   }

@@ -33,10 +33,10 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          2个编辑 + 1支AI团队
+          多智能体协同
           <br />
           <span className="bg-gradient-to-r from-primary to-[#22d3ee] bg-clip-text text-transparent">
-            = 全能新媒体军团
+            开放式内容生产引擎
           </span>
         </motion.h1>
 
@@ -47,8 +47,8 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
         >
-          从热点发现到全渠道分发，8位AI专业员工7×24小时协作，
-          让你的内容产出效率提升80%
+          8位AI智能体各司其职、自主协作，覆盖热点捕获到全渠道分发全链路，
+          构建开放、可扩展的智能内容生产生态
         </motion.p>
 
         {/* CTA buttons */}

@@ -1,6 +1,26 @@
 ---
 name: style_rewrite
-description: "按指定风格改写内容（正式/轻松/专业等）"
+displayName: 风格改写
+description: 按指定风格改写内容（正式/轻松/专业等）
+category: generation
+version: "2.0"
+inputSchema:
+  content: 原始内容
+  targetStyle: 目标风格
+  platform: 目标平台
+  tone: 语气
+outputSchema:
+  rewritten: 改写后内容
+  changes: 改动说明
+  wordCount: 字数变化
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 8000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_creator
+  - channel_operator
 ---
 
 # 风格改写

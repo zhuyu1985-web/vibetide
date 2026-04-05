@@ -192,10 +192,24 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
     return map;
   }, [mission.tasks]);
 
-  const sortedTasks = useMemo(() =>
-    [...mission.tasks].sort((a, b) => b.priority - a.priority),
-    [mission.tasks]
-  );
+  const sortedTasks = useMemo(() => {
+    const statusOrder: Record<string, number> = {
+      completed: 0,
+      in_progress: 1,
+      claimed: 1,
+      ready: 2,
+      pending: 3,
+      blocked: 4,
+      failed: 5,
+      cancelled: 5,
+    };
+    return [...mission.tasks].sort((a, b) => {
+      const sa = statusOrder[a.status] ?? 9;
+      const sb = statusOrder[b.status] ?? 9;
+      if (sa !== sb) return sa - sb;
+      return b.priority - a.priority;
+    });
+  }, [mission.tasks]);
 
   const empTaskMap = useMemo(() => {
     const map = new Map<string, MissionTask>();
@@ -750,32 +764,77 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
 
   return (
     <Sheet open={!!task} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
-        <SheetHeader><SheetTitle className="text-left">{task.title}</SheetTitle></SheetHeader>
-        <div className="mt-5 space-y-5">
-          <div className="flex items-center justify-between">
-            <div className={cn("flex items-center gap-1.5", config.color)}><StatusIcon size={14} /><span className="text-sm">{config.label}</span></div>
+      <SheetContent className="sm:max-w-lg overflow-y-auto p-0 gap-0">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white dark:bg-gray-950 px-6 pt-6 pb-4 border-b border-gray-100 dark:border-white/5">
+          <SheetHeader>
+            <SheetTitle className="text-left text-base leading-snug">{task.title}</SheetTitle>
+          </SheetHeader>
+          <div className="flex items-center justify-between mt-3">
+            <div className={cn("inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full", config.color, "bg-current/8")}>
+              <StatusIcon size={12} />
+              <span>{config.label}</span>
+            </div>
             {empMeta ? (
-              <div className="flex items-center gap-1.5"><EmployeeAvatar employeeId={empMeta.id} size="xs" /><span className="text-sm" style={{ color: empMeta.color }}>{empMeta.nickname}</span></div>
-            ) : <span className="text-sm text-muted-foreground">未分配</span>}
+              <div className="flex items-center gap-1.5">
+                <EmployeeAvatar employeeId={empMeta.id} size="xs" />
+                <span className="text-sm font-medium" style={{ color: empMeta.color }}>{empMeta.nickname}</span>
+              </div>
+            ) : <span className="text-xs text-muted-foreground">未分配</span>}
           </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5">
           {task.description && <DetailSection label="任务描述" text={task.description} />}
           {task.expectedOutput && <DetailSection label="期望输出" text={task.expectedOutput} />}
           {task.acceptanceCriteria && <DetailSection label="验收标准" text={task.acceptanceCriteria} />}
+
           {fullSummary && (
-            <div><h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3><div className="rounded-xl bg-gray-50 dark:bg-white/[0.03] p-3"><CollapsibleMessageContent markdown={fullSummary} /></div></div>
+            <div>
+              <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
+              <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
+                <CollapsibleMessageContent markdown={fullSummary} />
+              </div>
+            </div>
           )}
           {fullOutputText && !fullSummary && (
-            <div><h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">输出数据</h3><pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-white/[0.03] p-3 rounded-xl overflow-x-auto">{fullOutputText}</pre></div>
+            <div>
+              <h3 className="text-xs font-semibold text-muted-foreground mb-2">输出数据</h3>
+              <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 p-4 rounded-xl overflow-x-auto leading-relaxed">{fullOutputText}</pre>
+            </div>
           )}
           {task.errorMessage && (
-            <div><h3 className="text-xs font-semibold text-red-400 mb-2">错误信息</h3><p className="text-sm text-red-400/70 whitespace-pre-wrap bg-red-500/5 p-3 rounded-xl">{task.errorMessage}</p></div>
+            <div>
+              <h3 className="text-xs font-semibold text-red-500 dark:text-red-400 mb-2">错误信息</h3>
+              <p className="text-sm text-red-600/80 dark:text-red-400/70 whitespace-pre-wrap bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/10 p-4 rounded-xl">{task.errorMessage}</p>
+            </div>
           )}
-          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1 pt-3 border-t border-gray-200 dark:border-white/5 font-mono">
-            <p>创建 {new Date(task.createdAt).toLocaleString("zh-CN")}</p>
-            {task.startedAt && <p>开始 {new Date(task.startedAt).toLocaleString("zh-CN")}</p>}
-            {task.completedAt && <p>完成 {new Date(task.completedAt).toLocaleString("zh-CN")}</p>}
-            {task.retryCount > 0 && <p>重试 {task.retryCount} 次</p>}
+
+          {/* Timeline */}
+          <div className="pt-4 border-t border-gray-100 dark:border-white/5">
+            <div className="space-y-2.5">
+              {[
+                { label: "创建", time: task.createdAt, dot: "bg-gray-300 dark:bg-gray-600" },
+                task.startedAt ? { label: "开始", time: task.startedAt, dot: "bg-cyan-400" } : null,
+                task.completedAt ? { label: "完成", time: task.completedAt, dot: "bg-emerald-400" } : null,
+              ].filter(Boolean).map((item) => (
+                <div key={item!.label} className="flex items-center gap-3">
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", item!.dot)} />
+                  <span className="text-xs text-muted-foreground w-7">{item!.label}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-mono tabular-nums">
+                    {new Date(item!.time).toLocaleString("zh-CN")}
+                  </span>
+                </div>
+              ))}
+              {task.retryCount > 0 && (
+                <div className="flex items-center gap-3">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-orange-400" />
+                  <span className="text-xs text-muted-foreground w-7">重试</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-mono">{task.retryCount} 次</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </SheetContent>
@@ -786,8 +845,10 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
 function DetailSection({ label, text }: { label: string; text: string }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-muted-foreground mb-2">{label}</h3>
-      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{text}</p>
+      <h3 className="text-xs font-semibold text-muted-foreground mb-2">{label}</h3>
+      <div className="rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 px-4 py-3">
+        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{text}</p>
+      </div>
     </div>
   );
 }

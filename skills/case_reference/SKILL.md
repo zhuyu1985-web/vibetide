@@ -1,6 +1,26 @@
 ---
 name: case_reference
-description: "检索历史爆款案例，分析成功要素并提炼可复用的方法论"
+displayName: 案例参考
+description: 检索历史爆款案例作为创作参考
+category: knowledge
+version: "1.5"
+inputSchema:
+  topic: 创作主题
+  contentType: 内容类型
+  minPerformance: 最低表现
+  count: 案例数
+outputSchema:
+  cases: 案例列表
+  methodology: 方法论提炼
+  suggestions: 创作建议
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - asset_manager
+  - content_strategist
 ---
 
 # 案例参考

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { ChevronRight, Play, X, GripVertical, Trash2 } from "lucide-react";
-import type { IntentResult, IntentStep } from "@/lib/agent/intent-recognition";
-import { INTENT_TYPE_LABELS } from "@/lib/agent/intent-recognition";
+import type { IntentResult, IntentStep } from "@/lib/agent/types";
+import { INTENT_TYPE_LABELS } from "@/lib/agent/types";
 
 interface IntentCardProps {
   intent: IntentResult;

@@ -1,6 +1,25 @@
 ---
 name: video_edit_plan
-description: "生成视频剪辑计划和分镜脚本，将文字内容转化为可执行的视频制作方案"
+displayName: 视频剪辑方案
+description: 生成视频剪辑计划和分镜脚本
+category: production
+version: "2.8"
+inputSchema:
+  script: 视频脚本
+  duration: 目标时长
+  platform: 发布平台
+  availableAssets: 可用素材
+outputSchema:
+  storyboard: 分镜表
+  materialList: 素材清单
+  musicPlan: 配乐方案
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 10000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - video_producer
 ---
 
 # 视频剪辑方案

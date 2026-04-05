@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   EMPLOYEE_META,
   EMPLOYEE_CORE_SKILLS,
-  BUILTIN_SKILLS,
+  BUILTIN_SKILL_NAMES,
   type EmployeeId,
 } from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
@@ -25,7 +25,7 @@ const EMPLOYEE_DESCRIPTIONS: Record<string, string> = {
   xiaoshu: "全渠道数据分析，效果归因清晰透明",
 };
 
-const skillNameMap = new Map(BUILTIN_SKILLS.map((s) => [s.slug, s.name]));
+const skillNameMap = new Map(Object.entries(BUILTIN_SKILL_NAMES));
 
 function getSkillDisplayNames(employeeId: string, count: number): string[] {
   const slugs = EMPLOYEE_CORE_SKILLS[employeeId] ?? [];

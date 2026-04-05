@@ -1,6 +1,24 @@
 ---
 name: media_search
-description: "从媒资库中检索多媒体素材（图片、视频、音频），提供版权信息与使用建议"
+displayName: 媒资检索
+description: 从媒资库中检索素材（图片、视频、音频）
+category: knowledge
+version: "3.0"
+inputSchema:
+  query: 检索描述
+  mediaType: 素材类型
+  tags: 筛选标签
+  dateRange: 时间范围
+outputSchema:
+  results: 素材列表
+  totalCount: 匹配总数
+runtimeConfig:
+  type: api_call
+  avgLatencyMs: 3000
+  maxConcurrency: 5
+compatibleRoles:
+  - asset_manager
+  - video_producer
 ---
 
 # 媒资检索

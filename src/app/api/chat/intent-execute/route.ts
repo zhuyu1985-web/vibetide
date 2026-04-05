@@ -7,7 +7,7 @@ import { streamText, stepCountIs } from "ai";
 import { getLanguageModel } from "@/lib/agent/model-router";
 import { toVercelTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
-import { BUILTIN_SKILLS } from "@/lib/constants";
+import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import type { IntentResult } from "@/lib/agent/intent-recognition";
 
 /** Friendly Chinese labels for tool names */
@@ -26,7 +26,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const TOOL_TO_SKILL: Record<string, string> = Object.fromEntries(
-  BUILTIN_SKILLS.map((s) => [s.slug, s.name])
+  getBuiltinSkillSlugToName()
 );
 
 function extractDomain(url: string): string {

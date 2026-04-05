@@ -1,6 +1,29 @@
 ---
 name: content_generate
-description: "根据大纲和要求生成高质量内容"
+displayName: 内容生成
+description: 根据大纲和要求生成高质量内容
+category: generation
+version: "4.0"
+inputSchema:
+  topic: 内容主题
+  outline: 内容大纲
+  genre: 体裁
+  style: 风格
+  wordCount: 目标字数
+  keywords: SEO关键词
+outputSchema:
+  title: 标题
+  content: 正文内容
+  wordCount: 实际字数
+  keywordCoverage: 关键词覆盖
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 15000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_creator
+  - content_strategist
 ---
 
 # 内容生成

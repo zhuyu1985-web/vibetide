@@ -1,6 +1,26 @@
 ---
 name: competitor_analysis
-description: "分析竞品内容策略和表现数据，识别差异化机会与竞争优势"
+displayName: 竞品分析
+description: 分析竞品内容策略和表现数据
+category: analysis
+version: "2.0"
+inputSchema:
+  competitors: 竞品列表
+  dimension: 分析维度
+  timeRange: 分析周期
+outputSchema:
+  comparison: 指标对比表
+  topicAnalysis: 选题分析
+  opportunities: 差异化机会
+  actions: 行动建议
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 12000
+  maxConcurrency: 2
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - data_analyst
+  - content_strategist
 ---
 
 # 竞品分析

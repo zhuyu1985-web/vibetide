@@ -1,36 +1,17 @@
 import { generateText } from "ai";
 import { getLanguageModel } from "./model-router";
-import { BUILTIN_SKILLS, EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { getAllBuiltinSkills, getBuiltinSkillSlugs } from "@/lib/skill-loader";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// Types and labels re-exported from ./types (client-safe, no server dependencies)
+export type {
+  ChatIntentType,
+  IntentStep,
+  IntentResult,
+} from "./types";
+export { INTENT_TYPE_LABELS } from "./types";
 
-export type ChatIntentType =
-  | "information_retrieval"
-  | "content_creation"
-  | "deep_analysis"
-  | "data_analysis"
-  | "content_review"
-  | "media_production"
-  | "publishing"
-  | "general_chat";
-
-export interface IntentStep {
-  employeeSlug: EmployeeId;
-  employeeName: string;
-  skills: string[];
-  taskDescription: string;
-  dependsOn?: number;
-}
-
-export interface IntentResult {
-  intentType: ChatIntentType;
-  summary: string;
-  confidence: number;
-  steps: IntentStep[];
-  reasoning: string;
-}
+import type { ChatIntentType, IntentResult } from "./types";
 
 // ---------------------------------------------------------------------------
 // Intent memory (recent logs used as few-shot examples)
@@ -68,7 +49,7 @@ function buildEmployeeCatalog(
 
 function buildSkillCatalog(): string {
   const byCategory = new Map<string, string[]>();
-  for (const s of BUILTIN_SKILLS) {
+  for (const s of getAllBuiltinSkills()) {
     const list = byCategory.get(s.category) || [];
     list.push(`${s.slug}（${s.name}）：${s.description}`);
     byCategory.set(s.category, list);
@@ -237,7 +218,7 @@ export async function recognizeIntent(
     }
 
     // Validate skill slugs within steps
-    const allSkillSlugs = new Set(BUILTIN_SKILLS.map((s) => s.slug));
+    const allSkillSlugs = getBuiltinSkillSlugs();
     for (const step of parsed.steps) {
       step.skills = step.skills.filter((s) => allSkillSlugs.has(s));
     }
@@ -257,17 +238,4 @@ export async function recognizeIntent(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Intent type labels (for UI display)
-// ---------------------------------------------------------------------------
-
-export const INTENT_TYPE_LABELS: Record<ChatIntentType, string> = {
-  information_retrieval: "信息检索",
-  content_creation: "内容创作",
-  deep_analysis: "深度分析",
-  data_analysis: "数据分析",
-  content_review: "内容审核",
-  media_production: "媒体制作",
-  publishing: "发布运营",
-  general_chat: "自由对话",
-};
+// INTENT_TYPE_LABELS is re-exported from ./types at the top of this file

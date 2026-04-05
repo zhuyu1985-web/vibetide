@@ -2,7 +2,8 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, sql } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { BUILTIN_SKILLS, EMPLOYEE_CORE_SKILLS } from "../lib/constants";
+import { EMPLOYEE_CORE_SKILLS } from "../lib/constants";
+import { getAllBuiltinSkills } from "../lib/skill-loader";
 
 // Load env manually for standalone script (.env.local takes priority)
 import { config } from "dotenv";
@@ -173,23 +174,28 @@ async function seed() {
         .returning();
   console.log(`   ${existingOrg ? "Found" : "Created"} org: ${org.name} (${org.id})\n`);
 
-  // 2. Insert BUILTIN_SKILLS into skills table (idempotent)
+  // 2. Insert builtin skills into skills table (from skills/*/SKILL.md)
   console.log("2. Inserting builtin skills...");
+  const builtinSkills = getAllBuiltinSkills();
   const skillMap = new Map<string, string>(); // slug -> uuid
   let skillsCreated = 0;
 
   let skillsUpdated = 0;
-  for (const skillDef of BUILTIN_SKILLS) {
+  for (const skillDef of builtinSkills) {
+    // Match by slug first (preferred), fallback to name for pre-migration data
     const existing = await db.query.skills.findFirst({
-      where: (s, { eq, and }) =>
-        and(eq(s.organizationId, org.id), eq(s.name, skillDef.name)),
+      where: (s, { eq, and, or }) =>
+        and(
+          eq(s.organizationId, org.id),
+          or(eq(s.slug, skillDef.slug), eq(s.name, skillDef.name))
+        ),
     });
     if (existing) {
-      // Upsert: update content, version, schemas, and config for existing skills
+      // Upsert: update metadata + slug (content is loaded from SKILL.md at runtime)
       await db
         .update(schema.skills)
         .set({
-          content: skillDef.content,
+          slug: skillDef.slug,
           version: skillDef.version,
           description: skillDef.description,
           inputSchema: skillDef.inputSchema ?? null,
@@ -208,11 +214,12 @@ async function seed() {
       .values({
         organizationId: org.id,
         name: skillDef.name,
+        slug: skillDef.slug,
         category: skillDef.category,
         type: "builtin",
         version: skillDef.version,
         description: skillDef.description,
-        content: skillDef.content,
+        content: "",
         inputSchema: skillDef.inputSchema,
         outputSchema: skillDef.outputSchema,
         runtimeConfig: skillDef.runtimeConfig,
@@ -222,7 +229,7 @@ async function seed() {
     skillMap.set(skillDef.slug, skill.id);
     skillsCreated++;
   }
-  console.log(`   ${skillsCreated} new / ${skillsUpdated} updated / ${BUILTIN_SKILLS.length - skillsCreated - skillsUpdated} unchanged builtin skills\n`);
+  console.log(`   ${skillsCreated} new / ${skillsUpdated} updated / ${builtinSkills.length - skillsCreated - skillsUpdated} unchanged builtin skills\n`);
 
   // 3. Insert AI employees and bind core skills (idempotent)
   console.log("3. Inserting AI employees and binding skills...");

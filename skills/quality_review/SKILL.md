@@ -1,6 +1,26 @@
 ---
 name: quality_review
-description: "对内容进行四维评分体系全面质量审核，输出等级评定与修改建议"
+displayName: 质量审核
+description: 对内容进行全面质量审核评分
+category: management
+version: "3.5"
+inputSchema:
+  content: 待审核内容
+  contentType: 内容类型
+  standards: 审核标准
+outputSchema:
+  grade: 等级A/B/C/D
+  totalScore: 总分
+  dimensions: 四维评分
+  issues: 问题列表
+  verdict: 审核结论
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 10000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - quality_reviewer
 ---
 
 # 质量审核

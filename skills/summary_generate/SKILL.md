@@ -1,6 +1,26 @@
 ---
 name: summary_generate
-description: "自动生成文章摘要和提要"
+displayName: 摘要生成
+description: 自动生成文章摘要和提要
+category: generation
+version: "2.0"
+inputSchema:
+  text: 原始文章
+  levels: 摘要级别
+  purpose: 用途
+outputSchema:
+  oneline: 一句话摘要
+  short: 短摘要
+  medium: 中等摘要
+  long: 长摘要
+runtimeConfig:
+  type: llm_generation
+  avgLatencyMs: 5000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_creator
+  - channel_operator
 ---
 
 # 摘要生成

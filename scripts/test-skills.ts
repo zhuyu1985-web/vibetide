@@ -78,9 +78,9 @@ async function testSkill(
   testInput: string,
   dryRun: boolean
 ): Promise<TestResult> {
-  // Find skill by matching slug (name mapping via BUILTIN_SKILLS)
-  const { BUILTIN_SKILLS } = await import("../src/lib/constants");
-  const skillDef = BUILTIN_SKILLS.find((s) => s.slug === skillSlug);
+  // Find skill by matching slug
+  const { getAllBuiltinSkills } = await import("../src/lib/skill-loader");
+  const skillDef = getAllBuiltinSkills().find((s: { slug: string }) => s.slug === skillSlug);
   if (!skillDef) {
     return {
       slug: skillSlug, name: "Unknown", category: "unknown",
@@ -259,11 +259,12 @@ async function main() {
     }
   }
 
-  const { BUILTIN_SKILLS } = await import("../src/lib/constants");
+  const { getAllBuiltinSkills } = await import("../src/lib/skill-loader");
+  const allSkills = getAllBuiltinSkills();
   if (categoryFilter) {
-    const categorySlugs = BUILTIN_SKILLS
-      .filter((s) => s.category === categoryFilter)
-      .map((s) => s.slug);
+    const categorySlugs = allSkills
+      .filter((s: { category: string }) => s.category === categoryFilter)
+      .map((s: { slug: string }) => s.slug);
     slugs = slugs.filter((s) => categorySlugs.includes(s));
     if (slugs.length === 0) {
       console.error(`❌ 未找到类别: ${categoryFilter}`);
@@ -278,7 +279,7 @@ async function main() {
 
   for (const category of categories) {
     const categorySlugs = slugs.filter((s) => {
-      const def = BUILTIN_SKILLS.find((d) => d.slug === s);
+      const def = allSkills.find((d: { slug: string }) => d.slug === s);
       return def?.category === category;
     });
     if (categorySlugs.length === 0) continue;

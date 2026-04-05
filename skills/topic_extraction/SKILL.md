@@ -1,6 +1,26 @@
 ---
 name: topic_extraction
-description: "从文本中提取核心主题、关键词和命名实体，生成结构化标签"
+displayName: 主题提取
+description: 从文本中提取核心主题和关键词
+category: analysis
+version: "2.0"
+inputSchema:
+  text: 待提取文本
+  topN: 关键词数量
+  includeEntities: 是否提取实体
+outputSchema:
+  topics: 主题列表
+  keywords: 关键词列表
+  entities: 命名实体
+  tags: 推荐标签
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 6000
+  maxConcurrency: 5
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_strategist
+  - data_analyst
 ---
 
 # 主题提取

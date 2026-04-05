@@ -6,7 +6,7 @@ import { streamText, stepCountIs } from "ai";
 import { getLanguageModel } from "@/lib/agent/model-router";
 import { resolveTools, toVercelTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
-import { BUILTIN_SKILLS } from "@/lib/constants";
+import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 
 function resolveTemplate(
   template: string,
@@ -28,7 +28,7 @@ const TOOL_LABELS: Record<string, string> = {
 
 /** Map tool slug → skill display name */
 const TOOL_TO_SKILL: Record<string, string> = Object.fromEntries(
-  BUILTIN_SKILLS.map((s) => [s.slug, s.name])
+  getBuiltinSkillSlugToName()
 );
 
 /** Extract domain from URL */

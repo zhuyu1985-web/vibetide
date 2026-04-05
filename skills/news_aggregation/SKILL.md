@@ -1,6 +1,26 @@
 ---
 name: news_aggregation
-description: "聚合多源新闻资讯并去重排序"
+displayName: 新闻聚合
+description: 聚合多源新闻资讯并去重排序
+category: perception
+version: "2.0"
+inputSchema:
+  topic: 聚合主题
+  sources: 新闻源类型
+  timeRange: 时间范围
+  limit: 返回条数
+outputSchema:
+  headlines: 头条新闻
+  newsList: 新闻列表
+  sourceStats: 来源统计
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - trending_scout
+  - asset_manager
 ---
 
 # 新闻聚合

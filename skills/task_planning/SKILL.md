@@ -1,6 +1,26 @@
 ---
 name: task_planning
-description: "将复杂任务拆解为可执行步骤，合理分配AI员工并规划时间线"
+displayName: 任务规划
+description: 将复杂任务拆解为可执行步骤
+category: management
+version: "2.0"
+inputSchema:
+  goal: 任务目标
+  constraints: 约束条件
+  availableEmployees: 可用员工
+  priority: 优先级
+outputSchema:
+  tasks: 子任务列表
+  dependencies: 依赖关系
+  milestones: 里程碑
+  timeline: 时间线
+runtimeConfig:
+  type: llm_analysis
+  avgLatencyMs: 8000
+  maxConcurrency: 3
+  modelDependency: zhipu:glm-4-plus
+compatibleRoles:
+  - content_strategist
 ---
 
 # 任务规划
