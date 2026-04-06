@@ -7,7 +7,7 @@ import { RecentSection } from "@/components/home/recent-section";
 import { useSearchParams } from "next/navigation";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
-import { Send, Paperclip, Sparkles } from "lucide-react";
+import { Send, Plus, Wrench, Mic, AudioLines, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -129,102 +129,118 @@ export function HomeClient({
         </p>
       </div>
 
-      {/* ── Unified input box (iOS 26 liquid glass) ── */}
-      <div className="w-full max-w-2xl mb-6">
+      {/* ── Unified input box (Genspark style) ── */}
+      <div className="w-full max-w-3xl mb-6">
         <div
           className={cn(
             "rounded-2xl overflow-hidden",
-            "bg-black/[0.03] dark:bg-white/[0.06] backdrop-blur-2xl",
-            "border border-black/[0.08] dark:border-white/[0.08]",
-            "shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)]",
-            "focus-within:border-black/[0.12] dark:focus-within:border-white/[0.15]",
-            "focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.12),0_0_60px_rgba(59,130,246,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]",
-            "transition-all duration-500 ease-out"
+            "bg-white dark:bg-white/[0.06]",
+            "border border-gray-200 dark:border-white/[0.1]",
+            "shadow-sm dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
+            "focus-within:border-gray-300 dark:focus-within:border-white/[0.18]",
+            "focus-within:shadow-md dark:focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.12)]",
+            "transition-all duration-300 ease-out"
           )}
         >
-          <div className="flex items-end gap-2 p-3">
-            {/* Paperclip attachment button (disabled) */}
-            <button
-              disabled
-              className="p-2 rounded-lg text-gray-200 dark:text-white/20 cursor-not-allowed shrink-0 border-0"
-              title="附件功能即将上线"
-            >
-              <Paperclip size={18} />
-            </button>
-
-            {/* Active employee indicator */}
-            {activeMeta && ActiveIcon && (
-              <div
-                className="flex items-center gap-1.5 px-2 py-1 rounded-lg shrink-0"
-                style={{ backgroundColor: activeMeta.bgColor }}
-              >
-                <ActiveIcon
-                  size={14}
-                  style={{ color: activeMeta.color }}
-                />
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: activeMeta.color }}
-                >
-                  {activeMeta.nickname}
-                </span>
-              </div>
-            )}
-
-            {/* Textarea */}
+          {/* Textarea area */}
+          <div className="px-5 pt-4 pb-2">
             <textarea
               ref={textareaRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="输入你的需求，AI 团队为你协作完成..."
-              rows={1}
+              placeholder="询问任何问题，创造任何事物"
+              rows={2}
               className={cn(
-                "flex-1 bg-transparent text-sm text-gray-900 dark:text-white/90 placeholder:text-gray-400 dark:placeholder:text-white/25",
-                "resize-none outline-none min-h-[36px] max-h-[120px] py-2",
-                "scrollbar-thin scrollbar-thumb-white/10"
+                "w-full bg-transparent text-[15px] leading-relaxed",
+                "text-gray-900 dark:text-white/90",
+                "placeholder:text-gray-400 dark:placeholder:text-white/30",
+                "resize-none outline-none min-h-[52px] max-h-[160px]"
               )}
-              style={{
-                height: "auto",
-                overflowY: inputValue.split("\n").length > 3 ? "auto" : "hidden",
-              }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = "auto";
-                target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
               }}
             />
-
-            {/* Send button */}
-            <button
-              onClick={handleSend}
-              disabled={!inputValue.trim() || chat.loading || chat.isStreaming}
-              className={cn(
-                "p-2 rounded-lg shrink-0 transition-all duration-200 border-0",
-                inputValue.trim() && !chat.loading && !chat.isStreaming
-                  ? "bg-blue-500 text-white hover:bg-blue-400"
-                  : "text-gray-200 dark:text-white/15 cursor-not-allowed"
-              )}
-            >
-              <Send size={18} />
-            </button>
           </div>
 
-          {/* Subtle hint */}
-          {!chatOpen && (
-            <div className="flex items-center gap-1.5 px-4 pb-2 -mt-1">
-              <Sparkles size={10} className="text-gray-300 dark:text-white/15" />
-              <span className="text-[10px] text-gray-300 dark:text-white/15">
-                Enter 发送 / Shift+Enter 换行
-              </span>
+          {/* Toolbar row — Genspark style */}
+          <div className="flex items-center justify-between px-4 pb-3 pt-1">
+            {/* Left tools */}
+            <div className="flex items-center gap-1">
+              {/* Add button */}
+              <button
+                className="p-2 rounded-lg text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border-0 bg-transparent"
+                title="添加附件"
+              >
+                <Plus size={18} />
+              </button>
+
+              {/* Tool button */}
+              <button
+                className="p-2 rounded-lg text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border-0 bg-transparent"
+                title="工具"
+              >
+                <Wrench size={18} />
+              </button>
+
+              {/* Model/mode selector — Genspark "Ultra" style */}
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium",
+                  "text-gray-500 dark:text-white/40",
+                  "hover:bg-gray-100 dark:hover:bg-white/10",
+                  "transition-colors border-0 bg-transparent"
+                )}
+              >
+                {activeMeta && ActiveIcon ? (
+                  <>
+                    <ActiveIcon size={14} style={{ color: activeMeta.color }} />
+                    <span style={{ color: activeMeta.color }}>{activeMeta.nickname}</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={14} />
+                    <span>智能路由</span>
+                  </>
+                )}
+              </button>
             </div>
-          )}
+
+            {/* Right actions */}
+            <div className="flex items-center gap-1">
+              {/* Mic button */}
+              <button
+                className="p-2 rounded-lg text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border-0 bg-transparent"
+                title="语音输入"
+              >
+                <Mic size={18} />
+              </button>
+
+              {/* Send / "对话" button — Genspark style pill */}
+              <button
+                onClick={handleSend}
+                disabled={!inputValue.trim() || chat.loading || chat.isStreaming}
+                className={cn(
+                  "flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium",
+                  "transition-all duration-200 border-0",
+                  inputValue.trim() && !chat.loading && !chat.isStreaming
+                    ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-white"
+                    : "bg-gray-100 dark:bg-white/10 text-gray-300 dark:text-white/20 cursor-not-allowed"
+                )}
+              >
+                <AudioLines size={16} />
+                <span>对话</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ── Employee quick panel ── */}
       {!chatOpen && (
-        <div className="w-full max-w-2xl mb-8 flex justify-center">
+        <div className="w-full max-w-3xl mb-8 flex justify-center">
           <EmployeeQuickPanel onSelectEmployee={handleSelectEmployee} />
         </div>
       )}
