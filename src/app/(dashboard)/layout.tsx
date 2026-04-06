@@ -42,7 +42,7 @@ export default async function DashboardLayout({
   return (
     <PermissionProvider permissions={permissions} isSuperAdmin={superAdmin}>
       <SidebarProvider>
-        <AppSidebar permissions={permissions} />
+        <AppSidebar permissions={permissions} unreadCount={unreadCount} />
         <div className="flex-1 flex flex-col min-h-svh overflow-hidden">
           <Topbar userName={displayName} unreadCount={unreadCount} />
           <main className="flex-1 overflow-y-auto overflow-x-hidden bg-page bg-glow">

@@ -12,6 +12,7 @@ import {
   BarChart3,
   MoreHorizontal,
   Settings,
+  Bell,
   Lightbulb,
   Crosshair,
   PenTool,
@@ -248,7 +249,13 @@ function IconPopover({
 
 /* ─── Main Sidebar ─── */
 
-export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
+export function AppSidebar({
+  permissions = [],
+  unreadCount = 0,
+}: {
+  permissions?: string[];
+  unreadCount?: number;
+}) {
   const pathname = usePathname();
   const hasAllPerms = permissions.length === 0;
   const canAccessAdmin =
@@ -333,31 +340,52 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
           </nav>
         </SidebarContent>
 
-        {/* Bottom — Settings */}
-        <SidebarFooter className="flex flex-col items-center gap-1 px-2 pb-4 pt-1">
-          <div className="w-8 h-px bg-border/30 mb-1" />
+        {/* Bottom — Notification + Settings (icon only, no label) */}
+        <SidebarFooter className="flex flex-col items-center gap-1.5 px-2 pb-4 pt-2">
+          {/* Notification bell */}
+          <Link
+            href="/notifications"
+            className={cn(
+              "relative flex items-center justify-center w-10 h-10 rounded-xl",
+              "transition-all duration-200 ease-out",
+              "hover:-translate-y-0.5 hover:shadow-md",
+              "text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <Bell size={20} strokeWidth={1.5} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background" />
+            )}
+          </Link>
 
-          {canAccessAdmin && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className={cn(iconBtnBase, iconBtnIdle)}>
-                  <Settings size={18} strokeWidth={1.5} />
-                  <span className="text-[10px] leading-none font-medium">设置</span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="right"
-                align="end"
-                sideOffset={8}
-                className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+          {/* Settings */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-xl",
+                  "transition-all duration-200 ease-out",
+                  "hover:-translate-y-0.5 hover:shadow-md",
+                  "active:translate-y-0 active:shadow-none",
+                  "border-0 bg-transparent cursor-pointer",
+                  "text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+                )}
               >
-                <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                  系统管理
-                </p>
-                <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
-              </PopoverContent>
-            </Popover>
-          )}
+                <Settings size={20} strokeWidth={1.5} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="end"
+              sideOffset={8}
+              className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+            >
+              <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                系统管理
+              </p>
+              <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
+            </PopoverContent>
+          </Popover>
         </SidebarFooter>
       </Sidebar>
   );
