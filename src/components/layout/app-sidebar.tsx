@@ -135,7 +135,7 @@ function hasActiveChild(pathname: string, children?: SubItem[]) {
 /* ─── Shared icon button styles ─── */
 
 const iconBtnBase = cn(
-  "relative flex flex-col items-center justify-center gap-0.5 w-12 py-1.5 rounded-xl",
+  "relative flex flex-col items-center justify-center gap-1.5 w-12 py-2 rounded-xl",
   "transition-all duration-200 ease-out",
   "hover:-translate-y-0.5 hover:shadow-md",
   "active:translate-y-0 active:shadow-none",
@@ -279,7 +279,7 @@ export function AppSidebar({
   return (
       <Sidebar
         collapsible="none"
-        className="!w-[68px] border-r border-border/50 glass-sidebar"
+        className="!w-[68px] border-r border-border/50 bg-gray-50 dark:bg-[#0a0f1a]"
       >
         {/* Brand */}
         <SidebarHeader className="flex items-center justify-center py-4">
@@ -343,7 +343,7 @@ export function AppSidebar({
           <div className="flex-1" />
 
           {/* Bottom — Notification + Settings */}
-          <div className="flex flex-col items-center gap-1.5 px-2 pb-4 pt-2">
+          <div className="flex flex-col items-center gap-1.5 px-2 pb-12 pt-2">
             {/* Notification bell */}
             <Link
               href="/notifications"
