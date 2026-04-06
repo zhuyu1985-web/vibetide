@@ -2,6 +2,7 @@
 
 import { db } from "@/db";
 import { workflowTemplates } from "@/db/schema";
+import type { WorkflowStepDef } from "@/db/schema/workflows";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -22,7 +23,7 @@ export async function createWorkflowTemplate(data: {
   organizationId: string;
   name: string;
   description?: string;
-  steps: { key: string; label: string; employeeSlug: string; order: number }[];
+  steps: WorkflowStepDef[];
 }) {
   await requireAuth();
 
@@ -48,7 +49,7 @@ export async function updateWorkflowTemplate(
   data: {
     name?: string;
     description?: string;
-    steps?: { key: string; label: string; employeeSlug: string; order: number }[];
+    steps?: WorkflowStepDef[];
   }
 ) {
   await requireAuth();

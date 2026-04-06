@@ -510,3 +510,18 @@ export const learningSourceEnum = pgEnum("learning_source", [
   "discovered",
   "recommended",
 ]);
+
+// Workflow template enums
+
+export const workflowCategoryEnum = pgEnum("workflow_category", [
+  "news",
+  "video",
+  "analytics",
+  "distribution",
+  "custom",
+]);
+
+export const workflowTriggerTypeEnum = pgEnum("workflow_trigger_type", [
+  "manual",
+  "scheduled",
+]);

@@ -5,12 +5,38 @@ import {
   timestamp,
   jsonb,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
 import { missions } from "./missions";
-import { artifactTypeEnum } from "./enums";
+import {
+  artifactTypeEnum,
+  workflowCategoryEnum,
+  workflowTriggerTypeEnum,
+} from "./enums";
+
+// ─── Workflow Step Definition ───
+
+export interface WorkflowStepDef {
+  id: string;
+  order: number;
+  dependsOn: string[];
+  name: string;
+  type: "employee" | "tool" | "output";
+  config: {
+    employeeSlug?: string;
+    skillSlug?: string;
+    toolId?: string;
+    outputAction?: string;
+    parameters: Record<string, any>;
+  };
+  // Backward compat with old seed format
+  key?: string;
+  label?: string;
+  employeeSlug?: string;
+}
 
 // ─── Workflow Templates (kept for leader reference during task decomposition) ───
 
@@ -20,16 +46,19 @@ export const workflowTemplates = pgTable("workflow_templates", {
 
   name: text("name").notNull(),
   description: text("description"),
-  steps: jsonb("steps")
-    .$type<
-      {
-        key: string;
-        label: string;
-        employeeSlug: string;
-        order: number;
-      }[]
-    >()
-    .notNull(),
+  steps: jsonb("steps").$type<WorkflowStepDef[]>().notNull(),
+
+  category: workflowCategoryEnum("category").default("custom"),
+  triggerType: workflowTriggerTypeEnum("trigger_type").default("manual"),
+  triggerConfig: jsonb("trigger_config").$type<{
+    cron?: string;
+    timezone?: string;
+  } | null>(),
+  isBuiltin: boolean("is_builtin").notNull().default(false),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  createdBy: uuid("created_by"),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  runCount: integer("run_count").notNull().default(0),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

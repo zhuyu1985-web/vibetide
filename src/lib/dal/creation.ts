@@ -105,7 +105,7 @@ export async function getHitTemplates(
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
-    structure: row.steps.map((s) => s.label),
+    structure: row.steps.map((s) => s.label ?? s.name),
     usageCount: 0,
     hitRate: 0,
     bestPerformance: { views: 0, likes: 0, shares: 0 },
