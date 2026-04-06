@@ -144,7 +144,7 @@ const iconBtnBase = cn(
 );
 
 const iconBtnActive = "bg-primary/12 text-primary shadow-sm dark:bg-white/12 dark:text-white";
-const iconBtnIdle = "text-muted-foreground/60 hover:bg-accent hover:text-foreground";
+const iconBtnIdle = "text-muted-foreground hover:bg-accent hover:text-foreground";
 
 /* ─── Popover sub-menu list ─── */
 
@@ -349,7 +349,7 @@ export function AppSidebar({
               "relative flex items-center justify-center w-10 h-10 rounded-xl",
               "transition-all duration-200 ease-out",
               "hover:-translate-y-0.5 hover:shadow-md",
-              "text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+              "text-muted-foreground hover:bg-accent hover:text-foreground"
             )}
           >
             <Bell size={20} strokeWidth={1.5} />
@@ -368,7 +368,7 @@ export function AppSidebar({
                   "hover:-translate-y-0.5 hover:shadow-md",
                   "active:translate-y-0 active:shadow-none",
                   "border-0 bg-transparent cursor-pointer",
-                  "text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+                  "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
                 <Settings size={20} strokeWidth={1.5} />
