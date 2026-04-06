@@ -59,12 +59,24 @@ export const ALL_MENU_PERMISSIONS = Object.entries(PERMISSIONS)
   .map(([, v]) => v);
 
 // Map href → permission for sidebar filtering
-export const MENU_PERMISSION_MAP: Record<string, string> = {
+export const MENU_PERMISSION_MAP: Record<string, string | undefined> = {
+  // Primary nav (new simplified sidebar)
+  "/home": undefined, // always visible
+  "/ai-employees": PERMISSIONS.MENU_EMPLOYEES,
+  "/workflows": PERMISSIONS.MENU_MISSIONS, // reuse missions permission
   "/missions": PERMISSIONS.MENU_MISSIONS,
+  "/creation": undefined, // tab-level control (future)
+  "/content": undefined, // tab-level control (future)
+  "/analytics": undefined, // tab-level control (future)
+  // More panel items
+  "/channel-advisor": PERMISSIONS.MENU_CHANNEL_ADVISOR,
+  "/event-auto": PERMISSIONS.MENU_EVENT_AUTO,
+  "/batch-review": PERMISSIONS.MENU_BATCH_REVIEW,
+  "/case-library": PERMISSIONS.MENU_CASE_LIBRARY,
+  // Legacy routes (kept for backward compatibility)
   "/employee-marketplace": PERMISSIONS.MENU_EMPLOYEES,
   "/chat": PERMISSIONS.MENU_CHAT,
   "/skills": PERMISSIONS.MENU_SKILLS,
-  "/channel-advisor": PERMISSIONS.MENU_CHANNEL_ADVISOR,
   "/media-assets": PERMISSIONS.MENU_MEDIA_ASSETS,
   "/articles": PERMISSIONS.MENU_ARTICLES,
   "/categories": PERMISSIONS.MENU_CATEGORIES,
@@ -76,14 +88,36 @@ export const MENU_PERMISSION_MAP: Record<string, string> = {
   "/super-creation": PERMISSIONS.MENU_SUPER_CREATION,
   "/premium-content": PERMISSIONS.MENU_PREMIUM_CONTENT,
   "/video-batch": PERMISSIONS.MENU_VIDEO_BATCH,
-  "/event-auto": PERMISSIONS.MENU_EVENT_AUTO,
-  "/batch-review": PERMISSIONS.MENU_BATCH_REVIEW,
   "/production-templates": PERMISSIONS.MENU_PRODUCTION_TEMPLATES,
   "/publishing": PERMISSIONS.MENU_PUBLISHING,
-  "/analytics": PERMISSIONS.MENU_ANALYTICS,
   "/leaderboard": PERMISSIONS.MENU_LEADERBOARD,
   "/content-excellence": PERMISSIONS.MENU_CONTENT_EXCELLENCE,
-  "/case-library": PERMISSIONS.MENU_CASE_LIBRARY,
+};
+
+// Tab-level permission map for pages with tabbed sub-sections
+export const TAB_PERMISSION_MAP: Record<string, Record<string, string>> = {
+  "/creation": {
+    inspiration: PERMISSIONS.MENU_INSPIRATION,
+    benchmarking: PERMISSIONS.MENU_BENCHMARKING,
+    "super-creation": PERMISSIONS.MENU_SUPER_CREATION,
+    "premium-content": PERMISSIONS.MENU_PREMIUM_CONTENT,
+    "video-batch": PERMISSIONS.MENU_VIDEO_BATCH,
+    "production-templates": PERMISSIONS.MENU_PRODUCTION_TEMPLATES,
+  },
+  "/content": {
+    assets: PERMISSIONS.MENU_MEDIA_ASSETS,
+    articles: PERMISSIONS.MENU_ARTICLES,
+    categories: PERMISSIONS.MENU_CATEGORIES,
+    intelligence: PERMISSIONS.MENU_ASSET_INTELLIGENCE,
+    knowledge: PERMISSIONS.MENU_CHANNEL_KNOWLEDGE,
+    revive: PERMISSIONS.MENU_ASSET_REVIVE,
+  },
+  "/analytics": {
+    publishing: PERMISSIONS.MENU_PUBLISHING,
+    analytics: PERMISSIONS.MENU_ANALYTICS,
+    leaderboard: PERMISSIONS.MENU_LEADERBOARD,
+    excellence: PERMISSIONS.MENU_CONTENT_EXCELLENCE,
+  },
 };
 
 export const DEFAULT_ROLES = {
