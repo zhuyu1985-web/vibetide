@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,6 +12,23 @@ import {
   FolderOpen,
   BarChart3,
   Sparkles,
+  ChevronRight,
+  Lightbulb,
+  Crosshair,
+  PenTool,
+  Gem,
+  Film,
+  FileStack,
+  Package,
+  FileText,
+  Layers,
+  Brain as BrainIcon,
+  BookOpen,
+  RotateCcw,
+  Radio,
+  TrendingUp,
+  Award,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -34,6 +52,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  children?: NavItem[];
 }
 
 /* ─── Color System (blue theme only) ─── */
@@ -53,9 +72,37 @@ const PRIMARY_NAV: NavItem[] = [
   { label: "AI 员工", href: "/ai-employees", icon: UserCog },
   { label: "工作流", href: "/workflows", icon: GitBranch },
   { label: "任务中心", href: "/missions", icon: Target },
-  { label: "创作中心", href: "/creation", icon: Wand2 },
-  { label: "内容管理", href: "/content", icon: FolderOpen },
-  { label: "数据分析", href: "/analytics", icon: BarChart3 },
+  {
+    label: "创作中心", href: "#creation", icon: Wand2,
+    children: [
+      { label: "灵感池", href: "/inspiration", icon: Lightbulb },
+      { label: "同题对标", href: "/benchmarking", icon: Crosshair },
+      { label: "超级创作", href: "/super-creation", icon: PenTool },
+      { label: "精品聚合", href: "/premium-content", icon: Gem },
+      { label: "短视频工厂", href: "/video-batch", icon: Film },
+      { label: "生产模板", href: "/production-templates", icon: FileStack },
+    ],
+  },
+  {
+    label: "内容管理", href: "#content", icon: FolderOpen,
+    children: [
+      { label: "媒资管理", href: "/media-assets", icon: Package },
+      { label: "稿件管理", href: "/articles", icon: FileText },
+      { label: "栏目管理", href: "/categories", icon: Layers },
+      { label: "媒资智能理解", href: "/asset-intelligence", icon: BrainIcon },
+      { label: "频道知识库", href: "/channel-knowledge", icon: BookOpen },
+      { label: "资产盘活中心", href: "/asset-revive", icon: RotateCcw },
+    ],
+  },
+  {
+    label: "数据分析", href: "#analytics", icon: BarChart3,
+    children: [
+      { label: "全渠道发布", href: "/publishing", icon: Radio },
+      { label: "数据分析", href: "/analytics", icon: TrendingUp },
+      { label: "效果激励", href: "/leaderboard", icon: Award },
+      { label: "精品率提升", href: "/content-excellence", icon: Star },
+    ],
+  },
 ];
 
 /* ─── Helper ─── */
@@ -64,7 +111,11 @@ function isItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-/* ─── Menu Item ─── */
+function isGroupActive(pathname: string, children: NavItem[]) {
+  return children.some((child) => isItemActive(pathname, child.href));
+}
+
+/* ─── Simple Menu Item ─── */
 
 function NavMenuItem({
   href,
@@ -90,7 +141,6 @@ function NavMenuItem({
         )}
       >
         <Link href={href}>
-          {/* Active left bar indicator with glow */}
           {isActive && (
             <span
               className={cn(
@@ -118,6 +168,102 @@ function NavMenuItem({
   );
 }
 
+/* ─── Expandable Group Item ─── */
+
+function NavMenuGroup({
+  item,
+  pathname,
+  canSeeItem,
+}: {
+  item: NavItem;
+  pathname: string;
+  canSeeItem: (href: string) => boolean;
+}) {
+  const children = item.children!.filter((child) => canSeeItem(child.href));
+  const groupActive = isGroupActive(pathname, children);
+  const [open, setOpen] = useState(groupActive);
+
+  if (children.length === 0) return null;
+
+  const Icon = item.icon;
+
+  return (
+    <SidebarMenuItem className="group/nav-item">
+      <SidebarMenuButton
+        onClick={() => setOpen(!open)}
+        isActive={groupActive}
+        className={cn(
+          "relative transition-all duration-300 ease-out rounded-lg overflow-hidden cursor-pointer",
+          "glass-nav-item hover:backdrop-blur-sm",
+          groupActive && "active",
+          groupActive && theme.activeText
+        )}
+      >
+        {groupActive && (
+          <span
+            className={cn(
+              "absolute left-0 top-1 bottom-1 w-[3px] rounded-full",
+              theme.activeBar
+            )}
+            style={{
+              boxShadow: "0 0 8px rgba(96,165,250,0.4), 0 0 16px rgba(96,165,250,0.15)",
+            }}
+          />
+        )}
+        <Icon
+          size={18}
+          className={cn(
+            "transition-colors duration-200 shrink-0",
+            groupActive
+              ? theme.activeIcon
+              : cn("text-muted-foreground/50", theme.hoverIcon)
+          )}
+        />
+        <span className="flex-1">{item.label}</span>
+        <ChevronRight
+          size={14}
+          className={cn(
+            "transition-transform duration-200 text-muted-foreground/40",
+            open && "rotate-90",
+            "group-data-[collapsible=icon]:hidden"
+          )}
+        />
+      </SidebarMenuButton>
+
+      {/* Children */}
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-300 ease-out",
+          "group-data-[collapsible=icon]:hidden",
+          open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/30 pl-2">
+          {children.map((child) => {
+            const ChildIcon = child.icon;
+            const childActive = isItemActive(pathname, child.href);
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200",
+                  childActive
+                    ? "text-blue-600 dark:text-blue-300 bg-blue-500/10 font-medium"
+                    : "text-muted-foreground/70 hover:text-foreground hover:bg-accent/50"
+                )}
+              >
+                <ChildIcon size={14} className="shrink-0" />
+                <span>{child.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </SidebarMenuItem>
+  );
+}
+
 /* ─── Main Sidebar ─── */
 
 export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
@@ -134,7 +280,13 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
     return !perm || permissions.includes(perm);
   }
 
-  const visiblePrimary = PRIMARY_NAV.filter((item) => canSeeItem(item.href));
+  // Filter top-level items: if an item has children, check if any child is visible
+  const visiblePrimary = PRIMARY_NAV.filter((item) => {
+    if (item.children) {
+      return item.children.some((child) => canSeeItem(child.href));
+    }
+    return canSeeItem(item.href);
+  });
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50 glass-sidebar">
@@ -165,19 +317,28 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
 
       {/* ── Scrollable Content ── */}
       <SidebarContent className="sidebar-scroll">
-        {/* Primary navigation — flat list */}
+        {/* Primary navigation */}
         <SidebarGroup className="py-0.5 px-2">
           <SidebarGroupContent>
             <SidebarMenu>
-              {visiblePrimary.map((item) => (
-                <NavMenuItem
-                  key={item.href}
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={isItemActive(pathname, item.href)}
-                />
-              ))}
+              {visiblePrimary.map((item) =>
+                item.children ? (
+                  <NavMenuGroup
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    canSeeItem={canSeeItem}
+                  />
+                ) : (
+                  <NavMenuItem
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    isActive={isItemActive(pathname, item.href)}
+                  />
+                )
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
