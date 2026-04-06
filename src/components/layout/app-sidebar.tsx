@@ -297,7 +297,7 @@ export function AppSidebar({
         </SidebarHeader>
 
         {/* Main nav */}
-        <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden">
+        <SidebarContent className="!flex-none overflow-y-auto overflow-x-hidden">
           <nav className="flex flex-col items-center gap-1 px-2 py-1">
             {visibleNav.map((item) =>
               item.children ? (
@@ -340,8 +340,8 @@ export function AppSidebar({
           </nav>
         </SidebarContent>
 
-        {/* Bottom — Notification + Settings (icon only, no label) */}
-        <SidebarFooter className="flex flex-col items-center gap-1.5 px-2 pb-4 pt-2">
+        {/* Bottom — Notification + Settings (icon only, no label, pinned to bottom) */}
+        <SidebarFooter className="mt-auto flex flex-col items-center gap-1.5 px-2 pb-4 pt-2">
           {/* Notification bell */}
           <Link
             href="/notifications"
