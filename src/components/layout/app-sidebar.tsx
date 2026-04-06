@@ -44,7 +44,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-  SidebarFooter,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
@@ -296,8 +295,9 @@ export function AppSidebar({
           </Link>
         </SidebarHeader>
 
-        {/* Main nav */}
-        <SidebarContent className="!flex-none overflow-y-auto overflow-x-hidden">
+        {/* All content in one flex column — nav at top, icons at bottom */}
+        <SidebarContent className="overflow-x-hidden">
+          {/* Main nav */}
           <nav className="flex flex-col items-center gap-1 px-2 py-1">
             {visibleNav.map((item) =>
               item.children ? (
@@ -338,55 +338,58 @@ export function AppSidebar({
               </Popover>
             )}
           </nav>
-        </SidebarContent>
 
-        {/* Bottom — Notification + Settings (icon only, no label, pinned to bottom) */}
-        <SidebarFooter className="mt-auto flex flex-col items-center gap-1.5 px-2 pb-4 pt-2">
-          {/* Notification bell */}
-          <Link
-            href="/notifications"
-            className={cn(
-              "relative flex items-center justify-center w-10 h-10 rounded-xl",
-              "transition-all duration-200 ease-out",
-              "hover:-translate-y-0.5 hover:shadow-md",
-              "text-muted-foreground hover:bg-accent hover:text-foreground"
-            )}
-          >
-            <Bell size={20} strokeWidth={1.5} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background" />
-            )}
-          </Link>
+          {/* Spacer pushes bottom icons down */}
+          <div className="flex-1" />
 
-          {/* Settings */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className={cn(
-                  "flex items-center justify-center w-10 h-10 rounded-xl",
-                  "transition-all duration-200 ease-out",
-                  "hover:-translate-y-0.5 hover:shadow-md",
-                  "active:translate-y-0 active:shadow-none",
-                  "border-0 bg-transparent cursor-pointer",
-                  "text-muted-foreground hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <Settings size={20} strokeWidth={1.5} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="right"
-              align="end"
-              sideOffset={8}
-              className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+          {/* Bottom — Notification + Settings */}
+          <div className="flex flex-col items-center gap-1.5 px-2 pb-4 pt-2">
+            {/* Notification bell */}
+            <Link
+              href="/notifications"
+              className={cn(
+                "relative flex items-center justify-center w-10 h-10 rounded-xl",
+                "transition-all duration-200 ease-out",
+                "hover:-translate-y-0.5 hover:shadow-md",
+                "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
             >
-              <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                系统管理
-              </p>
-              <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
-            </PopoverContent>
-          </Popover>
-        </SidebarFooter>
+              <Bell size={20} strokeWidth={1.5} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background" />
+              )}
+            </Link>
+
+            {/* Settings */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center justify-center w-10 h-10 rounded-xl",
+                    "transition-all duration-200 ease-out",
+                    "hover:-translate-y-0.5 hover:shadow-md",
+                    "active:translate-y-0 active:shadow-none",
+                    "border-0 bg-transparent cursor-pointer",
+                    "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <Settings size={20} strokeWidth={1.5} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="end"
+                sideOffset={8}
+                className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+              >
+                <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  系统管理
+                </p>
+                <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </SidebarContent>
       </Sidebar>
   );
 }
