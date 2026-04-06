@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from "react";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
 import { RecentSection } from "@/components/home/recent-section";
+import { useSearchParams } from "next/navigation";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { Send, Paperclip, Sparkles } from "lucide-react";
@@ -47,6 +48,28 @@ export function HomeClient({
   const effectiveEmployee = activeEmployee ?? "xiaolei";
 
   const chat = useChatStream({ employeeSlug: effectiveEmployee });
+
+  // ── URL parameter linkage from marketplace ──
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const emp = searchParams.get("employee") as EmployeeId | null;
+    const task = searchParams.get("task");
+
+    if (emp && EMPLOYEE_META[emp]) {
+      setActiveEmployee(emp);
+      if (task) {
+        setInputValue(task);
+        // Auto-send after a brief delay for UI to settle
+        setTimeout(() => {
+          setChatOpen(true);
+          chat.sendMessage(task);
+          setInputValue("");
+        }, 100);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   // ── Handlers ──
   const handleSend = useCallback(() => {

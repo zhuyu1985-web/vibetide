@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { missions } from "@/db/schema/missions";
@@ -84,9 +85,11 @@ export default async function HomePage() {
   }
 
   return (
-    <HomeClient
-      recentMissions={recentMissions}
-      recentConversations={recentConversations}
-    />
+    <Suspense>
+      <HomeClient
+        recentMissions={recentMissions}
+        recentConversations={recentConversations}
+      />
+    </Suspense>
   );
 }
