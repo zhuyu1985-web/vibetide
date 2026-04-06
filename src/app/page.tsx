@@ -12,7 +12,7 @@ export default async function Home() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      redirect("/missions");
+      redirect("/home");
     }
   } catch {
     // Supabase unavailable — show landing page
