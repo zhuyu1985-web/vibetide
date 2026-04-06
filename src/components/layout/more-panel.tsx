@@ -105,7 +105,7 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
         side="right"
         align="end"
         sideOffset={8}
-        className="w-64 rounded-xl border border-white/10 bg-black/80 p-3 shadow-2xl backdrop-blur-xl"
+        className="w-64 rounded-xl border border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/80 p-3 shadow-2xl backdrop-blur-xl"
       >
         {/* Regular items */}
         <div className="grid grid-cols-2 gap-1">
@@ -120,8 +120,8 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
                   "flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium",
                   "transition-all duration-150 border-0",
                   active
-                    ? "bg-blue-500/15 text-blue-300"
-                    : "text-white/70 hover:bg-white/8 hover:text-white"
+                    ? "bg-blue-500/15 text-blue-600 dark:text-blue-300"
+                    : "text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
                 )}
               >
                 <Icon size={15} className="shrink-0" />
@@ -134,8 +134,8 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
         {/* Admin section */}
         {visibleAdmin.length > 0 && (
           <>
-            <div className="my-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+            <div className="my-2 h-px bg-gradient-to-r from-transparent via-black/10 dark:via-white/10 to-transparent" />
+            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300 dark:text-white/30">
               系统管理
             </p>
             <div className="grid grid-cols-2 gap-1">
@@ -150,8 +150,8 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
                       "flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium",
                       "transition-all duration-150 border-0",
                       active
-                        ? "bg-blue-500/15 text-blue-300"
-                        : "text-white/70 hover:bg-white/8 hover:text-white"
+                        ? "bg-blue-500/15 text-blue-600 dark:text-blue-300"
+                        : "text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
                     )}
                   >
                     <Icon size={15} className="shrink-0" />

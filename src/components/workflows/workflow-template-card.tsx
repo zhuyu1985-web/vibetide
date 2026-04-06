@@ -44,15 +44,15 @@ export function WorkflowTemplateCard({
     .filter(Boolean) as (typeof EMPLOYEE_META)[EmployeeId][];
 
   return (
-    <div className="group bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-5 transition-all hover:border-white/[0.15] hover:bg-white/[0.06] flex flex-col">
+    <div className="group bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 transition-all hover:border-black/[0.12] dark:hover:border-white/[0.15] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] flex flex-col">
       {/* Name */}
-      <h3 className="text-base font-semibold text-white/90 mb-1">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-white/90 mb-1">
         {template.name}
       </h3>
 
       {/* Description (2 lines max) */}
       {template.description && (
-        <p className="text-sm text-white/45 line-clamp-2 mb-4">
+        <p className="text-sm text-gray-500 dark:text-white/45 line-clamp-2 mb-4">
           {template.description}
         </p>
       )}
@@ -64,7 +64,7 @@ export function WorkflowTemplateCard({
           return (
             <span key={`${meta.id}-${idx}`} className="flex items-center gap-1">
               {idx > 0 && (
-                <ArrowRight className="w-3 h-3 text-white/20 mx-0.5 shrink-0" />
+                <ArrowRight className="w-3 h-3 text-gray-200 dark:text-white/20 mx-0.5 shrink-0" />
               )}
               <span
                 className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-lg"
@@ -81,7 +81,7 @@ export function WorkflowTemplateCard({
       {/* Action button */}
       <button
         onClick={() => onUseTemplate(template.id)}
-        className="w-full py-2 rounded-xl bg-white/[0.08] text-sm text-white/70 border-0 cursor-pointer transition-all hover:bg-white/[0.14] hover:text-white/90"
+        className="w-full py-2 rounded-xl bg-black/[0.05] dark:bg-white/[0.08] text-sm text-gray-700 dark:text-white/70 border-0 cursor-pointer transition-all hover:bg-black/[0.08] dark:hover:bg-white/[0.14] hover:text-gray-900 dark:hover:text-white/90"
       >
         使用模板
       </button>

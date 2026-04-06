@@ -90,16 +90,16 @@ export function AiEmployeesClient({
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white/90 mb-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90 mb-1">
             AI 数字员工
           </h1>
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-gray-400 dark:text-white/40">
             你的智能媒体团队，自主完成复杂任务。
           </p>
         </div>
         <button
           disabled
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.06] text-sm text-white/30 cursor-not-allowed border-0 transition-all"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-sm text-gray-300 dark:text-white/30 cursor-not-allowed border-0 transition-all"
           title="即将上线"
         >
           <UserPlus className="w-4 h-4" />
@@ -111,13 +111,13 @@ export function AiEmployeesClient({
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
         {/* Search */}
         <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-white/25" />
           <input
             type="text"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             placeholder="搜索员工名称、昵称或职位..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/25 outline-none focus:border-white/[0.15] transition-colors"
+            className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-black/[0.12] dark:focus:border-white/[0.15] transition-colors"
           />
         </div>
 
@@ -129,8 +129,8 @@ export function AiEmployeesClient({
               onClick={() => setStatusFilter(tab.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-0 cursor-pointer ${
                 statusFilter === tab.value
-                  ? "bg-white/10 text-white/90"
-                  : "bg-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.04]"
+                  ? "bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white/90"
+                  : "bg-transparent text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
               }`}
             >
               {tab.label}
@@ -141,7 +141,7 @@ export function AiEmployeesClient({
 
       {/* ── Employee count ── */}
       <div className="mb-4">
-        <span className="text-xs text-white/30">
+        <span className="text-xs text-gray-300 dark:text-white/30">
           共 {filteredEmployees.length} 名员工
           {statusFilter !== "all" && ` (已筛选)`}
         </span>
@@ -162,7 +162,7 @@ export function AiEmployeesClient({
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20">
-          <p className="text-sm text-white/30">
+          <p className="text-sm text-gray-300 dark:text-white/30">
             {searchText.trim() || statusFilter !== "all"
               ? "没有匹配的员工"
               : "暂无员工数据"}

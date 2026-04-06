@@ -148,17 +148,17 @@ export function WorkflowsClient({
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white/90 mb-1 flex items-center gap-2">
-            <GitBranch className="w-6 h-6 text-white/50" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90 mb-1 flex items-center gap-2">
+            <GitBranch className="w-6 h-6 text-gray-500 dark:text-white/50" />
             工作流
           </h1>
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-gray-400 dark:text-white/40">
             创建和管理自动化工作流程
           </p>
         </div>
         <button
           onClick={() => router.push("/workflows/new")}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.06] text-sm text-white/70 border-0 cursor-pointer transition-all hover:bg-white/[0.12] hover:text-white/90"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-sm text-gray-700 dark:text-white/70 border-0 cursor-pointer transition-all hover:bg-black/[0.08] dark:hover:bg-white/[0.12] hover:text-gray-900 dark:hover:text-white/90"
         >
           <Plus className="w-4 h-4" />
           新建工作流
@@ -167,14 +167,14 @@ export function WorkflowsClient({
 
       {/* ── 我的工作流 ── */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-white/70 mb-4">
+        <h2 className="text-lg font-semibold text-gray-700 dark:text-white/70 mb-4">
           我的工作流
         </h2>
 
         {myWorkflows.length === 0 ? (
-          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
-            <Inbox className="w-10 h-10 text-white/15" />
-            <p className="text-sm text-white/30">
+          <div className="bg-black/[0.02] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
+            <Inbox className="w-10 h-10 text-gray-200 dark:text-white/15" />
+            <p className="text-sm text-gray-300 dark:text-white/30">
               还没有工作流，从模板开始或创建自定义工作流
             </p>
           </div>
@@ -210,7 +210,7 @@ export function WorkflowsClient({
 
       {/* ── 从模板开始 ── */}
       <section>
-        <h2 className="text-lg font-semibold text-white/70 mb-4">
+        <h2 className="text-lg font-semibold text-gray-700 dark:text-white/70 mb-4">
           从模板开始
         </h2>
 
@@ -222,8 +222,8 @@ export function WorkflowsClient({
               onClick={() => setCategoryFilter(cat.value)}
               className={`px-3.5 py-1.5 rounded-xl text-sm border-0 cursor-pointer transition-all ${
                 categoryFilter === cat.value
-                  ? "bg-white/[0.12] text-white/90"
-                  : "bg-white/[0.04] text-white/45 hover:bg-white/[0.08] hover:text-white/70"
+                  ? "bg-black/[0.08] dark:bg-white/[0.12] text-gray-900 dark:text-white/90"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-gray-500 dark:text-white/45 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] hover:text-gray-700 dark:hover:text-white/70"
               }`}
             >
               {cat.label}
@@ -233,9 +233,9 @@ export function WorkflowsClient({
 
         {/* Template grid */}
         {filteredTemplates.length === 0 ? (
-          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
-            <Inbox className="w-10 h-10 text-white/15" />
-            <p className="text-sm text-white/30">
+          <div className="bg-black/[0.02] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
+            <Inbox className="w-10 h-10 text-gray-200 dark:text-white/15" />
+            <p className="text-sm text-gray-300 dark:text-white/30">
               该分类暂无模板
             </p>
           </div>
@@ -261,8 +261,8 @@ export function WorkflowsClient({
 
       {/* Loading overlay */}
       {isPending && (
-        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center">
-          <div className="bg-white/[0.08] backdrop-blur-xl border border-white/[0.12] rounded-2xl px-6 py-4 text-sm text-white/70">
+        <div className="fixed inset-0 z-40 bg-white/70 dark:bg-black/30 flex items-center justify-center">
+          <div className="bg-white/90 dark:bg-white/[0.08] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.12] rounded-2xl px-6 py-4 text-sm text-gray-700 dark:text-white/70">
             处理中...
           </div>
         </div>

@@ -82,20 +82,20 @@ export function MyWorkflowCard({
   const TriggerIcon = workflow.triggerType === "scheduled" ? Clock : Zap;
 
   return (
-    <div className="group bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-5 transition-all hover:border-white/[0.15] hover:bg-white/[0.06] flex flex-col">
+    <div className="group bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 transition-all hover:border-black/[0.12] dark:hover:border-white/[0.15] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] flex flex-col">
       {/* Name */}
-      <h3 className="text-base font-semibold text-white/90 mb-2">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-white/90 mb-2">
         {workflow.name}
       </h3>
 
       {/* Trigger info */}
-      <div className="flex items-center gap-1.5 text-sm text-white/45 mb-1">
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-white/45 mb-1">
         <TriggerIcon className="w-3.5 h-3.5" />
         <span>{triggerLabel}</span>
       </div>
 
       {/* Run count */}
-      <p className="text-sm text-white/35 mb-4">
+      <p className="text-sm text-gray-400 dark:text-white/35 mb-4">
         已运行 {workflow.runCount} 次
       </p>
 
@@ -103,14 +103,14 @@ export function MyWorkflowCard({
       <div className="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onRun(workflow.id)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] text-sm text-white/70 border-0 cursor-pointer transition-all hover:bg-white/[0.14] hover:text-white/90"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/[0.05] dark:bg-white/[0.08] text-sm text-gray-700 dark:text-white/70 border-0 cursor-pointer transition-all hover:bg-black/[0.08] dark:hover:bg-white/[0.14] hover:text-gray-900 dark:hover:text-white/90"
         >
           <Play className="w-3.5 h-3.5" />
           运行
         </button>
         <button
           onClick={() => onEdit(workflow.id)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] text-sm text-white/70 border-0 cursor-pointer transition-all hover:bg-white/[0.14] hover:text-white/90"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/[0.05] dark:bg-white/[0.08] text-sm text-gray-700 dark:text-white/70 border-0 cursor-pointer transition-all hover:bg-black/[0.08] dark:hover:bg-white/[0.14] hover:text-gray-900 dark:hover:text-white/90"
         >
           <Pencil className="w-3.5 h-3.5" />
           编辑

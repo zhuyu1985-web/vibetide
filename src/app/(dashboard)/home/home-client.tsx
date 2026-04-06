@@ -124,7 +124,7 @@ export function HomeClient({
             Vibetide 智媒工作空间
           </span>
         </h1>
-        <p className="text-sm text-white/40">
+        <p className="text-sm text-gray-400 dark:text-white/40">
           与 AI 团队协作，高效完成内容生产
         </p>
       </div>
@@ -134,10 +134,10 @@ export function HomeClient({
         <div
           className={cn(
             "rounded-2xl overflow-hidden",
-            "bg-white/[0.06] backdrop-blur-2xl",
-            "border border-white/[0.08]",
+            "bg-black/[0.03] dark:bg-white/[0.06] backdrop-blur-2xl",
+            "border border-black/[0.08] dark:border-white/[0.08]",
             "shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)]",
-            "focus-within:border-white/[0.15]",
+            "focus-within:border-black/[0.12] dark:focus-within:border-white/[0.15]",
             "focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.12),0_0_60px_rgba(59,130,246,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]",
             "transition-all duration-500 ease-out"
           )}
@@ -146,7 +146,7 @@ export function HomeClient({
             {/* Paperclip attachment button (disabled) */}
             <button
               disabled
-              className="p-2 rounded-lg text-white/20 cursor-not-allowed shrink-0 border-0"
+              className="p-2 rounded-lg text-gray-200 dark:text-white/20 cursor-not-allowed shrink-0 border-0"
               title="附件功能即将上线"
             >
               <Paperclip size={18} />
@@ -180,7 +180,7 @@ export function HomeClient({
               placeholder="输入你的需求，AI 团队为你协作完成..."
               rows={1}
               className={cn(
-                "flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/25",
+                "flex-1 bg-transparent text-sm text-gray-900 dark:text-white/90 placeholder:text-gray-400 dark:placeholder:text-white/25",
                 "resize-none outline-none min-h-[36px] max-h-[120px] py-2",
                 "scrollbar-thin scrollbar-thumb-white/10"
               )}
@@ -203,7 +203,7 @@ export function HomeClient({
                 "p-2 rounded-lg shrink-0 transition-all duration-200 border-0",
                 inputValue.trim() && !chat.loading && !chat.isStreaming
                   ? "bg-blue-500 text-white hover:bg-blue-400"
-                  : "text-white/15 cursor-not-allowed"
+                  : "text-gray-200 dark:text-white/15 cursor-not-allowed"
               )}
             >
               <Send size={18} />
@@ -213,8 +213,8 @@ export function HomeClient({
           {/* Subtle hint */}
           {!chatOpen && (
             <div className="flex items-center gap-1.5 px-4 pb-2 -mt-1">
-              <Sparkles size={10} className="text-white/15" />
-              <span className="text-[10px] text-white/15">
+              <Sparkles size={10} className="text-gray-300 dark:text-white/15" />
+              <span className="text-[10px] text-gray-300 dark:text-white/15">
                 Enter 发送 / Shift+Enter 换行
               </span>
             </div>

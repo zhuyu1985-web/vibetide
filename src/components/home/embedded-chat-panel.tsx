@@ -10,7 +10,7 @@ import {
   IntentConfirmCard,
 } from "@/components/chat/intent-bubble";
 import { saveConversation } from "@/app/actions/conversations";
-import { Maximize2, X, Loader2, Wrench } from "lucide-react";
+import { Maximize2, X, Loader2, Wrench, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -37,8 +37,8 @@ export function EmbeddedChatPanel({
   const savingRef = useRef(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
-  const meta = EMPLOYEE_META[activeEmployee];
-  const Icon = meta.icon;
+  const meta = EMPLOYEE_META[activeEmployee] as typeof EMPLOYEE_META[EmployeeId] | undefined;
+  const Icon = meta?.icon ?? UserCog;
 
   // ── Auto-scroll on new content ──
   useEffect(() => {
@@ -108,21 +108,21 @@ export function EmbeddedChatPanel({
 
   return (
     <div className="max-w-3xl mx-auto mt-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
-      <div className="bg-black/30 backdrop-blur-2xl border border-white/[0.08] rounded-2xl overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]">
+      <div className="bg-white/70 dark:bg-black/30 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]">
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-black/5 dark:border-white/5">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: meta.bgColor }}
+            style={{ backgroundColor: meta?.bgColor ?? "rgba(107,114,128,0.15)" }}
           >
-            <Icon size={16} style={{ color: meta.color }} />
+            <Icon size={16} style={{ color: meta?.color ?? "#6b7280" }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white/90">
-                {meta.nickname}
+              <span className="text-sm font-medium text-gray-900 dark:text-white/90">
+                {meta?.nickname ?? "AI 助手"}
               </span>
-              <span className="text-xs text-white/40">{meta.title}</span>
+              <span className="text-xs text-gray-400 dark:text-white/40">{meta?.title ?? ""}</span>
               {(chat.isStreaming || chat.loading) && (
                 <Loader2
                   size={14}
@@ -133,14 +133,14 @@ export function EmbeddedChatPanel({
           </div>
 
           <button
-            className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors border-0"
+            className="p-1.5 rounded-lg text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-0"
             onClick={handleExpand}
             title="展开到独立页面"
           >
             <Maximize2 size={16} />
           </button>
           <button
-            className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors border-0"
+            className="p-1.5 rounded-lg text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-0"
             onClick={onClose}
             title="关闭"
           >
@@ -171,7 +171,7 @@ export function EmbeddedChatPanel({
                     "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
                     isUser
                       ? "bg-blue-500/80 text-white shadow-[0_2px_12px_rgba(59,130,246,0.2)]"
-                      : "bg-white/[0.05] text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                      : "bg-black/[0.03] dark:bg-white/[0.05] text-gray-800 dark:text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                   )}
                 >
                   {/* Message content */}
@@ -182,7 +182,7 @@ export function EmbeddedChatPanel({
                   ) : isLastAssistant && (chat.isStreaming || chat.loading) ? (
                     <Loader2
                       size={14}
-                      className="text-white/40 animate-spin"
+                      className="text-gray-400 dark:text-white/40 animate-spin"
                     />
                   ) : null}
 
@@ -190,11 +190,11 @@ export function EmbeddedChatPanel({
                   {isLastAssistant &&
                     (chat.isStreaming || chat.loading) &&
                     chat.currentThinking.length > 0 && (
-                      <div className="mt-2 space-y-1 border-t border-white/5 pt-2">
+                      <div className="mt-2 space-y-1 border-t border-black/5 dark:border-white/5 pt-2">
                         {chat.currentThinking.map((step, si) => (
                           <div
                             key={si}
-                            className="flex items-center gap-1.5 text-xs text-white/40"
+                            className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-white/40"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-400/60 animate-pulse flex-shrink-0" />
                             <span>{step.label}</span>
@@ -209,7 +209,7 @@ export function EmbeddedChatPanel({
                       {msg.skillsUsed.map((skill) => (
                         <span
                           key={skill.tool}
-                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-white/40"
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 text-gray-400 dark:text-white/40"
                         >
                           <Wrench size={9} className="flex-shrink-0" />
                           {skill.skillName}

@@ -4,11 +4,11 @@ import { useState } from "react";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { AIEmployee } from "@/lib/types";
 import type { HotTask } from "@/lib/employee-tasks";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowUpRight, Plus, UserCog } from "lucide-react";
 
 const STATUS_CONFIG = {
   working: { label: "工作中", dotColor: "bg-emerald-400", textColor: "text-emerald-400/80" },
-  idle: { label: "空闲", dotColor: "bg-white/30", textColor: "text-white/40" },
+  idle: { label: "空闲", dotColor: "bg-gray-300 dark:bg-white/30", textColor: "text-gray-400 dark:text-white/40" },
   learning: { label: "学习中", dotColor: "bg-blue-400", textColor: "text-blue-400/80" },
   reviewing: { label: "审核中", dotColor: "bg-amber-400", textColor: "text-amber-400/80" },
 };
@@ -27,31 +27,36 @@ export function EmployeeAgentCard({
   onHotTaskClick,
 }: EmployeeAgentCardProps) {
   const [hoveredTask, setHoveredTask] = useState<number | null>(null);
-  const meta = EMPLOYEE_META[employee.id];
+  const meta = EMPLOYEE_META[employee.id as EmployeeId] as typeof EMPLOYEE_META[EmployeeId] | undefined;
   const statusCfg = STATUS_CONFIG[employee.status];
-  const Icon = meta.icon;
+  const Icon = meta?.icon ?? UserCog;
   const displaySkills = employee.skills.slice(0, 5);
+
+  const iconBg = meta?.bgColor ?? "rgba(107,114,128,0.15)";
+  const iconColor = meta?.color ?? "#6b7280";
+  const nickname = meta?.nickname ?? employee.nickname;
+  const name = meta?.name ?? employee.name;
 
   return (
     <div
-      className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-5 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-white/[0.15] hover:scale-[1.01] transition-all duration-300"
+      className="bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-black/[0.12] dark:hover:border-white/[0.15] hover:scale-[1.01] transition-all duration-300"
     >
       {/* Header: icon + name + status */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: meta.bgColor }}
+            style={{ backgroundColor: iconBg }}
           >
-            <Icon className="w-5 h-5" style={{ color: meta.color }} />
+            <Icon className="w-5 h-5" style={{ color: iconColor }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white/90">
-                {meta.nickname}
+              <span className="text-sm font-medium text-gray-900 dark:text-white/90">
+                {nickname}
               </span>
-              <span className="text-xs text-white/40">·</span>
-              <span className="text-xs text-white/50">{meta.name}</span>
+              <span className="text-xs text-gray-400 dark:text-white/40">·</span>
+              <span className="text-xs text-gray-500 dark:text-white/50">{name}</span>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dotColor}`} />
@@ -64,25 +69,25 @@ export function EmployeeAgentCard({
       </div>
 
       {/* Motto */}
-      <p className="text-xs text-white/40 mb-4 leading-relaxed">
+      <p className="text-xs text-gray-400 dark:text-white/40 mb-4 leading-relaxed">
         &ldquo;{employee.motto}&rdquo;
       </p>
 
       {/* Hot Tasks */}
       {hotTasks.length > 0 && (
         <div className="mb-4">
-          <div className="text-[11px] text-white/30 mb-2">热门任务:</div>
+          <div className="text-[11px] text-gray-300 dark:text-white/30 mb-2">热门任务:</div>
           <div className="flex flex-col gap-1">
             {hotTasks.map((task, idx) => (
               <button
                 key={idx}
-                className="flex items-center justify-between text-left text-sm text-white/60 hover:text-white/90 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] transition-all border-0 bg-transparent cursor-pointer w-full"
+                className="flex items-center justify-between text-left text-sm text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white/90 px-2 py-1.5 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-all border-0 bg-transparent cursor-pointer w-full"
                 onMouseEnter={() => setHoveredTask(idx)}
                 onMouseLeave={() => setHoveredTask(null)}
                 onClick={() => onHotTaskClick(employee.id, task.prompt)}
               >
                 <span className="flex items-center gap-2">
-                  <span className="text-white/20">·</span>
+                  <span className="text-gray-200 dark:text-white/20">·</span>
                   {task.label}
                 </span>
                 <ArrowUpRight
@@ -102,13 +107,13 @@ export function EmployeeAgentCard({
           {displaySkills.map((skill) => (
             <span
               key={skill.id}
-              className="px-2.5 py-1 rounded-full bg-white/[0.06] text-[11px] text-white/50"
+              className="px-2.5 py-1 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px] text-gray-500 dark:text-white/50"
             >
               {skill.name}
             </span>
           ))}
           {employee.skills.length > 5 && (
-            <span className="px-2.5 py-1 rounded-full bg-white/[0.06] text-[11px] text-white/30">
+            <span className="px-2.5 py-1 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px] text-gray-300 dark:text-white/30">
               +{employee.skills.length - 5}
             </span>
           )}
@@ -118,7 +123,7 @@ export function EmployeeAgentCard({
       {/* Dispatch Button */}
       <div className="flex justify-center">
         <button
-          className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white/80 hover:bg-white/10 rounded-xl px-4 py-2 transition-all border-0 bg-transparent cursor-pointer"
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-white/50 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl px-4 py-2 transition-all border-0 bg-transparent cursor-pointer"
           onClick={() => onDispatchTask(employee.id)}
         >
           <Plus className="w-4 h-4" />

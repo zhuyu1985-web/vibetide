@@ -36,7 +36,7 @@ export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps
             className={cn(
               "flex flex-col items-center gap-1.5 p-2 rounded-xl cursor-pointer",
               "transition-all duration-300 ease-out",
-              "hover:scale-[1.08] hover:bg-white/[0.06] hover:backdrop-blur-sm"
+              "hover:scale-[1.08] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:backdrop-blur-sm"
             )}
           >
             {/* Icon square */}
@@ -48,10 +48,10 @@ export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps
             </div>
 
             {/* Nickname */}
-            <span className="text-xs text-white/80 leading-none">{emp.nickname}</span>
+            <span className="text-xs text-gray-800 dark:text-white/80 leading-none">{emp.nickname}</span>
 
             {/* Title */}
-            <span className="text-[10px] text-white/40 leading-none">{emp.title}</span>
+            <span className="text-[10px] text-gray-400 dark:text-white/40 leading-none">{emp.title}</span>
           </button>
         );
       })}
@@ -62,17 +62,17 @@ export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps
         className={cn(
           "flex flex-col items-center gap-1.5 p-2 rounded-xl cursor-pointer",
           "transition-all duration-300 ease-out",
-          "hover:scale-[1.08] hover:bg-white/[0.06] hover:backdrop-blur-sm"
+          "hover:scale-[1.08] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:backdrop-blur-sm"
         )}
       >
         {/* Icon square */}
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-          <Sparkles size={24} className="text-white/60" />
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-black/5 dark:from-white/10 to-black/[0.03] dark:to-white/5 border border-black/[0.08] dark:border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+          <Sparkles size={24} className="text-gray-600 dark:text-white/60" />
         </div>
 
         {/* Label lines */}
-        <span className="text-xs text-white/80 leading-none">全部</span>
-        <span className="text-[10px] text-white/40 leading-none">员工</span>
+        <span className="text-xs text-gray-800 dark:text-white/80 leading-none">全部</span>
+        <span className="text-[10px] text-gray-400 dark:text-white/40 leading-none">员工</span>
       </button>
     </div>
   );
