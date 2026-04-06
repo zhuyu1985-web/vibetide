@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Search, Bell, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+// SidebarTrigger removed — sidebar has its own expand/collapse toggle
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -85,7 +85,7 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
         WebkitBackdropFilter: 'blur(20px) saturate(130%)',
       }}
     >
-      <SidebarTrigger />
+      {/* Sidebar trigger removed — sidebar has built-in toggle */}
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
