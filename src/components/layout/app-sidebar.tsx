@@ -38,12 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+// Tooltip removed — labels shown directly under icons
 import {
   Sidebar,
   SidebarContent,
@@ -140,7 +135,7 @@ function hasActiveChild(pathname: string, children?: SubItem[]) {
 /* ─── Shared icon button styles ─── */
 
 const iconBtnBase = cn(
-  "relative flex items-center justify-center w-10 h-10 rounded-xl",
+  "relative flex flex-col items-center justify-center gap-0.5 w-12 py-1.5 rounded-xl",
   "transition-all duration-200 ease-out",
   "hover:-translate-y-0.5 hover:shadow-md",
   "active:translate-y-0 active:shadow-none",
@@ -199,19 +194,13 @@ function IconLink({
   active: boolean;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          href={href}
-          className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}
-        >
-          <Icon size={20} strokeWidth={active ? 2 : 1.5} />
-        </Link>
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={8}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
+    <Link
+      href={href}
+      className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}
+    >
+      <Icon size={18} strokeWidth={active ? 2 : 1.5} />
+      <span className="text-[10px] leading-none font-medium">{label}</span>
+    </Link>
   );
 }
 
@@ -234,20 +223,14 @@ function IconPopover({
 
   return (
     <Popover>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}
-            >
-              <Icon size={20} strokeWidth={active ? 2 : 1.5} />
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>
-          {item.label}
-        </TooltipContent>
-      </Tooltip>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}
+        >
+          <Icon size={18} strokeWidth={active ? 2 : 1.5} />
+          <span className="text-[10px] leading-none font-medium">{item.label}</span>
+        </button>
+      </PopoverTrigger>
       <PopoverContent
         side="right"
         align="start"
@@ -288,10 +271,9 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
   const visibleMore = MORE_ITEMS.filter((i) => canSeeItem(i.href));
 
   return (
-    <TooltipProvider delayDuration={150}>
       <Sidebar
         collapsible="none"
-        className="!w-16 border-r border-border/50 glass-sidebar"
+        className="!w-[68px] border-r border-border/50 glass-sidebar"
       >
         {/* Brand */}
         <SidebarHeader className="flex items-center justify-center py-4">
@@ -332,18 +314,12 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
             {/* More */}
             {visibleMore.length > 0 && (
               <Popover>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <PopoverTrigger asChild>
-                      <button className={cn(iconBtnBase, iconBtnIdle)}>
-                        <MoreHorizontal size={20} strokeWidth={1.5} />
-                      </button>
-                    </PopoverTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" sideOffset={8}>
-                    更多
-                  </TooltipContent>
-                </Tooltip>
+                <PopoverTrigger asChild>
+                  <button className={cn(iconBtnBase, iconBtnIdle)}>
+                    <MoreHorizontal size={18} strokeWidth={1.5} />
+                    <span className="text-[10px] leading-none font-medium">更多</span>
+                  </button>
+                </PopoverTrigger>
                 <PopoverContent
                   side="right"
                   align="start"
@@ -363,18 +339,12 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
 
           {canAccessAdmin && (
             <Popover>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <button className={cn(iconBtnBase, iconBtnIdle)}>
-                      <Settings size={20} strokeWidth={1.5} />
-                    </button>
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8}>
-                  设置
-                </TooltipContent>
-              </Tooltip>
+              <PopoverTrigger asChild>
+                <button className={cn(iconBtnBase, iconBtnIdle)}>
+                  <Settings size={18} strokeWidth={1.5} />
+                  <span className="text-[10px] leading-none font-medium">设置</span>
+                </button>
+              </PopoverTrigger>
               <PopoverContent
                 side="right"
                 align="end"
@@ -390,6 +360,5 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
           )}
         </SidebarFooter>
       </Sidebar>
-    </TooltipProvider>
   );
 }
