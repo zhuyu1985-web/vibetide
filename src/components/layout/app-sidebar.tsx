@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -40,6 +39,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
@@ -50,11 +55,17 @@ import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
 
 /* ─── Types ─── */
 
+interface SubItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
+
 interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  children?: { label: string; href: string; icon: LucideIcon }[];
+  children?: SubItem[];
 }
 
 /* ─── Navigation Data ─── */
@@ -104,12 +115,12 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-const MORE_ITEMS = [
+const MORE_ITEMS: SubItem[] = [
   { label: "频道顾问", href: "/channel-advisor", icon: BrainIcon },
   { label: "批量审核", href: "/batch-review", icon: CheckSquare },
 ];
 
-const ADMIN_ITEMS = [
+const ADMIN_ITEMS: SubItem[] = [
   { label: "用户管理", href: "/admin/users", icon: Users },
   { label: "角色权限", href: "/admin/roles", icon: Shield },
   { label: "组织管理", href: "/admin/organizations", icon: Building2 },
@@ -117,18 +128,66 @@ const ADMIN_ITEMS = [
 
 /* ─── Helpers ─── */
 
-function isActive(pathname: string, href: string) {
+function isHrefActive(pathname: string, href: string) {
   if (href.startsWith("#")) return false;
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function isChildActive(pathname: string, children?: NavItem["children"]) {
-  return children?.some((c) => isActive(pathname, c.href)) ?? false;
+function hasActiveChild(pathname: string, children?: SubItem[]) {
+  return children?.some((c) => isHrefActive(pathname, c.href)) ?? false;
 }
 
-/* ─── Icon Button (top-level nav item) ─── */
+/* ─── Shared icon button styles ─── */
 
-function IconNavItem({
+const iconBtnBase = cn(
+  "relative flex items-center justify-center w-10 h-10 rounded-xl",
+  "transition-all duration-200 ease-out",
+  "hover:-translate-y-0.5 hover:shadow-md",
+  "active:translate-y-0 active:shadow-none",
+  "border-0 bg-transparent cursor-pointer"
+);
+
+const iconBtnActive = "bg-primary/12 text-primary shadow-sm dark:bg-white/12 dark:text-white";
+const iconBtnIdle = "text-muted-foreground/60 hover:bg-accent hover:text-foreground";
+
+/* ─── Popover sub-menu list ─── */
+
+function SubMenuList({
+  items,
+  pathname,
+}: {
+  items: SubItem[];
+  pathname: string;
+}) {
+  return (
+    <div className="space-y-0.5">
+      {items.map((child) => {
+        const ChildIcon = child.icon;
+        const active = isHrefActive(pathname, child.href);
+        return (
+          <Link
+            key={child.href}
+            href={child.href}
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
+              "transition-colors duration-150",
+              active
+                ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <ChildIcon size={15} className="shrink-0" />
+            <span>{child.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Simple icon link ─── */
+
+function IconLink({
   href,
   icon: Icon,
   label,
@@ -140,25 +199,25 @@ function IconNavItem({
   active: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
-        "transition-colors duration-150",
-        active
-          ? "bg-primary/10 text-primary dark:bg-white/10 dark:text-white"
-          : "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-      )}
-    >
-      <Icon size={20} strokeWidth={active ? 2 : 1.5} />
-      <span className="text-[10px] leading-tight font-medium">{label}</span>
-    </Link>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          href={href}
+          className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}
+        >
+          <Icon size={20} strokeWidth={active ? 2 : 1.5} />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
-/* ─── Icon Button with Popover (for items with children) ─── */
+/* ─── Icon with popover children ─── */
 
-function IconNavGroup({
+function IconPopover({
   item,
   pathname,
   canSeeItem,
@@ -168,58 +227,37 @@ function IconNavGroup({
   canSeeItem: (href: string) => boolean;
 }) {
   const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
-  const groupActive = isChildActive(pathname, children);
-
   if (children.length === 0) return null;
 
   const Icon = item.icon;
+  const active = hasActiveChild(pathname, children);
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          className={cn(
-            "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
-            "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
-            groupActive
-              ? "bg-primary/10 text-primary dark:bg-white/10 dark:text-white"
-              : "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-          )}
-        >
-          <Icon size={20} strokeWidth={groupActive ? 2 : 1.5} />
-          <span className="text-[10px] leading-tight font-medium">
-            {item.label}
-          </span>
-        </button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}
+            >
+              <Icon size={20} strokeWidth={active ? 2 : 1.5} />
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          {item.label}
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent
         side="right"
         align="start"
-        sideOffset={4}
+        sideOffset={8}
         className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
       >
-        <div className="space-y-0.5">
-          {children.map((child) => {
-            const ChildIcon = child.icon;
-            const childActive = isActive(pathname, child.href);
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
-                  "transition-colors duration-150",
-                  childActive
-                    ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <ChildIcon size={15} className="shrink-0" />
-                <span>{child.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+        <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+          {item.label}
+        </p>
+        <SubMenuList items={children} pathname={pathname} />
       </PopoverContent>
     </Popover>
   );
@@ -250,146 +288,108 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
   const visibleMore = MORE_ITEMS.filter((i) => canSeeItem(i.href));
 
   return (
-    <Sidebar
-      collapsible="none"
-      className="!w-[68px] border-r border-border/50 glass-sidebar"
-    >
-      {/* Brand icon */}
-      <SidebarHeader className="flex items-center justify-center py-4">
-        <Link
-          href="/home"
-          className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20"
-        >
-          <SparklesIcon size={18} className="text-white" />
-        </Link>
-      </SidebarHeader>
+    <TooltipProvider delayDuration={150}>
+      <Sidebar
+        collapsible="none"
+        className="!w-16 border-r border-border/50 glass-sidebar"
+      >
+        {/* Brand */}
+        <SidebarHeader className="flex items-center justify-center py-4">
+          <Link
+            href="/home"
+            className={cn(
+              "w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600",
+              "flex items-center justify-center shadow-lg shadow-blue-500/20",
+              "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30"
+            )}
+          >
+            <SparklesIcon size={20} className="text-white" />
+          </Link>
+        </SidebarHeader>
 
-      {/* Main nav — icon + label vertical stack */}
-      <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-1">
-        <nav className="flex flex-col gap-0.5">
-          {visibleNav.map((item) =>
-            item.children ? (
-              <IconNavGroup
-                key={item.href}
-                item={item}
-                pathname={pathname}
-                canSeeItem={canSeeItem}
-              />
-            ) : (
-              <IconNavItem
-                key={item.href}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                active={isActive(pathname, item.href)}
-              />
-            )
-          )}
+        {/* Main nav */}
+        <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden">
+          <nav className="flex flex-col items-center gap-1 px-2 py-1">
+            {visibleNav.map((item) =>
+              item.children ? (
+                <IconPopover
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  canSeeItem={canSeeItem}
+                />
+              ) : (
+                <IconLink
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  active={isHrefActive(pathname, item.href)}
+                />
+              )
+            )}
 
-          {/* More */}
-          {visibleMore.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
-                    "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
-                    "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  <MoreHorizontal size={20} strokeWidth={1.5} />
-                  <span className="text-[10px] leading-tight font-medium">
+            {/* More */}
+            {visibleMore.length > 0 && (
+              <Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <button className={cn(iconBtnBase, iconBtnIdle)}>
+                        <MoreHorizontal size={20} strokeWidth={1.5} />
+                      </button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={8}>
                     更多
-                  </span>
-                </button>
-              </PopoverTrigger>
+                  </TooltipContent>
+                </Tooltip>
+                <PopoverContent
+                  side="right"
+                  align="start"
+                  sideOffset={8}
+                  className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+                >
+                  <SubMenuList items={visibleMore} pathname={pathname} />
+                </PopoverContent>
+              </Popover>
+            )}
+          </nav>
+        </SidebarContent>
+
+        {/* Bottom — Settings */}
+        <SidebarFooter className="flex flex-col items-center gap-1 px-2 pb-4 pt-1">
+          <div className="w-8 h-px bg-border/30 mb-1" />
+
+          {canAccessAdmin && (
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button className={cn(iconBtnBase, iconBtnIdle)}>
+                      <Settings size={20} strokeWidth={1.5} />
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>
+                  设置
+                </TooltipContent>
+              </Tooltip>
               <PopoverContent
                 side="right"
-                align="start"
-                sideOffset={4}
+                align="end"
+                sideOffset={8}
                 className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
               >
-                <div className="space-y-0.5">
-                  {visibleMore.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(pathname, item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
-                          "transition-colors duration-150",
-                          active
-                            ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                        )}
-                      >
-                        <Icon size={15} className="shrink-0" />
-                        <span>{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  系统管理
+                </p>
+                <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
               </PopoverContent>
             </Popover>
           )}
-        </nav>
-      </SidebarContent>
-
-      {/* Bottom — Admin + Settings */}
-      <SidebarFooter className="px-2 pb-3 pt-1 flex flex-col gap-0.5">
-        <div className="h-px bg-border/30 mb-1" />
-
-        {/* Admin items */}
-        {canAccessAdmin && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className={cn(
-                  "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
-                  "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
-                  "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <Settings size={20} strokeWidth={1.5} />
-                <span className="text-[10px] leading-tight font-medium">
-                  设置
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="right"
-              align="end"
-              sideOffset={4}
-              className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
-            >
-              <div className="space-y-0.5">
-                {ADMIN_ITEMS.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(pathname, item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
-                        "transition-colors duration-150",
-                        active
-                          ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      )}
-                    >
-                      <Icon size={15} className="shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
-      </SidebarFooter>
-    </Sidebar>
+        </SidebarFooter>
+      </Sidebar>
+    </TooltipProvider>
   );
 }
