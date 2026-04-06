@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Search, Bell, User, LogOut } from "lucide-react";
+import { Search, Bell, User, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // SidebarTrigger removed — sidebar has its own expand/collapse toggle
 import {
@@ -69,9 +69,11 @@ const pageGroups: Record<string, string> = {
 interface TopbarProps {
   userName: string;
   unreadCount?: number;
+  sidebarExpanded?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
+export function Topbar({ userName, unreadCount = 0, sidebarExpanded, onToggleSidebar }: TopbarProps) {
   const pathname = usePathname();
   const pageTitle = pageTitles[pathname] || "工作台";
   const groupName = pageGroups[pathname];
@@ -85,7 +87,16 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
         WebkitBackdropFilter: 'blur(20px) saturate(130%)',
       }}
     >
-      {/* Sidebar trigger removed — sidebar has built-in toggle */}
+      {/* Sidebar expand/collapse toggle */}
+      {onToggleSidebar && (
+        <button
+          onClick={onToggleSidebar}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors border-0 bg-transparent cursor-pointer shrink-0"
+          title={sidebarExpanded ? "收起菜单" : "展开菜单"}
+        >
+          {sidebarExpanded ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+        </button>
+      )}
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>

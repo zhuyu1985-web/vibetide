@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+// useState still needed for ExpandedGroup
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -34,8 +35,6 @@ import {
   Shield,
   CheckSquare,
   ChevronDown,
-  PanelLeftClose,
-  PanelLeftOpen,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -293,12 +292,13 @@ function SubMenuList({ items, pathname }: { items: SubItem[]; pathname: string }
 export function AppSidebar({
   permissions = [],
   unreadCount = 0,
+  expanded = false,
 }: {
   permissions?: string[];
   unreadCount?: number;
+  expanded?: boolean;
 }) {
   const pathname = usePathname();
-  const [expanded, setExpanded] = useState(false);
   const hasAllPerms = permissions.length === 0;
   const canAccessAdmin =
     hasAllPerms ||
@@ -416,21 +416,6 @@ export function AppSidebar({
         "flex flex-col items-center gap-1.5 px-2 pb-8 pt-2 shrink-0",
         expanded && "items-stretch"
       )}>
-        {/* Expand/Collapse toggle */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className={cn(
-            "flex items-center justify-center rounded-xl transition-all duration-200 ease-out",
-            "hover:-translate-y-0.5 hover:shadow-md border-0 bg-transparent cursor-pointer",
-            "text-muted-foreground hover:bg-accent hover:text-foreground",
-            expanded ? "w-full py-2 gap-3 px-3" : "w-10 h-10"
-          )}
-          title={expanded ? "收起菜单" : "展开菜单"}
-        >
-          {expanded ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-          {expanded && <span className="text-[13px] font-medium flex-1 text-left">收起</span>}
-        </button>
-
         {/* Notification */}
         <Link
           href="/notifications"

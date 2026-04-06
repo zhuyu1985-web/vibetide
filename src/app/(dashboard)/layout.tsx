@@ -1,8 +1,7 @@
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { Topbar } from "@/components/layout/topbar";
 import { getUnreadCount } from "@/lib/dal/notifications";
 import { getCurrentUserProfile } from "@/lib/dal/auth";
 import { PermissionProvider } from "@/components/providers/permission-provider";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 export default async function DashboardLayout({
   children,
@@ -40,15 +39,13 @@ export default async function DashboardLayout({
 
   return (
     <PermissionProvider permissions={permissions} isSuperAdmin={superAdmin}>
-      <div className="flex h-svh overflow-hidden">
-        <AppSidebar permissions={permissions} unreadCount={unreadCount} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Topbar userName={displayName} unreadCount={unreadCount} />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-page bg-glow">
-            <div className="relative z-10 p-6">{children}</div>
-          </main>
-        </div>
-      </div>
+      <DashboardShell
+        userName={displayName}
+        unreadCount={unreadCount}
+        permissions={permissions}
+      >
+        {children}
+      </DashboardShell>
     </PermissionProvider>
   );
 }
