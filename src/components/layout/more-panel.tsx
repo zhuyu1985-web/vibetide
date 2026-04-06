@@ -20,41 +20,37 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-/* ─── Types ─── */
+/* ─── Data ─── */
 
-interface MorePanelItem {
+interface MoreItem {
   label: string;
   href: string;
   icon: LucideIcon;
 }
 
-interface MorePanelProps {
-  canSeeItem: (href: string) => boolean;
-  canAccessAdmin: boolean;
-}
-
-/* ─── Data ─── */
-
-const regularItems: MorePanelItem[] = [
+const regularItems: MoreItem[] = [
   { label: "频道顾问", href: "/channel-advisor", icon: Brain },
   { label: "节赛会展", href: "/event-auto", icon: CalendarDays },
   { label: "批量审核", href: "/batch-review", icon: CheckSquare },
   { label: "案例库", href: "/case-library", icon: BookOpen },
 ];
 
-const adminItems: MorePanelItem[] = [
+const adminItems: MoreItem[] = [
   { label: "组织管理", href: "/admin/organizations", icon: Building2 },
   { label: "用户管理", href: "/admin/users", icon: Users },
   { label: "角色权限", href: "/admin/roles", icon: Shield },
 ];
-
-/* ─── Helper ─── */
 
 function isItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
 /* ─── Component ─── */
+
+interface MorePanelProps {
+  canSeeItem: (href: string) => boolean;
+  canAccessAdmin: boolean;
+}
 
 export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
   const pathname = usePathname();
@@ -73,42 +69,34 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium",
-            "transition-all duration-200 ease-out",
-            "glass-nav-item",
-            "border-0 outline-none",
-            "group/nav-item",
-            anyActive && "active",
+            "flex w-full items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium",
+            "transition-colors duration-150 cursor-pointer",
+            "border-0 bg-transparent outline-none",
             anyActive
-              ? "text-blue-400/80 dark:text-blue-300/80"
-              : "text-muted-foreground/70 hover:text-foreground"
+              ? "text-primary dark:text-white"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
         >
           <MoreHorizontal
             size={18}
             className={cn(
-              "shrink-0 transition-colors duration-200",
-              anyActive
-                ? "text-blue-400/80 dark:text-blue-300/80"
-                : "text-muted-foreground/50 group-hover/nav-item:text-blue-400/80 dark:group-hover/nav-item:text-blue-300/80"
+              "shrink-0",
+              anyActive ? "text-primary dark:text-white" : ""
             )}
           />
-          <span className="overflow-hidden transition-[opacity,width] duration-200 ease-linear group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
+          <span className="truncate transition-[opacity,width] duration-200 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
             更多
           </span>
-          {anyActive && (
-            <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-gradient-to-b from-blue-400/80 to-indigo-400/80" />
-          )}
         </button>
       </PopoverTrigger>
       <PopoverContent
         side="right"
         align="end"
         sideOffset={8}
-        className="w-64 rounded-xl border border-black/10 dark:border-white/10 bg-white/90 dark:bg-black/80 p-3 shadow-2xl backdrop-blur-xl"
+        className="w-56 rounded-xl border border-border bg-popover p-2 shadow-xl"
       >
         {/* Regular items */}
-        <div className="grid grid-cols-2 gap-1">
+        <div className="space-y-0.5">
           {visibleRegular.map((item) => {
             const Icon = item.icon;
             const active = isItemActive(pathname, item.href);
@@ -117,15 +105,15 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium",
-                  "transition-all duration-150 border-0",
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px]",
+                  "transition-colors duration-150",
                   active
-                    ? "bg-blue-500/15 text-blue-600 dark:text-blue-300"
-                    : "text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
+                    ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
-                <Icon size={15} className="shrink-0" />
-                <span className="truncate">{item.label}</span>
+                <Icon size={16} className="shrink-0" />
+                <span>{item.label}</span>
               </Link>
             );
           })}
@@ -134,11 +122,11 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
         {/* Admin section */}
         {visibleAdmin.length > 0 && (
           <>
-            <div className="my-2 h-px bg-gradient-to-r from-transparent via-black/10 dark:via-white/10 to-transparent" />
-            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300 dark:text-white/30">
+            <div className="my-1.5 h-px bg-border/50" />
+            <p className="mb-1 px-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
               系统管理
             </p>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="space-y-0.5">
               {visibleAdmin.map((item) => {
                 const Icon = item.icon;
                 const active = isItemActive(pathname, item.href);
@@ -147,15 +135,15 @@ export function MorePanel({ canSeeItem, canAccessAdmin }: MorePanelProps) {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium",
-                      "transition-all duration-150 border-0",
+                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px]",
+                      "transition-colors duration-150",
                       active
-                        ? "bg-blue-500/15 text-blue-600 dark:text-blue-300"
-                        : "text-gray-700 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
+                        ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}
                   >
-                    <Icon size={15} className="shrink-0" />
-                    <span className="truncate">{item.label}</span>
+                    <Icon size={16} className="shrink-0" />
+                    <span>{item.label}</span>
                   </Link>
                 );
               })}

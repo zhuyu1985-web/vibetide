@@ -12,7 +12,7 @@ import {
   FolderOpen,
   BarChart3,
   Sparkles,
-  ChevronRight,
+  ChevronDown,
   Lightbulb,
   Crosshair,
   PenTool,
@@ -34,13 +34,8 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarHeader,
   SidebarFooter,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
@@ -55,16 +50,6 @@ interface NavItem {
   children?: NavItem[];
 }
 
-/* ─── Color System (blue theme only) ─── */
-
-const theme = {
-  activeBar: "bg-gradient-to-b from-blue-400/80 to-indigo-400/80",
-  activeIcon: "text-blue-400/80 dark:text-blue-300/80",
-  activeText: "text-foreground font-semibold",
-  hoverIcon:
-    "group-hover/nav-item:text-blue-400/80 dark:group-hover/nav-item:text-blue-300/80",
-};
-
 /* ─── Navigation Data ─── */
 
 const PRIMARY_NAV: NavItem[] = [
@@ -73,7 +58,9 @@ const PRIMARY_NAV: NavItem[] = [
   { label: "工作流", href: "/workflows", icon: GitBranch },
   { label: "任务中心", href: "/missions", icon: Target },
   {
-    label: "创作中心", href: "#creation", icon: Wand2,
+    label: "创作中心",
+    href: "#creation",
+    icon: Wand2,
     children: [
       { label: "灵感池", href: "/inspiration", icon: Lightbulb },
       { label: "同题对标", href: "/benchmarking", icon: Crosshair },
@@ -84,7 +71,9 @@ const PRIMARY_NAV: NavItem[] = [
     ],
   },
   {
-    label: "内容管理", href: "#content", icon: FolderOpen,
+    label: "内容管理",
+    href: "#content",
+    icon: FolderOpen,
     children: [
       { label: "媒资管理", href: "/media-assets", icon: Package },
       { label: "稿件管理", href: "/articles", icon: FileText },
@@ -95,7 +84,9 @@ const PRIMARY_NAV: NavItem[] = [
     ],
   },
   {
-    label: "数据分析", href: "#analytics", icon: BarChart3,
+    label: "数据分析",
+    href: "#analytics",
+    icon: BarChart3,
     children: [
       { label: "全渠道发布", href: "/publishing", icon: Radio },
       { label: "数据分析", href: "/analytics", icon: TrendingUp },
@@ -105,72 +96,54 @@ const PRIMARY_NAV: NavItem[] = [
   },
 ];
 
-/* ─── Helper ─── */
+/* ─── Helpers ─── */
 
-function isItemActive(pathname: string, href: string) {
+function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function isGroupActive(pathname: string, children: NavItem[]) {
-  return children.some((child) => isItemActive(pathname, child.href));
+function isChildActive(pathname: string, children: NavItem[]) {
+  return children.some((c) => isActive(pathname, c.href));
 }
 
-/* ─── Simple Menu Item ─── */
+/* ─── Flat Nav Item (Genspark style: clean, minimal, no glass borders) ─── */
 
-function NavMenuItem({
+function NavLink({
   href,
   icon: Icon,
   label,
-  isActive,
+  active,
 }: {
   href: string;
   icon: LucideIcon;
   label: string;
-  isActive: boolean;
+  active: boolean;
 }) {
   return (
-    <SidebarMenuItem className="group/nav-item">
-      <SidebarMenuButton
-        asChild
-        isActive={isActive}
-        className={cn(
-          "relative transition-all duration-300 ease-out rounded-lg overflow-hidden",
-          "glass-nav-item hover:backdrop-blur-sm",
-          isActive && "active",
-          isActive && theme.activeText
-        )}
-      >
-        <Link href={href}>
-          {isActive && (
-            <span
-              className={cn(
-                "absolute left-0 top-1 bottom-1 w-[3px] rounded-full",
-                theme.activeBar
-              )}
-              style={{
-                boxShadow: "0 0 8px rgba(96,165,250,0.4), 0 0 16px rgba(96,165,250,0.15)",
-              }}
-            />
-          )}
-          <Icon
-            size={18}
-            className={cn(
-              "transition-colors duration-200 shrink-0",
-              isActive
-                ? theme.activeIcon
-                : cn("text-muted-foreground/50", theme.hoverIcon)
-            )}
-          />
-          <span>{label}</span>
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium",
+        "transition-colors duration-150",
+        active
+          ? "bg-primary/10 text-primary dark:bg-white/10 dark:text-white"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+    >
+      <Icon
+        size={18}
+        className={cn("shrink-0", active ? "text-primary dark:text-white" : "")}
+      />
+      <span className="truncate transition-[opacity,width] duration-200 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
+        {label}
+      </span>
+    </Link>
   );
 }
 
-/* ─── Expandable Group Item ─── */
+/* ─── Expandable Group (Genspark style: simple toggle, indent children) ─── */
 
-function NavMenuGroup({
+function NavGroup({
   item,
   pathname,
   canSeeItem,
@@ -179,8 +152,8 @@ function NavMenuGroup({
   pathname: string;
   canSeeItem: (href: string) => boolean;
 }) {
-  const children = item.children!.filter((child) => canSeeItem(child.href));
-  const groupActive = isGroupActive(pathname, children);
+  const children = item.children!.filter((c) => canSeeItem(c.href));
+  const groupActive = isChildActive(pathname, children);
   const [open, setOpen] = useState(groupActive);
 
   if (children.length === 0) return null;
@@ -188,79 +161,71 @@ function NavMenuGroup({
   const Icon = item.icon;
 
   return (
-    <SidebarMenuItem className="group/nav-item">
-      <SidebarMenuButton
+    <div>
+      {/* Group header — clickable toggle, not a link */}
+      <button
         onClick={() => setOpen(!open)}
-        isActive={groupActive}
         className={cn(
-          "relative transition-all duration-300 ease-out rounded-lg overflow-hidden cursor-pointer",
-          "glass-nav-item hover:backdrop-blur-sm",
-          groupActive && "active",
-          groupActive && theme.activeText
+          "flex w-full items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium",
+          "transition-colors duration-150 cursor-pointer",
+          "border-0 bg-transparent outline-none",
+          groupActive
+            ? "text-primary dark:text-white"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground"
         )}
       >
-        {groupActive && (
-          <span
-            className={cn(
-              "absolute left-0 top-1 bottom-1 w-[3px] rounded-full",
-              theme.activeBar
-            )}
-            style={{
-              boxShadow: "0 0 8px rgba(96,165,250,0.4), 0 0 16px rgba(96,165,250,0.15)",
-            }}
-          />
-        )}
         <Icon
           size={18}
           className={cn(
-            "transition-colors duration-200 shrink-0",
-            groupActive
-              ? theme.activeIcon
-              : cn("text-muted-foreground/50", theme.hoverIcon)
+            "shrink-0",
+            groupActive ? "text-primary dark:text-white" : ""
           )}
         />
-        <span className="flex-1">{item.label}</span>
-        <ChevronRight
+        <span className="flex-1 text-left truncate transition-[opacity,width] duration-200 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
+          {item.label}
+        </span>
+        <ChevronDown
           size={14}
           className={cn(
-            "transition-transform duration-200 text-muted-foreground/40",
-            open && "rotate-90",
+            "shrink-0 text-muted-foreground/50 transition-transform duration-200",
+            open && "rotate-180",
             "group-data-[collapsible=icon]:hidden"
           )}
         />
-      </SidebarMenuButton>
+      </button>
 
-      {/* Children */}
+      {/* Children — clean indented list, no left border line */}
       <div
         className={cn(
-          "overflow-hidden transition-all duration-300 ease-out",
+          "overflow-hidden transition-all duration-200 ease-out",
           "group-data-[collapsible=icon]:hidden",
-          open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+          open ? "max-h-[500px] opacity-100 mt-0.5" : "max-h-0 opacity-0"
         )}
       >
-        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/30 pl-2">
+        <div className="ml-[18px] space-y-0.5">
           {children.map((child) => {
             const ChildIcon = child.icon;
-            const childActive = isItemActive(pathname, child.href);
+            const childActive = isActive(pathname, child.href);
             return (
               <Link
                 key={child.href}
                 href={child.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200",
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px]",
+                  "transition-colors duration-150",
                   childActive
-                    ? "text-blue-600 dark:text-blue-300 bg-blue-500/10 font-medium"
-                    : "text-muted-foreground/70 hover:text-foreground hover:bg-accent/50"
+                    ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                    : "text-muted-foreground/80 hover:bg-accent hover:text-foreground"
                 )}
               >
                 <ChildIcon size={14} className="shrink-0" />
-                <span>{child.label}</span>
+                <span className="truncate">{child.label}</span>
               </Link>
             );
           })}
         </div>
       </div>
-    </SidebarMenuItem>
+    </div>
   );
 }
 
@@ -268,7 +233,7 @@ function NavMenuGroup({
 
 export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
   const pathname = usePathname();
-  const hasAllPerms = permissions.length === 0; // no permissions = demo mode, show all
+  const hasAllPerms = permissions.length === 0;
   const canAccessAdmin =
     permissions.includes("system:manage_users") ||
     permissions.includes("system:manage_orgs") ||
@@ -280,22 +245,30 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
     return !perm || permissions.includes(perm);
   }
 
-  // Filter top-level items: if an item has children, check if any child is visible
-  const visiblePrimary = PRIMARY_NAV.filter((item) => {
+  const visibleItems = PRIMARY_NAV.filter((item) => {
     if (item.children) {
-      return item.children.some((child) => canSeeItem(child.href));
+      return item.children.some((c) => canSeeItem(c.href));
     }
     return canSeeItem(item.href);
   });
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50 glass-sidebar">
-      {/* ── Brand Header ── */}
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-border/50 glass-sidebar"
+    >
+      {/* Brand */}
       <SidebarHeader className="p-4 pb-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:p-2">
-        <Link href="/home" className="flex items-center gap-2.5 overflow-hidden">
+        <Link
+          href="/home"
+          className="flex items-center gap-2.5 overflow-hidden"
+        >
           <div
             className="shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center transition-all duration-200 ease-linear w-9 h-9 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8"
-            style={{ boxShadow: "0 0 12px rgba(59, 130, 246, 0.3), 0 0 24px rgba(96, 165, 250, 0.15)", animation: "pulse-glow 3s ease-in-out infinite", willChange: "opacity" }}
+            style={{
+              boxShadow:
+                "0 0 12px rgba(59,130,246,0.3), 0 0 24px rgba(96,165,250,0.15)",
+            }}
           >
             <Sparkles size={18} className="text-white" />
           </div>
@@ -311,56 +284,45 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
             </p>
           </div>
         </Link>
-        {/* Header gradient separator */}
-        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-blue-500/15 to-transparent transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-0" />
+        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-border/40 to-transparent transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-0" />
       </SidebarHeader>
 
-      {/* ── Scrollable Content ── */}
-      <SidebarContent className="sidebar-scroll">
-        {/* Primary navigation */}
-        <SidebarGroup className="py-0.5 px-2">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visiblePrimary.map((item) =>
-                item.children ? (
-                  <NavMenuGroup
-                    key={item.href}
-                    item={item}
-                    pathname={pathname}
-                    canSeeItem={canSeeItem}
-                  />
-                ) : (
-                  <NavMenuItem
-                    key={item.href}
-                    href={item.href}
-                    icon={item.icon}
-                    label={item.label}
-                    isActive={isItemActive(pathname, item.href)}
-                  />
-                )
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {/* Nav */}
+      <SidebarContent className="sidebar-scroll px-3 py-1">
+        <nav className="space-y-0.5">
+          {visibleItems.map((item) =>
+            item.children ? (
+              <NavGroup
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                canSeeItem={canSeeItem}
+              />
+            ) : (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                icon={item.icon}
+                label={item.label}
+                active={isActive(pathname, item.href)}
+              />
+            )
+          )}
+        </nav>
 
-        {/* More panel — secondary items + admin */}
-        <SidebarGroup className="py-0.5 px-2 mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <MorePanel
-                  canSeeItem={canSeeItem}
-                  canAccessAdmin={hasAllPerms || canAccessAdmin}
-                />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Separator before More */}
+        <div className="my-2 h-px bg-border/30" />
+
+        {/* More panel */}
+        <MorePanel
+          canSeeItem={canSeeItem}
+          canAccessAdmin={hasAllPerms || canAccessAdmin}
+        />
       </SidebarContent>
 
-      {/* ── Footer ── */}
+      {/* Footer */}
       <SidebarFooter className="p-3 pt-1 overflow-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-10 group-data-[collapsible=icon]:opacity-0">
-        <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent mb-2" />
+        <div className="h-px bg-border/20 mb-2" />
         <div className="flex items-center justify-between px-1">
           <span className="text-[10px] text-muted-foreground/40 tracking-wide">
             Vibe Media v1.0
