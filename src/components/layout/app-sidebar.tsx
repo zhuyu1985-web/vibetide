@@ -5,32 +5,40 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  UserCog,
+  Sparkles as SparklesIcon,
   GitBranch,
   Target,
   Wand2,
   FolderOpen,
   BarChart3,
-  Sparkles,
-  ChevronDown,
+  MoreHorizontal,
+  Settings,
   Lightbulb,
   Crosshair,
   PenTool,
   Gem,
   Film,
   FileStack,
+  Radio,
+  CalendarDays,
   Package,
   FileText,
-  Layers,
   Brain as BrainIcon,
   BookOpen,
-  RotateCcw,
-  Radio,
+  Star,
   TrendingUp,
   Award,
-  Star,
+  Building2,
+  Users,
+  Shield,
+  CheckSquare,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Sidebar,
   SidebarContent,
@@ -39,7 +47,6 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
-import { MorePanel } from "@/components/layout/more-panel";
 
 /* ─── Types ─── */
 
@@ -47,18 +54,18 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  children?: NavItem[];
+  children?: { label: string; href: string; icon: LucideIcon }[];
 }
 
 /* ─── Navigation Data ─── */
 
-const PRIMARY_NAV: NavItem[] = [
+const NAV_ITEMS: NavItem[] = [
   { label: "首页", href: "/home", icon: Home },
-  { label: "AI 员工", href: "/ai-employees", icon: UserCog },
+  { label: "智能体", href: "/ai-employees", icon: SparklesIcon },
   { label: "工作流", href: "/workflows", icon: GitBranch },
-  { label: "任务中心", href: "/missions", icon: Target },
+  { label: "任务", href: "/missions", icon: Target },
   {
-    label: "创作中心",
+    label: "创作",
     href: "#creation",
     icon: Wand2,
     children: [
@@ -68,47 +75,60 @@ const PRIMARY_NAV: NavItem[] = [
       { label: "精品聚合", href: "/premium-content", icon: Gem },
       { label: "短视频工厂", href: "/video-batch", icon: Film },
       { label: "生产模板", href: "/production-templates", icon: FileStack },
+      { label: "全渠道发布", href: "/publishing", icon: Radio },
+      { label: "节赛会展", href: "/event-auto", icon: CalendarDays },
     ],
   },
   {
-    label: "内容管理",
+    label: "内容",
     href: "#content",
     icon: FolderOpen,
     children: [
       { label: "媒资管理", href: "/media-assets", icon: Package },
       { label: "稿件管理", href: "/articles", icon: FileText },
-      { label: "栏目管理", href: "/categories", icon: Layers },
-      { label: "媒资智能理解", href: "/asset-intelligence", icon: BrainIcon },
-      { label: "频道知识库", href: "/channel-knowledge", icon: BookOpen },
-      { label: "资产盘活中心", href: "/asset-revive", icon: RotateCcw },
+      { label: "智能分析", href: "/asset-intelligence", icon: BrainIcon },
+      { label: "知识库", href: "/channel-knowledge", icon: BookOpen },
+      { label: "智能推荐", href: "/asset-revive", icon: Star },
+      { label: "案例库", href: "/case-library", icon: Award },
     ],
   },
   {
-    label: "数据分析",
+    label: "数据",
     href: "#analytics",
     icon: BarChart3,
     children: [
-      { label: "全渠道发布", href: "/publishing", icon: Radio },
-      { label: "数据分析", href: "/analytics", icon: TrendingUp },
+      { label: "数据看板", href: "/analytics", icon: TrendingUp },
       { label: "效果激励", href: "/leaderboard", icon: Award },
-      { label: "精品率提升", href: "/content-excellence", icon: Star },
+      { label: "精品提升率", href: "/content-excellence", icon: Star },
     ],
   },
+];
+
+const MORE_ITEMS = [
+  { label: "频道顾问", href: "/channel-advisor", icon: BrainIcon },
+  { label: "批量审核", href: "/batch-review", icon: CheckSquare },
+];
+
+const ADMIN_ITEMS = [
+  { label: "用户管理", href: "/admin/users", icon: Users },
+  { label: "角色权限", href: "/admin/roles", icon: Shield },
+  { label: "组织管理", href: "/admin/organizations", icon: Building2 },
 ];
 
 /* ─── Helpers ─── */
 
 function isActive(pathname: string, href: string) {
+  if (href.startsWith("#")) return false;
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function isChildActive(pathname: string, children: NavItem[]) {
-  return children.some((c) => isActive(pathname, c.href));
+function isChildActive(pathname: string, children?: NavItem["children"]) {
+  return children?.some((c) => isActive(pathname, c.href)) ?? false;
 }
 
-/* ─── Flat Nav Item (Genspark style: clean, minimal, no glass borders) ─── */
+/* ─── Icon Button (top-level nav item) ─── */
 
-function NavLink({
+function IconNavItem({
   href,
   icon: Icon,
   label,
@@ -123,27 +143,22 @@ function NavLink({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium",
+        "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
         "transition-colors duration-150",
         active
           ? "bg-primary/10 text-primary dark:bg-white/10 dark:text-white"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+          : "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
       )}
     >
-      <Icon
-        size={18}
-        className={cn("shrink-0", active ? "text-primary dark:text-white" : "")}
-      />
-      <span className="truncate transition-[opacity,width] duration-200 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
-        {label}
-      </span>
+      <Icon size={20} strokeWidth={active ? 2 : 1.5} />
+      <span className="text-[10px] leading-tight font-medium">{label}</span>
     </Link>
   );
 }
 
-/* ─── Expandable Group (Genspark style: simple toggle, indent children) ─── */
+/* ─── Icon Button with Popover (for items with children) ─── */
 
-function NavGroup({
+function IconNavGroup({
   item,
   pathname,
   canSeeItem,
@@ -152,57 +167,38 @@ function NavGroup({
   pathname: string;
   canSeeItem: (href: string) => boolean;
 }) {
-  const children = item.children!.filter((c) => canSeeItem(c.href));
+  const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
   const groupActive = isChildActive(pathname, children);
-  const [open, setOpen] = useState(groupActive);
 
   if (children.length === 0) return null;
 
   const Icon = item.icon;
 
   return (
-    <div>
-      {/* Group header — clickable toggle, not a link */}
-      <button
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "flex w-full items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium",
-          "transition-colors duration-150 cursor-pointer",
-          "border-0 bg-transparent outline-none",
-          groupActive
-            ? "text-primary dark:text-white"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground"
-        )}
-      >
-        <Icon
-          size={18}
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
           className={cn(
-            "shrink-0",
-            groupActive ? "text-primary dark:text-white" : ""
+            "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
+            "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
+            groupActive
+              ? "bg-primary/10 text-primary dark:bg-white/10 dark:text-white"
+              : "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
           )}
-        />
-        <span className="flex-1 text-left truncate transition-[opacity,width] duration-200 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
-          {item.label}
-        </span>
-        <ChevronDown
-          size={14}
-          className={cn(
-            "shrink-0 text-muted-foreground/50 transition-transform duration-200",
-            open && "rotate-180",
-            "group-data-[collapsible=icon]:hidden"
-          )}
-        />
-      </button>
-
-      {/* Children — clean indented list, no left border line */}
-      <div
-        className={cn(
-          "overflow-hidden transition-all duration-200 ease-out",
-          "group-data-[collapsible=icon]:hidden",
-          open ? "max-h-[500px] opacity-100 mt-0.5" : "max-h-0 opacity-0"
-        )}
+        >
+          <Icon size={20} strokeWidth={groupActive ? 2 : 1.5} />
+          <span className="text-[10px] leading-tight font-medium">
+            {item.label}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="right"
+        align="start"
+        sideOffset={4}
+        className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
       >
-        <div className="ml-[18px] space-y-0.5">
+        <div className="space-y-0.5">
           {children.map((child) => {
             const ChildIcon = child.icon;
             const childActive = isActive(pathname, child.href);
@@ -211,21 +207,21 @@ function NavGroup({
                 key={child.href}
                 href={child.href}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px]",
+                  "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
                   "transition-colors duration-150",
                   childActive
                     ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
-                    : "text-muted-foreground/80 hover:bg-accent hover:text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
-                <ChildIcon size={14} className="shrink-0" />
-                <span className="truncate">{child.label}</span>
+                <ChildIcon size={15} className="shrink-0" />
+                <span>{child.label}</span>
               </Link>
             );
           })}
         </div>
-      </div>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -235,6 +231,7 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
   const pathname = usePathname();
   const hasAllPerms = permissions.length === 0;
   const canAccessAdmin =
+    hasAllPerms ||
     permissions.includes("system:manage_users") ||
     permissions.includes("system:manage_orgs") ||
     permissions.includes("system:manage_roles");
@@ -245,61 +242,41 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
     return !perm || permissions.includes(perm);
   }
 
-  const visibleItems = PRIMARY_NAV.filter((item) => {
-    if (item.children) {
-      return item.children.some((c) => canSeeItem(c.href));
-    }
+  const visibleNav = NAV_ITEMS.filter((item) => {
+    if (item.children) return item.children.some((c) => canSeeItem(c.href));
     return canSeeItem(item.href);
   });
 
+  const visibleMore = MORE_ITEMS.filter((i) => canSeeItem(i.href));
+
   return (
     <Sidebar
-      collapsible="icon"
-      className="border-r border-border/50 glass-sidebar"
+      collapsible="none"
+      className="!w-[68px] border-r border-border/50 glass-sidebar"
     >
-      {/* Brand */}
-      <SidebarHeader className="p-4 pb-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:p-2">
+      {/* Brand icon */}
+      <SidebarHeader className="flex items-center justify-center py-4">
         <Link
           href="/home"
-          className="flex items-center gap-2.5 overflow-hidden"
+          className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20"
         >
-          <div
-            className="shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center transition-all duration-200 ease-linear w-9 h-9 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8"
-            style={{
-              boxShadow:
-                "0 0 12px rgba(59,130,246,0.3), 0 0 24px rgba(96,165,250,0.15)",
-            }}
-          >
-            <Sparkles size={18} className="text-white" />
-          </div>
-          <div className="overflow-hidden transition-[opacity,width] duration-200 ease-linear group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
-            <h1 className="text-base font-bold leading-tight whitespace-nowrap">
-              <span className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">
-                Vibe
-              </span>
-              <span className="text-foreground ml-0.5">Media</span>
-            </h1>
-            <p className="text-[10px] text-muted-foreground/60 leading-tight tracking-wide whitespace-nowrap">
-              数智全媒平台
-            </p>
-          </div>
+          <SparklesIcon size={18} className="text-white" />
         </Link>
-        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-border/40 to-transparent transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-0" />
       </SidebarHeader>
 
-      {/* Nav */}
-      <SidebarContent className="sidebar-scroll px-3 py-1">
-        <nav className="space-y-0.5">
-          {visibleItems.map((item) =>
+      {/* Main nav — icon + label vertical stack */}
+      <SidebarContent className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-1">
+        <nav className="flex flex-col gap-0.5">
+          {visibleNav.map((item) =>
             item.children ? (
-              <NavGroup
+              <IconNavGroup
                 key={item.href}
                 item={item}
                 pathname={pathname}
                 canSeeItem={canSeeItem}
               />
             ) : (
-              <NavLink
+              <IconNavItem
                 key={item.href}
                 href={item.href}
                 icon={item.icon}
@@ -308,29 +285,110 @@ export function AppSidebar({ permissions = [] }: { permissions?: string[] }) {
               />
             )
           )}
+
+          {/* More */}
+          {visibleMore.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
+                    "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
+                    "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <MoreHorizontal size={20} strokeWidth={1.5} />
+                  <span className="text-[10px] leading-tight font-medium">
+                    更多
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                sideOffset={4}
+                className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+              >
+                <div className="space-y-0.5">
+                  {visibleMore.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(pathname, item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
+                          "transition-colors duration-150",
+                          active
+                            ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        )}
+                      >
+                        <Icon size={15} className="shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </nav>
-
-        {/* Separator before More */}
-        <div className="my-2 h-px bg-border/30" />
-
-        {/* More panel */}
-        <MorePanel
-          canSeeItem={canSeeItem}
-          canAccessAdmin={hasAllPerms || canAccessAdmin}
-        />
       </SidebarContent>
 
-      {/* Footer */}
-      <SidebarFooter className="p-3 pt-1 overflow-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-10 group-data-[collapsible=icon]:opacity-0">
-        <div className="h-px bg-border/20 mb-2" />
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] text-muted-foreground/40 tracking-wide">
-            Vibe Media v1.0
-          </span>
-          <span className="text-[10px] text-muted-foreground/30">
-            Powered by AI
-          </span>
-        </div>
+      {/* Bottom — Admin + Settings */}
+      <SidebarFooter className="px-2 pb-3 pt-1 flex flex-col gap-0.5">
+        <div className="h-px bg-border/30 mb-1" />
+
+        {/* Admin items */}
+        {canAccessAdmin && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl w-full",
+                  "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
+                  "text-muted-foreground/70 hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <Settings size={20} strokeWidth={1.5} />
+                <span className="text-[10px] leading-tight font-medium">
+                  设置
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="end"
+              sideOffset={4}
+              className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+            >
+              <div className="space-y-0.5">
+                {ADMIN_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
+                        "transition-colors duration-150",
+                        active
+                          ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
+                    >
+                      <Icon size={15} className="shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
