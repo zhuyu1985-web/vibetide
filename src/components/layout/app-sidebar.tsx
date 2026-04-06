@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-// useState still needed for ExpandedGroup
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -47,18 +46,8 @@ import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
 
 /* ─── Types ─── */
 
-interface SubItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-}
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  children?: SubItem[];
-}
+interface SubItem { label: string; href: string; icon: LucideIcon }
+interface NavItem extends SubItem { children?: SubItem[] }
 
 /* ─── Navigation Data ─── */
 
@@ -68,9 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "工作流", href: "/workflows", icon: GitBranch },
   { label: "任务", href: "/missions", icon: Target },
   {
-    label: "创作",
-    href: "#creation",
-    icon: Wand2,
+    label: "创作", href: "#creation", icon: Wand2,
     children: [
       { label: "灵感池", href: "/inspiration", icon: Lightbulb },
       { label: "同题对标", href: "/benchmarking", icon: Crosshair },
@@ -83,9 +70,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: "内容",
-    href: "#content",
-    icon: FolderOpen,
+    label: "内容", href: "#content", icon: FolderOpen,
     children: [
       { label: "媒资管理", href: "/media-assets", icon: Package },
       { label: "稿件管理", href: "/articles", icon: FileText },
@@ -96,9 +81,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: "数据",
-    href: "#analytics",
-    icon: BarChart3,
+    label: "数据", href: "#analytics", icon: BarChart3,
     children: [
       { label: "数据看板", href: "/analytics", icon: TrendingUp },
       { label: "效果激励", href: "/leaderboard", icon: Award },
@@ -129,134 +112,7 @@ function hasActiveChild(pathname: string, children?: SubItem[]) {
   return children?.some((c) => isHrefActive(pathname, c.href)) ?? false;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   COLLAPSED MODE COMPONENTS (icon + small label, 68px)
-   ═══════════════════════════════════════════════════════════ */
-
-const iconBtnBase = cn(
-  "relative flex flex-col items-center justify-center gap-1.5 w-12 py-2 rounded-xl",
-  "transition-all duration-200 ease-out",
-  "hover:-translate-y-0.5 hover:shadow-md",
-  "active:translate-y-0 active:shadow-none",
-  "border-0 bg-transparent cursor-pointer"
-);
-const iconBtnActive = "bg-primary/12 text-primary shadow-sm dark:bg-white/12 dark:text-white";
-const iconBtnIdle = "text-muted-foreground hover:bg-accent hover:text-foreground";
-
-function CollapsedLink({ href, icon: Icon, label, active }: { href: string; icon: LucideIcon; label: string; active: boolean }) {
-  return (
-    <Link href={href} className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}>
-      <Icon size={18} strokeWidth={active ? 2 : 1.5} />
-      <span className="text-[10px] leading-none font-medium">{label}</span>
-    </Link>
-  );
-}
-
-function CollapsedGroup({ item, pathname, canSeeItem }: { item: NavItem; pathname: string; canSeeItem: (h: string) => boolean }) {
-  const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
-  if (!children.length) return null;
-  const Icon = item.icon;
-  const active = hasActiveChild(pathname, children);
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className={cn(iconBtnBase, active ? iconBtnActive : iconBtnIdle)}>
-          <Icon size={18} strokeWidth={active ? 2 : 1.5} />
-          <span className="text-[10px] leading-none font-medium">{item.label}</span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent side="right" align="start" sideOffset={8} className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
-        <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">{item.label}</p>
-        <SubMenuList items={children} pathname={pathname} />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   EXPANDED MODE COMPONENTS (icon + inline label, 200px)
-   ═══════════════════════════════════════════════════════════ */
-
-function ExpandedLink({ href, icon: Icon, label, active }: { href: string; icon: LucideIcon; label: string; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium w-full",
-        "transition-colors duration-150",
-        active
-          ? "bg-primary/10 text-primary dark:bg-white/10 dark:text-white"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      )}
-    >
-      <Icon size={18} strokeWidth={active ? 2 : 1.5} className="shrink-0" />
-      <span className="truncate">{label}</span>
-    </Link>
-  );
-}
-
-function ExpandedGroup({ item, pathname, canSeeItem }: { item: NavItem; pathname: string; canSeeItem: (h: string) => boolean }) {
-  const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
-  if (!children.length) return null;
-  const Icon = item.icon;
-  const active = hasActiveChild(pathname, children);
-  const [open, setOpen] = useState(active);
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium w-full",
-          "transition-colors duration-150 border-0 bg-transparent cursor-pointer",
-          active
-            ? "text-primary dark:text-white"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground"
-        )}
-      >
-        <Icon size={18} strokeWidth={active ? 2 : 1.5} className="shrink-0" />
-        <span className="flex-1 text-left truncate">{item.label}</span>
-        <ChevronDown
-          size={14}
-          className={cn(
-            "shrink-0 text-muted-foreground/50 transition-transform duration-200",
-            open && "rotate-180"
-          )}
-        />
-      </button>
-      <div className={cn(
-        "overflow-hidden transition-all duration-200 ease-out",
-        open ? "max-h-[500px] opacity-100 mt-0.5" : "max-h-0 opacity-0"
-      )}>
-        <div className="ml-[22px] space-y-0.5">
-          {children.map((child) => {
-            const ChildIcon = child.icon;
-            const childActive = isHrefActive(pathname, child.href);
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px]",
-                  "transition-colors duration-150",
-                  childActive
-                    ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
-                    : "text-muted-foreground/80 hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <ChildIcon size={14} className="shrink-0" />
-                <span className="truncate">{child.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Shared sub-menu list (for popovers) ─── */
+/* ─── Popover sub-menu (collapsed mode only) ─── */
 
 function SubMenuList({ items, pathname }: { items: SubItem[]; pathname: string }) {
   return (
@@ -265,22 +121,121 @@ function SubMenuList({ items, pathname }: { items: SubItem[]; pathname: string }
         const ChildIcon = child.icon;
         const active = isHrefActive(pathname, child.href);
         return (
-          <Link
-            key={child.href}
-            href={child.href}
+          <Link key={child.href} href={child.href}
             className={cn(
-              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
-              "transition-colors duration-150",
-              active
-                ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            )}
-          >
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors duration-150",
+              active ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}>
             <ChildIcon size={15} className="shrink-0" />
             <span>{child.label}</span>
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+/* ─── Unified Nav Item (adapts between collapsed/expanded via CSS) ─── */
+
+function NavLink({ href, icon: Icon, label, active, expanded }: {
+  href: string; icon: LucideIcon; label: string; active: boolean; expanded: boolean;
+}) {
+  return (
+    <Link href={href}
+      className={cn(
+        "flex items-center rounded-xl transition-all duration-300 ease-out",
+        "hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
+        active ? "bg-primary/12 text-primary shadow-sm dark:bg-white/12 dark:text-white"
+               : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        expanded
+          ? "flex-row gap-3 px-3 py-2"
+          : "flex-col gap-1.5 justify-center w-12 py-2"
+      )}>
+      <Icon size={18} strokeWidth={active ? 2 : 1.5} className="shrink-0" />
+      <span className={cn(
+        "font-medium transition-all duration-300 whitespace-nowrap",
+        expanded ? "text-[13px] opacity-100" : "text-[10px] leading-none text-center opacity-100"
+      )}>{label}</span>
+    </Link>
+  );
+}
+
+/* ─── Unified Nav Group (collapsed=popover, expanded=inline children) ─── */
+
+function NavGroup({ item, pathname, canSeeItem, expanded }: {
+  item: NavItem; pathname: string; canSeeItem: (h: string) => boolean; expanded: boolean;
+}) {
+  const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
+  if (!children.length) return null;
+  const Icon = item.icon;
+  const active = hasActiveChild(pathname, children);
+  const [open, setOpen] = useState(active);
+
+  if (!expanded) {
+    // Collapsed: popover
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className={cn(
+            "flex flex-col items-center justify-center gap-1.5 w-12 py-2 rounded-xl",
+            "transition-all duration-300 ease-out",
+            "hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
+            "border-0 bg-transparent cursor-pointer",
+            active ? "bg-primary/12 text-primary shadow-sm dark:bg-white/12 dark:text-white"
+                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
+          )}>
+            <Icon size={18} strokeWidth={active ? 2 : 1.5} />
+            <span className="text-[10px] leading-none font-medium">{item.label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent side="right" align="start" sideOffset={8}
+          className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
+          <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">{item.label}</p>
+          <SubMenuList items={children} pathname={pathname} />
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // Expanded: inline toggle + children
+  return (
+    <div>
+      <button onClick={() => setOpen(!open)}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium w-full",
+          "transition-all duration-300 ease-out border-0 bg-transparent cursor-pointer",
+          "hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
+          active ? "text-primary dark:text-white"
+                 : "text-muted-foreground hover:bg-accent hover:text-foreground"
+        )}>
+        <Icon size={18} strokeWidth={active ? 2 : 1.5} className="shrink-0" />
+        <span className="flex-1 text-left truncate">{item.label}</span>
+        <ChevronDown size={14}
+          className={cn("shrink-0 text-muted-foreground/50 transition-transform duration-300", open && "rotate-180")} />
+      </button>
+      <div className={cn(
+        "overflow-hidden transition-all duration-300 ease-out",
+        open ? "max-h-[500px] opacity-100 mt-0.5" : "max-h-0 opacity-0"
+      )}>
+        <div className="ml-[22px] space-y-0.5">
+          {children.map((child) => {
+            const ChildIcon = child.icon;
+            const childActive = isHrefActive(pathname, child.href);
+            return (
+              <Link key={child.href} href={child.href}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] transition-colors duration-150",
+                  childActive ? "bg-primary/10 text-primary font-medium dark:bg-white/10 dark:text-white"
+                              : "text-muted-foreground/80 hover:bg-accent hover:text-foreground"
+                )}>
+                <ChildIcon size={14} className="shrink-0" />
+                <span className="truncate">{child.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -320,114 +275,85 @@ export function AppSidebar({
   const visibleMore = MORE_ITEMS.filter((i) => canSeeItem(i.href));
 
   return (
-    <div
-      className={cn(
-        "flex flex-col h-full border-r border-border/50 bg-gray-50 dark:bg-[#0a0f1a]",
-        "transition-[width] duration-300 ease-out overflow-hidden shrink-0",
-        expanded ? "w-[200px]" : "w-[68px]"
-      )}
-    >
-      {/* Brand + toggle */}
+    <div className={cn(
+      "flex flex-col h-full border-r border-border/50 bg-gray-50 dark:bg-[#0a0f1a] shrink-0",
+      "transition-[width] duration-300 ease-out overflow-hidden",
+      expanded ? "w-[200px]" : "w-[68px]"
+    )}>
+      {/* Brand */}
       <div className={cn(
-        "flex items-center py-4 shrink-0",
+        "flex items-center py-4 shrink-0 transition-all duration-300",
         expanded ? "px-4 gap-3" : "justify-center px-2"
       )}>
-        <Link
-          href="/home"
-          className={cn(
-            "shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600",
-            "flex items-center justify-center shadow-lg shadow-blue-500/20",
-            "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30"
-          )}
-        >
+        <Link href="/home"
+          className="shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30">
           <SparklesIcon size={20} className="text-white" />
         </Link>
-        {expanded && (
-          <div className="overflow-hidden">
-            <h1 className="text-base font-bold leading-tight whitespace-nowrap">
-              <span className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">
-                Vibe
-              </span>
-              <span className="text-foreground ml-0.5">Media</span>
-            </h1>
-            <p className="text-[10px] text-muted-foreground/60 leading-tight tracking-wide whitespace-nowrap">
-              数智全媒平台
-            </p>
-          </div>
-        )}
+        <div className={cn(
+          "overflow-hidden transition-all duration-300 whitespace-nowrap",
+          expanded ? "w-auto opacity-100" : "w-0 opacity-0"
+        )}>
+          <h1 className="text-base font-bold leading-tight">
+            <span className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">Vibe</span>
+            <span className="text-foreground ml-0.5">Media</span>
+          </h1>
+          <p className="text-[10px] text-muted-foreground/60 leading-tight tracking-wide">数智全媒平台</p>
+        </div>
       </div>
 
       {/* Nav */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        {expanded ? (
-          /* ── Expanded nav ── */
-          <nav className="flex flex-col gap-0.5 px-2 py-1">
-            {visibleNav.map((item) =>
-              item.children ? (
-                <ExpandedGroup key={item.href} item={item} pathname={pathname} canSeeItem={canSeeItem} />
-              ) : (
-                <ExpandedLink key={item.href} href={item.href} icon={item.icon} label={item.label} active={isHrefActive(pathname, item.href)} />
-              )
-            )}
-            {/* More */}
-            {visibleMore.length > 0 && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium w-full transition-colors duration-150 border-0 bg-transparent cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground">
-                    <MoreHorizontal size={18} strokeWidth={1.5} className="shrink-0" />
-                    <span>更多</span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="right" align="start" sideOffset={8} className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
-                  <SubMenuList items={visibleMore} pathname={pathname} />
-                </PopoverContent>
-              </Popover>
-            )}
-          </nav>
-        ) : (
-          /* ── Collapsed nav ── */
-          <nav className="flex flex-col items-center gap-1 px-2 py-1">
-            {visibleNav.map((item) =>
-              item.children ? (
-                <CollapsedGroup key={item.href} item={item} pathname={pathname} canSeeItem={canSeeItem} />
-              ) : (
-                <CollapsedLink key={item.href} href={item.href} icon={item.icon} label={item.label} active={isHrefActive(pathname, item.href)} />
-              )
-            )}
-            {visibleMore.length > 0 && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className={cn(iconBtnBase, iconBtnIdle)}>
-                    <MoreHorizontal size={18} strokeWidth={1.5} />
-                    <span className="text-[10px] leading-none font-medium">更多</span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="right" align="start" sideOffset={8} className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
-                  <SubMenuList items={visibleMore} pathname={pathname} />
-                </PopoverContent>
-              </Popover>
-            )}
-          </nav>
-        )}
+        <nav className={cn(
+          "flex flex-col gap-0.5 px-2 py-1 transition-all duration-300",
+          !expanded && "items-center"
+        )}>
+          {visibleNav.map((item) =>
+            item.children ? (
+              <NavGroup key={item.href} item={item} pathname={pathname} canSeeItem={canSeeItem} expanded={expanded} />
+            ) : (
+              <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label}
+                active={isHrefActive(pathname, item.href)} expanded={expanded} />
+            )
+          )}
+          {/* More */}
+          {visibleMore.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className={cn(
+                  "flex items-center rounded-xl transition-all duration-300 ease-out",
+                  "hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
+                  "border-0 bg-transparent cursor-pointer",
+                  "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  expanded ? "flex-row gap-3 px-3 py-2 w-full" : "flex-col gap-1.5 justify-center w-12 py-2"
+                )}>
+                  <MoreHorizontal size={18} strokeWidth={1.5} className="shrink-0" />
+                  <span className={cn("font-medium whitespace-nowrap", expanded ? "text-[13px]" : "text-[10px] leading-none")}>更多</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="right" align="start" sideOffset={8}
+                className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
+                <SubMenuList items={visibleMore} pathname={pathname} />
+              </PopoverContent>
+            </Popover>
+          )}
+        </nav>
       </div>
 
-      {/* Bottom — Toggle + Notification + Settings */}
+      {/* Bottom — Notification + Settings */}
       <div className={cn(
-        "flex flex-col items-center gap-1.5 px-2 pb-8 pt-2 shrink-0",
-        expanded && "items-stretch"
+        "flex flex-col gap-1.5 px-2 pb-8 pt-2 shrink-0 transition-all duration-300",
+        expanded ? "items-stretch" : "items-center"
       )}>
         {/* Notification */}
-        <Link
-          href="/notifications"
+        <Link href="/notifications"
           className={cn(
-            "relative flex items-center rounded-xl transition-all duration-200 ease-out",
+            "relative flex items-center rounded-xl transition-all duration-300 ease-out",
             "hover:-translate-y-0.5 hover:shadow-md",
             "text-muted-foreground hover:bg-accent hover:text-foreground",
-            expanded ? "w-full py-2 gap-3 px-3" : "justify-center w-10 h-10"
-          )}
-        >
-          <Bell size={expanded ? 18 : 20} strokeWidth={1.5} className="shrink-0" />
-          {expanded && <span className="text-[13px] font-medium flex-1 text-left">通知</span>}
+            expanded ? "gap-3 px-3 py-2" : "justify-center w-10 h-10"
+          )}>
+          <Bell size={18} strokeWidth={1.5} className="shrink-0" />
+          {expanded && <span className="text-[13px] font-medium">通知</span>}
           {unreadCount > 0 && (
             <span className={cn(
               "w-2 h-2 rounded-full bg-red-500",
@@ -437,26 +363,27 @@ export function AppSidebar({
         </Link>
 
         {/* Settings */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              className={cn(
-                "flex items-center rounded-xl transition-all duration-200 ease-out",
-                "hover:-translate-y-0.5 hover:shadow-md",
+        {canAccessAdmin && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className={cn(
+                "flex items-center rounded-xl transition-all duration-300 ease-out",
+                "hover:-translate-y-0.5 hover:shadow-md active:translate-y-0",
                 "border-0 bg-transparent cursor-pointer",
                 "text-muted-foreground hover:bg-accent hover:text-foreground",
-                expanded ? "w-full py-2 gap-3 px-3" : "justify-center w-10 h-10"
-              )}
-            >
-              <Settings size={expanded ? 18 : 20} strokeWidth={1.5} className="shrink-0" />
-              {expanded && <span className="text-[13px] font-medium flex-1 text-left">设置</span>}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="right" align="end" sideOffset={8} className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
-            <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">系统管理</p>
-            <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
-          </PopoverContent>
-        </Popover>
+                expanded ? "gap-3 px-3 py-2 w-full" : "justify-center w-10 h-10"
+              )}>
+                <Settings size={18} strokeWidth={1.5} className="shrink-0" />
+                {expanded && <span className="text-[13px] font-medium">设置</span>}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="end" sideOffset={8}
+              className="w-44 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
+              <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">系统管理</p>
+              <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
     </div>
   );
