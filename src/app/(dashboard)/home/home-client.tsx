@@ -87,7 +87,13 @@ export function HomeClient({
   const ActiveIcon = activeMeta?.icon;
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center pt-[10vh] px-4 pb-8">
+    <div className="relative min-h-[calc(100vh-80px)] flex flex-col items-center pt-[10vh] px-4 pb-8">
+      {/* Background atmospheric glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full bg-blue-500/[0.04] blur-[120px]" />
+        <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[400px] h-[300px] rounded-full bg-purple-500/[0.03] blur-[80px]" />
+      </div>
+
       {/* ── Title ── */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-2">
@@ -106,11 +112,11 @@ export function HomeClient({
           className={cn(
             "rounded-2xl overflow-hidden",
             "bg-white/[0.06] backdrop-blur-2xl",
-            "border border-white/[0.12]",
-            "shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]",
-            "focus-within:border-white/20",
-            "focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.15),inset_0_1px_0_rgba(255,255,255,0.15)]",
-            "transition-all duration-300"
+            "border border-white/[0.08]",
+            "shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)]",
+            "focus-within:border-white/[0.15]",
+            "focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.12),0_0_60px_rgba(59,130,246,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]",
+            "transition-all duration-500 ease-out"
           )}
         >
           <div className="flex items-end gap-2 p-3">

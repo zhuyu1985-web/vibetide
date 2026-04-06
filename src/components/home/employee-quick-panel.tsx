@@ -35,12 +35,13 @@ export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps
             onClick={() => onSelectEmployee(id)}
             className={cn(
               "flex flex-col items-center gap-1.5 p-2 rounded-xl cursor-pointer",
-              "transition-all duration-200 hover:scale-105 hover:bg-white/5 hover:backdrop-blur-sm"
+              "transition-all duration-300 ease-out",
+              "hover:scale-[1.08] hover:bg-white/[0.06] hover:backdrop-blur-sm"
             )}
           >
             {/* Icon square */}
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
               style={{ backgroundColor: emp.bgColor }}
             >
               <Icon size={24} style={{ color: emp.color }} />
@@ -60,11 +61,12 @@ export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps
         onClick={() => router.push("/ai-employees")}
         className={cn(
           "flex flex-col items-center gap-1.5 p-2 rounded-xl cursor-pointer",
-          "transition-all duration-200 hover:scale-105 hover:bg-white/5 hover:backdrop-blur-sm"
+          "transition-all duration-300 ease-out",
+          "hover:scale-[1.08] hover:bg-white/[0.06] hover:backdrop-blur-sm"
         )}
       >
         {/* Icon square */}
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/10">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
           <Sparkles size={24} className="text-white/60" />
         </div>
 

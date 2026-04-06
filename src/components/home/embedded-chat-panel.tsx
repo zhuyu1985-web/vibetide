@@ -108,7 +108,7 @@ export function EmbeddedChatPanel({
 
   return (
     <div className="max-w-3xl mx-auto mt-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
-      <div className="bg-black/30 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/20 rounded-2xl overflow-hidden">
+      <div className="bg-black/30 backdrop-blur-2xl border border-white/[0.08] rounded-2xl overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]">
         {/* ── Header ── */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
           <div
@@ -168,10 +168,10 @@ export function EmbeddedChatPanel({
               >
                 <div
                   className={cn(
-                    "max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed",
+                    "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
                     isUser
-                      ? "bg-blue-500/80 text-white"
-                      : "bg-white/5 text-white/85"
+                      ? "bg-blue-500/80 text-white shadow-[0_2px_12px_rgba(59,130,246,0.2)]"
+                      : "bg-white/[0.05] text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                   )}
                 >
                   {/* Message content */}
@@ -196,10 +196,7 @@ export function EmbeddedChatPanel({
                             key={si}
                             className="flex items-center gap-1.5 text-xs text-white/40"
                           >
-                            <Loader2
-                              size={10}
-                              className="animate-spin flex-shrink-0"
-                            />
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400/60 animate-pulse flex-shrink-0" />
                             <span>{step.label}</span>
                           </div>
                         ))}

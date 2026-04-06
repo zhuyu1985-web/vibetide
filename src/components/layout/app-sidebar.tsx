@@ -83,20 +83,23 @@ function NavMenuItem({
         asChild
         isActive={isActive}
         className={cn(
-          "relative transition-all duration-200 ease-out rounded-lg overflow-hidden",
-          "glass-nav-item",
+          "relative transition-all duration-300 ease-out rounded-lg overflow-hidden",
+          "glass-nav-item hover:backdrop-blur-sm",
           isActive && "active",
           isActive && theme.activeText
         )}
       >
         <Link href={href}>
-          {/* Active left bar indicator */}
+          {/* Active left bar indicator with glow */}
           {isActive && (
             <span
               className={cn(
                 "absolute left-0 top-1 bottom-1 w-[3px] rounded-full",
                 theme.activeBar
               )}
+              style={{
+                boxShadow: "0 0 8px rgba(96,165,250,0.4), 0 0 16px rgba(96,165,250,0.15)",
+              }}
             />
           )}
           <Icon

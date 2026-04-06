@@ -43,12 +43,12 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* 最近任务 */}
-      <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/5 p-4 flex flex-col gap-3">
+      <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.05] p-4 flex flex-col gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.05)]">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Target size={14} className="text-white/50" />
-            <span className="text-sm font-medium text-white/70">最近任务</span>
+            <Target size={14} className="text-white/60" />
+            <span className="text-sm font-medium text-white/80">最近任务</span>
           </div>
           <Link
             href="/missions"
@@ -72,7 +72,7 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
               <Link
                 key={mission.id}
                 href={`/missions/${mission.id}`}
-                className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors"
+                className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.06] transition-all duration-300"
               >
                 <span className="text-sm text-white/80 truncate">{mission.title}</span>
                 <RelativeTime isoString={mission.createdAt} />
@@ -83,12 +83,12 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
       </div>
 
       {/* 最近对话 */}
-      <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/5 p-4 flex flex-col gap-3">
+      <div className="rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.05] p-4 flex flex-col gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.05)]">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MessageSquare size={14} className="text-white/50" />
-            <span className="text-sm font-medium text-white/70">最近对话</span>
+            <MessageSquare size={14} className="text-white/60" />
+            <span className="text-sm font-medium text-white/80">最近对话</span>
           </div>
           <Link
             href="/chat"
@@ -117,7 +117,7 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
                 <Link
                   key={conv.id}
                   href={`/chat/${conv.id}`}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.06] transition-all duration-300"
                 >
                   {/* Employee icon */}
                   <div
