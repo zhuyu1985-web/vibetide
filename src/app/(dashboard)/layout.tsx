@@ -1,4 +1,3 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { getUnreadCount } from "@/lib/dal/notifications";
@@ -41,7 +40,7 @@ export default async function DashboardLayout({
 
   return (
     <PermissionProvider permissions={permissions} isSuperAdmin={superAdmin}>
-      <SidebarProvider className="!h-svh">
+      <div className="flex h-svh overflow-hidden">
         <AppSidebar permissions={permissions} unreadCount={unreadCount} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Topbar userName={displayName} unreadCount={unreadCount} />
@@ -49,7 +48,7 @@ export default async function DashboardLayout({
             <div className="relative z-10 p-6">{children}</div>
           </main>
         </div>
-      </SidebarProvider>
+      </div>
     </PermissionProvider>
   );
 }
