@@ -119,12 +119,10 @@ export function HomeClient({
 
       {/* ── Title ── */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Vibetide 智媒工作空间
-          </span>
+        <h1 className="text-3xl font-bold mb-2 text-foreground">
+          Vibetide 智媒工作空间
         </h1>
-        <p className="text-sm text-gray-400 dark:text-white/40">
+        <p className="text-sm text-muted-foreground">
           与 AI 团队协作，高效完成内容生产
         </p>
       </div>
