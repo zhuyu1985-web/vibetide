@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import {
   Sheet,
@@ -44,19 +43,61 @@ const OUTPUT_ACTIONS = [
   { id: "send_notification", label: "发送通知", icon: Bell },
 ] as const;
 
-const EMPLOYEE_SLUGS: EmployeeId[] = [
-  "xiaolei",
-  "xiaoce",
-  "xiaozi",
-  "xiaowen",
-  "xiaojian",
-  "xiaoshen",
-  "xiaofa",
-  "xiaoshu",
+interface SkillOption {
+  slug: string;
+  name: string;
+  category: string;
+}
+
+const SKILL_OPTIONS: SkillOption[] = [
+  // perception
+  { slug: "trend_monitor", name: "趋势监控", category: "perception" },
+  { slug: "news_aggregation", name: "新闻聚合", category: "perception" },
+  { slug: "social_listening", name: "社交聆听", category: "perception" },
+  { slug: "web_search", name: "网络搜索", category: "perception" },
+  // analysis
+  { slug: "topic_extraction", name: "选题提取", category: "analysis" },
+  { slug: "audience_analysis", name: "受众分析", category: "analysis" },
+  { slug: "competitor_analysis", name: "竞品分析", category: "analysis" },
+  { slug: "sentiment_analysis", name: "情感分析", category: "analysis" },
+  { slug: "heat_scoring", name: "热度评分", category: "analysis" },
+  { slug: "data_report", name: "数据报告", category: "analysis" },
+  // generation
+  { slug: "content_generate", name: "内容生成", category: "generation" },
+  { slug: "headline_generate", name: "标题生成", category: "generation" },
+  { slug: "summary_generate", name: "摘要生成", category: "generation" },
+  { slug: "script_generate", name: "脚本生成", category: "generation" },
+  { slug: "style_rewrite", name: "风格改写", category: "generation" },
+  { slug: "translation", name: "翻译", category: "generation" },
+  { slug: "angle_design", name: "角度设计", category: "generation" },
+  // production
+  { slug: "video_edit_plan", name: "视频剪辑方案", category: "production" },
+  { slug: "thumbnail_generate", name: "缩略图生成", category: "production" },
+  { slug: "layout_design", name: "版面设计", category: "production" },
+  { slug: "audio_plan", name: "音频方案", category: "production" },
+  // management
+  { slug: "quality_review", name: "质量审核", category: "management" },
+  { slug: "compliance_check", name: "合规检查", category: "management" },
+  { slug: "fact_check", name: "事实核查", category: "management" },
+  { slug: "publish_strategy", name: "发布策略", category: "management" },
+  { slug: "task_planning", name: "任务规划", category: "management" },
+  // knowledge
+  { slug: "knowledge_retrieval", name: "知识检索", category: "knowledge" },
+  { slug: "media_search", name: "媒资搜索", category: "knowledge" },
+  { slug: "case_reference", name: "案例参考", category: "knowledge" },
 ];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  perception: "感知",
+  analysis: "分析",
+  generation: "生成",
+  production: "制作",
+  management: "管理",
+  knowledge: "知识",
+};
+
 const STEP_TYPES = [
-  { value: "employee" as const, label: "AI 员工" },
+  { value: "skill" as const, label: "技能" },
   { value: "output" as const, label: "输出动作" },
 ];
 
@@ -71,22 +112,25 @@ export function StepConfigPanel({
   onSave,
 }: StepConfigPanelProps) {
   const [name, setName] = useState("");
-  const [type, setType] = useState<"employee" | "tool" | "output">("employee");
-  const [employeeSlug, setEmployeeSlug] = useState<string>("");
+  const [type, setType] = useState<"skill" | "output">("skill");
+  const [skillSlug, setSkillSlug] = useState<string>("");
   const [outputAction, setOutputAction] = useState<string>("");
 
   // Sync local state when the step prop changes
   useEffect(() => {
     if (step) {
       setName(step.name);
-      setType(step.type);
-      setEmployeeSlug(step.config?.employeeSlug ?? step.employeeSlug ?? "");
+      // Handle backward compat: old "employee" type maps to "skill"
+      setType(step.type === "output" ? "output" : "skill");
+      setSkillSlug(step.config?.skillSlug ?? "");
       setOutputAction(step.config?.outputAction ?? "");
     }
   }, [step]);
 
   function handleSave() {
     if (!step) return;
+
+    const selectedSkill = SKILL_OPTIONS.find((s) => s.slug === skillSlug);
 
     const updated: WorkflowStepDef = {
       ...step,
@@ -95,15 +139,12 @@ export function StepConfigPanel({
       config: {
         ...step.config,
         parameters: step.config?.parameters ?? {},
-        employeeSlug: type === "employee" ? employeeSlug : undefined,
+        skillSlug: type === "skill" ? skillSlug : undefined,
+        skillName: type === "skill" ? selectedSkill?.name : undefined,
+        skillCategory: type === "skill" ? selectedSkill?.category : undefined,
         outputAction: type === "output" ? outputAction : undefined,
       },
     };
-
-    // Also update the top-level backward-compat field
-    if (type === "employee") {
-      updated.employeeSlug = employeeSlug;
-    }
 
     onSave(updated);
     onClose();
@@ -114,7 +155,7 @@ export function StepConfigPanel({
       <SheetContent side="right" className="sm:max-w-md">
         <SheetHeader>
           <SheetTitle>配置步骤</SheetTitle>
-          <SheetDescription>修改步骤名称、类型和执行角色</SheetDescription>
+          <SheetDescription>修改步骤名称、类型和执行技能</SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col gap-5 px-4 flex-1 overflow-y-auto">
@@ -135,7 +176,7 @@ export function StepConfigPanel({
             <Select
               value={type}
               onValueChange={(v) =>
-                setType(v as "employee" | "tool" | "output")
+                setType(v as "skill" | "output")
               }
             >
               <SelectTrigger className="w-full">
@@ -151,33 +192,29 @@ export function StepConfigPanel({
             </Select>
           </div>
 
-          {/* Employee selector (visible when type = employee) */}
-          {type === "employee" && (
+          {/* Skill selector (visible when type = skill) */}
+          {type === "skill" && (
             <div className="flex flex-col gap-2">
-              <Label>执行员工</Label>
-              <Select value={employeeSlug} onValueChange={setEmployeeSlug}>
+              <Label>执行技能</Label>
+              <Select value={skillSlug} onValueChange={setSkillSlug}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="选择 AI 员工" />
+                  <SelectValue placeholder="选择技能" />
                 </SelectTrigger>
                 <SelectContent>
-                  {EMPLOYEE_SLUGS.map((slug) => {
-                    const meta = EMPLOYEE_META[slug];
-                    const Icon = meta.icon;
+                  {Object.keys(CATEGORY_LABELS).map((cat) => {
+                    const catSkills = SKILL_OPTIONS.filter((s) => s.category === cat);
+                    if (catSkills.length === 0) return null;
                     return (
-                      <SelectItem key={slug} value={slug}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="flex items-center justify-center w-5 h-5 rounded"
-                            style={{ backgroundColor: meta.bgColor }}
-                          >
-                            <Icon
-                              className="w-3 h-3"
-                              style={{ color: meta.color }}
-                            />
-                          </span>
-                          {meta.nickname} · {meta.title}
-                        </span>
-                      </SelectItem>
+                      <div key={cat}>
+                        <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                          {CATEGORY_LABELS[cat]}
+                        </div>
+                        {catSkills.map((skill) => (
+                          <SelectItem key={skill.slug} value={skill.slug}>
+                            {skill.name}
+                          </SelectItem>
+                        ))}
+                      </div>
                     );
                   })}
                 </SelectContent>

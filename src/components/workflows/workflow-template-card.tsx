@@ -1,8 +1,7 @@
 "use client";
 
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Cog, type LucideIcon } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +20,19 @@ interface WorkflowTemplateCardProps {
 }
 
 // ---------------------------------------------------------------------------
+// Skill category colors
+// ---------------------------------------------------------------------------
+
+const CATEGORY_COLORS: Record<string, { color: string; bgColor: string }> = {
+  perception: { color: "#f59e0b", bgColor: "rgba(245,158,11,0.12)" },
+  analysis: { color: "#8b5cf6", bgColor: "rgba(139,92,246,0.12)" },
+  generation: { color: "#3b82f6", bgColor: "rgba(59,130,246,0.12)" },
+  production: { color: "#ef4444", bgColor: "rgba(239,68,68,0.12)" },
+  management: { color: "#6366f1", bgColor: "rgba(99,102,241,0.12)" },
+  knowledge: { color: "#14b8a6", bgColor: "rgba(20,184,166,0.12)" },
+};
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -28,20 +40,18 @@ export function WorkflowTemplateCard({
   template,
   onUseTemplate,
 }: WorkflowTemplateCardProps) {
-  // Build the employee chain from steps (sorted by order)
+  // Build the skill chain from steps (sorted by order)
   const sortedSteps = [...template.steps].sort((a, b) => a.order - b.order);
 
   const chain = sortedSteps
     .map((step) => {
-      const slug = (step.config?.employeeSlug ?? step.employeeSlug) as
-        | EmployeeId
-        | undefined;
-      if (!slug) return null;
-      const meta = EMPLOYEE_META[slug];
-      if (!meta) return null;
-      return meta;
+      const skillName = step.config?.skillName;
+      const category = step.config?.skillCategory ?? "";
+      if (!skillName) return null;
+      const colors = CATEGORY_COLORS[category] ?? { color: "#6b7280", bgColor: "rgba(107,114,128,0.12)" };
+      return { name: skillName, ...colors };
     })
-    .filter(Boolean) as (typeof EMPLOYEE_META)[EmployeeId][];
+    .filter(Boolean) as { name: string; color: string; bgColor: string }[];
 
   return (
     <div className="group bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 transition-all hover:border-black/[0.12] dark:hover:border-white/[0.15] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] flex flex-col">
@@ -57,25 +67,21 @@ export function WorkflowTemplateCard({
         </p>
       )}
 
-      {/* Employee chain */}
+      {/* Skill chain */}
       <div className="flex flex-wrap items-center gap-1 mt-auto mb-4">
-        {chain.map((meta, idx) => {
-          const Icon = meta.icon;
-          return (
-            <span key={`${meta.id}-${idx}`} className="flex items-center gap-1">
-              {idx > 0 && (
-                <ArrowRight className="w-3 h-3 text-gray-200 dark:text-white/20 mx-0.5 shrink-0" />
-              )}
-              <span
-                className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-lg"
-                style={{ backgroundColor: meta.bgColor, color: meta.color }}
-              >
-                <Icon className="w-3 h-3" />
-                {meta.nickname}
-              </span>
+        {chain.map((item, idx) => (
+          <span key={`${item.name}-${idx}`} className="flex items-center gap-1">
+            {idx > 0 && (
+              <ArrowRight className="w-3 h-3 text-gray-200 dark:text-white/20 mx-0.5 shrink-0" />
+            )}
+            <span
+              className="text-xs px-1.5 py-0.5 rounded-lg"
+              style={{ backgroundColor: item.bgColor, color: item.color }}
+            >
+              {item.name}
             </span>
-          );
-        })}
+          </span>
+        ))}
       </div>
 
       {/* Action button */}

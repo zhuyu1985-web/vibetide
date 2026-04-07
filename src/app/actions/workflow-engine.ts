@@ -1,9 +1,9 @@
 "use server";
 
 import { db } from "@/db";
-import { workflowTemplates, aiEmployees } from "@/db/schema";
+import { workflowTemplates } from "@/db/schema";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
@@ -234,34 +234,15 @@ export async function executeWorkflow(id: string) {
   });
   if (!workflow) throw new Error("工作流不存在");
 
-  // 2. Resolve employee nicknames for instruction text
+  // 2. Build structured instruction from skill-based steps
   const steps = workflow.steps as WorkflowStepDef[];
-  const employeeSlugs = [
-    ...new Set(
-      steps
-        .map((s) => s.config?.employeeSlug ?? s.employeeSlug)
-        .filter((slug): slug is string => !!slug)
-    ),
-  ];
-
-  const nicknameMap = new Map<string, string>();
-  if (employeeSlugs.length > 0) {
-    const employees = await db
-      .select({ slug: aiEmployees.slug, nickname: aiEmployees.nickname })
-      .from(aiEmployees)
-      .where(eq(aiEmployees.organizationId, orgId));
-    for (const emp of employees) {
-      nicknameMap.set(emp.slug, emp.nickname);
-    }
-  }
 
   // 3. Build structured instruction
   const stepDescriptions = steps
     .sort((a, b) => a.order - b.order)
     .map((step, idx) => {
-      const slug = step.config?.employeeSlug ?? step.employeeSlug;
-      const nickname = slug ? nicknameMap.get(slug) ?? slug : "自动分配";
-      return `${idx + 1}. ${step.name} — ${nickname}`;
+      const skillName = step.config?.skillName ?? step.config?.skillSlug ?? "自动分配";
+      return `${idx + 1}. ${step.name} — ${skillName}`;
     })
     .join("\n");
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { AIEmployee } from "@/lib/types";
 import type { HotTask } from "@/lib/employee-tasks";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Plus, UserCog } from "lucide-react";
 
 const STATUS_CONFIG = {
@@ -26,11 +27,12 @@ export function EmployeeAgentCard({
   onDispatchTask,
   onHotTaskClick,
 }: EmployeeAgentCardProps) {
+  const router = useRouter();
   const [hoveredTask, setHoveredTask] = useState<number | null>(null);
   const meta = EMPLOYEE_META[employee.id as EmployeeId] as typeof EMPLOYEE_META[EmployeeId] | undefined;
   const statusCfg = STATUS_CONFIG[employee.status];
   const Icon = meta?.icon ?? UserCog;
-  const displaySkills = employee.skills.slice(0, 5);
+  const displaySkills = employee.skills.slice(0, 3);
 
   const iconBg = meta?.bgColor ?? "rgba(107,114,128,0.15)";
   const iconColor = meta?.color ?? "#6b7280";
@@ -39,46 +41,52 @@ export function EmployeeAgentCard({
 
   return (
     <div
-      className="bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-black/[0.12] dark:hover:border-white/[0.15] hover:scale-[1.01] transition-all duration-300"
+      className="bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-black/[0.12] dark:hover:border-white/[0.15] hover:scale-[1.01] transition-all duration-300"
     >
-      {/* Header: icon + name + status */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: iconBg }}
-          >
-            <Icon className="w-5 h-5" style={{ color: iconColor }} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900 dark:text-white/90">
-                {nickname}
-              </span>
-              <span className="text-xs text-gray-400 dark:text-white/40">·</span>
-              <span className="text-xs text-gray-500 dark:text-white/50">{name}</span>
+      {/* Clickable area: Header + Motto */}
+      <div
+        className="cursor-pointer"
+        onClick={() => router.push(`/employee/${employee.id}`)}
+      >
+        {/* Header: icon + name + status */}
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: iconBg }}
+            >
+              <Icon className="w-5 h-5" style={{ color: iconColor }} />
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dotColor}`} />
-              <span className={`text-[11px] ${statusCfg.textColor}`}>
-                {statusCfg.label}
-              </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-900 dark:text-white/90">
+                  {nickname}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-white/40">·</span>
+                <span className="text-xs text-gray-500 dark:text-white/50">{name}</span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dotColor}`} />
+                <span className={`text-[11px] ${statusCfg.textColor}`}>
+                  {statusCfg.label}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Motto */}
-      <p className="text-xs text-gray-400 dark:text-white/40 mb-4 leading-relaxed">
-        &ldquo;{employee.motto}&rdquo;
-      </p>
+        {/* Motto */}
+        <p className="text-xs text-gray-400 dark:text-white/40 mb-2 leading-relaxed">
+          &ldquo;{employee.motto}&rdquo;
+        </p>
+      </div>
 
       {/* Hot Tasks */}
       {hotTasks.length > 0 && (
-        <div className="mb-4">
-          <div className="text-[11px] text-gray-300 dark:text-white/30 mb-2">热门任务:</div>
-          <div className="flex flex-col gap-1">
-            {hotTasks.map((task, idx) => (
+        <div className="mb-2">
+          <div className="text-[11px] text-gray-300 dark:text-white/30 mb-1.5">热门任务:</div>
+          <div className="flex flex-col gap-0.5">
+            {hotTasks.slice(0, 2).map((task, idx) => (
               <button
                 key={idx}
                 className="flex items-center justify-between text-left text-sm text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white/90 px-2 py-1.5 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-all border-0 bg-transparent cursor-pointer w-full"
@@ -103,18 +111,18 @@ export function EmployeeAgentCard({
 
       {/* Skill Tags */}
       {displaySkills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex gap-1.5 mb-2 overflow-hidden">
           {displaySkills.map((skill) => (
             <span
               key={skill.id}
-              className="px-2.5 py-1 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px] text-gray-500 dark:text-white/50"
+              className="px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px] text-gray-500 dark:text-white/50 whitespace-nowrap shrink-0"
             >
               {skill.name}
             </span>
           ))}
-          {employee.skills.length > 5 && (
-            <span className="px-2.5 py-1 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px] text-gray-300 dark:text-white/30">
-              +{employee.skills.length - 5}
+          {employee.skills.length > 3 && (
+            <span className="px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px] text-gray-300 dark:text-white/30 whitespace-nowrap shrink-0">
+              +{employee.skills.length - 3}
             </span>
           )}
         </div>

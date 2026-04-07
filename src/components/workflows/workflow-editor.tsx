@@ -82,19 +82,20 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
 
   // ── Step handlers ──
 
-  const handleAddEmployeeStep = useCallback(
-    (employeeSlug: string, employeeName: string) => {
+  const handleAddSkillStep = useCallback(
+    (skillSlug: string, skillName: string, skillCategory: string) => {
       const newStep: WorkflowStepDef = {
         id: crypto.randomUUID(),
         order: steps.length + 1,
         dependsOn: steps.length > 0 ? [steps[steps.length - 1].id] : [],
-        name: employeeName,
-        type: "employee",
+        name: skillName,
+        type: "skill",
         config: {
-          employeeSlug,
+          skillSlug,
+          skillName,
+          skillCategory,
           parameters: {},
         },
-        employeeSlug,
       };
       setSteps((prev) => [...prev, newStep]);
     },
@@ -351,7 +352,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
         {/* Right column: add step panel */}
         <div className="w-80 shrink-0 overflow-y-auto p-6 bg-black/[0.01] dark:bg-white/[0.01]">
           <AddStepPanel
-            onAddEmployeeStep={handleAddEmployeeStep}
+            onAddSkillStep={handleAddSkillStep}
             onAddOutputStep={handleAddOutputStep}
           />
         </div>

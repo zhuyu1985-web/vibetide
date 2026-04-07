@@ -34,6 +34,7 @@ import {
   Shield,
   CheckSquare,
   ChevronDown,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -53,7 +54,13 @@ interface NavItem extends SubItem { children?: SubItem[] }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "首页", href: "/home", icon: Home },
-  { label: "智能体", href: "/ai-employees", icon: SparklesIcon },
+  {
+    label: "智能体", href: "#agents", icon: SparklesIcon,
+    children: [
+      { label: "AI 员工", href: "/ai-employees", icon: Users },
+      { label: "技能管理", href: "/skills", icon: Wrench },
+    ],
+  },
   { label: "工作流", href: "/workflows", icon: GitBranch },
   { label: "任务", href: "/missions", icon: Target },
   {

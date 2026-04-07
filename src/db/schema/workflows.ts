@@ -24,17 +24,21 @@ export interface WorkflowStepDef {
   order: number;
   dependsOn: string[];
   name: string;
-  type: "employee" | "tool" | "output";
+  type: "skill" | "output";
   config: {
-    employeeSlug?: string;
     skillSlug?: string;
-    toolId?: string;
+    skillName?: string;
+    skillCategory?: string;
     outputAction?: string;
     parameters: Record<string, any>;
+    /** @deprecated kept for backward compat with old data */
+    employeeSlug?: string;
+    toolId?: string;
   };
   // Backward compat with old seed format
   key?: string;
   label?: string;
+  /** @deprecated use config.skillSlug */
   employeeSlug?: string;
 }
 

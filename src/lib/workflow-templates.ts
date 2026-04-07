@@ -12,16 +12,17 @@ export interface BuiltinTemplate {
 function step(
   order: number,
   name: string,
-  employeeSlug: string,
-  skillSlug?: string
+  skillSlug: string,
+  skillName: string,
+  skillCategory: string
 ): WorkflowStepDef {
   return {
     id: `step-${order}`,
     order,
     dependsOn: order > 1 ? [`step-${order - 1}`] : [],
     name,
-    type: "employee",
-    config: { employeeSlug, skillSlug, parameters: {} },
+    type: "skill",
+    config: { skillSlug, skillName, skillCategory, parameters: {} },
   };
 }
 
@@ -32,11 +33,11 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     category: "news",
     triggerType: "manual",
     steps: [
-      step(1, "热点确认与信息采集", "xiaolei"),
-      step(2, "快速选题策划", "xiaoce"),
-      step(3, "稿件快速撰写", "xiaowen"),
-      step(4, "质量审核", "xiaoshen"),
-      step(5, "多渠道发布", "xiaofa"),
+      step(1, "热点确认与信息采集", "trend_monitor", "趋势监控", "perception"),
+      step(2, "快速选题策划", "topic_extraction", "选题提取", "analysis"),
+      step(3, "稿件快速撰写", "content_generate", "内容生成", "generation"),
+      step(4, "质量审核", "quality_review", "质量审核", "management"),
+      step(5, "多渠道发布", "publish_strategy", "发布策略", "management"),
     ],
   },
   {
@@ -45,10 +46,10 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     category: "news",
     triggerType: "manual",
     steps: [
-      step(1, "发布会信息采集", "xiaolei"),
-      step(2, "要点提取与稿件生成", "xiaowen"),
-      step(3, "内容审核", "xiaoshen"),
-      step(4, "全渠道分发", "xiaofa"),
+      step(1, "发布会信息采集", "news_aggregation", "新闻聚合", "perception"),
+      step(2, "要点提取与稿件生成", "content_generate", "内容生成", "generation"),
+      step(3, "内容审核", "quality_review", "质量审核", "management"),
+      step(4, "全渠道分发", "publish_strategy", "发布策略", "management"),
     ],
   },
   {
@@ -58,8 +59,8 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     triggerType: "scheduled",
     triggerConfig: { cron: "0 8 * * *", timezone: "Asia/Shanghai" },
     steps: [
-      step(1, "全网热点聚合", "xiaolei"),
-      step(2, "热点摘要生成", "xiaowen"),
+      step(1, "全网热点聚合", "news_aggregation", "新闻聚合", "perception"),
+      step(2, "热点摘要生成", "summary_generate", "摘要生成", "generation"),
     ],
   },
   {
@@ -68,10 +69,10 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     category: "video",
     triggerType: "manual",
     steps: [
-      step(1, "选题策划", "xiaoce"),
-      step(2, "脚本生成", "xiaowen"),
-      step(3, "剪辑计划", "xiaojian"),
-      step(4, "质量审核", "xiaoshen"),
+      step(1, "选题策划", "topic_extraction", "选题提取", "analysis"),
+      step(2, "脚本生成", "script_generate", "脚本生成", "generation"),
+      step(3, "剪辑计划", "video_edit_plan", "视频剪辑方案", "production"),
+      step(4, "质量审核", "quality_review", "质量审核", "management"),
     ],
   },
   {
@@ -81,8 +82,8 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     triggerType: "scheduled",
     triggerConfig: { cron: "0 9 * * 1", timezone: "Asia/Shanghai" },
     steps: [
-      step(1, "竞品信息抓取", "xiaolei"),
-      step(2, "数据对比分析", "xiaoshu"),
+      step(1, "竞品信息抓取", "competitor_analysis", "竞品分析", "analysis"),
+      step(2, "数据对比分析", "data_report", "数据报告", "analysis"),
     ],
   },
   {
@@ -91,9 +92,9 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     category: "distribution",
     triggerType: "manual",
     steps: [
-      step(1, "质量审核", "xiaoshen"),
-      step(2, "渠道适配与发布", "xiaofa"),
-      step(3, "数据回收分析", "xiaoshu"),
+      step(1, "质量审核", "quality_review", "质量审核", "management"),
+      step(2, "渠道适配与发布", "publish_strategy", "发布策略", "management"),
+      step(3, "数据回收分析", "data_report", "数据报告", "analysis"),
     ],
   },
   {
@@ -102,11 +103,11 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     category: "news",
     triggerType: "manual",
     steps: [
-      step(1, "深度调研", "xiaolei"),
-      step(2, "专题策划", "xiaoce"),
-      step(3, "长文写作", "xiaowen"),
-      step(4, "视频制作方案", "xiaojian"),
-      step(5, "质量审核", "xiaoshen"),
+      step(1, "深度调研", "web_search", "网络搜索", "perception"),
+      step(2, "专题策划", "topic_extraction", "选题提取", "analysis"),
+      step(3, "长文写作", "content_generate", "内容生成", "generation"),
+      step(4, "视频制作方案", "video_edit_plan", "视频剪辑方案", "production"),
+      step(5, "质量审核", "quality_review", "质量审核", "management"),
     ],
   },
 ];

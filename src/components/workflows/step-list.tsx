@@ -1,6 +1,5 @@
 "use client";
 
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import {
   MoreVertical,
@@ -10,6 +9,35 @@ import {
   ArrowDown,
   Trash2,
   Cog,
+  Telescope,
+  Globe,
+  Newspaper,
+  Ear,
+  Search,
+  BarChart3,
+  Users,
+  Target,
+  PenTool,
+  Heading,
+  FileStack,
+  BookOpen,
+  Wand2,
+  Languages,
+  Lightbulb,
+  Film,
+  Image,
+  Layout,
+  Mic,
+  CheckSquare,
+  Shield,
+  ListChecks,
+  Share2,
+  FolderSearch,
+  Library,
+  Award,
+  TrendingUp,
+  Flame,
+  type LucideIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,15 +61,61 @@ interface StepListProps {
 }
 
 // ---------------------------------------------------------------------------
+// Skill icon/color registry
+// ---------------------------------------------------------------------------
+
+const SKILL_ICON_MAP: Record<string, LucideIcon> = {
+  trend_monitor: Telescope,
+  news_aggregation: Newspaper,
+  social_listening: Ear,
+  web_search: Globe,
+  topic_extraction: Search,
+  audience_analysis: Users,
+  competitor_analysis: Target,
+  sentiment_analysis: BarChart3,
+  heat_scoring: Flame,
+  data_report: TrendingUp,
+  content_generate: PenTool,
+  headline_generate: Heading,
+  summary_generate: FileStack,
+  script_generate: BookOpen,
+  style_rewrite: Wand2,
+  translation: Languages,
+  angle_design: Lightbulb,
+  video_edit_plan: Film,
+  thumbnail_generate: Image,
+  layout_design: Layout,
+  audio_plan: Mic,
+  quality_review: CheckSquare,
+  compliance_check: Shield,
+  fact_check: ListChecks,
+  publish_strategy: Share2,
+  task_planning: ListChecks,
+  knowledge_retrieval: FolderSearch,
+  media_search: Library,
+  case_reference: Award,
+};
+
+const CATEGORY_COLORS: Record<string, { color: string; bgColor: string }> = {
+  perception: { color: "#f59e0b", bgColor: "rgba(245,158,11,0.12)" },
+  analysis: { color: "#8b5cf6", bgColor: "rgba(139,92,246,0.12)" },
+  generation: { color: "#3b82f6", bgColor: "rgba(59,130,246,0.12)" },
+  production: { color: "#ef4444", bgColor: "rgba(239,68,68,0.12)" },
+  management: { color: "#6366f1", bgColor: "rgba(99,102,241,0.12)" },
+  knowledge: { color: "#14b8a6", bgColor: "rgba(20,184,166,0.12)" },
+};
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getEmployeeMeta(step: WorkflowStepDef) {
-  const slug = (step.config?.employeeSlug ?? step.employeeSlug) as
-    | EmployeeId
-    | undefined;
-  if (!slug) return null;
-  return EMPLOYEE_META[slug] ?? null;
+function getStepVisuals(step: WorkflowStepDef) {
+  const skillSlug = step.config?.skillSlug;
+  const category = step.config?.skillCategory ?? "";
+  const icon = (skillSlug && SKILL_ICON_MAP[skillSlug]) || Cog;
+  const colors = CATEGORY_COLORS[category] ?? { color: "#6b7280", bgColor: "rgba(107,114,128,0.12)" };
+  const label = step.config?.skillName ?? (step.type === "output" ? "输出动作" : "未分配");
+  return { icon, colors, label };
 }
 
 // ---------------------------------------------------------------------------
@@ -61,10 +135,9 @@ export function StepList({
   return (
     <div className="flex flex-col items-center w-full">
       {sortedSteps.map((step, idx) => {
-        const meta = getEmployeeMeta(step);
+        const { icon: StepIcon, colors, label } = getStepVisuals(step);
         const isFirst = idx === 0;
         const isLast = idx === sortedSteps.length - 1;
-        const StepIcon = meta?.icon ?? Cog;
 
         return (
           <div key={step.id} className="flex flex-col items-center w-full">
@@ -79,24 +152,24 @@ export function StepList({
               <div
                 className="flex items-center justify-center w-7 h-7 rounded-lg text-xs font-semibold shrink-0"
                 style={{
-                  backgroundColor: meta?.bgColor ?? "rgba(107,114,128,0.12)",
-                  color: meta?.color ?? "#6b7280",
+                  backgroundColor: colors.bgColor,
+                  color: colors.color,
                 }}
               >
                 {idx + 1}
               </div>
 
-              {/* Employee icon + info */}
+              {/* Skill icon + info */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div
                   className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
                   style={{
-                    backgroundColor: meta?.bgColor ?? "rgba(107,114,128,0.12)",
+                    backgroundColor: colors.bgColor,
                   }}
                 >
                   <StepIcon
                     className="w-4 h-4"
-                    style={{ color: meta?.color ?? "#6b7280" }}
+                    style={{ color: colors.color }}
                   />
                 </div>
                 <div className="min-w-0">
@@ -104,7 +177,7 @@ export function StepList({
                     {step.name}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {meta ? `${meta.nickname} · ${meta.title}` : (step.type === "output" ? "输出动作" : "未分配")}
+                    {label}
                   </p>
                 </div>
               </div>
