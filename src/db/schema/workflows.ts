@@ -31,6 +31,7 @@ export interface WorkflowStepDef {
     skillCategory?: string;
     outputAction?: string;
     parameters: Record<string, any>;
+    description?: string;
     /** @deprecated kept for backward compat with old data */
     employeeSlug?: string;
     toolId?: string;
