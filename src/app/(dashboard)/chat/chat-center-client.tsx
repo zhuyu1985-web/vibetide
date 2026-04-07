@@ -150,6 +150,21 @@ export function ChatCenterClient({
     };
   }, []);
 
+  // Auto-send task from URL param (e.g., from employee marketplace hot task click)
+  const taskParamHandled = useRef(false);
+  useEffect(() => {
+    const task = searchParams.get("task");
+    if (task && !taskParamHandled.current) {
+      taskParamHandled.current = true;
+      // Small delay to let the component mount fully
+      setTimeout(() => {
+        chat.sendMessage(task);
+        // Clean URL
+        window.history.replaceState(null, "", `/chat?employee=${selectedSlug}`);
+      }, 200);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Update URL when slug changes — use history.replaceState to avoid Next.js navigation/scroll
   useEffect(() => {
     if (selectedSlug) {
