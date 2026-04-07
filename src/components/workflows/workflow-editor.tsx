@@ -301,51 +301,108 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     router,
   ]);
 
-  const handleTestRun = useCallback(() => {
+  const handleTestRun = useCallback(async () => {
     if (testRunning) return;
     setTestRunning(true);
-    setTriggerStatus("running");
+    setTriggerStatus("idle");
     setStepStatuses({});
 
-    // Simulate: trigger completes after 1s
-    setTimeout(() => {
-      setTriggerStatus("completed");
-
-      // Then each step completes after 2s delay each
-      const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
-      sortedSteps.forEach((step, idx) => {
-        // Mark as running
-        setTimeout(() => {
-          setStepStatuses((prev) => ({
-            ...prev,
-            [step.id]: { status: "running" },
-          }));
-        }, idx * 2000);
-
-        // Mark as completed
-        setTimeout(() => {
-          setStepStatuses((prev) => ({
-            ...prev,
-            [step.id]: { status: "completed", message: "模拟完成" },
-          }));
-
-          // If last step, end test
-          if (idx === sortedSteps.length - 1) {
-            setTimeout(() => {
-              setTestRunning(false);
-            }, 500);
-          }
-        }, (idx + 1) * 2000);
+    try {
+      const res = await fetch("/api/workflows/test-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steps, triggerType, triggerConfig }),
       });
 
-      // If no steps, end test immediately
-      if (sortedSteps.length === 0) {
-        setTimeout(() => {
-          setTestRunning(false);
-        }, 500);
+      if (!res.ok || !res.body) {
+        console.error("[test-run] Request failed:", res.status);
+        setTestRunning(false);
+        return;
       }
-    }, 1000);
-  }, [testRunning, steps]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        let eventType = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && eventType) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              switch (eventType) {
+                case "trigger-start":
+                  setTriggerStatus("running");
+                  break;
+                case "trigger-complete":
+                  setTriggerStatus("completed");
+                  break;
+                case "step-start":
+                  setStepStatuses((prev) => ({
+                    ...prev,
+                    [data.stepId as string]: { status: "running" },
+                  }));
+                  break;
+                case "step-progress":
+                  setStepStatuses((prev) => ({
+                    ...prev,
+                    [data.stepId as string]: {
+                      status: "running",
+                      message: data.message as string,
+                    },
+                  }));
+                  break;
+                case "step-complete":
+                  setStepStatuses((prev) => ({
+                    ...prev,
+                    [data.stepId as string]: {
+                      status: "completed",
+                      message: data.result as string,
+                    },
+                  }));
+                  break;
+                case "step-failed":
+                  setStepStatuses((prev) => ({
+                    ...prev,
+                    [data.stepId as string]: {
+                      status: "failed",
+                      message: data.error as string,
+                    },
+                  }));
+                  break;
+                case "done":
+                  setTestRunning(false);
+                  break;
+                case "error":
+                  console.error("[test-run] Server error:", data.message);
+                  setTestRunning(false);
+                  break;
+              }
+            } catch {
+              // Ignore parse errors for incomplete data
+            }
+            eventType = "";
+          }
+        }
+      }
+
+      // Stream ended — ensure testRunning is reset
+      setTestRunning(false);
+    } catch (err) {
+      console.error("[test-run] Fetch error:", err);
+      setTestRunning(false);
+    }
+  }, [testRunning, steps, triggerType, triggerConfig]);
 
   const handleToggleEnabled = useCallback(() => {
     setIsEnabled((prev) => !prev);
