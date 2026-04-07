@@ -158,6 +158,10 @@ export interface IntentResult {
   confidence: number;
   steps: IntentStep[];
   reasoning: string;
+  /** If the intent matches a configured workflow, these fields are populated */
+  workflowId?: string;
+  workflowName?: string;
+  executionMode?: "skill" | "workflow";
 }
 
 export const INTENT_TYPE_LABELS: Record<ChatIntentType, string> = {

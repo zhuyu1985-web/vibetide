@@ -6,12 +6,14 @@ import {
   employeeSkills,
   skills,
   intentLogs,
+  workflowTemplates,
 } from "@/db/schema";
 import { and, eq, desc, inArray } from "drizzle-orm";
 import {
   recognizeIntent,
   type IntentResult,
   type IntentMemoryEntry,
+  type AvailableWorkflow,
 } from "@/lib/agent/intent-recognition";
 
 export async function POST(req: Request) {
@@ -74,7 +76,7 @@ export async function POST(req: Request) {
             label: "正在加载员工能力档案...",
           });
 
-          const [empRows, recentLogs] = await Promise.all([
+          const [empRows, recentLogs, workflowRows] = await Promise.all([
             db.query.aiEmployees.findMany({
               where: eq(
                 aiEmployees.organizationId,
@@ -97,6 +99,20 @@ export async function POST(req: Request) {
               )
               .orderBy(desc(intentLogs.createdAt))
               .limit(10),
+            db
+              .select({
+                id: workflowTemplates.id,
+                name: workflowTemplates.name,
+                description: workflowTemplates.description,
+                triggerType: workflowTemplates.triggerType,
+              })
+              .from(workflowTemplates)
+              .where(
+                eq(
+                  workflowTemplates.organizationId,
+                  profile.organizationId
+                )
+              ),
           ]);
 
           // Deduplicate employees by slug
@@ -171,11 +187,22 @@ export async function POST(req: Request) {
             label: "正在分析意图、匹配技能组合...",
           });
 
+          // Build available workflows list
+          const availableWorkflows: AvailableWorkflow[] = workflowRows.map(
+            (w) => ({
+              id: w.id,
+              name: w.name,
+              description: w.description,
+              triggerType: w.triggerType ?? "manual",
+            })
+          );
+
           const intentResult = await recognizeIntent(
             message,
             employeeSlug || uniqueEmps[0]?.slug || "xiaolei",
             availableEmployees,
-            userMemories
+            userMemories,
+            availableWorkflows
           );
 
           // Phase 5: Result

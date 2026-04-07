@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   Wrench,
   Sparkles,
   X,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +30,12 @@ import type { WorkflowStepDef } from "@/db/schema/workflows";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+interface ChatMessage {
+  role: "user" | "ai";
+  content: string;
+  type?: "thinking" | "result" | "error";
+}
 
 interface WorkflowEditorProps {
   initialData?: {
@@ -107,6 +115,8 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
   const [chatInput, setChatInput] = useState("");
   const [generating, setGenerating] = useState(false);
   const [showGuide, setShowGuide] = useState(mode === "create");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // ── Step management handlers ──
 
@@ -344,15 +354,185 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
 
   // ── AI chat ──
 
-  const handleChatSend = useCallback(() => {
-    if (!chatInput.trim()) return;
+  const scrollChatToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      chatScrollRef.current?.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    });
+  }, []);
+
+  const handleChatSend = useCallback(async () => {
+    if (!chatInput.trim() || generating) return;
+    const userMessage = chatInput.trim();
     setChatInput("");
-    // Placeholder: show a message saying AI generation coming soon
+    setShowGuide(false);
+
+    // Add user message
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "user", content: userMessage },
+    ]);
+    scrollChatToBottom();
+
     setGenerating(true);
-    setTimeout(() => {
+
+    try {
+      const res = await fetch("/api/workflows/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: userMessage }),
+      });
+
+      if (!res.ok || !res.body) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "ai", content: "请求失败，请重试", type: "error" },
+        ]);
+        setGenerating(false);
+        scrollChatToBottom();
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        let eventType = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && eventType) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (eventType === "thinking") {
+                setChatMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "ai",
+                    content: data.message as string,
+                    type: "thinking",
+                  },
+                ]);
+                scrollChatToBottom();
+              } else if (eventType === "result") {
+                // Apply the generated workflow
+                const generated = data as {
+                  name: string;
+                  description: string;
+                  category: string;
+                  triggerType: string;
+                  triggerConfig: {
+                    cron?: string;
+                    timezone?: string;
+                  } | null;
+                  steps: Array<{
+                    name: string;
+                    skillSlug: string;
+                    skillName: string;
+                    skillCategory: string;
+                    description: string;
+                  }>;
+                };
+
+                // Set workflow metadata
+                setName(generated.name || "");
+                setDescription(generated.description || "");
+                if (
+                  ["news", "video", "analytics", "distribution", "custom"].includes(
+                    generated.category
+                  )
+                ) {
+                  setCategory(generated.category as Category);
+                }
+                if (
+                  generated.triggerType === "manual" ||
+                  generated.triggerType === "scheduled"
+                ) {
+                  setTriggerType(generated.triggerType);
+                }
+                if (generated.triggerConfig) {
+                  setTriggerConfig(generated.triggerConfig);
+                }
+
+                // Convert to WorkflowStepDef array
+                const newSteps: WorkflowStepDef[] = generated.steps.map(
+                  (s, idx) => ({
+                    id: crypto.randomUUID(),
+                    order: idx + 1,
+                    dependsOn: idx > 0 ? [/* will be filled below */] : [],
+                    name: s.name,
+                    type: "skill" as const,
+                    config: {
+                      skillSlug: s.skillSlug,
+                      skillName: s.skillName,
+                      skillCategory: s.skillCategory,
+                      description: s.description,
+                      parameters: {},
+                    },
+                  })
+                );
+
+                // Wire up linear dependencies
+                for (let i = 1; i < newSteps.length; i++) {
+                  newSteps[i].dependsOn = [newSteps[i - 1].id];
+                }
+
+                setSteps(newSteps);
+                setHasChanges(true);
+
+                setChatMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "ai",
+                    content: `已生成 ${newSteps.length} 个步骤的工作流「${generated.name}」`,
+                    type: "result",
+                  },
+                ]);
+                scrollChatToBottom();
+              } else if (eventType === "error") {
+                setChatMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "ai",
+                    content: (data.message as string) || "生成失败",
+                    type: "error",
+                  },
+                ]);
+                scrollChatToBottom();
+              }
+            } catch {
+              // Ignore parse errors for incomplete data
+            }
+            eventType = "";
+          }
+        }
+      }
+    } catch (err) {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content:
+            err instanceof Error ? err.message : "网络错误，请重试",
+          type: "error",
+        },
+      ]);
+      scrollChatToBottom();
+    } finally {
       setGenerating(false);
-    }, 1000);
-  }, [chatInput]);
+    }
+  }, [chatInput, generating, scrollChatToBottom]);
 
   // ── Derived ──
 
@@ -418,9 +598,9 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           </div>
 
           {/* Content area */}
-          <div className="flex-1 overflow-y-auto px-4 py-2">
+          <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4 py-2">
             {/* Guide bubble */}
-            {showGuide && (
+            {showGuide && chatMessages.length === 0 && (
               <div className="relative mt-4 mb-4">
                 <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-4">
                   <div className="flex items-start gap-2">
@@ -448,11 +628,48 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
               </div>
             )}
 
-            {/* AI generation status */}
+            {/* Chat messages */}
+            {chatMessages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`mb-3 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {msg.role === "user" ? (
+                  <div className="max-w-[85%] rounded-xl bg-primary/10 px-3 py-2 text-xs text-foreground">
+                    {msg.content}
+                  </div>
+                ) : (
+                  <div className="max-w-[85%] flex items-start gap-1.5">
+                    {msg.type === "thinking" && (
+                      <Loader2 className="w-3 h-3 animate-spin text-muted-foreground mt-0.5 shrink-0" />
+                    )}
+                    {msg.type === "result" && (
+                      <CheckCircle2 className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                    )}
+                    {msg.type === "error" && (
+                      <AlertCircle className="w-3 h-3 text-destructive mt-0.5 shrink-0" />
+                    )}
+                    <span
+                      className={`text-xs ${
+                        msg.type === "error"
+                          ? "text-destructive"
+                          : msg.type === "result"
+                            ? "text-green-600 dark:text-green-400 font-medium"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {msg.content}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Generating spinner */}
             {generating && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>AI 工作流生成即将推出</span>
+                <span>AI 正在生成工作流...</span>
               </div>
             )}
           </div>

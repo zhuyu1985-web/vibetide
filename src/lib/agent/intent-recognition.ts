@@ -25,6 +25,17 @@ export interface IntentMemoryEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Workflow info for matching
+// ---------------------------------------------------------------------------
+
+export interface AvailableWorkflow {
+  id: string;
+  name: string;
+  description: string | null;
+  triggerType: string;
+}
+
+// ---------------------------------------------------------------------------
 // Employee + skill catalog for the prompt
 // ---------------------------------------------------------------------------
 
@@ -72,6 +83,24 @@ function buildSkillCatalog(): string {
     .join("\n\n");
 }
 
+function buildWorkflowCatalog(workflows: AvailableWorkflow[]): string {
+  if (workflows.length === 0) return "";
+
+  const triggerLabels: Record<string, string> = {
+    manual: "手动触发",
+    scheduled: "定时触发",
+  };
+
+  const list = workflows
+    .map(
+      (w) =>
+        `- ${w.name}：${w.description || "无描述"}（${triggerLabels[w.triggerType] || w.triggerType}）[id: ${w.id}]`
+    )
+    .join("\n");
+
+  return `\n## 已配置的工作流\n${list}\n\n如果用户的意图明确匹配一个已配置的工作流，优先使用工作流执行。\n在返回的 JSON 中添加 workflowId、workflowName 和 executionMode 字段。\nexecutionMode 为 "workflow" 表示使用工作流执行，"skill" 表示使用技能执行。\n`;
+}
+
 function buildFewShotExamples(memories: IntentMemoryEntry[]): string {
   if (memories.length === 0) return "";
 
@@ -107,7 +136,7 @@ const INTENT_PROMPT = `你是一个智能意图识别引擎。请分析用户的
 
 ## 可用AI员工
 {EMPLOYEE_CATALOG}
-{FEW_SHOT}
+{WORKFLOW_CATALOG}{FEW_SHOT}
 ## 规则
 1. 根据用户输入判断最匹配的意图类型
 2. 选择完成任务所需的最少技能组合（不要贪多）
@@ -134,22 +163,28 @@ const INTENT_PROMPT = `你是一个智能意图识别引擎。请分析用户的
       "dependsOn": null 或前置步骤的index
     }
   ],
-  "reasoning": "推理过程（中文）"
+  "reasoning": "推理过程（中文）",
+  "workflowId": "如果匹配到已配置的工作流，填写其 id，否则省略",
+  "workflowName": "如果匹配到已配置的工作流，填写其名称，否则省略",
+  "executionMode": "skill 或 workflow，默认 skill"
 }`;
 
 export async function recognizeIntent(
   message: string,
   currentEmployeeSlug: string,
   availableEmployees: EmployeeSkillInfo[],
-  userMemories: IntentMemoryEntry[] = []
+  userMemories: IntentMemoryEntry[] = [],
+  availableWorkflows: AvailableWorkflow[] = []
 ): Promise<IntentResult> {
   const skillCatalog = buildSkillCatalog();
   const employeeCatalog = buildEmployeeCatalog(availableEmployees);
+  const workflowCatalog = buildWorkflowCatalog(availableWorkflows);
   const fewShot = buildFewShotExamples(userMemories);
 
   const systemPrompt = INTENT_PROMPT
     .replace("{SKILL_CATALOG}", skillCatalog)
     .replace("{EMPLOYEE_CATALOG}", employeeCatalog)
+    .replace("{WORKFLOW_CATALOG}", workflowCatalog)
     .replace("{FEW_SHOT}", fewShot);
 
   const userPrompt = `当前选中的员工：${currentEmployeeSlug}\n用户输入：${message}`;
@@ -221,6 +256,24 @@ export async function recognizeIntent(
     const allSkillSlugs = getBuiltinSkillSlugs();
     for (const step of parsed.steps) {
       step.skills = step.skills.filter((s) => allSkillSlugs.has(s));
+    }
+
+    // Validate workflow fields if present
+    if (parsed.workflowId) {
+      const validWorkflowIds = new Set(availableWorkflows.map((w) => w.id));
+      if (!validWorkflowIds.has(parsed.workflowId)) {
+        // Invalid workflow ID — clear workflow fields
+        delete parsed.workflowId;
+        delete parsed.workflowName;
+        parsed.executionMode = "skill";
+      } else {
+        parsed.executionMode = "workflow";
+      }
+    } else {
+      // No workflow matched — ensure executionMode defaults to "skill"
+      if (!parsed.executionMode) {
+        parsed.executionMode = "skill";
+      }
     }
 
     return parsed;
