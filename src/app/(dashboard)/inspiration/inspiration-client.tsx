@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { HeatScoreBadge } from "@/components/shared/heat-score-badge";
@@ -547,16 +548,13 @@ export function InspirationClient({
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Title bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-white/5 shrink-0">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">灵感池</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">全网热点聚合 · AI 选题建议</p>
-        </div>
-      </div>
+    <div className="max-w-[1400px] mx-auto">
+      <PageHeader
+        title="灵感池"
+        description="全网热点聚合 · AI 选题建议"
+      />
       {/* Three-column layout */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex h-[calc(100vh-200px)] min-h-[600px] rounded-xl border border-gray-200 dark:border-white/5 overflow-hidden">
         {/* ======================== Column 1: Platform Sidebar ======================== */}
         <div className="w-[140px] shrink-0 flex flex-col min-h-0 border-r border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.01]">
           <ScrollArea className="h-full">
