@@ -721,4 +721,47 @@ export async function autoGenerateAnalysisIfNeeded(orgId: string) {
       });
     }
   }
+
+  await identifyMissedFromHotTopics(orgId);
+}
+
+export async function identifyMissedFromHotTopics(orgId: string): Promise<void> {
+  const p0Topics = await db
+    .select({ id: hotTopics.id, title: hotTopics.title, heatScore: hotTopics.heatScore, category: hotTopics.category, platforms: hotTopics.platforms })
+    .from(hotTopics)
+    .where(and(eq(hotTopics.organizationId, orgId), eq(hotTopics.priority, "P0")));
+
+  for (const topic of p0Topics) {
+    // Check if article with similar title exists
+    const [match] = await db
+      .select({ id: articles.id })
+      .from(articles)
+      .where(and(eq(articles.organizationId, orgId), sql`${articles.title} ILIKE ${"%" + topic.title.slice(0, 20) + "%"}`))
+      .limit(1);
+
+    if (match) continue;
+
+    // Check if already in missedTopics
+    const [existing] = await db
+      .select({ id: missedTopics.id })
+      .from(missedTopics)
+      .where(and(eq(missedTopics.organizationId, orgId), sql`${missedTopics.title} = ${topic.title}`))
+      .limit(1);
+
+    if (existing) continue;
+
+    await db.insert(missedTopics).values({
+      organizationId: orgId,
+      title: topic.title,
+      priority: "high",
+      discoveredAt: new Date(),
+      competitors: [],
+      heatScore: topic.heatScore || 0,
+      category: topic.category || "综合",
+      type: "trending",
+      status: "missed",
+      sourceType: "social_hot",
+      sourcePlatform: ((topic.platforms as string[]) ?? [])[0] ?? "热搜",
+    });
+  }
 }
