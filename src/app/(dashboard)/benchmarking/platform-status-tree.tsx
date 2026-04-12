@@ -31,6 +31,13 @@ const statusColors = {
   error: "bg-red-500",
 };
 
+const LEVEL_BADGE: Record<string, { label: string; className: string }> = {
+  central: { label: "央媒", className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
+  provincial: { label: "省媒", className: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" },
+  municipal: { label: "市媒", className: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
+  industry: { label: "行业", className: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+};
+
 function formatRelativeTime(dateStr?: string): string {
   if (!dateStr) return "待抓取";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -143,6 +150,16 @@ export function PlatformStatusTree({
                           >
                             {platform.name}
                           </span>
+                          {LEVEL_BADGE[platform.category] && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium shrink-0",
+                                LEVEL_BADGE[platform.category].className
+                              )}
+                            >
+                              {LEVEL_BADGE[platform.category].label}
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
                           {formatRelativeTime(platform.lastCrawledAt)}

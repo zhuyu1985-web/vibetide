@@ -49,7 +49,9 @@ import type {
   BenchmarkAlertUI,
   PlatformComparisonRow,
   CoverageOverview,
+  BenchmarkArticleUI,
 } from "@/lib/types";
+import { crawlPlatformDirect } from "@/app/actions/benchmarking";
 import { PlatformConfigSheet } from "./platform-config-sheet";
 import { PlatformStatusTree } from "./platform-status-tree";
 import { CrawlFeedList } from "./crawl-feed-list";
@@ -59,6 +61,8 @@ import { AISuggestionPanel } from "./ai-suggestion-panel";
 import { MultiPlatformTable } from "./multi-platform-table";
 import { AIPredictionPanel } from "./ai-prediction-panel";
 import { ExportButtons } from "./export-buttons";
+import { ArticleCompareView } from "./article-compare-view";
+import { MissedTopicDetail } from "./missed-topic-detail";
 
 const priorityColors: Record<string, string> = {
   high: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200",
@@ -98,6 +102,7 @@ interface BenchmarkingClientProps {
   coverageOverview: CoverageOverview;
   multiPlatformComparison: PlatformComparisonRow[];
   topicCandidates: TopicCandidate[];
+  publishedArticles: BenchmarkArticleUI[];
 }
 
 export function BenchmarkingClient({
@@ -114,6 +119,7 @@ export function BenchmarkingClient({
   coverageOverview,
   multiPlatformComparison,
   topicCandidates,
+  publishedArticles,
 }: BenchmarkingClientProps) {
   const router = useRouter();
   const [selectedTopicId, setSelectedTopicId] = useState(benchmarkTopics[0]?.id || "");
@@ -128,6 +134,16 @@ export function BenchmarkingClient({
   const [showTopicDropdown, setShowTopicDropdown] = useState(false);
   const [isGenerating, startGenerateTransition] = useTransition();
   const topicPickerRef = useRef<HTMLDivElement>(null);
+
+  // Compare tab: selected published article
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+
+  // Missed topics: expanded detail
+  const [expandedMissedId, setExpandedMissedId] = useState<string | null>(null);
+
+  // Auto-crawl state
+  const [crawlProgress, setCrawlProgress] = useState<Record<string, "idle" | "loading" | "done" | "error">>({});
+  const [isCrawling, setIsCrawling] = useState(false);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -177,6 +193,47 @@ export function BenchmarkingClient({
         best: rd.best,
       }))
     : [];
+
+  // Compare tab: selected article and matching competitor content
+  const selectedPublishedArticle = publishedArticles.find((a) => a.id === selectedArticleId);
+  const matchingCompetitorContent = useMemo(() => {
+    if (!selectedPublishedArticle) return [];
+    const titleWords = selectedPublishedArticle.title
+      .replace(/[，。、：；！？（）【】《》""'']/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 2);
+    if (titleWords.length === 0) return recentContent;
+    return recentContent.filter((c) =>
+      titleWords.some(
+        (kw) =>
+          c.title.includes(kw) ||
+          c.topics.some((t) => t.includes(kw)) ||
+          (c.summary && c.summary.includes(kw))
+      )
+    );
+  }, [selectedPublishedArticle, recentContent]);
+
+  // Auto-crawl handler
+  async function handleAutoCrawl() {
+    if (platforms.length === 0) return;
+    setIsCrawling(true);
+    const initial: Record<string, "idle" | "loading" | "done" | "error"> = {};
+    for (const p of platforms) initial[p.id] = "loading";
+    setCrawlProgress(initial);
+
+    await Promise.allSettled(
+      platforms.map(async (p) => {
+        try {
+          await crawlPlatformDirect(p.id);
+          setCrawlProgress((prev) => ({ ...prev, [p.id]: "done" }));
+        } catch {
+          setCrawlProgress((prev) => ({ ...prev, [p.id]: "error" }));
+        }
+      })
+    );
+    setIsCrawling(false);
+    router.refresh();
+  }
 
   const interceptedCount = missedTopics.filter(
     (t) => t.status === "tracking" || t.status === "resolved"
@@ -310,6 +367,46 @@ export function BenchmarkingClient({
         {/* ====== Tab 1: 监控看板 ====== */}
         <TabsContent value="dashboard">
           {recentContent.length === 0 ? (
+            platforms.length > 0 ? (
+              <GlassCard>
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+                    <Activity size={24} className="text-blue-500" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    已配置 {platforms.length} 个监控平台
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-4">
+                    点击下方按钮立即开始抓取所有平台的最新内容
+                  </p>
+
+                  {isCrawling ? (
+                    <div className="w-full max-w-md space-y-2">
+                      {platforms.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2 text-xs">
+                          <span className="w-28 truncate text-gray-600 dark:text-gray-400">{p.name}</span>
+                          {crawlProgress[p.id] === "loading" && <Loader2 size={12} className="animate-spin text-blue-500" />}
+                          {crawlProgress[p.id] === "done" && <CheckCircle size={12} className="text-green-500" />}
+                          {crawlProgress[p.id] === "error" && <AlertTriangle size={12} className="text-red-500" />}
+                          <span className="text-gray-400">
+                            {crawlProgress[p.id] === "loading" ? "抓取中..." : crawlProgress[p.id] === "done" ? "完成" : crawlProgress[p.id] === "error" ? "失败" : "等待"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="border-0"
+                      onClick={handleAutoCrawl}
+                    >
+                      <Zap size={14} className="mr-1.5" />
+                      开始抓取
+                    </Button>
+                  )}
+                </div>
+              </GlassCard>
+            ) : (
             <EmptyState
               icon={Activity}
               title="暂无监控数据"
@@ -321,6 +418,7 @@ export function BenchmarkingClient({
                 </Button>
               }
             />
+            )
           ) : (
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-3">
@@ -360,7 +458,54 @@ export function BenchmarkingClient({
 
         {/* ====== Tab 2: 同题对标 ====== */}
         <TabsContent value="compare">
-          {/* Topic picker — always visible */}
+          {/* Published articles selector */}
+          {publishedArticles.length > 0 && (
+            <GlassCard padding="sm" className="mb-4">
+              <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
+                <FileText size={13} className="text-blue-500" />
+                选择我方作品进行对标
+              </h4>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {publishedArticles.slice(0, 10).map((article) => (
+                  <button
+                    key={article.id}
+                    className={`shrink-0 text-left px-3 py-2 rounded-lg transition-colors text-xs max-w-[220px] ${
+                      selectedArticleId === article.id
+                        ? "bg-blue-50 dark:bg-blue-950/40 ring-1 ring-blue-300 dark:ring-blue-700"
+                        : "bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                    onClick={() =>
+                      setSelectedArticleId(
+                        selectedArticleId === article.id ? null : article.id
+                      )
+                    }
+                  >
+                    <p className="font-medium text-gray-800 dark:text-gray-100 truncate">
+                      {article.title}
+                    </p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      {article.publishedAt
+                        ? new Date(article.publishedAt).toLocaleDateString("zh-CN")
+                        : article.status}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Article compare view when article selected */}
+          {selectedArticleId && selectedPublishedArticle && (
+            <div className="mb-5">
+              <ArticleCompareView
+                ourArticle={selectedPublishedArticle}
+                competitorContent={matchingCompetitorContent}
+                topicTitle={selectedPublishedArticle.title}
+              />
+            </div>
+          )}
+
+          {/* Topic picker — search-based flow */}
           <div className="mb-4 flex items-center gap-3">
             <div ref={topicPickerRef} className="relative flex-1 max-w-lg">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
@@ -451,13 +596,13 @@ export function BenchmarkingClient({
           )}
 
           {/* Analysis results */}
-          {!isGenerating && benchmarkTopics.length === 0 ? (
+          {!isGenerating && benchmarkTopics.length === 0 && !selectedArticleId ? (
             <EmptyState
               icon={Target}
               title="选择一个话题开始对标"
-              description="在上方搜索框中输入选题关键词，或从已有文章、热点话题中选取，系统将自动与竞品内容进行四维度对比分析。"
+              description="在上方选择我方作品，或在搜索框中输入选题关键词，系统将自动与竞品内容进行四维度对比分析。"
             />
-          ) : !isGenerating && (
+          ) : !isGenerating && benchmarkTopics.length > 0 && (
           <>
           <div className="grid grid-cols-12 gap-5">
             {/* Left: Compare Table + Timeline */}
@@ -615,80 +760,110 @@ export function BenchmarkingClient({
               </div>
               {missedTopics.map((topic) => {
                 const status = statusConfig[topic.status];
+                const isExpanded = expandedMissedId === topic.id;
+                const sourceTypeBadge: Record<string, { label: string; color: string }> = {
+                  social_hot: { label: "社媒热榜", color: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-700/50" },
+                  sentiment_event: { label: "舆情事件", color: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-700/50" },
+                  benchmark_media: { label: "对标媒体", color: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700/50" },
+                };
+                const stBadge = topic.sourceType ? sourceTypeBadge[topic.sourceType] : null;
+
                 return (
                   <GlassCard
                     key={topic.id}
                     variant="interactive"
                     padding="sm"
+                    className={topic.heatScore >= 80 ? "ring-1 ring-red-200 dark:ring-red-800/40 bg-red-50/30 dark:bg-red-950/10" : ""}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span
-                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${priorityColors[topic.priority]}`}
-                          >
-                            {topic.priority === "high"
-                              ? "高优"
-                              : topic.priority === "medium"
-                              ? "中优"
-                              : "低优"}
-                          </span>
-                          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                            {topic.title}
-                          </h4>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="flex items-center gap-1">
-                            <Clock size={11} />
-                            {topic.discoveredAt} 发现
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Flame size={11} className="text-orange-400" />
-                            热度 {topic.heatScore}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                            竞品已发:
-                          </span>
-                          {topic.competitors.map((comp, i) => (
-                            <Badge
-                              key={i}
-                              variant="secondary"
-                              className="text-[10px] py-0"
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => setExpandedMissedId(isExpanded ? null : topic.id)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${priorityColors[topic.priority]}`}
                             >
-                              {comp}
-                            </Badge>
-                          ))}
+                              {topic.priority === "high"
+                                ? "高优"
+                                : topic.priority === "medium"
+                                ? "中优"
+                                : "低优"}
+                            </span>
+                            {stBadge && (
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${stBadge.color}`}
+                              >
+                                {stBadge.label}
+                              </span>
+                            )}
+                            <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                              {topic.title}
+                            </h4>
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Clock size={11} />
+                              {topic.discoveredAt} 发现
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Flame size={11} className={topic.heatScore >= 80 ? "text-red-500" : "text-orange-400"} />
+                              热度 {topic.heatScore}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                              竞品已发:
+                            </span>
+                            {topic.competitors.map((comp, i) => (
+                              <Badge
+                                key={i}
+                                variant="secondary"
+                                className="text-[10px] py-0"
+                              >
+                                {comp}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${status.color}`}
-                        >
-                          {status.icon}
-                          {status.label}
-                        </span>
-
-                        {topic.status === "missed" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs h-7 px-3"
-                            onClick={() => {
-                              const params = new URLSearchParams({ topic: topic.title, source: "benchmarking" });
-                              router.push(`/super-creation?${params.toString()}`);
-                            }}
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${status.color}`}
                           >
-                            <Crosshair size={12} className="mr-1" />
-                            发起跟进
-                          </Button>
-                        )}
+                            {status.icon}
+                            {status.label}
+                          </span>
+
+                          {topic.status === "missed" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-7 px-3 border-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const params = new URLSearchParams({ topic: topic.title, source: "benchmarking" });
+                                router.push(`/super-creation?${params.toString()}`);
+                              }}
+                            >
+                              <Crosshair size={12} className="mr-1" />
+                              发起跟进
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Expandable detail panel */}
+                    {isExpanded && (
+                      <MissedTopicDetail
+                        topic={topic}
+                        onUpdate={() => router.refresh()}
+                      />
+                    )}
                   </GlassCard>
                 );
               })}

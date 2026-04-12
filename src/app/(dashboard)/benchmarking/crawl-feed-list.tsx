@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GlassCard } from "@/components/shared/glass-card";
+import { Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import type { PlatformContentUI } from "@/lib/types";
 
 interface CrawlFeedListProps {
@@ -73,6 +76,128 @@ const coverageLabels: Record<string, string> = {
   partially_covered: "部分覆盖",
 };
 
+function FeedItem({ item }: { item: PlatformContentUI }) {
+  const [interpretation, setInterpretation] = useState<string | null>(
+    item.aiInterpretation ?? null
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleInterpret = useCallback(async () => {
+    if (interpretation) {
+      setExpanded((prev) => !prev);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/benchmarking/interpret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId: item.id }),
+      });
+      if (!res.ok) throw new Error("请求失败");
+      const data = await res.json();
+      setInterpretation(data.interpretation);
+      setExpanded(true);
+    } catch {
+      // silently fail
+    } finally {
+      setIsLoading(false);
+    }
+  }, [interpretation, item.id]);
+
+  return (
+    <div className="rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+      {isRealArticleUrl(item.sourceUrl) ? (
+        <a
+          href={item.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:underline line-clamp-2"
+        >
+          {item.title}
+        </a>
+      ) : (
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
+          {item.title}
+        </span>
+      )}
+
+      {item.summary && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mt-1 line-clamp-2">
+          {item.summary}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+        <span>{item.platformName || "未知平台"}</span>
+        {item.publishedAt && (
+          <>
+            <span>·</span>
+            <span>发布于 {formatPublishTime(item.publishedAt)}</span>
+          </>
+        )}
+        <span>·</span>
+        <span>收录于 {formatRelativeTime(item.crawledAt)}</span>
+      </div>
+
+      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+        <Badge
+          variant="secondary"
+          className={getImportanceColor(item.importance)}
+        >
+          {item.importance}分
+        </Badge>
+
+        {item.coverageStatus && coverageLabels[item.coverageStatus] && (
+          <Badge
+            variant="secondary"
+            className={getCoverageColor(item.coverageStatus)}
+          >
+            {coverageLabels[item.coverageStatus]}
+          </Badge>
+        )}
+
+        {item.topics.map((topic) => (
+          <Badge
+            key={topic}
+            variant="secondary"
+            className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          >
+            {topic}
+          </Badge>
+        ))}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto h-6 px-2 text-[11px] border-0"
+          onClick={handleInterpret}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <Loader2 size={11} className="mr-1 animate-spin" />
+          ) : (
+            <Sparkles size={11} className="mr-1" />
+          )}
+          {interpretation ? (expanded ? "收起" : "AI 解读") : "AI 解读"}
+          {interpretation && !isLoading && (
+            expanded ? <ChevronUp size={11} className="ml-0.5" /> : <ChevronDown size={11} className="ml-0.5" />
+          )}
+        </Button>
+      </div>
+
+      {expanded && interpretation && (
+        <div className="mt-2 px-3 py-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
+          <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
+            {interpretation}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FeedContent({ content }: { content: PlatformContentUI[] }) {
   return (
     <ScrollArea className="h-[480px]">
@@ -83,71 +208,7 @@ function FeedContent({ content }: { content: PlatformContentUI[] }) {
           </p>
         )}
         {content.map((item) => (
-          <div
-            key={item.id}
-            className="rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-          >
-            {isRealArticleUrl(item.sourceUrl) ? (
-              <a
-                href={item.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:underline line-clamp-2"
-              >
-                {item.title}
-              </a>
-            ) : (
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
-                {item.title}
-              </span>
-            )}
-
-            {item.summary && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mt-1 line-clamp-2">
-                {item.summary}
-              </p>
-            )}
-
-            <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-              <span>{item.platformName || "未知平台"}</span>
-              {item.publishedAt && (
-                <>
-                  <span>·</span>
-                  <span>发布于 {formatPublishTime(item.publishedAt)}</span>
-                </>
-              )}
-              <span>·</span>
-              <span>收录于 {formatRelativeTime(item.crawledAt)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <Badge
-                variant="secondary"
-                className={getImportanceColor(item.importance)}
-              >
-                {item.importance}分
-              </Badge>
-
-              {item.coverageStatus && coverageLabels[item.coverageStatus] && (
-                <Badge
-                  variant="secondary"
-                  className={getCoverageColor(item.coverageStatus)}
-                >
-                  {coverageLabels[item.coverageStatus]}
-                </Badge>
-              )}
-
-              {item.topics.map((topic) => (
-                <Badge
-                  key={topic}
-                  variant="secondary"
-                  className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                >
-                  {topic}
-                </Badge>
-              ))}
-            </div>
-          </div>
+          <FeedItem key={item.id} item={item} />
         ))}
       </div>
     </ScrollArea>

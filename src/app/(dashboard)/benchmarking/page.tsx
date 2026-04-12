@@ -15,9 +15,11 @@ import {
   getCoverageOverview,
   getMultiPlatformComparison,
   getTopicCandidates,
+  getPublishedArticlesForBenchmark,
   autoGenerateAnalysisIfNeeded,
 } from "@/lib/dal/benchmarking";
 import type { TopicCandidate } from "@/lib/dal/benchmarking";
+import type { BenchmarkArticleUI } from "@/lib/types";
 import { initializeDefaultPlatforms } from "@/app/actions/benchmarking";
 import { BenchmarkingClient } from "./benchmarking-client";
 
@@ -34,6 +36,7 @@ export default async function BenchmarkingPage() {
   let coverageOverview: Awaited<ReturnType<typeof getCoverageOverview>> = { totalExternal: 0, covered: 0, missed: 0, coverageRate: 0, byPlatformCategory: [] };
   let multiPlatformComparison: Awaited<ReturnType<typeof getMultiPlatformComparison>> = [];
   let topicCandidates: TopicCandidate[] = [];
+  let publishedArticles: BenchmarkArticleUI[] = [];
 
   try {
     const orgId = await getCurrentUserOrg();
@@ -57,6 +60,7 @@ export default async function BenchmarkingPage() {
         coverageOverview,
         multiPlatformComparison,
         topicCandidates,
+        publishedArticles,
       ] = await Promise.all([
         getBenchmarkTopics(orgId),
         getMissedTopics(orgId),
@@ -70,6 +74,7 @@ export default async function BenchmarkingPage() {
         getCoverageOverview(orgId),
         getMultiPlatformComparison(orgId),
         getTopicCandidates(orgId),
+        getPublishedArticlesForBenchmark(orgId),
       ]);
     }
   } catch {
@@ -93,6 +98,7 @@ export default async function BenchmarkingPage() {
       coverageOverview={coverageOverview}
       multiPlatformComparison={multiPlatformComparison}
       topicCandidates={topicCandidates}
+      publishedArticles={publishedArticles}
     />
   );
 }
