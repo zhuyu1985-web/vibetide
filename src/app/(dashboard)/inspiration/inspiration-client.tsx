@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -767,16 +767,14 @@ export function InspirationClient({
         {/* ======================== Column 3: Right Panel ======================== */}
         <div className="w-[380px] shrink-0 flex flex-col min-h-0 overflow-x-hidden border-l border-gray-200 dark:border-white/5">
           <Tabs defaultValue="briefing" className="flex flex-col h-full">
-            <div className="px-3 pt-2 pb-0 shrink-0 border-b border-gray-200 dark:border-white/5">
-              <div className="flex">
-                <TabsTrigger value="briefing" className="flex-1 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent border-0">
-                  编辑简报
-                </TabsTrigger>
-                <TabsTrigger value="inspiration" className="flex-1 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent border-0">
-                  灵感整理
-                </TabsTrigger>
-              </div>
-            </div>
+            <TabsList variant="line" className="px-3 pt-1 shrink-0 w-full justify-start rounded-none border-b border-gray-200 dark:border-white/5 bg-transparent h-auto">
+              <TabsTrigger value="briefing" className="text-xs rounded-none border-0">
+                编辑简报
+              </TabsTrigger>
+              <TabsTrigger value="inspiration" className="text-xs rounded-none border-0">
+                灵感整理
+              </TabsTrigger>
+            </TabsList>
             <TabsContent value="briefing" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
               <ScrollArea className="h-full">
                 <div className="p-5">
