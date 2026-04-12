@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -82,7 +82,6 @@ import {
   rejectCalendarEventAction,
 } from "@/app/actions/calendar-events";
 import { cn } from "@/lib/utils";
-import { PageHeader } from "@/components/shared/page-header";
 import type {
   InspirationTopic,
   PlatformMonitor,
@@ -549,21 +548,6 @@ export function InspirationClient({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader
-        title="灵感池"
-        description="全网热点聚合 · AI 选题建议"
-        actions={
-          <Button
-            onClick={handleRefresh}
-            disabled={crawlProgress !== null}
-            className="text-xs border-0"
-            variant="ghost"
-          >
-            <RefreshCw size={14} className={cn(crawlProgress !== null && "animate-spin", "mr-1")} />
-            {crawlProgress !== null ? "抓取中..." : "刷新数据"}
-          </Button>
-        }
-      />
       {/* Three-column layout */}
       <div className="flex flex-1 min-h-0">
         {/* ======================== Column 1: Platform Sidebar ======================== */}
@@ -628,6 +612,16 @@ export function InspirationClient({
               >
                 <CalendarPlus size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
                 <span className="text-xs text-gray-500 dark:text-gray-400">日历事件</span>
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={crawlProgress !== null}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
+              >
+                <RefreshCw size={14} className={cn("text-gray-400 dark:text-gray-500 shrink-0", crawlProgress !== null && "animate-spin")} />
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {crawlProgress !== null ? "抓取中..." : "刷新数据"}
+                </span>
               </button>
             </div>
           </ScrollArea>
@@ -773,19 +767,17 @@ export function InspirationClient({
         {/* ======================== Column 3: Right Panel ======================== */}
         <div className="w-[380px] shrink-0 flex flex-col min-h-0 overflow-x-hidden border-l border-gray-200 dark:border-white/5">
           <Tabs defaultValue="briefing" className="flex flex-col h-full">
-            <div className="px-4 pt-3 pb-0 shrink-0">
-              <TabsList className="w-full">
-                <TabsTrigger value="briefing" className="flex-1 text-xs">
-                  <Zap size={12} className="mr-1" />
+            <div className="px-3 pt-2 pb-0 shrink-0 border-b border-gray-200 dark:border-white/5">
+              <div className="flex">
+                <TabsTrigger value="briefing" className="flex-1 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent border-0">
                   编辑简报
                 </TabsTrigger>
-                <TabsTrigger value="inspiration" className="flex-1 text-xs">
-                  <Sparkles size={12} className="mr-1" />
+                <TabsTrigger value="inspiration" className="flex-1 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent border-0">
                   灵感整理
                 </TabsTrigger>
-              </TabsList>
+              </div>
             </div>
-            <TabsContent value="briefing" className="flex-1 min-h-0 mt-0">
+            <TabsContent value="briefing" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
               <ScrollArea className="h-full">
                 <div className="p-5">
                   <EditorialBriefing
@@ -801,7 +793,7 @@ export function InspirationClient({
                 </div>
               </ScrollArea>
             </TabsContent>
-            <TabsContent value="inspiration" className="flex-1 min-h-0 mt-0 flex flex-col">
+            <TabsContent value="inspiration" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
               <InspirationInput />
             </TabsContent>
           </Tabs>
@@ -1030,7 +1022,6 @@ function TopicList({
               "py-4 px-3 transition-all duration-150 relative",
               "hover:bg-blue-100/80 dark:hover:bg-blue-900/30",
               isTracked && "bg-blue-50/40 dark:bg-blue-950/20 border-l-4 border-l-blue-500",
-              !isTracked && "border-l-4 border-l-transparent",
               index < topics.length - 1 && "border-b border-gray-200/80 dark:border-white/[0.06]"
             )}
             onMouseEnter={() => onMarkRead(topic.id)}
