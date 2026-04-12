@@ -799,6 +799,65 @@ async function generateInlineAnalysis(orgId: string, platformId: string, platfor
   }
 }
 
+export async function linkMissedTopicToArticle(topicId: string, articleId: string) {
+  await requireAuth();
+  await db.update(missedTopics).set({
+    status: "resolved",
+    matchedArticleId: articleId,
+  }).where(eq(missedTopics.id, topicId));
+  revalidatePath("/benchmarking");
+}
+
+export async function saveMissedTopicAISummary(topicId: string, aiSummary: unknown) {
+  await requireAuth();
+  await db.update(missedTopics).set({ aiSummary }).where(eq(missedTopics.id, topicId));
+  revalidatePath("/benchmarking");
+}
+
+export async function pushMissedTopicToExternal(topicId: string) {
+  await requireAuth();
+
+  const topic = await db.query.missedTopics.findFirst({
+    where: eq(missedTopics.id, topicId),
+  });
+  if (!topic) throw new Error("Topic not found");
+
+  const webhookUrl = process.env.MISSED_TOPIC_WEBHOOK_URL;
+  if (!webhookUrl) throw new Error("推送地址未配置（MISSED_TOPIC_WEBHOOK_URL）");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: topic.title,
+        priority: topic.priority,
+        heatScore: topic.heatScore,
+        sourceUrl: topic.sourceUrl,
+        competitors: topic.competitors,
+        category: topic.category,
+        sourceType: topic.sourceType,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) throw new Error(`推送失败: HTTP ${res.status}`);
+
+    await db.update(missedTopics).set({
+      pushedAt: new Date(),
+      pushedToSystem: webhookUrl,
+    }).where(eq(missedTopics.id, topicId));
+
+    revalidatePath("/benchmarking");
+    return { success: true };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Seed Test Data (uses existing connection pool)
 // ---------------------------------------------------------------------------

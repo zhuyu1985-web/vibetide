@@ -19,6 +19,7 @@ import type {
   BenchmarkAlertUI,
   PlatformComparisonRow,
   CoverageOverview,
+  BenchmarkArticleUI,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -49,7 +50,7 @@ export async function getMissedTopics(
 ): Promise<MissedTopic[]> {
   const rows = await db.query.missedTopics.findMany({
     where: eq(missedTopics.organizationId, orgId),
-    orderBy: [desc(missedTopics.discoveredAt)],
+    orderBy: [desc(missedTopics.heatScore), desc(missedTopics.discoveredAt)],
   });
 
   return rows.map((row) => ({
@@ -65,6 +66,13 @@ export async function getMissedTopics(
     category: row.category || "",
     type: row.type,
     status: row.status,
+    sourceType: row.sourceType ?? undefined,
+    sourceUrl: row.sourceUrl ?? undefined,
+    sourcePlatform: row.sourcePlatform ?? undefined,
+    matchedArticleId: row.matchedArticleId ?? undefined,
+    aiSummary: (row.aiSummary as MissedTopic["aiSummary"]) ?? undefined,
+    pushedAt: row.pushedAt?.toISOString(),
+    pushedToSystem: row.pushedToSystem ?? undefined,
   }));
 }
 
@@ -558,6 +566,75 @@ export async function getMultiPlatformComparison(
       ? Math.round((row.coveredCount / row.totalContent) * 100)
       : 0,
     avgImportance: Math.round(row.avgImportance),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Published Articles for Benchmarking
+// ---------------------------------------------------------------------------
+
+export async function getPublishedArticlesForBenchmark(
+  orgId: string,
+  limit = 30
+): Promise<BenchmarkArticleUI[]> {
+  const rows = await db
+    .select({
+      id: articles.id,
+      title: articles.title,
+      summary: articles.summary,
+      status: articles.status,
+      publishedAt: articles.publishedAt,
+      publishChannels: articles.publishChannels,
+      spreadData: articles.spreadData,
+    })
+    .from(articles)
+    .where(
+      and(
+        eq(articles.organizationId, orgId),
+        inArray(articles.status, ["published", "reviewing"])
+      )
+    )
+    .orderBy(desc(articles.publishedAt))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    summary: row.summary ?? undefined,
+    status: row.status,
+    publishedAt: row.publishedAt?.toISOString(),
+    publishChannels: (row.publishChannels as string[]) ?? [],
+    spreadData: (row.spreadData as BenchmarkArticleUI["spreadData"]) ?? {},
+  }));
+}
+
+export async function searchArticlesForLinking(
+  orgId: string,
+  query: string,
+  limit = 20
+): Promise<{ id: string; title: string; publishedAt?: string; status: string }[]> {
+  const rows = await db
+    .select({
+      id: articles.id,
+      title: articles.title,
+      publishedAt: articles.publishedAt,
+      status: articles.status,
+    })
+    .from(articles)
+    .where(
+      and(
+        eq(articles.organizationId, orgId),
+        sql`${articles.title} ILIKE ${"%" + query + "%"}`
+      )
+    )
+    .orderBy(desc(articles.updatedAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    publishedAt: r.publishedAt?.toISOString(),
+    status: r.status,
   }));
 }
 
