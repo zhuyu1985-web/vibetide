@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -771,20 +772,39 @@ export function InspirationClient({
 
         {/* ======================== Column 3: Right Panel ======================== */}
         <div className="w-[380px] shrink-0 flex flex-col min-h-0 overflow-x-hidden border-l border-gray-200 dark:border-white/5">
-          <ScrollArea className="h-full">
-            <div className="p-5">
-              <EditorialBriefing
-                meeting={meeting}
-                calendarEvents={calendarEvents}
-                p0Count={meeting.p0Count}
-                p1Count={meeting.p1Count}
-                p2Count={meeting.p2Count}
-                onTrackAllP0={handleTrackAllP0}
-                isTrackingAll={isTrackingAll}
-                onAddCalendarEvent={() => setShowCalendarSheet(true)}
-              />
+          <Tabs defaultValue="briefing" className="flex flex-col h-full">
+            <div className="px-4 pt-3 pb-0 shrink-0">
+              <TabsList className="w-full">
+                <TabsTrigger value="briefing" className="flex-1 text-xs">
+                  <Zap size={12} className="mr-1" />
+                  编辑简报
+                </TabsTrigger>
+                <TabsTrigger value="inspiration" className="flex-1 text-xs">
+                  <Sparkles size={12} className="mr-1" />
+                  灵感整理
+                </TabsTrigger>
+              </TabsList>
             </div>
-          </ScrollArea>
+            <TabsContent value="briefing" className="flex-1 min-h-0 mt-0">
+              <ScrollArea className="h-full">
+                <div className="p-5">
+                  <EditorialBriefing
+                    meeting={meeting}
+                    calendarEvents={calendarEvents}
+                    p0Count={meeting.p0Count}
+                    p1Count={meeting.p1Count}
+                    p2Count={meeting.p2Count}
+                    onTrackAllP0={handleTrackAllP0}
+                    isTrackingAll={isTrackingAll}
+                    onAddCalendarEvent={() => setShowCalendarSheet(true)}
+                  />
+                </div>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="inspiration" className="flex-1 min-h-0 mt-0 flex flex-col">
+              <InspirationInput />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 
@@ -1332,8 +1352,6 @@ function EditorialBriefing({
         </Button>
       )}
 
-      {/* Inspiration Input */}
-      <InspirationInput />
     </div>
   );
 }
@@ -1540,18 +1558,22 @@ function InspirationInput() {
   }, []);
 
   return (
-    <div className="mt-5 space-y-0">
-      {/* Section header */}
-      <div className="flex items-center gap-2 mb-3">
-        <Sparkles size={14} className="text-blue-500 dark:text-blue-400" />
-        <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400">灵感整理</h3>
-        <span className="text-[11px] text-gray-400 dark:text-gray-500">小策帮你提炼选题</span>
-      </div>
+    <div className="flex flex-col h-full p-4">
+      {/* Empty state hint */}
+      {messages.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
+          <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center mb-3">
+            <Sparkles size={24} className="text-blue-500 dark:text-blue-400" />
+          </div>
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">灵感整理</h4>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">输入你的灵感或想法</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">小策会帮你整理成结构化选题建议</p>
+        </div>
+      )}
 
-      <GlassCard variant="default" padding="sm">
-        {/* Message history */}
-        {messages.length > 0 && (
-          <div className="mb-3 space-y-3 max-h-72 overflow-y-auto pr-1">
+      {/* Message history */}
+      {messages.length > 0 && (
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3 pr-1">
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -1633,12 +1655,9 @@ function InspirationInput() {
         </div>
 
         {/* Hint */}
-        {messages.length === 0 && (
-          <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 text-center">
-            Enter 发送 · Shift+Enter 换行
-          </p>
-        )}
-      </GlassCard>
+        <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 text-center">
+          Enter 发送 · Shift+Enter 换行
+        </p>
     </div>
   );
 }
