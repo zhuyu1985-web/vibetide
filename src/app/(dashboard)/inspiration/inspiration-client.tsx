@@ -1331,6 +1331,314 @@ function EditorialBriefing({
           {isTrackingAll ? "启动中..." : `一键追踪全部 P0（${p0Count} 条）`}
         </Button>
       )}
+
+      {/* Inspiration Input */}
+      <InspirationInput />
+    </div>
+  );
+}
+
+// ========================
+// Inspiration Input Panel (小策灵感整理)
+// ========================
+
+interface InspirationMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface OrganizeResult {
+  title: string;
+  summary: string;
+  angles: string[];
+  relatedKeywords: string[];
+  confidence: "high" | "medium" | "low";
+}
+
+function InspirationResultCard({ content }: { content: string }) {
+  let result: OrganizeResult | null = null;
+  try {
+    // Strip markdown code fences if present
+    const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    result = JSON.parse(cleaned) as OrganizeResult;
+  } catch {
+    // Fall back to plain text
+  }
+
+  if (!result) {
+    return (
+      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+        {content}
+      </p>
+    );
+  }
+
+  const confidenceLabel: Record<string, { label: string; color: string }> = {
+    high: { label: "高", color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" },
+    medium: { label: "中", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30" },
+    low: { label: "低", color: "text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5" },
+  };
+  const conf = confidenceLabel[result.confidence] ?? confidenceLabel.medium;
+
+  return (
+    <div className="space-y-3">
+      {/* Title + confidence */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug flex-1">
+          {result.title}
+        </p>
+        <span className={cn("shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded-full", conf.color)}>
+          置信度·{conf.label}
+        </span>
+      </div>
+
+      {/* Summary */}
+      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+        {result.summary}
+      </p>
+
+      {/* Angles */}
+      {result.angles.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">建议角度</p>
+          {result.angles.map((angle, i) => (
+            <div key={i} className="flex items-start gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+              <span className="text-blue-500 dark:text-blue-400 font-semibold shrink-0 mt-px">{i + 1}.</span>
+              <span>{angle}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Keywords */}
+      {result.relatedKeywords.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {result.relatedKeywords.map((kw) => (
+            <span
+              key={kw}
+              className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
+            >
+              {kw}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InspirationInput() {
+  const [messages, setMessages] = useState<InspirationMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
+  const handleSend = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
+
+    const userMsg: InspirationMessage = { role: "user", content: trimmed };
+    const history = messages.slice(-10); // send last 10 messages as context
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setIsLoading(true);
+
+    // Resize textarea back to default
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
+    try {
+      const res = await fetch("/api/inspiration/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, history }),
+      });
+
+      if (!res.ok || !res.body) {
+        throw new Error(`请求失败: ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const part of parts) {
+          const lines = part.split("\n");
+          let eventType = "";
+          let dataLine = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+            if (line.startsWith("data: ")) dataLine = line.slice(6);
+          }
+          if (!dataLine) continue;
+
+          try {
+            const parsed = JSON.parse(dataLine) as { content?: string; message?: string };
+            if (eventType === "result" && parsed.content) {
+              assistantContent = parsed.content;
+            } else if (eventType === "error") {
+              assistantContent = parsed.message ?? "AI 处理失败";
+            }
+          } catch {
+            // Malformed JSON — skip
+          }
+        }
+      }
+
+      if (assistantContent) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: assistantContent },
+        ]);
+      }
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: err instanceof Error ? err.message : "请求失败，请稍后重试",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [input, isLoading, messages]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    [handleSend]
+  );
+
+  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    // Auto-resize textarea
+    const el = e.target;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, []);
+
+  return (
+    <div className="mt-5 space-y-0">
+      {/* Section header */}
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles size={14} className="text-blue-500 dark:text-blue-400" />
+        <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400">灵感整理</h3>
+        <span className="text-[11px] text-gray-400 dark:text-gray-500">小策帮你提炼选题</span>
+      </div>
+
+      <GlassCard variant="default" padding="sm">
+        {/* Message history */}
+        {messages.length > 0 && (
+          <div className="mb-3 space-y-3 max-h-72 overflow-y-auto pr-1">
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
+              >
+                {msg.role === "assistant" && (
+                  <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0 mt-0.5 mr-1.5">
+                    <Sparkles size={10} className="text-blue-500 dark:text-blue-400" />
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    "rounded-xl px-3 py-2 max-w-[85%] text-xs",
+                    msg.role === "user"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200"
+                  )}
+                >
+                  {msg.role === "assistant" ? (
+                    <InspirationResultCard content={msg.content} />
+                  ) : (
+                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Loading indicator */}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0 mt-0.5 mr-1.5">
+                  <Sparkles size={10} className="text-blue-500 dark:text-blue-400" />
+                </div>
+                <div className="rounded-xl px-3 py-2 bg-gray-100 dark:bg-white/5 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                  <span className="inline-flex gap-0.5">
+                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:300ms]" />
+                  </span>
+                  小策正在整理...
+                </div>
+              </div>
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+        )}
+
+        {/* Input area */}
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            placeholder="输入你的灵感或想法，小策帮你整理成选题..."
+            rows={2}
+            disabled={isLoading}
+            className={cn(
+              "flex-1 resize-none rounded-xl bg-gray-100 dark:bg-white/5 px-3 py-2 text-xs text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all min-h-[48px]",
+              isLoading && "opacity-60 cursor-not-allowed"
+            )}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            className={cn(
+              "shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-0 transition-all",
+              input.trim() && !isLoading
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "bg-gray-200 dark:bg-white/10 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+            )}
+          >
+            <ArrowUp size={14} />
+          </button>
+        </div>
+
+        {/* Hint */}
+        {messages.length === 0 && (
+          <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 text-center">
+            Enter 发送 · Shift+Enter 换行
+          </p>
+        )}
+      </GlassCard>
     </div>
   );
 }
