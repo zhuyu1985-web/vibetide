@@ -32,24 +32,38 @@ export function EmployeeAgentCard({
   const meta = EMPLOYEE_META[employee.id as EmployeeId] as typeof EMPLOYEE_META[EmployeeId] | undefined;
   const statusCfg = STATUS_CONFIG[employee.status];
   const Icon = meta?.icon ?? UserCog;
+  const isWorking = employee.status === "working";
 
   const iconBg = meta?.bgColor ?? "rgba(107,114,128,0.15)";
   const iconColor = meta?.color ?? "#6b7280";
   const nickname = meta?.nickname ?? employee.nickname;
   const name = meta?.name ?? employee.name;
+  const description = meta?.description ?? employee.title;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-3 shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-200">
+    <div
+      className={`relative bg-card border rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-200 ${
+        isWorking
+          ? "border-emerald-400/50 hover:border-emerald-400/70 shadow-emerald-400/10 employee-card-working"
+          : "border-border hover:border-border/80"
+      }`}
+    >
       {/* Header: icon + name + status — clickable to detail */}
       <div
         className="flex items-center gap-2.5 cursor-pointer"
         onClick={() => router.push(`/employee/${employee.id}`)}
       >
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          className="relative w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
           style={{ backgroundColor: iconBg }}
         >
-          <Icon className="w-4.5 h-4.5" style={{ color: iconColor }} />
+          {isWorking && (
+            <span
+              className="absolute inset-0 rounded-lg animate-ping opacity-60"
+              style={{ backgroundColor: iconBg }}
+            />
+          )}
+          <Icon className="relative w-4.5 h-4.5" style={{ color: iconColor }} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -57,14 +71,29 @@ export function EmployeeAgentCard({
             <span className="text-[11px] text-muted-foreground truncate">{name}</span>
           </div>
           <div className="flex items-center gap-1 mt-0.5">
-            <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dotColor}`} />
-            <span className={`text-[10px] ${statusCfg.textColor}`}>{statusCfg.label}</span>
+            <span className="relative flex w-1.5 h-1.5">
+              {isWorking && (
+                <span className={`absolute inline-flex h-full w-full rounded-full ${statusCfg.dotColor} opacity-75 animate-ping`} />
+              )}
+              <span className={`relative inline-flex w-1.5 h-1.5 rounded-full ${statusCfg.dotColor} ${isWorking ? "animate-pulse" : ""}`} />
+            </span>
+            <span className={`text-[10px] ${statusCfg.textColor}`}>
+              {statusCfg.label}
+              {isWorking && employee.currentTask && (
+                <span className="ml-1 text-emerald-400/60">· 执行中</span>
+              )}
+            </span>
             {employee.skills.length > 0 && (
               <span className="text-[10px] text-muted-foreground/50 ml-1">{employee.skills.length} 项技能</span>
             )}
           </div>
         </div>
       </div>
+
+      {/* Description: one-line core capability */}
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2">
+        {description}
+      </p>
 
       {/* Hot Tasks — compact, inline */}
       {hotTasks.length > 0 && (

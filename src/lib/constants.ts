@@ -39,6 +39,7 @@ export interface EmployeeMeta {
   name: string;
   nickname: string;
   title: string;
+  description: string;
   icon: LucideIcon;
   color: string;
   bgColor: string;
@@ -50,6 +51,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "热点猎手",
     nickname: "小雷",
     title: "热点猎手",
+    description: "实时捕捉全网热点，第一时间发现新闻线索",
     icon: Telescope,
     color: "#f59e0b",
     bgColor: "rgba(245,158,11,0.12)",
@@ -59,6 +61,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "选题策划师",
     nickname: "小策",
     title: "选题策划师",
+    description: "挖掘独特选题角度，策划高价值内容主题",
     icon: Lightbulb,
     color: "#8b5cf6",
     bgColor: "rgba(139,92,246,0.12)",
@@ -68,6 +71,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "素材管家",
     nickname: "小资",
     title: "素材管家",
+    description: "整合多源素材资源，构建可检索媒资知识库",
     icon: Package,
     color: "#10b981",
     bgColor: "rgba(16,185,129,0.12)",
@@ -77,6 +81,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "内容创作师",
     nickname: "小文",
     title: "内容创作师",
+    description: "多风格内容生成，标题摘要脚本一键产出",
     icon: PenTool,
     color: "#3b82f6",
     bgColor: "rgba(59,130,246,0.12)",
@@ -86,6 +91,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "视频制片人",
     nickname: "小剪",
     title: "视频制片人",
+    description: "视频剪辑方案设计，封面排版音频一体化",
     icon: Film,
     color: "#ef4444",
     bgColor: "rgba(239,68,68,0.12)",
@@ -95,6 +101,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "质量审核官",
     nickname: "小审",
     title: "质量审核官",
+    description: "多维内容审核，把关事实、质量与合规",
     icon: Search,
     color: "#6366f1",
     bgColor: "rgba(99,102,241,0.12)",
@@ -104,6 +111,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "渠道运营师",
     nickname: "小发",
     title: "渠道运营师",
+    description: "渠道策略制定，多平台精准适配分发",
     icon: Radio,
     color: "#14b8a6",
     bgColor: "rgba(20,184,166,0.12)",
@@ -113,6 +121,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "数据分析师",
     nickname: "小数",
     title: "数据分析师",
+    description: "数据洞察分析，效果追踪与内容复盘",
     icon: BarChart3,
     color: "#f97316",
     bgColor: "rgba(249,115,22,0.12)",
@@ -122,6 +131,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "频道顾问",
     nickname: "顾问",
     title: "频道顾问",
+    description: "频道运营策略咨询，内容方向智能建议",
     icon: Brain,
     color: "#ec4899",
     bgColor: "rgba(236,72,153,0.12)",
@@ -131,6 +141,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     name: "任务总监",
     nickname: "小领",
     title: "智能项目管理与任务调度",
+    description: "智能项目管理，多员工协同任务调度",
     icon: Crown,
     color: "#e11d48",
     bgColor: "rgba(225,29,72,0.12)",
