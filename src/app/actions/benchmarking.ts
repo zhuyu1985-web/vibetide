@@ -300,6 +300,21 @@ export async function initializeDefaultPlatforms(organizationId: string) {
   }));
 
   await db.insert(monitoredPlatforms).values(values);
+
+  // Auto-crawl all newly created platforms to populate initial data
+  const newPlatforms = await db
+    .select({ id: monitoredPlatforms.id })
+    .from(monitoredPlatforms)
+    .where(eq(monitoredPlatforms.organizationId, organizationId));
+
+  for (const p of newPlatforms) {
+    try {
+      await crawlPlatformInternal(organizationId, p.id);
+    } catch {
+      // Best-effort: continue with other platforms if one fails
+    }
+  }
+
   revalidatePath("/benchmarking");
   return { created: values.length };
 }
@@ -491,24 +506,19 @@ export async function regenerateAnalysisFromContent() {
  * Directly crawl a platform using Tavily, or generate realistic demo data
  * if Tavily isn't configured. Bypasses Inngest for immediate results.
  */
-export async function crawlPlatformDirect(platformId: string) {
-  const user = await requireAuth();
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-  });
-  if (!profile?.organizationId) throw new Error("No organization found");
-  const orgId = profile.organizationId;
-
-  // Load platform
+/**
+ * Internal crawl function — no auth required.
+ * Used by both the public crawlPlatformDirect (with auth) and initializeDefaultPlatforms (server-side).
+ */
+async function crawlPlatformInternal(orgId: string, platformId: string) {
   const [platform] = await db
     .select()
     .from(monitoredPlatforms)
     .where(eq(monitoredPlatforms.id, platformId))
     .limit(1);
 
-  if (!platform) throw new Error("平台不存在");
+  if (!platform) return { status: "error" as const, message: "平台不存在", count: 0 };
 
-  // Try Tavily first
   const tavilyKey = process.env.TAVILY_API_KEY;
   let insertedCount = 0;
 
@@ -525,17 +535,8 @@ export async function crawlPlatformDirect(platformId: string) {
 
       const crypto = await import("crypto");
       for (const item of items) {
-        const contentHash = crypto
-          .createHash("md5")
-          .update(`${item.title}::${item.url}`)
-          .digest("hex");
-
-        const [existing] = await db
-          .select({ id: platformContent.id })
-          .from(platformContent)
-          .where(eq(platformContent.contentHash, contentHash))
-          .limit(1);
-
+        const contentHash = crypto.createHash("md5").update(`${item.title}::${item.url}`).digest("hex");
+        const [existing] = await db.select({ id: platformContent.id }).from(platformContent).where(eq(platformContent.contentHash, contentHash)).limit(1);
         if (existing) continue;
 
         await db.insert(platformContent).values({
@@ -555,7 +556,6 @@ export async function crawlPlatformDirect(platformId: string) {
     }
   }
 
-  // Fallback: generate demo content if Tavily didn't produce results
   if (insertedCount === 0) {
     const demoContent = getDemoCrawlContent(platform.name);
     const now = Date.now();
@@ -583,28 +583,31 @@ export async function crawlPlatformDirect(platformId: string) {
     }
   }
 
-  // Update platform stats
-  await db
-    .update(monitoredPlatforms)
-    .set({
-      lastCrawledAt: new Date(),
-      lastErrorMessage: null,
-      totalContentCount: sql`${monitoredPlatforms.totalContentCount} + ${insertedCount}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(monitoredPlatforms.id, platform.id));
+  await db.update(monitoredPlatforms).set({
+    lastCrawledAt: new Date(),
+    lastErrorMessage: null,
+    totalContentCount: sql`${monitoredPlatforms.totalContentCount} + ${insertedCount}`,
+    updatedAt: new Date(),
+  }).where(eq(monitoredPlatforms.id, platform.id));
 
-  // Auto-generate analysis: benchmarkAnalyses + missedTopics + alerts
   if (insertedCount > 0) {
     await generateInlineAnalysis(orgId, platform.id, platform.name);
   }
 
+  return { status: "success" as const, message: `已收录 ${insertedCount} 条内容`, count: insertedCount };
+}
+
+export async function crawlPlatformDirect(platformId: string) {
+  const user = await requireAuth();
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+  if (!profile?.organizationId) throw new Error("No organization found");
+  const orgId = profile.organizationId;
+
+  const result = await crawlPlatformInternal(orgId, platformId);
   revalidatePath("/benchmarking");
-  return {
-    status: "success" as const,
-    message: `已收录 ${insertedCount} 条内容`,
-    count: insertedCount,
-  };
+  return result;
 }
 
 const DEMO_CONTENT_POOL: Array<{
