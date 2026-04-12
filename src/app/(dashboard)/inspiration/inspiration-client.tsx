@@ -81,6 +81,7 @@ import {
   rejectCalendarEventAction,
 } from "@/app/actions/calendar-events";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/shared/page-header";
 import type {
   InspirationTopic,
   PlatformMonitor,
@@ -504,6 +505,21 @@ export function InspirationClient({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      <PageHeader
+        title="灵感池"
+        description="全网热点聚合 · AI 选题建议"
+        actions={
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="text-xs border-0"
+            variant="ghost"
+          >
+            <RefreshCw size={14} className={cn(isRefreshing && "animate-spin", "mr-1")} />
+            {isRefreshing ? "抓取中..." : "刷新数据"}
+          </Button>
+        }
+      />
       {/* Three-column layout */}
       <div className="flex flex-1 min-h-0">
         {/* ======================== Column 1: Platform Sidebar ======================== */}
@@ -568,16 +584,6 @@ export function InspirationClient({
               >
                 <CalendarPlus size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
                 <span className="text-xs text-gray-500 dark:text-gray-400">日历事件</span>
-              </button>
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
-              >
-                <RefreshCw size={14} className={cn("text-gray-400 dark:text-gray-500 shrink-0", isRefreshing && "animate-spin")} />
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {isRefreshing ? "抓取中..." : "刷新数据"}
-                </span>
               </button>
             </div>
           </ScrollArea>
@@ -942,8 +948,10 @@ function TopicList({
           <div
             key={topic.id}
             className={cn(
-              "py-4 px-3 transition-all duration-150",
+              "py-4 px-3 transition-all duration-150 relative",
               "hover:bg-blue-100/80 dark:hover:bg-blue-900/30",
+              isTracked && "bg-blue-50/40 dark:bg-blue-950/20 border-l-4 border-l-blue-500",
+              !isTracked && "border-l-4 border-l-transparent",
               index < topics.length - 1 && "border-b border-gray-200/80 dark:border-white/[0.06]"
             )}
             onMouseEnter={() => onMarkRead(topic.id)}
@@ -1050,9 +1058,9 @@ function TopicList({
                   </span>
                   <div className="ml-auto flex items-center gap-1">
                     {isTracked ? (
-                      <span className="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-0.5">
-                        <Eye size={10} />
-                        已追踪
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+                        <Radar size={10} className="animate-pulse" />
+                        追踪中
                       </span>
                     ) : (
                       <button
