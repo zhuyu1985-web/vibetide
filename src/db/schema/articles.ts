@@ -52,6 +52,15 @@ export const articles = pgTable("articles", {
 
   taskId: uuid("task_id").references(() => tasks.id),
   missionId: uuid("mission_id").references(() => missions.id),
+  publishChannels: jsonb("publish_channels").$type<string[]>().default([]),
+  spreadData: jsonb("spread_data").$type<{
+    views?: number;
+    likes?: number;
+    shares?: number;
+    comments?: number;
+    lastSyncedAt?: string;
+    source?: "manual" | "api_sync";
+  }>().default({}),
 
   // News reader / detail page fields
   webArchiveHtml: text("web_archive_html"),
