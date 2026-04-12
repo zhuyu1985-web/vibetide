@@ -548,6 +548,13 @@ export function InspirationClient({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {/* Title bar */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-white/5 shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">灵感池</h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400">全网热点聚合 · AI 选题建议</p>
+        </div>
+      </div>
       {/* Three-column layout */}
       <div className="flex flex-1 min-h-0">
         {/* ======================== Column 1: Platform Sidebar ======================== */}
