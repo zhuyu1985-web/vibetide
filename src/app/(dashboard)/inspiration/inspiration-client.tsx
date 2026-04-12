@@ -1627,10 +1627,10 @@ function InspirationInput() {
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             placeholder="输入你的灵感或想法，小策帮你整理成选题..."
-            rows={2}
+            rows={4}
             disabled={isLoading}
             className={cn(
-              "flex-1 resize-none rounded-xl bg-gray-100 dark:bg-white/5 px-3 py-2 text-xs text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all min-h-[48px]",
+              "flex-1 resize-none rounded-xl bg-gray-100 dark:bg-white/5 px-4 py-3 text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all min-h-[96px]",
               isLoading && "opacity-60 cursor-not-allowed"
             )}
           />
@@ -1638,13 +1638,13 @@ function InspirationInput() {
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
             className={cn(
-              "shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-0 transition-all",
+              "shrink-0 w-9 h-9 rounded-full flex items-center justify-center border-0 transition-all",
               input.trim() && !isLoading
                 ? "bg-blue-600 text-white hover:bg-blue-700"
                 : "bg-gray-200 dark:bg-white/10 text-gray-400 dark:text-gray-500 cursor-not-allowed"
             )}
           >
-            <ArrowUp size={14} />
+            <ArrowUp size={16} />
           </button>
         </div>
 
