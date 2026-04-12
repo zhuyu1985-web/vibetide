@@ -13,6 +13,7 @@ import {
   missedTopicPriorityEnum,
   missedTopicTypeEnum,
   missedTopicStatusEnum,
+  missedTopicSourceTypeEnum,
   platformCategoryEnum,
   crawlStatusEnum,
   benchmarkAlertPriorityEnum,
@@ -20,6 +21,7 @@ import {
   benchmarkAlertStatusEnum,
 } from "./enums";
 import { aiEmployees } from "./ai-employees";
+import { articles } from "./articles";
 
 export const competitors = pgTable("competitors", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -59,6 +61,8 @@ export const benchmarkAnalyses = pgTable("benchmark_analyses", {
     .$type<{ dimension: string; us: number; best: number }[]>()
     .default([]),
   improvements: jsonb("improvements").$type<string[]>().default([]),
+  aiSummary: jsonb("ai_summary"),
+  sourceArticleId: uuid("source_article_id").references(() => articles.id),
 
   analyzedAt: timestamp("analyzed_at", { withTimezone: true })
     .defaultNow()
@@ -79,6 +83,13 @@ export const missedTopics = pgTable("missed_topics", {
   category: text("category"),
   type: missedTopicTypeEnum("type").notNull().default("trending"),
   status: missedTopicStatusEnum("status").notNull().default("missed"),
+  sourceType: missedTopicSourceTypeEnum("source_type").default("social_hot"),
+  sourceUrl: text("source_url"),
+  sourcePlatform: text("source_platform"),
+  matchedArticleId: uuid("matched_article_id").references(() => articles.id),
+  aiSummary: jsonb("ai_summary"),
+  pushedAt: timestamp("pushed_at", { withTimezone: true }),
+  pushedToSystem: text("pushed_to_system"),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -192,6 +203,7 @@ export const platformContent = pgTable("platform_content", {
   contentHash: text("content_hash"),
   coverageStatus: text("coverage_status"),
   gapAnalysis: text("gap_analysis"),
+  aiInterpretation: text("ai_interpretation"),
 
   crawledAt: timestamp("crawled_at", { withTimezone: true })
     .defaultNow()

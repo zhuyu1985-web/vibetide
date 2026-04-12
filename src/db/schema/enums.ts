@@ -246,6 +246,12 @@ export const missedTopicStatusEnum = pgEnum("missed_topic_status", [
   "resolved",
 ]);
 
+export const missedTopicSourceTypeEnum = pgEnum("missed_topic_source_type", [
+  "social_hot",
+  "sentiment_event",
+  "benchmark_media",
+]);
+
 // Batch Production (2.4)
 export const batchJobStatusEnum = pgEnum("batch_job_status", [
   "pending",
