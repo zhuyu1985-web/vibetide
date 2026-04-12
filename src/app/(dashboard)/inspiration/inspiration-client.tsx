@@ -1045,7 +1045,7 @@ function TopicList({
               <div className="flex-1 min-w-0">
                 {/* Title row */}
                 <div className="flex items-start gap-2 mb-1">
-                  {topic.sourceUrl ? (
+                  {topic.sourceUrl && topic.sourceUrl.startsWith("http") ? (
                     <a
                       href={topic.sourceUrl}
                       target="_blank"
