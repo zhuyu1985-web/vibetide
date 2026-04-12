@@ -1224,6 +1224,38 @@ export interface ActivityLog {
   action: string;
 }
 
+export interface BenchmarkAISummary {
+  centralMediaReport: string;
+  otherMediaReport: string;
+  highlights: string;
+  overallSummary: string;
+  sourceArticles: {
+    title: string;
+    url: string;
+    platform: string;
+    mediaLevel: "central" | "provincial" | "municipal" | "industry" | "unknown";
+    publishedAt?: string;
+    excerpt?: string;
+  }[];
+  generatedAt: string;
+}
+
+export interface BenchmarkArticleUI {
+  id: string;
+  title: string;
+  summary?: string;
+  status: string;
+  publishedAt?: string;
+  publishChannels: string[];
+  spreadData: {
+    views?: number;
+    likes?: number;
+    shares?: number;
+    comments?: number;
+  };
+  categoryName?: string;
+}
+
 // 2.2 - Benchmarking
 export interface BenchmarkTopic {
   id: string;
@@ -1238,6 +1270,8 @@ export interface BenchmarkTopic {
   }[];
   radarData: { dimension: string; us: number; best: number }[];
   improvements: string[];
+  aiSummary?: BenchmarkAISummary;
+  sourceArticleId?: string;
 }
 
 export interface MissedTopic {
@@ -1250,6 +1284,14 @@ export interface MissedTopic {
   category: string;
   type: "breaking" | "trending" | "analysis";
   status: "missed" | "tracking" | "resolved";
+  sourceType?: "social_hot" | "sentiment_event" | "benchmark_media";
+  sourceUrl?: string;
+  sourcePlatform?: string;
+  matchedArticleId?: string;
+  matchedArticleTitle?: string;
+  aiSummary?: BenchmarkAISummary;
+  pushedAt?: string;
+  pushedToSystem?: string;
 }
 
 export interface WeeklyReport {
@@ -1425,6 +1467,7 @@ export interface PlatformContentUI {
   gapAnalysis?: string;
   crawledAt: string;
   analyzedAt?: string;
+  aiInterpretation?: string;
 }
 
 export interface BenchmarkAlertUI {
