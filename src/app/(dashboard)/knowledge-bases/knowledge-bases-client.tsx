@@ -3,6 +3,7 @@
 import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,8 +36,21 @@ import {
   Clock,
   Sparkles,
   AlertTriangle,
+  Tv,
 } from "lucide-react";
-import type { KBSummary, KBVectorizationStatus } from "@/lib/types";
+import type {
+  KBSummary,
+  KBVectorizationStatus,
+  KnowledgeSource,
+  KnowledgeItem,
+  ChannelDNA,
+  KnowledgeSyncLog,
+} from "@/lib/types";
+
+const ChannelKnowledgeClient = dynamic(
+  () => import("@/app/(dashboard)/channel-knowledge/channel-knowledge-client"),
+  { ssr: false }
+);
 
 const KB_TYPE_LABELS: Record<string, string> = {
   general: "通用",
@@ -85,12 +100,26 @@ const STATUS_TABS = [
   { value: "failed", label: "失败" },
 ] as const;
 
-interface Props {
-  initialSummaries: KBSummary[];
+interface ChannelData {
+  sources: {
+    upload: KnowledgeSource[];
+    cms: KnowledgeSource[];
+    subscription: KnowledgeSource[];
+    stats: { totalDocuments: number; totalChunks: number; lastSync: string };
+  };
+  items: KnowledgeItem[];
+  dna: { dimensions: ChannelDNA[]; report: string };
+  syncLogs: KnowledgeSyncLog[];
 }
 
-export function KnowledgeBasesClient({ initialSummaries }: Props) {
+interface Props {
+  initialSummaries: KBSummary[];
+  channelData?: ChannelData;
+}
+
+export function KnowledgeBasesClient({ initialSummaries, channelData }: Props) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState("general");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -114,23 +143,40 @@ export function KnowledgeBasesClient({ initialSummaries }: Props) {
   return (
     <div className="max-w-[1400px] mx-auto px-1">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90 mb-1">
-            知识库管理
+            知识库
           </h1>
           <p className="text-sm text-gray-400 dark:text-white/40">
-            集中管理 AI 员工可消费的知识库与文档资料。
+            管理 AI 员工的通用知识库与频道专属知识沉淀。
           </p>
         </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="rounded-xl border-0"
-        >
-          <Plus className="w-4 h-4 mr-1.5" />
-          新建知识库
-        </Button>
+        {activeTab === "general" && (
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="rounded-xl border-0"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            新建知识库
+          </Button>
+        )}
       </div>
+
+      {/* ── Top-level Tab: 通用知识库 / 频道知识沉淀 ── */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="bg-transparent border-0 p-0 h-auto gap-1">
+          <TabsTrigger value="general" className="border-0 data-[state=active]:bg-accent rounded-lg px-4 py-2">
+            <Database className="w-4 h-4 mr-1.5" />
+            通用知识库
+          </TabsTrigger>
+          <TabsTrigger value="channel" className="border-0 data-[state=active]:bg-accent rounded-lg px-4 py-2">
+            <Tv className="w-4 h-4 mr-1.5" />
+            频道知识沉淀
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="mt-4">
 
       {/* ── Search + Filter ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
@@ -194,6 +240,27 @@ export function KnowledgeBasesClient({ initialSummaries }: Props) {
         onOpenChange={setCreateOpen}
         onCreated={() => router.refresh()}
       />
+        </TabsContent>
+
+        <TabsContent value="channel" className="mt-4">
+          {channelData ? (
+            <ChannelKnowledgeClient
+              sources={channelData.sources}
+              items={channelData.items}
+              dna={channelData.dna}
+              syncLogs={channelData.syncLogs}
+              embedded
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Tv className="w-10 h-10 text-gray-200 dark:text-white/20 mb-3" />
+              <p className="text-sm text-gray-400 dark:text-white/40">
+                频道知识数据加载中...
+              </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

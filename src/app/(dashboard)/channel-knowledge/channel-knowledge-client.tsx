@@ -54,6 +54,7 @@ interface Props {
   items: KnowledgeItem[];
   dna: { dimensions: ChannelDNA[]; report: string };
   syncLogs: KnowledgeSyncLog[];
+  embedded?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ const recentSyncTimeline = [
 // Page Component
 // ---------------------------------------------------------------------------
 
-export default function ChannelKnowledgeClient({ sources, items, dna, syncLogs }: Props) {
+export default function ChannelKnowledgeClient({ sources, items, dna, syncLogs, embedded }: Props) {
   const [knowledgeSearchQuery, setKnowledgeSearchQuery] = useState("");
   const [sourceTypeFilter, setSourceTypeFilter] = useState<string | null>(null);
 
@@ -142,7 +143,7 @@ export default function ChannelKnowledgeClient({ sources, items, dna, syncLogs }
   });
 
   return (
-    <div className="max-w-[1400px] mx-auto">
+    <div className={embedded ? "" : "max-w-[1400px] mx-auto"}>
       {/* Page Header */}
       <PageHeader
         title="频道知识库"
