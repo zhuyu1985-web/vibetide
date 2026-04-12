@@ -217,61 +217,48 @@ export async function updateCommentInsight(data: {
 }
 
 /**
- * Direct crawl: fetches all 10 platforms via TopHub API,
- * deduplicates, and persists to hotTopics table.
- * Called directly from the UI "刷新热点" button (no Inngest dependency).
+ * Crawl a single platform via the TopHub API.
+ * Returns the platform name + items (or error message).
+ * Not a server action per se, but exported for use by API routes.
  */
-export async function triggerHotTopicCrawl() {
-  const user = await requireAuth();
-
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-  });
-
-  if (!profile?.organizationId) {
-    throw new Error("No organization found");
+export async function crawlSinglePlatform(
+  platformName: string
+): Promise<{ name: string; items: TrendingItem[]; error?: string }> {
+  try {
+    const items = await fetchTrendingFromApi("platforms", {
+      platforms: [platformName],
+      limit: 30,
+    });
+    return { name: platformName, items };
+  } catch (err) {
+    return {
+      name: platformName,
+      items: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
+}
 
-  const organizationId = profile.organizationId;
-
-  // Step 1: Crawl all platforms
-  const platformEntries = Object.entries(TOPHUB_DEFAULT_NODES);
-  const allItems: TrendingItem[] = [];
-
-  const results = await Promise.allSettled(
-    platformEntries.map(async ([name]) => {
-      const items = await fetchTrendingFromApi("platforms", {
-        platforms: [name],
-        limit: 30,
-      });
-      return { name, items };
-    })
-  );
-
-  const crawlLogValues: (typeof hotTopicCrawlLogs.$inferInsert)[] = [];
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    const [name, nodeId] = platformEntries[i];
-
-    if (result.status === "fulfilled") {
-      allItems.push(...result.value.items);
-      crawlLogValues.push({ organizationId, platformName: name, platformNodeId: nodeId, status: "success", topicsFound: result.value.items.length });
-    } else {
-      const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      crawlLogValues.push({ organizationId, platformName: name, platformNodeId: nodeId, status: "error", topicsFound: 0, errorMessage: errMsg });
-    }
-  }
+/**
+ * Shared dedup + persist helper used by both triggerHotTopicCrawl
+ * and the SSE crawl route. Accepts all collected items across platforms
+ * and upserts into the hotTopics table.
+ */
+export async function persistCrawledTopics(
+  organizationId: string,
+  allItems: TrendingItem[],
+  crawlLogValues: (typeof hotTopicCrawlLogs.$inferInsert)[]
+): Promise<{ newTopics: number; updatedTopics: number }> {
   // Write all crawl logs in one batch
   if (crawlLogValues.length > 0) {
     await db.insert(hotTopicCrawlLogs).values(crawlLogValues);
   }
 
   if (allItems.length === 0) {
-    revalidatePath("/inspiration");
-    return { success: true, newTopics: 0, updatedTopics: 0 };
+    return { newTopics: 0, updatedTopics: 0 };
   }
 
-  // Step 2: Dedup and persist (batch approach to avoid N+1 queries)
+  // Dedup and persist (batch approach to avoid N+1 queries)
   const crossPlatform = buildCrossPlatformTopics(allItems);
 
   const topicAgg = new Map<string, {
@@ -320,9 +307,6 @@ export async function triggerHotTopicCrawl() {
   const now = new Date();
   const timeLabel = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 
-  // Upsert: INSERT ... ON CONFLICT (organization_id, title_hash) DO UPDATE
-  // This relies on the unique index `hot_topics_org_title_hash_uniq`.
-  // No separate SELECT needed — the DB handles dedup atomically.
   let newCount = 0;
   let updatedCount = 0;
 
@@ -364,7 +348,6 @@ export async function triggerHotTopicCrawl() {
       })
       .returning({ id: hotTopics.id, updatedAt: hotTopics.updatedAt });
 
-    // If updatedAt was just set, it's an update; otherwise it's a new insert
     if (result[0]?.updatedAt) {
       updatedCount++;
     } else {
@@ -372,8 +355,60 @@ export async function triggerHotTopicCrawl() {
     }
   }
 
+  return { newTopics: newCount, updatedTopics: updatedCount };
+}
+
+/**
+ * Direct crawl: fetches all 10 platforms via TopHub API,
+ * deduplicates, and persists to hotTopics table.
+ * Called directly from the UI "刷新热点" button (no Inngest dependency).
+ */
+export async function triggerHotTopicCrawl() {
+  const user = await requireAuth();
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+
+  if (!profile?.organizationId) {
+    throw new Error("No organization found");
+  }
+
+  const organizationId = profile.organizationId;
+
+  // Step 1: Crawl all platforms
+  const platformEntries = Object.entries(TOPHUB_DEFAULT_NODES);
+  const allItems: TrendingItem[] = [];
+
+  const results = await Promise.allSettled(
+    platformEntries.map(async ([name]) => {
+      const items = await fetchTrendingFromApi("platforms", {
+        platforms: [name],
+        limit: 30,
+      });
+      return { name, items };
+    })
+  );
+
+  const crawlLogValues: (typeof hotTopicCrawlLogs.$inferInsert)[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const [name, nodeId] = platformEntries[i];
+
+    if (result.status === "fulfilled") {
+      allItems.push(...result.value.items);
+      crawlLogValues.push({ organizationId, platformName: name, platformNodeId: nodeId, status: "success", topicsFound: result.value.items.length });
+    } else {
+      const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      crawlLogValues.push({ organizationId, platformName: name, platformNodeId: nodeId, status: "error", topicsFound: 0, errorMessage: errMsg });
+    }
+  }
+
+  // Step 2: Dedup and persist using shared helper
+  const { newTopics, updatedTopics } = await persistCrawledTopics(organizationId, allItems, crawlLogValues);
+
   revalidatePath("/inspiration");
-  return { success: true, newTopics: newCount, updatedTopics: updatedCount };
+  return { success: true, newTopics, updatedTopics };
 }
 
 export async function refreshInspirationData() {

@@ -72,7 +72,7 @@ import {
   Radio,
   ExternalLink,
 } from "lucide-react";
-import { triggerHotTopicCrawl, startTopicMission, refreshInspirationData } from "@/app/actions/hot-topics";
+import { startTopicMission, refreshInspirationData } from "@/app/actions/hot-topics";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
 import { updateSubscriptionsAction } from "@/app/actions/topic-subscriptions";
 import {
@@ -270,8 +270,12 @@ export function InspirationClient({
     new Set(subscriptions?.subscribedEventTypes ?? [])
   );
 
-  // Refresh state
-  const [isRefreshing, startRefreshTransition] = useTransition();
+  // Crawl progress state (null = idle)
+  const [crawlProgress, setCrawlProgress] = useState<{
+    current: number;
+    total: number;
+    platform: string;
+  } | null>(null);
   const pageLoadTimeRef = useRef(new Date().toISOString());
 
   // Sync topics from props
@@ -442,17 +446,56 @@ export function InspirationClient({
     });
   }, [localTopics, router, startTrackingAllTransition]);
 
-  const handleRefresh = useCallback(() => {
-    startRefreshTransition(async () => {
-      try {
-        const result = await triggerHotTopicCrawl();
-        console.log("[refresh]", result);
-        router.refresh();
-      } catch (err) {
-        console.error("[refresh] 抓取失败:", err);
+  const handleRefresh = useCallback(async () => {
+    if (crawlProgress !== null) return;
+    try {
+      const res = await fetch("/api/inspiration/crawl", { method: "POST" });
+      if (!res.ok || !res.body) {
+        console.error("[refresh] 请求失败:", res.status);
+        return;
       }
-    });
-  }, [router, startRefreshTransition]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const dataLine = line.startsWith("data: ") ? line.slice(6) : null;
+          if (!dataLine) continue;
+          try {
+            const event = JSON.parse(dataLine) as {
+              type: string;
+              current?: number;
+              total?: number;
+              platform?: string;
+              newTopics?: number;
+              updatedTopics?: number;
+              message?: string;
+            };
+            if (event.type === "progress" && typeof event.current === "number" && typeof event.total === "number") {
+              setCrawlProgress({
+                current: event.current,
+                total: event.total,
+                platform: event.platform ?? "",
+              });
+            } else if (event.type === "complete" || event.type === "error") {
+              setCrawlProgress(null);
+              router.refresh();
+            }
+          } catch {
+            // Malformed JSON — skip
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[refresh] 抓取失败:", err);
+      setCrawlProgress(null);
+    }
+  }, [crawlProgress, router]);
 
   const handleNewTopicClick = useCallback(async () => {
     setNewTopicCount(0);
@@ -492,11 +535,11 @@ export function InspirationClient({
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">点击下方按钮从全网平台获取最新热点</p>
           <Button
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={crawlProgress !== null}
             className="bg-blue-600 hover:bg-blue-700 text-white border-0"
           >
-            <RefreshCw size={14} className={isRefreshing ? "animate-spin mr-2" : "mr-2"} />
-            {isRefreshing ? "正在抓取..." : "刷新热点"}
+            <RefreshCw size={14} className={crawlProgress !== null ? "animate-spin mr-2" : "mr-2"} />
+            {crawlProgress !== null ? "正在抓取..." : "刷新热点"}
           </Button>
         </div>
       </div>
@@ -511,12 +554,12 @@ export function InspirationClient({
         actions={
           <Button
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={crawlProgress !== null}
             className="text-xs border-0"
             variant="ghost"
           >
-            <RefreshCw size={14} className={cn(isRefreshing && "animate-spin", "mr-1")} />
-            {isRefreshing ? "抓取中..." : "刷新数据"}
+            <RefreshCw size={14} className={cn(crawlProgress !== null && "animate-spin", "mr-1")} />
+            {crawlProgress !== null ? "抓取中..." : "刷新数据"}
           </Button>
         }
       />
@@ -591,6 +634,22 @@ export function InspirationClient({
 
         {/* ======================== Column 2: Main Content ======================== */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-x-hidden">
+          {/* Crawl Progress Bar */}
+          {crawlProgress && (
+            <div className="border-b border-gray-200 dark:border-white/5">
+              <div className="px-4 py-2 flex items-center gap-3">
+                <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${(crawlProgress.current / crawlProgress.total) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                  {crawlProgress.current}/{crawlProgress.total} 平台已完成
+                </span>
+              </div>
+            </div>
+          )}
           {/* AI Summary Bar (thin, collapsible) */}
           <AISummaryBar
             delta={meeting.delta}
