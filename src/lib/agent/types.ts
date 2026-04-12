@@ -68,6 +68,11 @@ export interface AssembledAgent {
     responseMapping?: Record<string, string>;
     timeoutMs?: number;
   } }>;
+  /**
+   * IDs of knowledge bases bound to this employee.
+   * When non-empty, the kb_search tool is auto-injected at execution time.
+   */
+  knowledgeBaseIds?: string[];
 }
 
 // ---------------------------------------------------------------------------

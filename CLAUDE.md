@@ -57,11 +57,12 @@ npm run db:seed      # Seed database (npx tsx src/db/seed.ts)
 
 ### Route Structure
 
-Two route groups under `src/app/`:
-- `(auth)/` — Login, register, OAuth callback. No layout protection.
-- `(dashboard)/` — All 20+ dashboard pages. Protected by auth check in layout.tsx which redirects to `/login` if unauthenticated.
+Three route areas under `src/app/`:
+- `landing/` — Public landing page (shown at `/` for unauthenticated visitors).
+- `(auth)/` — `login/`, `register/`, `auth/` (OAuth callback). No layout protection.
+- `(dashboard)/` — 34 dashboard route groups. Layout fetches user profile with graceful fallback.
 
-Root page (`/`) redirects authenticated users to `/team-hub`, unauthenticated to `/login`.
+Root page (`/`) shows the landing page for unauthenticated users, redirects authenticated users to `/home`.
 
 ### Server/Client Component Pattern
 
@@ -87,9 +88,9 @@ Mutations  → Server Actions (src/app/actions/) ─────────┘
 
 ### Database
 
-- **60 tables** defined across 27 schema files in `src/db/schema/`
-- **37 enums** in `src/db/schema/enums.ts`
-- **Key tables:** `organizations`, `user_profiles`, `ai_employees`, `skills`, `employee_skills`, `employee_memories`, `teams`, `team_members`, `workflow_templates`, `workflow_instances`, `workflow_steps`, `workflow_artifacts`, `team_messages`, `tasks`, `knowledge_bases`, `employee_knowledge_bases`
+- **~145 tables** defined across 54 schema files in `src/db/schema/`
+- **72 enums** in `src/db/schema/enums.ts`
+- **Key tables:** `organizations`, `user_profiles`, `ai_employees`, `skills`, `employee_skills`, `employee_memories`, `teams`, `team_members`, `workflow_templates`, `workflow_instances`, `workflow_steps`, `workflow_artifacts`, `team_messages`, `tasks`, `knowledge_bases`, `employee_knowledge_bases`, `missions`, `media_assets`, `articles`, `categories`
 - **Types** auto-derived in `src/db/types.ts` via `InferSelectModel`/`InferInsertModel`
 - **Connection** in `src/db/index.ts`: uses `postgres` driver with `{ prepare: false }` (required for Supabase PgBouncer)
 - **Migrations** output to `supabase/migrations/`
@@ -97,8 +98,8 @@ Mutations  → Server Actions (src/app/actions/) ─────────┘
 
 ### Auth Flow
 
-- **Supabase clients:** `src/lib/supabase/client.ts` (browser), `server.ts` (RSC/actions), `middleware.ts` (session refresh)
-- **Middleware** (`src/middleware.ts`): Refreshes session cookies, protects dashboard routes, redirects auth pages for logged-in users
+- **Supabase clients:** `src/lib/supabase/client.ts` (browser), `server.ts` (RSC/actions)
+- **Middleware helper** (`src/lib/supabase/middleware.ts`): `updateSession()` refreshes cookies, redirects unauthenticated users to `/login`, redirects authenticated users away from auth pages to `/home`. Note: no active root `middleware.ts` file currently exists.
 - **Server Actions** in `src/app/actions/auth.ts`: `signIn`, `signUp`, `signOut`
 - Email/password auth only (no social login)
 
@@ -120,22 +121,71 @@ Each employee has skills (many-to-many via `employee_skills`), performance stats
 
 All environment variables are stored in **`.env.local`** (not `.env`). See `.env.example` for template:
 ```
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-DATABASE_URL          # Direct PostgreSQL connection for Drizzle
-ANTHROPIC_API_KEY     # For AI SDK agent execution
-ZHIPU_API_KEY         # For GLM-5 model (skill testing)
+DATABASE_URL              # Direct PostgreSQL connection for Drizzle
+
+# AI Services (DeepSeek via OpenAI-compatible API)
+OPENAI_API_KEY            # DeepSeek API key
+OPENAI_API_BASE_URL       # https://api.deepseek.com/v1
+OPENAI_MODEL              # deepseek-chat
+
+# Web Search & Content Reading
+TAVILY_API_KEY            # Tavily Search API (全网搜索)
+JINA_API_KEY              # Jina Reader API (网页深读)
+
+# Trending Topics (热榜聚合)
+TRENDING_API_URL
+TRENDING_API_KEY
+TRENDING_RESPONSE_MAPPING # JSON response field mapping
+
+# Inngest (production only; dev auto-configures)
+INNGEST_EVENT_KEY
+INNGEST_SIGNING_KEY
 ```
 
 **Important:** Supabase may have connectivity issues. Pages that query the database at render time must add `export const dynamic = 'force-dynamic'` to avoid build-time DB connection timeouts.
 
+### API Routes
+
+`src/app/api/` has 10 route groups:
+- `/ai/` — analysis, chat, edit (AI-powered content operations)
+- `/chat/` — intent, intent-execute, stream (chat center backend)
+- `/employees/`, `/inspiration/`, `/media-assets/`, `/missions/`, `/scenarios/`, `/skills/`, `/workflows/`
+- `/inngest/` — Inngest webhook endpoint
+
 ### Agent System
 
-- **8 agent files** in `src/lib/agent/`: assembly, execution, intent-parser, prompt-templates, step-io, tool-registry, types, index
+- **10 files + tools dir** in `src/lib/agent/`: assembly, execution, index, intent-parser, intent-recognition, model-router, prompt-templates, step-io, tool-registry, types, `tools/`
 - **Agent assembly pipeline:** Load employee → skills → knowledge bases → memories (top-10) → compute proficiency → filter tools by authority → build 7-layer system prompt
 - **7-layer prompt:** Identity → Skills+Proficiency → Authority → Sensitive Topics → Knowledge → Memories → Output+Quality Self-Eval
-- **Workflow engine:** `src/inngest/functions/execute-workflow.ts` — Inngest-based, with quality gates, token budget, artifact persistence
+- **Intent recognition** (`intent-recognition.ts`): AI-driven skill routing in chat center; parses user messages to determine which employee/skill to invoke
+- **Model router** (`model-router.ts`): Routes LLM calls to appropriate providers
+
+### Inngest (Background Jobs)
+
+`src/inngest/functions/` contains 16 event-driven functions:
+- **Content pipeline:** `hot-topic-crawl`, `hot-topic-enrichment`, `publishing-events`
+- **Mission engine:** `execute-mission-task`, `check-task-dependencies`, `handle-task-failure`
+- **AI operations:** `leader-plan`, `leader-consolidate`, `learning-engine`, `benchmarking-analysis`, `benchmarking-crawl`
+- **Monitoring:** `analytics-report`, `daily-performance-snapshot`, `employee-status-guard`
+- **Knowledge base:** `knowledge-base-vectorize` (Jina embeddings pipeline for KB documents)
+- Dev server auto-configures; production requires `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`
+
+### Knowledge Base Module
+
+Top-level module at `/knowledge-bases` for managing AI employee knowledge bases (separate from `/channel-knowledge` which is the channel DNA dashboard).
+
+- **Routes:** `src/app/(dashboard)/knowledge-bases/` — list page + `[id]` detail page (4 tabs: 文档/绑定员工/同步日志/设置)
+- **DAL:** `src/lib/dal/knowledge-bases.ts` — `listKnowledgeBaseSummariesByOrg`, `getKnowledgeBaseById`, `listKnowledgeItems`, `getKnowledgeBaseBindings`, `getKnowledgeBaseSyncLogs`, `loadEmbeddedKnowledgeItems`, `assertKnowledgeBaseOwnership`. All multi-tenant scoped via `organizationId`.
+- **Server actions:** `src/app/actions/knowledge-bases.ts` — `createKnowledgeBase`, `updateKnowledgeBase`, `deleteKnowledgeBase`, `addKnowledgeItem`, `crawlUrlIntoKB`, `updateKnowledgeItem`, `deleteKnowledgeItem`, `reindexKnowledgeBase`
+- **Ingestion:** 3 paths — manual paste, .md/.txt upload, URL crawl via existing Jina Reader (`src/lib/web-fetch.ts:181`)
+- **Chunking:** `src/lib/knowledge/chunking.ts` — paragraph + sentence + char-based fallback, 500-800 chars per chunk with 50-char overlap
+- **Embeddings:** `src/lib/knowledge/embeddings.ts` — Jina `jina-embeddings-v3` (1024 dim), batch 100 with retry/backoff. Async via Inngest `knowledge-base-vectorize`.
+- **Retrieval:** `src/lib/knowledge/retrieval.ts` — application-layer cosine similarity over jsonb-stored vectors. V1 keeps jsonb (no pgvector); upgrade path documented when chunk count exceeds ~10k.
+- **Agent integration:** `kb_search` tool in `tool-registry.ts` (`createKnowledgeBaseTools`). Auto-injected at execution time when employee has KB bindings (see `assembly.ts` and `execution.ts`). Filters by employee's bound KBs and skips KBs with `vectorization_status != 'done'`.
 
 ## AI SDK Notes
 
@@ -160,3 +210,5 @@ After implementing features, always verify before considering work complete:
 - Glass UI design system: follow existing component patterns in `src/components/shared/` for consistent styling (GlassCard, frosted backgrounds, gradient accents)
 
 所有的按钮或lab等任何可以点击触发事件的按钮，不要带边框
+
+所有的回复采用中文

@@ -48,6 +48,7 @@ export async function assembleAgent(
       .where(eq(employeeSkills.employeeId, employeeId)),
     db
       .select({
+        kbId: knowledgeBases.id,
         kbName: knowledgeBases.name,
         kbDescription: knowledgeBases.description,
         kbType: knowledgeBases.type,
@@ -153,6 +154,19 @@ export async function assembleAgent(
     tools = tools.filter((tool) => overrideSet.has(tool.name));
   }
 
+  // Auto-inject kb_search descriptor when employee has KB bindings.
+  // The actual tool implementation is built at execution time via createKnowledgeBaseTools.
+  if (empKBs.length > 0 && employee.authorityLevel !== "observer") {
+    tools = [
+      ...tools,
+      {
+        name: "kb_search",
+        description: "在你绑定的知识库中按语义检索相关内容片段。需要参考组织内部资料、风格指南、敏感词或领域知识时使用。",
+        parameters: {},
+      },
+    ];
+  }
+
   // 4b. Build plugin configs map for plugin-type skills
   type PluginEntry = NonNullable<AssembledAgent["pluginConfigs"]> extends Map<string, infer V> ? V : never;
   const pluginConfigs = new Map<string, PluginEntry>();
@@ -187,6 +201,7 @@ export async function assembleAgent(
     sensitiveTopics: context?.sensitiveTopics,
     skillContents: Object.keys(skillContents).length > 0 ? skillContents : undefined,
     pluginConfigs: pluginConfigs.size > 0 ? pluginConfigs : undefined,
+    knowledgeBaseIds: empKBs.length > 0 ? empKBs.map((kb) => kb.kbId) : undefined,
   };
 
   // Build system prompt with full agent context

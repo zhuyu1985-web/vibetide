@@ -990,10 +990,96 @@ export function createMissionTools(context: {
   return tools;
 }
 
+// ---------------------------------------------------------------------------
+// Knowledge Base retrieval tools (injected when employee has KB bindings)
+// ---------------------------------------------------------------------------
+
+export function createKnowledgeBaseTools(context: {
+  employeeKnowledgeBaseIds: string[];
+}): ToolSet {
+  const tools: ToolSet = {};
+
+  if (context.employeeKnowledgeBaseIds.length === 0) {
+    return tools;
+  }
+
+  tools["kb_search"] = tool({
+    description:
+      "在你绑定的知识库中按语义检索相关内容片段。返回与 query 最相关的文档片段。当需要参考组织内部资料、风格指南、敏感词或领域知识时使用。",
+    inputSchema: z.object({
+      query: z.string().describe("自然语言检索 query"),
+      kb_ids: z
+        .array(z.string())
+        .optional()
+        .describe("可选：指定只检索某些知识库 ID。不传则检索所有绑定的知识库"),
+      top_k: z.number().int().min(1).max(20).optional().default(5).describe("返回结果数，默认 5"),
+    }),
+    execute: async ({ query, kb_ids, top_k = 5 }) => {
+      const { searchKnowledgeBases } = await import("@/lib/knowledge/retrieval");
+      const { db: _db } = await import("@/db");
+      const { knowledgeBases: _kb } = await import("@/db/schema");
+      const { inArray: _inArray, eq: _eq, and: _and } = await import("drizzle-orm");
+
+      // Filter kb_ids: must be in employee's bound list
+      const allowedSet = new Set(context.employeeKnowledgeBaseIds);
+      let targetIds = context.employeeKnowledgeBaseIds;
+      if (kb_ids && kb_ids.length > 0) {
+        targetIds = kb_ids.filter((id) => allowedSet.has(id));
+      }
+
+      if (targetIds.length === 0) {
+        return {
+          hits: [],
+          warnings: ["没有可用的知识库"],
+        };
+      }
+
+      // Only search KBs that are vectorized (status = done)
+      const kbStatuses = await _db
+        .select({ id: _kb.id, name: _kb.name, status: _kb.vectorizationStatus })
+        .from(_kb)
+        .where(_inArray(_kb.id, targetIds));
+
+      const ready = kbStatuses.filter((k) => k.status === "done").map((k) => k.id);
+      const notReady = kbStatuses.filter((k) => k.status !== "done");
+
+      const warnings: string[] = [];
+      for (const k of notReady) {
+        warnings.push(`知识库「${k.name}」未完成向量化（状态：${k.status}），已跳过`);
+      }
+
+      if (ready.length === 0) {
+        return { hits: [], warnings };
+      }
+
+      try {
+        const hits = await searchKnowledgeBases(query, ready, top_k);
+        return {
+          hits: hits.map((h) => ({
+            title: h.title,
+            snippet: h.snippet,
+            relevance: Math.round(h.relevance * 1000) / 1000,
+          })),
+          warnings: warnings.length > 0 ? warnings : undefined,
+        };
+      } catch (err) {
+        return {
+          hits: [],
+          error: `知识库检索失败：${err instanceof Error ? err.message : String(err)}`,
+          warnings: warnings.length > 0 ? warnings : undefined,
+        };
+      }
+    },
+  });
+
+  return tools;
+}
+
 export function toVercelTools(
   agentTools: AgentTool[],
   pluginConfigs?: Map<string, { description: string; config: PluginConfig }>,
-  missionTools?: ToolSet
+  missionTools?: ToolSet,
+  knowledgeBaseTools?: ToolSet
 ): ToolSet {
   const result: ToolSet = {};
 
@@ -1019,6 +1105,11 @@ export function toVercelTools(
   // Merge mission collaboration tools if provided
   if (missionTools) {
     Object.assign(result, missionTools);
+  }
+
+  // Merge knowledge base retrieval tools if provided
+  if (knowledgeBaseTools) {
+    Object.assign(result, knowledgeBaseTools);
   }
 
   return result;

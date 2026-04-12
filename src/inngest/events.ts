@@ -142,4 +142,26 @@ export type InngestEvents = {
       calendarEventId?: string;
     };
   };
+
+  // ─── Knowledge Base Vectorization Pipeline ───
+
+  "kb/document-created": {
+    data: {
+      knowledgeBaseId: string;
+      organizationId: string;
+    };
+  };
+  "kb/document-updated": {
+    data: {
+      knowledgeBaseId: string;
+      itemId: string;
+      organizationId: string;
+    };
+  };
+  "kb/reindex-requested": {
+    data: {
+      knowledgeBaseId: string;
+      organizationId: string;
+    };
+  };
 };

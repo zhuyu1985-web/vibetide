@@ -1,6 +1,6 @@
 import { generateText, stepCountIs } from "ai";
 import { getLanguageModel } from "./model-router";
-import { toVercelTools } from "./tool-registry";
+import { toVercelTools, createKnowledgeBaseTools } from "./tool-registry";
 import {
   buildStepInstruction,
   formatPreviousStepContext,
@@ -64,8 +64,12 @@ export async function executeAgent(
 
   onProgress?.({ percent: 30, message: "正在调用 AI 模型..." });
 
-  // Prepare tools (merge mission collaboration tools if provided)
-  const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs, missionTools);
+  // Prepare tools (merge mission collaboration tools + KB retrieval tool)
+  const kbTools =
+    agent.knowledgeBaseIds && agent.knowledgeBaseIds.length > 0
+      ? createKnowledgeBaseTools({ employeeKnowledgeBaseIds: agent.knowledgeBaseIds })
+      : undefined;
+  const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs, missionTools, kbTools);
 
   let toolCallCount = 0;
 

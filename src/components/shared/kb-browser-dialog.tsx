@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { bindKnowledgeBaseToEmployee } from "@/app/actions/employees";
-import { Loader2, Link as LinkIcon, Database } from "lucide-react";
+import { Loader2, Link as LinkIcon, Database, ExternalLink } from "lucide-react";
 import type { KnowledgeBaseInfo } from "@/lib/types";
 
 const kbTypeLabels: Record<string, string> = {
@@ -71,6 +72,17 @@ export function KBBrowserDialog({
             知识库
           </DialogTitle>
         </DialogHeader>
+
+        {/* Manage link */}
+        <div className="flex justify-end pb-1">
+          <Link
+            href="/knowledge-bases"
+            className="text-[11px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 inline-flex items-center gap-1"
+          >
+            前往知识库管理
+            <ExternalLink size={10} />
+          </Link>
+        </div>
 
         {/* Type Filter */}
         <div className="flex gap-2 flex-wrap pb-2">

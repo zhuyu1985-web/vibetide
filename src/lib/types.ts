@@ -381,6 +381,71 @@ export interface KnowledgeBaseInfo {
   documentCount: number;
 }
 
+// ---------------------------------------------------------------------------
+// Knowledge Base Management Module (full management UI)
+// ---------------------------------------------------------------------------
+
+export type KBVectorizationStatus = "pending" | "processing" | "done" | "failed";
+
+export type KBType = "general" | "channel_style" | "sensitive_topics" | "domain_specific";
+
+export interface KBSummary {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  documentCount: number;
+  chunkCount: number;
+  vectorizationStatus: KBVectorizationStatus;
+  boundEmployeeCount: number;
+  lastSyncAt: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface KBDetail extends KBSummary {
+  sourceType: string;
+  sourceUrl: string | null;
+}
+
+export interface KBItemRow {
+  id: string;
+  title: string;
+  snippet: string;
+  fullContent: string;
+  sourceDocument: string | null;
+  sourceType: string;
+  tags: string[];
+  chunkIndex: number;
+  hasEmbedding: boolean;
+  createdAt: string;
+}
+
+export interface KBSyncLogRow {
+  id: string;
+  action: string;
+  status: "success" | "error" | "warning";
+  detail: string;
+  documentsProcessed: number;
+  chunksGenerated: number;
+  errorsCount: number;
+  createdAt: string;
+}
+
+export interface KBBindingRow {
+  employeeDbId: string;
+  employeeSlug: string;
+  employeeName: string;
+  employeeNickname: string;
+}
+
+export interface KBItemListResult {
+  items: KBItemRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export type LearnedPatterns = Record<
   string,
   {
