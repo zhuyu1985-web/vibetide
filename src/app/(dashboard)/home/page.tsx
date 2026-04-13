@@ -5,6 +5,9 @@ import { missions } from "@/db/schema/missions";
 import { savedConversations } from "@/db/schema/saved-conversations";
 import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
+import { getAllScenariosByOrg } from "@/lib/dal/scenarios";
+import { getEmployees } from "@/lib/dal/employees";
+import type { ScenarioCardData } from "@/lib/types";
 import { HomeClient } from "./home-client";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +26,8 @@ export default async function HomePage() {
     employeeSlug: string;
     updatedAt: string;
   }> = [];
+  let scenarioMap: Record<string, ScenarioCardData[]> = {};
+  let employeeDbIdMap: Record<string, string> = {};
 
   try {
     const supabase = await createClient();
@@ -80,6 +85,24 @@ export default async function HomePage() {
         updatedAt: c.updatedAt.toISOString(),
       }));
     }
+
+    // Fetch scenarios grouped by employee slug — pass full data so the
+    // home chat can show inline scenario forms (matching chat center UX)
+    try {
+      scenarioMap = await getAllScenariosByOrg();
+    } catch {
+      // Graceful degradation
+    }
+
+    // Fetch employees to build slug → dbId map for scenario execution
+    try {
+      const employees = await getEmployees();
+      employeeDbIdMap = Object.fromEntries(
+        employees.map((e) => [e.id, e.dbId])
+      );
+    } catch {
+      // Graceful degradation
+    }
   } catch {
     // Graceful degradation — show empty data
   }
@@ -89,6 +112,8 @@ export default async function HomePage() {
       <HomeClient
         recentMissions={recentMissions}
         recentConversations={recentConversations}
+        scenarioMap={scenarioMap}
+        employeeDbIdMap={employeeDbIdMap}
       />
     </Suspense>
   );

@@ -87,9 +87,12 @@ export async function POST(req: Request) {
               skillName,
             });
 
+            const stepStartedAt = Date.now();
+
             try {
               // Try to find an employee with this skill
               let resultText: string | null = null;
+              let employeeName: string | null = null;
 
               if (skillSlug && skillSlug !== "ai_custom") {
                 const binding = await db
@@ -112,6 +115,7 @@ export async function POST(req: Request) {
                   .limit(1);
 
                 if (binding.length > 0) {
+                  employeeName = binding[0].employeeName;
                   send("step-progress", {
                     stepId: step.id,
                     message: `${binding[0].employeeName} 正在执行「${skillName}」...`,
@@ -119,7 +123,7 @@ export async function POST(req: Request) {
                 }
               }
 
-              // Call LLM with simplified prompt (30s timeout)
+              // Call LLM with richer prompt (30s timeout)
               const stepDescription =
                 step.config.description || `执行「${skillName}」任务`;
 
@@ -134,16 +138,23 @@ export async function POST(req: Request) {
                   model: getLanguageModel({
                     provider: "openai",
                     model: process.env.OPENAI_MODEL || "deepseek-chat",
-                    temperature: 0.5,
-                    maxTokens: 1000,
+                    temperature: 0.6,
+                    maxTokens: 1500,
                   }),
                   messages: [
                     {
                       role: "user",
-                      content: `你是一个媒体内容AI助手。请模拟执行以下任务并返回简短的执行结果摘要（50字以内）：\n任务：${skillName}\n${stepDescription}`,
+                      content: `你是媒体内容工作流测试助手。请模拟执行下列任务并给出可读的执行过程与结果。
+任务：${skillName}
+说明：${stepDescription}
+
+请严格按以下格式输出（中文，300 字以内，不要多余客套）：
+【执行摘要】一句话总结本步骤做了什么、产出是什么（≤40字）
+【执行过程】3-5 条要点，展示推理与关键动作
+【产出结果】列出核心数据、示例或关键结论（可包含 JSON/列表/链接示意）`,
                     },
                   ],
-                  maxOutputTokens: 200,
+                  maxOutputTokens: 600,
                   abortSignal: abortController.signal,
                 });
 
@@ -160,18 +171,26 @@ export async function POST(req: Request) {
 
               // Fallback if LLM didn't return a result
               if (!resultText) {
-                resultText = `「${skillName}」模拟执行完成`;
+                resultText = `【执行摘要】「${skillName}」模拟执行完成\n【执行过程】本次为本地模拟运行，未连接真实技能工具。\n【产出结果】无实际数据输出（请在正式运行时查看）。`;
               }
 
-              // Truncate to 200 chars
-              if (resultText.length > 200) {
-                resultText = resultText.slice(0, 197) + "...";
+              // Safety cap — 4000 chars should be plenty for a step summary
+              if (resultText.length > 4000) {
+                resultText = resultText.slice(0, 3997) + "...";
               }
+
+              // Derive a short summary for inline display (first 【执行摘要】line
+              // or fallback to first line)
+              const summary = extractSummary(resultText, skillName);
+              const durationMs = Date.now() - stepStartedAt;
 
               send("step-complete", {
                 stepId: step.id,
                 stepIndex: i,
                 result: resultText,
+                summary,
+                durationMs,
+                employeeName,
                 success: true,
               });
               completedSteps++;
@@ -180,13 +199,17 @@ export async function POST(req: Request) {
                 `[test-run] Step "${skillName}" failed:`,
                 stepErr
               );
+              const durationMs = Date.now() - stepStartedAt;
+              const errorMessage =
+                stepErr instanceof Error
+                  ? stepErr.message
+                  : "步骤执行失败";
               send("step-failed", {
                 stepId: step.id,
                 stepIndex: i,
-                error:
-                  stepErr instanceof Error
-                    ? stepErr.message
-                    : "步骤执行失败",
+                error: errorMessage,
+                summary: errorMessage.slice(0, 60),
+                durationMs,
               });
               failedSteps++;
               // Continue to next step — don't stop the whole run
@@ -239,4 +262,24 @@ export async function POST(req: Request) {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Extract a short one-line summary from the LLM output.
+ * Looks for 【执行摘要】 header first, then falls back to first non-empty line.
+ */
+function extractSummary(fullText: string, skillName: string): string {
+  const summaryMatch = fullText.match(/【执行摘要】\s*([^\n【]+)/);
+  if (summaryMatch?.[1]) {
+    const s = summaryMatch[1].trim();
+    return s.length > 60 ? s.slice(0, 57) + "..." : s;
+  }
+  const firstLine = fullText
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  if (firstLine) {
+    return firstLine.length > 60 ? firstLine.slice(0, 57) + "..." : firstLine;
+  }
+  return `「${skillName}」执行完成`;
 }

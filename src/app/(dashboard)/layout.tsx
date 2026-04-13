@@ -2,6 +2,7 @@ import { getUnreadCount } from "@/lib/dal/notifications";
 import { getCurrentUserProfile } from "@/lib/dal/auth";
 import { PermissionProvider } from "@/components/providers/permission-provider";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { Toaster } from "sonner";
 
 export default async function DashboardLayout({
   children,
@@ -46,6 +47,7 @@ export default async function DashboardLayout({
       >
         {children}
       </DashboardShell>
+      <Toaster position="top-center" richColors />
     </PermissionProvider>
   );
 }

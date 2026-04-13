@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VibeTide 展示页面结构 V2</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --card-bg: rgba(255,255,255,0.05);
+    --card-border: rgba(255,255,255,0.1);
+    --text: #f0f0f0;
+    --text-muted: #888;
+    --accent: #6366f1;
+  }
+  [data-theme="light"] {
+    --bg: #f8f9fa;
+    --card-bg: #fff;
+    --card-border: #e2e5e9;
+    --text: #1a1a2e;
+    --text-muted: #666;
+    --accent: #4f46e5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 24px; transition: all 0.3s; }
+
+  .theme-toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 100;
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 16px; cursor: pointer; font-size: 14px;
+  }
+
+  .header { text-align: center; margin: 20px 0 32px; }
+  .header h1 { font-size: 28px; background: linear-gradient(135deg, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: var(--text-muted); margin-top: 8px; font-size: 15px; }
+
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+  .badge-new { background: rgba(16,185,129,0.2); color: #10b981; }
+  .badge-core { background: rgba(99,102,241,0.2); color: #818cf8; }
+
+  .screen-grid { display: flex; flex-direction: column; gap: 20px; max-width: 960px; margin: 0 auto; }
+
+  .screen-card {
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px;
+    padding: 24px; transition: all 0.3s;
+  }
+  .screen-card:hover { border-color: var(--accent); box-shadow: 0 0 20px rgba(99,102,241,0.1); }
+
+  .screen-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 10px; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0;
+  }
+  .screen-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .screen-title { font-size: 18px; font-weight: 700; }
+  .screen-desc { color: var(--text-muted); font-size: 14px; line-height: 1.7; margin-bottom: 12px; }
+
+  .sub-items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .sub-item {
+    background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 10px; padding: 12px; font-size: 13px; line-height: 1.6;
+  }
+  .sub-item h4 { font-size: 14px; margin-bottom: 4px; color: var(--accent); }
+
+  .animation-tag {
+    display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 6px;
+    background: rgba(236,72,153,0.1); color: #ec4899; margin: 2px 4px 2px 0;
+  }
+
+  .note-box {
+    margin-top: 32px; padding: 20px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(236,72,153,0.08));
+    border: 1px solid rgba(99,102,241,0.2);
+  }
+  .note-box h3 { color: var(--accent); margin-bottom: 10px; font-size: 16px; }
+  .note-box ul { padding-left: 20px; font-size: 14px; line-height: 2; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()">🌓 切换亮色/暗色</button>
+
+<div class="header">
+  <h1>VibeTide 产品介绍页 · 完整结构规划</h1>
+  <p>产品全景图式 · 全屏翻页 · 亮暗双模式 · 共15屏</p>
+</div>
+
+<div class="screen-grid">
+
+  <!-- Screen 1 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">1</div>
+      <div class="screen-title">封面 · 品牌亮相</div>
+    </div>
+    <div class="screen-desc">
+      产品名「Vibe Media 智媒体」+ 一句话定位「多智能体协同 · 开放式内容生产引擎」<br/>
+      底部展示核心数据指标（8名AI员工 · 28+技能 · 5大引擎）
+    </div>
+    <div>
+      <span class="animation-tag">粒子流动背景</span>
+      <span class="animation-tag">文字逐字打出</span>
+      <span class="animation-tag">数字滚动计数</span>
+    </div>
+  </div>
+
+  <!-- Screen 2 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#06b6d4,#0ea5e9)">2</div>
+      <div class="screen-title">行业痛点 · 为什么需要AI内容团队</div>
+    </div>
+    <div class="screen-desc">
+      列出媒体行业4大核心痛点，每个痛点配图标 + 数据佐证，形成共鸣后自然过渡到解决方案。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>⏰ 时效性压力</h4>
+        突发事件从发现到发布需要4+小时<br/>竞品已实现分钟级响应
+      </div>
+      <div class="sub-item">
+        <h4>👥 人力瓶颈</h4>
+        编辑团队人均负责3+渠道<br/>质量与数量无法兼顾
+      </div>
+      <div class="sub-item">
+        <h4>📊 数据断裂</h4>
+        创作→发布→反馈链路断开<br/>无法用数据驱动内容优化
+      </div>
+      <div class="sub-item">
+        <h4>🧠 知识流失</h4>
+        优秀编辑经验无法沉淀<br/>新人培养周期长、成本高
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">痛点卡片依次弹入</span>
+      <span class="animation-tag">数据高亮闪烁</span>
+    </div>
+  </div>
+
+  <!-- Screen 3 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#f59e0b,#f97316)">3</div>
+      <div class="screen-title">产品全景图 · 系统架构总览 <span class="badge badge-core">核心屏</span></div>
+    </div>
+    <div class="screen-desc">
+      一张交互式全景架构图，展示五大引擎如何围绕AI员工团队协作。节点逐个亮起，连线展示数据流向。<br/>
+      <strong>布局：</strong>中心是「AI员工团队」核心圈，五大引擎环绕分布，外圈是具体功能模块。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>中心层：AI团队核心</h4>
+        8名AI员工头像环形排列<br/>连线显示协作关系
+      </div>
+      <div class="sub-item">
+        <h4>引擎层：五大能力引擎</h4>
+        智创生产 / AI资产 / 全渠道分发 / 数据分析 / 团队协作
+      </div>
+      <div class="sub-item">
+        <h4>模块层：30+功能模块</h4>
+        每个引擎下挂具体模块节点<br/>hover显示模块简介
+      </div>
+      <div class="sub-item">
+        <h4>数据流：闭环流转</h4>
+        虚线箭头展示数据如何在<br/>模块间流动形成闭环
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">SVG节点逐个点亮</span>
+      <span class="animation-tag">连线流光效果</span>
+      <span class="animation-tag">hover展开详情</span>
+      <span class="animation-tag">引擎高亮切换</span>
+    </div>
+  </div>
+
+  <!-- Screen 4 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#10b981,#059669)">4</div>
+      <div class="screen-title">AI 团队 · 8大智能员工 <span class="badge badge-core">核心屏</span></div>
+    </div>
+    <div class="screen-desc">
+      详细介绍每位AI员工的角色定位、核心能力和协作关系。<br/>
+      <strong>布局：</strong>上半部分是8员工的卡片矩阵（4×2），下半部分是选中员工的详情展开区。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>员工卡片</h4>
+        头像 + 姓名 + 职位 + 核心技能标签<br/>点击展开详情面板
+      </div>
+      <div class="sub-item">
+        <h4>详情面板</h4>
+        技能树可视化 + 擅长场景<br/>+ 与其他员工的协作关系图
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">卡片翻转进入</span>
+      <span class="animation-tag">技能树辐射展开</span>
+      <span class="animation-tag">协作连线动画</span>
+    </div>
+  </div>
+
+  <!-- Screen 5 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#8b5cf6,#a855f7)">5</div>
+      <div class="screen-title">技能体系 · 员工能力架构 <span class="badge badge-new">深度</span></div>
+    </div>
+    <div class="screen-desc">
+      展示技能与员工的多对多关系，技能如何定义、如何绑定、如何影响任务分配。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>技能分类体系</h4>
+        28+技能按类别分组：搜索/创作/审核/分发/分析<br/>每个技能有权限等级（观察者/顾问/领导者）
+      </div>
+      <div class="sub-item">
+        <h4>技能-员工映射</h4>
+        矩阵图展示哪些员工拥有哪些技能<br/>技能熟练度用颜色深浅表示
+      </div>
+      <div class="sub-item">
+        <h4>技能执行机制</h4>
+        技能 → 工具注册 → AI调用 → 结果验证<br/>展示一个技能的完整执行链路
+      </div>
+      <div class="sub-item">
+        <h4>设计目的</h4>
+        <strong>痛点：</strong>传统AI只有单一能力<br/>
+        <strong>解决：</strong>模块化技能可组合、可扩展、可量化
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">技能矩阵渐入</span>
+      <span class="animation-tag">映射连线动画</span>
+      <span class="animation-tag">执行链路流转</span>
+    </div>
+  </div>
+
+  <!-- Screen 6 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#ec4899,#f43f5e)">6</div>
+      <div class="screen-title">工作流引擎 · 多智能体协作 <span class="badge badge-core">核心屏</span></div>
+    </div>
+    <div class="screen-desc">
+      展示工作流模板如何编排多个AI员工协作完成复杂任务，DAG任务图如何拆解和执行。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>工作流模板</h4>
+        可视化步骤编排：每个步骤绑定技能+员工<br/>支持串行、并行、条件分支
+      </div>
+      <div class="sub-item">
+        <h4>任务 DAG 执行</h4>
+        模板 → 任务实例 → DAG拆解 → 依赖调度<br/>展示一个真实工作流的DAG执行过程
+      </div>
+      <div class="sub-item">
+        <h4>意图识别 → 自动编排</h4>
+        用户输入自然语言 → AI识别意图 → 自动匹配<br/>工作流或拆解为多步骤任务
+      </div>
+      <div class="sub-item">
+        <h4>设计目的</h4>
+        <strong>痛点：</strong>内容生产流程割裂、手动协调<br/>
+        <strong>解决：</strong>自动化流水线，AI员工像团队一样协作
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">DAG图逐步展开</span>
+      <span class="animation-tag">任务节点状态流转</span>
+      <span class="animation-tag">工作流动画模拟</span>
+    </div>
+  </div>
+
+  <!-- Screen 7 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#14b8a6,#06b6d4)">7</div>
+      <div class="screen-title">知识库系统 · AI员工的记忆与知识 <span class="badge badge-new">深度</span></div>
+    </div>
+    <div class="screen-desc">
+      展示知识库如何建立、如何与员工绑定、如何在执行时检索增强。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>知识入库三通道</h4>
+        手动录入 / 文档上传 / URL自动抓取<br/>→ 智能分块（500-800字符）→ 向量化
+      </div>
+      <div class="sub-item">
+        <h4>向量检索机制</h4>
+        Jina Embeddings (1024维) → 余弦相似度<br/>员工执行时自动检索关联知识
+      </div>
+      <div class="sub-item">
+        <h4>员工-知识库绑定</h4>
+        多对多关系：同一知识库可绑定多个员工<br/>员工只能访问授权的知识库
+      </div>
+      <div class="sub-item">
+        <h4>设计目的</h4>
+        <strong>痛点：</strong>编辑经验和领域知识无法传承<br/>
+        <strong>解决：</strong>知识沉淀+RAG检索，AI员工具备领域专业度
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">知识入库流程动画</span>
+      <span class="animation-tag">向量空间可视化</span>
+      <span class="animation-tag">检索匹配高亮</span>
+    </div>
+  </div>
+
+  <!-- Screen 8 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">8</div>
+      <div class="screen-title">认知引擎 · 自我进化闭环 <span class="badge badge-core">核心屏</span></div>
+    </div>
+    <div class="screen-desc">
+      展示AI员工如何通过「执行→评估→反馈→学习→优化」形成自动进化闭环。这是系统的核心竞争力。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>① 执行 · 7层提示词系统</h4>
+        身份→技能→权限→知识→记忆→风格→自评<br/>7层递进构建完整AI人格
+      </div>
+      <div class="sub-item">
+        <h4>② 自我评估 · 质量评分</h4>
+        LLM对自身输出打分（准确性/完整性/风格/合规）<br/>≥80分提取成功模式，<60分提取失败教训
+      </div>
+      <div class="sub-item">
+        <h4>③ 用户反馈 · 记忆生成</h4>
+        用户点赞/点踩 → 生成加权记忆<br/>踩(0.9权重) > 赞(0.75) → 存入员工记忆库
+      </div>
+      <div class="sub-item">
+        <h4>④ 学习引擎 · 模式提取</h4>
+        日频聚合反馈 → 提取拒绝/编辑/正面模式<br/>→ 更新员工学习模式 → 下次执行自动加载
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:12px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);font-size:13px;color:var(--text-muted)">
+      <strong style="color:#f59e0b">闭环流转：</strong>
+      执行产出 → 自评打分 → 用户反馈 → 记忆沉淀 → 模式学习 → 注入下次执行（第6层记忆）→ 行为持续优化
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">闭环圆环动画</span>
+      <span class="animation-tag">评分仪表盘</span>
+      <span class="animation-tag">记忆节点生成</span>
+      <span class="animation-tag">进化轨迹曲线</span>
+    </div>
+  </div>
+
+  <!-- Screen 9-13: Five Engines -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#6366f1,#06b6d4)">9-13</div>
+      <div class="screen-title">五大能力引擎 · 每屏一个引擎（共5屏）</div>
+    </div>
+    <div class="screen-desc">
+      每个引擎单独一屏，统一布局：左侧「痛点→方案」，右侧「功能模块矩阵」，底部「场景举例」。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>🔥 引擎一：智能内容生产</h4>
+        灵感池 → 选题策划 → AI写作 → 质量审核<br/>
+        <em style="color:#10b981">解决：从热点发现到稿件产出全自动化</em>
+      </div>
+      <div class="sub-item">
+        <h4>📦 引擎二：AI资产管理</h4>
+        媒资库 → 智能标签 → 知识图谱 → 资产复用<br/>
+        <em style="color:#10b981">解决：海量素材找不到、用不好的问题</em>
+      </div>
+      <div class="sub-item">
+        <h4>📡 引擎三：全渠道分发</h4>
+        渠道策略 → 内容适配 → 最佳时机 → 合规检查<br/>
+        <em style="color:#10b981">解决：多平台分发靠人工、效率低</em>
+      </div>
+      <div class="sub-item">
+        <h4>📊 引擎四：数据分析</h4>
+        内容分析 → 竞品监测 → 排行榜 → 异常预警<br/>
+        <em style="color:#10b981">解决：发布后缺乏数据反馈驱动优化</em>
+      </div>
+    </div>
+    <div class="sub-items" style="grid-template-columns:1fr">
+      <div class="sub-item">
+        <h4>🤝 引擎五：团队协作引擎</h4>
+        工作流编排 → 任务分配 → 审批流 → 消息协同 → 认知进化<br/>
+        <em style="color:#10b981">解决：AI员工各自为政、无法像真实团队一样协作</em>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">左右分栏滑入</span>
+      <span class="animation-tag">模块图标弹入</span>
+      <span class="animation-tag">场景工作流动画</span>
+    </div>
+  </div>
+
+  <!-- Screen 14 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">14</div>
+      <div class="screen-title">技术架构 · 底层能力支撑</div>
+    </div>
+    <div class="screen-desc">
+      三层架构图 + 技术栈展示，让技术决策者了解系统可靠性和先进性。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>应用层</h4>
+        Next.js 16 + React 19 + TypeScript<br/>shadcn/ui + Tailwind CSS + Framer Motion
+      </div>
+      <div class="sub-item">
+        <h4>智能层</h4>
+        AI SDK v6 + DeepSeek LLM<br/>7层提示词 + 意图识别 + 工具注册
+      </div>
+      <div class="sub-item">
+        <h4>数据层</h4>
+        Supabase PostgreSQL + Drizzle ORM<br/>Jina Embeddings + 向量检索
+      </div>
+      <div class="sub-item">
+        <h4>调度层</h4>
+        Inngest 事件驱动 + DAG任务调度<br/>16个后台函数 + 定时学习引擎
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">三层堆叠展开</span>
+      <span class="animation-tag">技术图标浮入</span>
+      <span class="animation-tag">数据流线条</span>
+    </div>
+  </div>
+
+  <!-- Screen 15 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#10b981,#06b6d4)">15</div>
+      <div class="screen-title">成效对比 · 价值量化</div>
+    </div>
+    <div class="screen-desc">
+      传统流程 vs AI驱动流程的对比，用动态数字和对比图证明价值。
+    </div>
+    <div class="sub-items">
+      <div class="sub-item">
+        <h4>效率对比</h4>
+        突发新闻：4小时 → 3分钟<br/>日常产出：人均3篇/天 → 50+篇/天
+      </div>
+      <div class="sub-item">
+        <h4>质量对比</h4>
+        AI自评+人工审核双保险<br/>事实核查准确率、合规通过率
+      </div>
+      <div class="sub-item">
+        <h4>成本对比</h4>
+        8名AI员工 ≈ 传统20人团队产能<br/>7×24小时不间断工作
+      </div>
+      <div class="sub-item">
+        <h4>持续进化</h4>
+        越用越好：每日学习、模式提取<br/>知识沉淀不流失
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">数字滚动计数</span>
+      <span class="animation-tag">对比柱状图生长</span>
+      <span class="animation-tag">时间轴压缩动画</span>
+    </div>
+  </div>
+
+  <!-- Screen 16 -->
+  <div class="screen-card">
+    <div class="screen-header">
+      <div class="screen-num" style="background:linear-gradient(135deg,#6366f1,#ec4899)">16</div>
+      <div class="screen-title">结尾 · 行动召唤</div>
+    </div>
+    <div class="screen-desc">
+      产品Slogan + 联系方式 + 二维码<br/>
+      背景回归封面粒子效果，首尾呼应。<br/>
+      <span style="color:var(--accent)">「让AI团队成为您的内容生产力」</span>
+    </div>
+    <div style="margin-top:10px">
+      <span class="animation-tag">粒子汇聚LOGO</span>
+      <span class="animation-tag">信息渐入</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="note-box">
+  <h3>全局设计规范</h3>
+  <ul>
+    <li><strong>亮暗双模式：</strong>右上角一键切换，所有屏幕同步变化，投屏环境灵活适配</li>
+    <li><strong>翻页导航：</strong>滚轮/键盘↑↓/←→翻页，右侧圆点指示器 + 当前屏标题</li>
+    <li><strong>进场动画：</strong>每屏内容分3-4组依次渐入（300ms间隔），不拖沓</li>
+    <li><strong>粒子背景：</strong>全局微弱粒子流动（亮色模式用浅灰点，暗色用微光点）</li>
+    <li><strong>进度条：</strong>顶部细线进度条，显示当前第几屏/总屏数</li>
+    <li><strong>键盘快捷键：</strong>空格=下一屏，Escape=回到封面，T=切换主题</li>
+    <li><strong>独立路由：</strong>作为 /showcase 独立路由，不需要登录即可访问</li>
+  </ul>
+</div>
+
+<script>
+function toggleTheme() {
+  document.body.toggleAttribute('data-theme');
+  if (document.body.hasAttribute('data-theme')) {
+    document.body.setAttribute('data-theme', 'light');
+  }
+}
+</script>
+
+</body>
+</html>

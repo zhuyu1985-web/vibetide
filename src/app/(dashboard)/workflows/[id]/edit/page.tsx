@@ -14,7 +14,7 @@ export default async function EditWorkflowPage({
   if (!workflow) return notFound();
 
   return (
-    <div className="-m-6 h-[calc(100vh-56px)]">
+    <div className="-m-6 h-[calc(100%+48px)] overflow-hidden">
       <WorkflowEditor
         mode="edit"
         initialData={{

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -27,26 +26,11 @@ export function StepDetailPanel({
   onSave,
   onClose,
 }: StepDetailPanelProps) {
-  const [name, setName] = useState(step.name);
-  const [description, setDescription] = useState(
-    step.config?.description ?? ""
-  );
-
   const catConfig = step.config?.skillCategory
     ? SKILL_CATEGORY_CONFIG[step.config.skillCategory]
     : null;
 
-  function handleSave() {
-    onSave({
-      ...step,
-      name,
-      config: {
-        ...step.config,
-        parameters: step.config?.parameters ?? {},
-        description: description || undefined,
-      },
-    });
-  }
+  const description = step.config?.description ?? "";
 
   return (
     <div className="flex flex-col h-full">
@@ -70,8 +54,17 @@ export function StepDetailPanel({
           <Label htmlFor="detail-step-name">步骤名称</Label>
           <Input
             id="detail-step-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={step.name}
+            onChange={(e) =>
+              onSave({
+                ...step,
+                name: e.target.value,
+                config: {
+                  ...step.config,
+                  parameters: step.config?.parameters ?? {},
+                },
+              })
+            }
             placeholder="输入步骤名称"
           />
         </div>
@@ -82,7 +75,16 @@ export function StepDetailPanel({
           <Textarea
             id="detail-step-desc"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) =>
+              onSave({
+                ...step,
+                config: {
+                  ...step.config,
+                  parameters: step.config?.parameters ?? {},
+                  description: e.target.value || undefined,
+                },
+              })
+            }
             placeholder="输入步骤说明"
             className="min-h-[80px] resize-none"
           />
@@ -149,22 +151,6 @@ export function StepDetailPanel({
             <span className="text-xs text-muted-foreground">暂无参数配置</span>
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center gap-3 px-4 py-3 border-t border-border shrink-0">
-        <button
-          onClick={onClose}
-          className="flex-1 py-2 rounded-xl bg-black/[0.05] dark:bg-white/[0.08] text-sm text-muted-foreground cursor-pointer transition-colors hover:bg-black/[0.08] dark:hover:bg-white/[0.12]"
-        >
-          取消
-        </button>
-        <button
-          onClick={handleSave}
-          className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm cursor-pointer transition-colors hover:bg-primary/90"
-        >
-          保存
-        </button>
       </div>
     </div>
   );

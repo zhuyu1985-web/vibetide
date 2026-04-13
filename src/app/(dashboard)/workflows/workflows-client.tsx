@@ -173,8 +173,8 @@ export function WorkflowsClient({
 
         {myWorkflows.length === 0 ? (
           <div className="bg-black/[0.02] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
-            <Inbox className="w-10 h-10 text-gray-200 dark:text-white/15" />
-            <p className="text-sm text-gray-300 dark:text-white/30">
+            <Inbox className="w-10 h-10 text-gray-400 dark:text-white/30" />
+            <p className="text-sm text-gray-500 dark:text-white/60">
               还没有工作流，从模板开始或创建自定义工作流
             </p>
           </div>
@@ -234,8 +234,8 @@ export function WorkflowsClient({
         {/* Template grid */}
         {filteredTemplates.length === 0 ? (
           <div className="bg-black/[0.02] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
-            <Inbox className="w-10 h-10 text-gray-200 dark:text-white/15" />
-            <p className="text-sm text-gray-300 dark:text-white/30">
+            <Inbox className="w-10 h-10 text-gray-400 dark:text-white/30" />
+            <p className="text-sm text-gray-500 dark:text-white/60">
               该分类暂无模板
             </p>
           </div>

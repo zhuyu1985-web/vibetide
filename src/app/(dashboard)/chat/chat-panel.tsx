@@ -46,7 +46,9 @@ import {
   RotateCcw,
   Radio,
   Zap,
+  Home,
 } from "lucide-react";
+import Link from "next/link";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { AIEmployee, ScenarioCardData } from "@/lib/types";
 import type { ChatMessage, ThinkingStep, SkillUsed } from "@/lib/chat-utils";
@@ -57,6 +59,7 @@ import {
   IntentResultBubble,
   IntentConfirmCard,
 } from "@/components/chat/intent-bubble";
+import { MessageActions } from "@/components/chat/message-actions";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Radar,
@@ -213,6 +216,8 @@ interface ChatPanelProps {
   onCancelScenario: () => void;
   onSave: () => void;
   onNewChat: () => void;
+  /** Regenerate the assistant response at the given index. */
+  onRegenerate?: (assistantIndex: number) => void;
   currentThinking: ThinkingStep[];
   currentSkillsUsed: SkillUsed[];
   currentSources: string[];
@@ -241,6 +246,7 @@ export function ChatPanel({
   onCancelScenario,
   onSave,
   onNewChat,
+  onRegenerate,
   currentThinking,
   currentSkillsUsed,
   currentSources,
@@ -410,8 +416,9 @@ export function ChatPanel({
       {/* Gradient background */}
       <div className="absolute inset-0 bg-gradient-to-b from-blue-50/30 via-slate-50/60 to-slate-50/40 dark:from-blue-950/10 dark:via-gray-900/50 dark:to-gray-900/30 pointer-events-none" />
 
-      {/* ── Header ── */}
-      <div className="relative flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+      {/* ── Header ── fixed at top of the chat panel; sticky + z-index acts
+          as a safety net if any ancestor ever regains scrollability. */}
+      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
         <EmployeeAvatar
           employeeId={employee.id}
           size="md"
@@ -452,6 +459,13 @@ export function ChatPanel({
           </button>
         )}
 
+        <Link
+          href="/home"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-200"
+        >
+          <Home size={15} />
+          首页
+        </Link>
         <button
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-200 border-0"
           onClick={onNewChat}
@@ -551,7 +565,7 @@ export function ChatPanel({
                       <IntentAnalyzing steps={intentProgress ?? []} />
                     )}
                     {showIntentHere && pendingIntent && !intentLoading && (
-                      pendingIntent.confidence < 0.8 && !loading && !isStreaming ? (
+                      pendingIntent.confidence < 0.8 && !loading && !isStreaming && isLastUserMsg ? (
                         <IntentConfirmCard
                           intent={pendingIntent}
                           onConfirm={(edited) => onIntentConfirm?.(edited)}
@@ -689,9 +703,40 @@ export function ChatPanel({
                                     )}
                                 </div>
                               )}
-                              {/* Action bar for completed messages */}
+                              {/* Action bars — only for completed messages */}
                               {msg.durationMs && (
-                                <MessageActionBar onAction={onSendMessage} />
+                                <>
+                                  {/* Message-level actions (复制/重新生成/喜欢/
+                                      不喜欢/分享/收藏). Like & dislike flow
+                                      through to /api/chat/feedback which
+                                      persists to employee_memories and
+                                      steers future outputs via the prompt
+                                      assembly layer. */}
+                                  <MessageActions
+                                    messageContent={msg.content}
+                                    employeeSlug={employee.id}
+                                    userPrompt={
+                                      messages[i - 1]?.role === "user"
+                                        ? messages[i - 1]?.content
+                                        : undefined
+                                    }
+                                    onRegenerate={
+                                      onRegenerate && !viewingSaved
+                                        ? () => onRegenerate(i)
+                                        : undefined
+                                    }
+                                    onFavorite={
+                                      !viewingSaved && !isSaved
+                                        ? onSave
+                                        : undefined
+                                    }
+                                    isFavorited={isSaved}
+                                  />
+                                  {/* Next-action shortcuts (查热点/数据分析/
+                                      去创作/总结要点) — domain-specific
+                                      follow-ups kept for existing flow */}
+                                  <MessageActionBar onAction={onSendMessage} />
+                                </>
                               )}
                             </div>
                           </div>
@@ -923,15 +968,16 @@ export function ChatPanel({
       {/* ── Bottom input bar (pinned) ── */}
       {!viewingSaved && (
         <div className="relative flex-shrink-0">
-          {/* Scenario quick-action chips — always visible like DingTalk action bar */}
+          {/* Scenario quick-action chips — wrap to multiple rows instead
+              of horizontal scroll, matching the /home embedded panel. */}
           {scenarios.length > 0 && (
-            <div className="flex items-center gap-1.5 px-5 pt-2.5 pb-1 overflow-x-auto scrollbar-hide">
+            <div className="flex flex-wrap gap-1.5 px-5 pt-2.5 pb-1">
               {scenarios.map((s) => {
                 const Icon = ICON_MAP[s.icon] || Sparkles;
                 return (
                   <button
                     key={s.id}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 dark:bg-gray-800/60 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 flex-shrink-0 border-0"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 dark:bg-gray-800/60 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 border-0"
                     onClick={() => onSelectScenario(s)}
                   >
                     <Icon size={12} />

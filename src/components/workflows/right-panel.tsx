@@ -1,16 +1,19 @@
 "use client";
 
-import { X } from "lucide-react";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import { AddStepPanel } from "./add-step-panel";
 import { StepDetailPanel } from "./step-detail-panel";
+import {
+  TestResultPanel,
+  type TestResultData,
+} from "./test-result-panel";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface RightPanelProps {
-  mode: "add" | "detail";
+  mode: "add" | "detail" | "testResult";
   // Add mode
   onAddSkillStep: (
     skillSlug: string,
@@ -23,6 +26,11 @@ interface RightPanelProps {
   selectedStep: WorkflowStepDef | null;
   onSaveStep: (step: WorkflowStepDef) => void;
   onCloseDetail: () => void;
+  // Test result mode
+  testResultStep?: WorkflowStepDef | null;
+  testResultStepIndex?: number;
+  testResult?: TestResultData | null;
+  onCloseTestResult?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,15 +44,32 @@ export function RightPanel({
   selectedStep,
   onSaveStep,
   onCloseDetail,
+  testResultStep,
+  testResultStepIndex,
+  testResult,
+  onCloseTestResult,
 }: RightPanelProps) {
+  if (
+    mode === "testResult" &&
+    testResultStep &&
+    testResult &&
+    onCloseTestResult
+  ) {
+    return (
+      <TestResultPanel
+        step={testResultStep}
+        stepIndex={testResultStepIndex ?? 0}
+        result={testResult}
+        onClose={onCloseTestResult}
+      />
+    );
+  }
+
   if (mode === "detail" && selectedStep) {
     return (
       <StepDetailPanel
         step={selectedStep}
-        onSave={(updated) => {
-          onSaveStep(updated);
-          onCloseDetail();
-        }}
+        onSave={onSaveStep}
         onClose={onCloseDetail}
       />
     );
@@ -56,14 +81,6 @@ export function RightPanel({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <h3 className="text-sm font-semibold text-foreground">添加步骤</h3>
-        {mode === "detail" && (
-          <button
-            onClick={onCloseDetail}
-            className="p-1.5 rounded-lg bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Body */}

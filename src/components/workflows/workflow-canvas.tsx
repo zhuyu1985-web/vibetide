@@ -9,14 +9,23 @@ import { StepCard } from "./step-card";
 // Types
 // ---------------------------------------------------------------------------
 
+export interface StepStatus {
+  status: "idle" | "pending" | "running" | "completed" | "failed";
+  message?: string;
+  fullResult?: string;
+  durationMs?: number;
+  employeeName?: string;
+}
+
 interface WorkflowCanvasProps {
   triggerType: "manual" | "scheduled";
   triggerConfig?: { cron?: string; timezone?: string } | null;
   steps: WorkflowStepDef[];
   selectedStepId: string | null;
+  testResultStepId?: string | null;
   testRunning: boolean;
   triggerStatus?: "idle" | "running" | "completed";
-  stepStatuses?: Record<string, { status: string; message?: string }>;
+  stepStatuses?: Record<string, StepStatus>;
   onTriggerClick: () => void;
   onStepClick: (stepId: string) => void;
   onStepEdit: (stepId: string) => void;
@@ -24,6 +33,7 @@ interface WorkflowCanvasProps {
   onStepMoveUp: (stepId: string) => void;
   onStepMoveDown: (stepId: string) => void;
   onAddStep: () => void;
+  onViewStepResult?: (stepId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +45,7 @@ export function WorkflowCanvas({
   triggerConfig,
   steps,
   selectedStepId,
+  testResultStepId = null,
   testRunning,
   triggerStatus = "idle",
   stepStatuses = {},
@@ -45,11 +56,12 @@ export function WorkflowCanvas({
   onStepMoveUp,
   onStepMoveDown,
   onAddStep,
+  onViewStepResult,
 }: WorkflowCanvasProps) {
   const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
 
   return (
-    <div className="flex flex-col items-center w-full max-w-lg mx-auto py-6 px-4">
+    <div className="flex flex-col items-center w-full max-w-2xl mx-auto py-6 px-4">
       {/* Test run banner */}
       {testRunning && (
         <div className="w-full mb-6 rounded-xl bg-amber-500/10 p-3 flex items-center gap-2 text-amber-700 dark:text-amber-400">
@@ -86,20 +98,19 @@ export function WorkflowCanvas({
               step={step}
               index={idx}
               selected={selectedStepId === step.id}
-              status={
-                (stepStatus?.status as
-                  | "idle"
-                  | "pending"
-                  | "running"
-                  | "completed"
-                  | "failed") ?? "idle"
-              }
+              status={stepStatus?.status ?? "idle"}
               statusMessage={stepStatus?.message}
+              durationMs={stepStatus?.durationMs}
+              hasResult={!!stepStatus?.fullResult}
+              resultSelected={testResultStepId === step.id}
               onClick={() => onStepClick(step.id)}
               onEdit={() => onStepEdit(step.id)}
               onDelete={() => onStepDelete(step.id)}
               onMoveUp={() => onStepMoveUp(step.id)}
               onMoveDown={() => onStepMoveDown(step.id)}
+              onViewResult={
+                onViewStepResult ? () => onViewStepResult(step.id) : undefined
+              }
               isFirst={idx === 0}
               isLast={idx === sortedSteps.length - 1}
             />

@@ -56,6 +56,7 @@ export function ChatCenterClient({
     executeIntent: executeIntentFn,
     cancelIntent,
     clearMessages,
+    regenerate,
   } = chat;
 
   // Persist messages per employee across switches
@@ -136,14 +137,14 @@ export function ChatCenterClient({
     const sidebarInset = innerMain?.parentElement; // SidebarInset (main)
     const sidebarWrapper = sidebarInset?.parentElement; // sidebar-wrapper div
 
-    // sidebar-wrapper: lock to viewport height
-    patch(sidebarWrapper, { height: "100svh", maxHeight: "100svh", overflow: "hidden" });
-    // SidebarInset: constrain height, don't grow
+    // sidebar-wrapper (div.flex.h-svh): already correct, just ensure no overflow
+    patch(sidebarWrapper, { overflow: "hidden" });
+    // SidebarInset (div.flex-1.flex.flex-col): constrain height
     patch(sidebarInset, { minHeight: "0", overflow: "hidden" });
-    // inner-main: flex container, no scroll
-    patch(innerMain, { overflow: "hidden", display: "flex", flexDirection: "column" });
-    // div.p-6 wrapper: fill remaining space
-    patch(wrapper, { padding: "0", flex: "1", minHeight: "0", display: "flex", flexDirection: "column" });
+    // inner-main (main.flex-1): flex container, no scroll, min-h-0 for proper flex sizing
+    patch(innerMain, { overflow: "hidden", display: "flex", flexDirection: "column", minHeight: "0" });
+    // div.p-6 wrapper: fill remaining space, keep minimal top padding for header clearance
+    patch(wrapper, { padding: "4px 0 0 0", flex: "1", minHeight: "0", display: "flex", flexDirection: "column" });
 
     return () => {
       for (const p of patches) p.el.style.cssText = p.saved;
@@ -164,6 +165,115 @@ export function ChatCenterClient({
       }, 200);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-load saved conversation from URL param (e.g., from /chat/[id] redirect)
+  const convParamHandled = useRef(false);
+  useEffect(() => {
+    const convId = searchParams.get("conversation");
+    if (convId && !convParamHandled.current) {
+      convParamHandled.current = true;
+      const conv = savedConversations.find((c) => c.id === convId);
+      if (conv) {
+        setViewingSaved(conv);
+        setSelectedSlug(conv.employeeSlug);
+        setMessages((conv.messages as ChatMessage[]) ?? []);
+        setIsSaved(true);
+        setTab("saved");
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Continue a conversation started elsewhere (e.g., embedded home chat handoff).
+  // Unlike `conversation=<id>` (which opens saved read-only view), `continue=<id>`
+  // loads the messages into the LIVE chat state so the user can keep typing.
+  const continueParamHandled = useRef(false);
+  useEffect(() => {
+    const convId = searchParams.get("continue");
+    if (convId && !continueParamHandled.current) {
+      continueParamHandled.current = true;
+      const conv = savedConversations.find((c) => c.id === convId);
+      if (conv) {
+        setSelectedSlug(conv.employeeSlug);
+        const restored = (conv.messages as ChatMessage[]) ?? [];
+        setMessages(restored);
+        // Prime the per-employee cache so switching back and forth preserves state
+        messagesMapRef.current[conv.employeeSlug] = restored;
+        setIsSaved(true); // already persisted, no need to re-save until new activity
+        setViewingSaved(null); // live mode — input bar stays visible
+        setTab("employees");
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live handoff from the home embedded chat. sessionStorage carries the
+  // in-memory snapshot (messages, pendingIntent) so the user instantly sees
+  // the same conversation state here — even if they clicked "Expand" while
+  // the home panel was still streaming. The active home-side fetch can't be
+  // transferred across the page boundary; we prefer showing the snapshot
+  // immediately over flashing an empty view.
+  const handoffParamHandled = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("handoff") !== "1" || handoffParamHandled.current) {
+      return;
+    }
+    handoffParamHandled.current = true;
+
+    try {
+      const raw = sessionStorage.getItem("home-chat-handoff");
+      if (raw) {
+        const data = JSON.parse(raw) as {
+          employeeSlug?: string;
+          messages?: ChatMessage[];
+          conversationId?: string | null;
+          wasStreaming?: boolean;
+          timestamp?: number;
+        };
+        const fresh =
+          data &&
+          data.employeeSlug &&
+          Array.isArray(data.messages) &&
+          typeof data.timestamp === "number" &&
+          Date.now() - data.timestamp < 60_000;
+
+        if (fresh) {
+          setSelectedSlug(data.employeeSlug!);
+          setMessages(data.messages!);
+          messagesMapRef.current[data.employeeSlug!] = data.messages!;
+          // Already persisted server-side if we have an id — skip duplicate save
+          setIsSaved(!!data.conversationId);
+          setViewingSaved(null);
+          setTab("employees");
+          // Note: we intentionally do NOT transfer pendingIntent / intentLoading.
+          // The home-side stream owned that state; after handoff the stream is
+          // dropped, so a stale intent bubble would render in a "completed"
+          // phantom state. Starting fresh is cleaner.
+        }
+      }
+    } catch {
+      // Snapshot unparseable or missing — fall through to the bare employee view
+    } finally {
+      // Single-shot: always remove so a refresh doesn't re-hydrate stale data
+      try {
+        sessionStorage.removeItem("home-chat-handoff");
+      } catch {
+        // ignore
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clean the handoff/continue flags out of the URL AFTER they've been
+  // consumed, so a refresh won't replay the hydration.
+  useEffect(() => {
+    const hasHandoff = searchParams.get("handoff") === "1";
+    const hasContinue = searchParams.get("continue");
+    if ((hasHandoff || hasContinue) && selectedSlug) {
+      window.history.replaceState(
+        null,
+        "",
+        `/chat?employee=${selectedSlug}`
+      );
+    }
+  }, [selectedSlug, searchParams]);
 
   // Update URL when slug changes — use history.replaceState to avoid Next.js navigation/scroll
   useEffect(() => {
@@ -373,6 +483,17 @@ export function ChatCenterClient({
     setInlineScenario(null);
   }, []);
 
+  /* ── Regenerate an assistant message ── */
+  const handleRegenerate = useCallback(
+    async (assistantIndex: number) => {
+      // Opening a new generation invalidates the saved snapshot — the user
+      // can re-save once the new response lands.
+      setIsSaved(false);
+      await regenerate(assistantIndex);
+    },
+    [regenerate]
+  );
+
   return (
     <div ref={rootRef} className="flex flex-1 min-h-0 overflow-hidden">
       <EmployeeListPanel
@@ -401,6 +522,7 @@ export function ChatCenterClient({
         onCancelScenario={handleCancelScenario}
         onSave={handleSave}
         onNewChat={handleNewChat}
+        onRegenerate={handleRegenerate}
         currentThinking={currentThinking}
         currentSkillsUsed={currentSkillsUsed}
         currentSources={currentSources}

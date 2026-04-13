@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Loader2,
-  MessageSquare,
   Plus,
   Wrench,
   Sparkles,
-  X,
+  Cpu,
+  Check,
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,11 +22,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { WorkflowCanvas } from "./workflow-canvas";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { WorkflowCanvas, type StepStatus } from "./workflow-canvas";
 import { RightPanel } from "./right-panel";
 import { BottomActionBar } from "./bottom-action-bar";
 import { saveWorkflow, updateWorkflow } from "@/app/actions/workflow-engine";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+
+// ---------------------------------------------------------------------------
+// Model options (mirrors home-client.tsx)
+// ---------------------------------------------------------------------------
+
+const AVAILABLE_MODELS = [
+  { id: "auto", label: "智能路由", description: "自动选择最佳模型" },
+  { id: "deepseek-chat", label: "DeepSeek", description: "通用对话" },
+  { id: "glm-5", label: "GLM-5", description: "智谱最新模型" },
+  { id: "glm-4-flash", label: "GLM-4 Flash", description: "快速响应" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,11 +110,14 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     initialData?.steps ?? []
   );
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [testResultStepId, setTestResultStepId] = useState<string | null>(
+    null
+  );
 
   // ── Right panel mode ──
-  const [rightPanelMode, setRightPanelMode] = useState<"add" | "detail">(
-    "add"
-  );
+  const [rightPanelMode, setRightPanelMode] = useState<
+    "add" | "detail" | "testResult"
+  >("add");
 
   // ── UI state ──
   const [saving, setSaving] = useState(false);
@@ -108,7 +129,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     "idle" | "running" | "completed"
   >("idle");
   const [stepStatuses, setStepStatuses] = useState<
-    Record<string, { status: string; message?: string }>
+    Record<string, StepStatus>
   >({});
 
   // ── AI chat (left panel) ──
@@ -117,6 +138,27 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
   const [showGuide, setShowGuide] = useState(mode === "create");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // ── Chat toolbar state ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [connectorOpen, setConnectorOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("auto");
+
+  const handleFileSelect = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      if (files.length > 0) {
+        toast.info("文件上传功能即将上线", {
+          description: `已选择 ${files.length} 个文件`,
+        });
+      }
+      e.target.value = "";
+    },
+    []
+  );
+
+  const activeModelInfo = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
 
   // ── Step management handlers ──
 
@@ -190,6 +232,16 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     []
   );
 
+  const handleViewStepResult = useCallback((stepId: string) => {
+    setTestResultStepId(stepId);
+    setRightPanelMode("testResult");
+  }, []);
+
+  const handleCloseTestResult = useCallback(() => {
+    setTestResultStepId(null);
+    setRightPanelMode("add");
+  }, []);
+
   const handleSaveStep = useCallback((updatedStep: WorkflowStepDef) => {
     setSteps((prev) =>
       prev.map((s) => (s.id === updatedStep.id ? updatedStep : s))
@@ -248,6 +300,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
   const handleAddStepFromBar = useCallback(() => {
     setRightPanelMode("add");
     setSelectedStepId(null);
+    setTestResultStepId(null);
   }, []);
 
   const handleTriggerClick = useCallback(() => {
@@ -306,6 +359,10 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     setTestRunning(true);
     setTriggerStatus("idle");
     setStepStatuses({});
+    setTestResultStepId(null);
+    if (rightPanelMode === "testResult") {
+      setRightPanelMode("add");
+    }
 
     try {
       const res = await fetch("/api/workflows/test-run", {
@@ -350,13 +407,17 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
                 case "step-start":
                   setStepStatuses((prev) => ({
                     ...prev,
-                    [data.stepId as string]: { status: "running" },
+                    [data.stepId as string]: {
+                      status: "running",
+                      message: "执行中…",
+                    },
                   }));
                   break;
                 case "step-progress":
                   setStepStatuses((prev) => ({
                     ...prev,
                     [data.stepId as string]: {
+                      ...(prev[data.stepId as string] ?? { status: "running" }),
                       status: "running",
                       message: data.message as string,
                     },
@@ -367,7 +428,14 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
                     ...prev,
                     [data.stepId as string]: {
                       status: "completed",
-                      message: data.result as string,
+                      message:
+                        (data.summary as string | undefined) ??
+                        (data.result as string),
+                      fullResult: data.result as string,
+                      durationMs: data.durationMs as number | undefined,
+                      employeeName: data.employeeName as
+                        | string
+                        | undefined,
                     },
                   }));
                   break;
@@ -376,7 +444,11 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
                     ...prev,
                     [data.stepId as string]: {
                       status: "failed",
-                      message: data.error as string,
+                      message:
+                        (data.summary as string | undefined) ??
+                        (data.error as string),
+                      fullResult: data.error as string,
+                      durationMs: data.durationMs as number | undefined,
                     },
                   }));
                   break;
@@ -402,7 +474,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
       console.error("[test-run] Fetch error:", err);
       setTestRunning(false);
     }
-  }, [testRunning, steps, triggerType, triggerConfig]);
+  }, [testRunning, steps, triggerType, triggerConfig, rightPanelMode]);
 
   const handleToggleEnabled = useCallback(() => {
     setIsEnabled((prev) => !prev);
@@ -595,6 +667,18 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
 
   const selectedStep = steps.find((s) => s.id === selectedStepId) ?? null;
 
+  const sortedStepsForLookup = [...steps].sort((a, b) => a.order - b.order);
+  const testResultStepIdx = sortedStepsForLookup.findIndex(
+    (s) => s.id === testResultStepId
+  );
+  const testResultStep =
+    testResultStepIdx >= 0 ? sortedStepsForLookup[testResultStepIdx] : null;
+  const testResultStepIndex =
+    testResultStepIdx >= 0 ? testResultStepIdx : 0;
+  const testResultData = testResultStepId
+    ? stepStatuses[testResultStepId] ?? null
+    : null;
+
   // ── Render ──
 
   return (
@@ -643,7 +727,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
       {/* ── Three-column body ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* ── Left: AI Chat Panel ── */}
-        <div className="w-[280px] border-r border-border flex flex-col shrink-0 bg-muted/30">
+        <div className="w-[360px] border-r border-border flex flex-col shrink-0 bg-muted/30">
           {/* Header */}
           <div className="px-4 pt-5 pb-3">
             <h2 className="text-sm font-semibold text-foreground">
@@ -748,16 +832,120 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
                 className="w-full rounded-xl bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring transition-colors border-0"
               />
             </div>
-            <div className="flex items-center gap-1 mt-2">
-              <button className="p-1.5 rounded-lg bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer">
+            <div className="flex items-center flex-wrap gap-1 mt-2">
+              {/* Attachment button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded-lg border-0 bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+                title="添加附件"
+              >
                 <Plus className="w-4 h-4" />
               </button>
-              <button className="p-1.5 rounded-lg bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer">
-                <Wrench className="w-4 h-4" />
-              </button>
-              <button className="p-1.5 rounded-lg bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer">
-                <MessageSquare className="w-4 h-4" />
-              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xlsx"
+                onChange={handleFileSelect}
+              />
+
+              {/* Connector manager */}
+              <Popover open={connectorOpen} onOpenChange={setConnectorOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="p-1.5 rounded-lg border-0 bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    title="管理连接器"
+                  >
+                    <Wrench className="w-4 h-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  sideOffset={8}
+                  className="w-60 p-1.5"
+                >
+                  <div className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
+                    管理连接器
+                  </div>
+                  <div className="space-y-0.5">
+                    {["微信公众号", "抖音", "微博", "邮箱"].map((cname) => (
+                      <button
+                        key={cname}
+                        onClick={() => {
+                          toast.info("连接器管理即将上线");
+                          setConnectorOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg border-0 bg-transparent text-left text-sm text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                      >
+                        <span>{cname}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          未授权
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-1 pt-1 border-t border-border">
+                    <button
+                      onClick={() => {
+                        toast.info("连接器管理即将上线");
+                        setConnectorOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-2 rounded-lg border-0 bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    >
+                      前往连接器中心 →
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Model switcher */}
+              <Popover open={modelOpen} onOpenChange={setModelOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg border-0 bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    title="切换模型"
+                  >
+                    <Cpu className="w-4 h-4" />
+                    <span className="text-[11px]">
+                      {activeModelInfo?.label ?? "智能路由"}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  sideOffset={8}
+                  className="w-52 p-1.5"
+                >
+                  <div className="space-y-0.5">
+                    {AVAILABLE_MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedModel(m.id);
+                          setModelOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors border-0 bg-transparent cursor-pointer",
+                          selectedModel === m.id
+                            ? "bg-black/[0.05] dark:bg-white/[0.08] text-foreground"
+                            : "text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
+                        )}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{m.label}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {m.description}
+                          </span>
+                        </div>
+                        {selectedModel === m.id && (
+                          <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
@@ -770,6 +958,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
               triggerConfig={triggerConfig}
               steps={steps}
               selectedStepId={selectedStepId}
+              testResultStepId={testResultStepId}
               testRunning={testRunning}
               triggerStatus={triggerStatus}
               stepStatuses={stepStatuses}
@@ -780,6 +969,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
               onStepMoveUp={handleMoveUp}
               onStepMoveDown={handleMoveDown}
               onAddStep={handleAddStepFromBar}
+              onViewStepResult={handleViewStepResult}
             />
           </div>
           <BottomActionBar
@@ -795,7 +985,7 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
         </div>
 
         {/* ── Right: Add/Detail Panel ── */}
-        <div className="w-[300px] border-l border-border shrink-0 overflow-y-auto bg-background">
+        <div className="w-[380px] border-l border-border shrink-0 overflow-y-auto bg-background">
           <RightPanel
             mode={rightPanelMode}
             onAddSkillStep={handleAddSkillStep}
@@ -804,6 +994,10 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
             selectedStep={selectedStep}
             onSaveStep={handleSaveStep}
             onCloseDetail={handleCloseDetail}
+            testResultStep={testResultStep}
+            testResultStepIndex={testResultStepIndex}
+            testResult={testResultData}
+            onCloseTestResult={handleCloseTestResult}
           />
         </div>
       </div>

@@ -569,14 +569,80 @@ async function seed() {
         { id: "step-8", order: 8, dependsOn: ["step-7"], name: "数据分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "analyze", label: "数据分析" },
       ],
     },
+    {
+      name: "每日热点新闻推荐",
+      description: "每天早晨自动聚合全网热点，评估价值后生成推荐列表并推送到编辑部",
+      category: "news" as const,
+      triggerType: "scheduled" as const,
+      triggerConfig: { cron: "0 7 * * *", timezone: "Asia/Shanghai" },
+      steps: [
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "全网热点聚合", type: "skill" as const, config: { skillSlug: "news_aggregation", skillName: "新闻聚合", skillCategory: "perception", parameters: {} }, key: "aggregate", label: "全网热点聚合" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "热度与价值评估", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "evaluate", label: "热度与价值评估" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "推荐列表生成", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "generate", label: "推荐列表生成" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "推送到编辑部", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "dispatch", label: "推送到编辑部" },
+      ],
+    },
+    {
+      name: "金融科技监管日报",
+      description: "工作日定时抓取金融监管政策，分析影响后生成日报并合规审核发布",
+      category: "news" as const,
+      triggerType: "scheduled" as const,
+      triggerConfig: { cron: "0 9 * * 1-5", timezone: "Asia/Shanghai" },
+      steps: [
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "监管政策抓取", type: "skill" as const, config: { skillSlug: "fintech_regulation_monitor", skillName: "金融监管监控", skillCategory: "perception", parameters: {} }, key: "crawl", label: "监管政策抓取" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "政策影响分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "analyze", label: "政策影响分析" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "日报稿件撰写", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "draft", label: "日报稿件撰写" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "合规审核", type: "skill" as const, config: { skillSlug: "quality_review", skillName: "质量审核", skillCategory: "management", parameters: {} }, key: "review", label: "合规审核" },
+        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "多渠道发布", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "publish", label: "多渠道发布" },
+      ],
+    },
+    {
+      name: "每周竞争对手情报报告",
+      description: "每周一自动抓取竞品动态，对比分析差异与机会后生成情报报告推送管理层",
+      category: "analytics" as const,
+      triggerType: "scheduled" as const,
+      triggerConfig: { cron: "0 10 * * 1", timezone: "Asia/Shanghai" },
+      steps: [
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "竞品动态抓取", type: "skill" as const, config: { skillSlug: "competitor_analysis", skillName: "竞品分析", skillCategory: "perception", parameters: {} }, key: "crawl", label: "竞品动态抓取" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "竞品内容对比", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "compare", label: "竞品内容对比" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "差异与机会分析", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "insight", label: "差异与机会分析" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "情报报告生成", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "report", label: "情报报告生成" },
+        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "报告推送至管理层", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "dispatch", label: "报告推送至管理层" },
+      ],
+    },
+    {
+      name: "客户投诉邮件分类",
+      description: "手动触发客户投诉邮件分类流程，自动识别情感与紧急度后派发到对应部门",
+      category: "distribution" as const,
+      triggerType: "manual" as const,
+      steps: [
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "邮件拉取与预处理", type: "skill" as const, config: { skillSlug: "email_classifier", skillName: "邮件分类", skillCategory: "perception", parameters: {} }, key: "ingest", label: "邮件拉取与预处理" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "情感与紧急度分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "analyze", label: "情感与紧急度分析" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "自动分类与打标", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "classify", label: "自动分类与打标" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "派发至对应部门", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "dispatch", label: "派发至对应部门" },
+      ],
+    },
   ];
 
   for (const tmpl of templatesData) {
+    const extras: {
+      category?: "news" | "video" | "analytics" | "distribution" | "custom";
+      triggerType?: "manual" | "scheduled";
+      triggerConfig?: { cron?: string; timezone?: string } | null;
+    } = {};
+    if ("category" in tmpl && tmpl.category) extras.category = tmpl.category;
+    if ("triggerType" in tmpl && tmpl.triggerType)
+      extras.triggerType = tmpl.triggerType;
+    if ("triggerConfig" in tmpl && tmpl.triggerConfig)
+      extras.triggerConfig = tmpl.triggerConfig;
+
     await db.insert(schema.workflowTemplates).values({
       organizationId: org.id,
       name: tmpl.name,
       description: tmpl.description,
       steps: tmpl.steps,
+      isBuiltin: true,
+      ...extras,
     });
     console.log(`   Template: ${tmpl.name}`);
   }

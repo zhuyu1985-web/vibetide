@@ -43,7 +43,7 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* 最近任务 */}
-      <div className="rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.05] dark:border-white/[0.05] p-4 flex flex-col gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div className="rounded-2xl bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] p-4 flex flex-col gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_2px_8px_rgba(0,0,0,0.03)]">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -83,7 +83,7 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
       </div>
 
       {/* 最近对话 */}
-      <div className="rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.05] dark:border-white/[0.05] p-4 flex flex-col gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div className="rounded-2xl bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] p-4 flex flex-col gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_2px_8px_rgba(0,0,0,0.03)]">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

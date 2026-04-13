@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { skills, skillFiles, skillVersions, skillUsageRecords } from "@/db/schema";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
@@ -401,6 +401,74 @@ export async function deleteSkill(id: string) {
 }
 
 // --- Skill Package Import/Export ---
+
+export interface SkillExportData {
+  id: string;
+  name: string;
+  slug: string | null;
+  category: SkillCategory;
+  type: string;
+  version: string;
+  description: string;
+  content: string;
+  inputSchema: Record<string, string> | null;
+  outputSchema: Record<string, string> | null;
+  runtimeConfig: {
+    type: string;
+    avgLatencyMs: number;
+    maxConcurrency: number;
+    modelDependency?: string;
+  } | null;
+  compatibleRoles: string[];
+}
+
+export async function getSkillsForExport(
+  ids: string[]
+): Promise<SkillExportData[]> {
+  await requireAuth();
+  const orgId = await requireCurrentOrgId();
+
+  if (ids.length === 0) return [];
+  if (ids.length > 100) throw new Error("单次最多导出 100 个技能");
+
+  const rows = await db
+    .select({
+      id: skills.id,
+      name: skills.name,
+      slug: skills.slug,
+      category: skills.category,
+      type: skills.type,
+      version: skills.version,
+      description: skills.description,
+      content: skills.content,
+      inputSchema: skills.inputSchema,
+      outputSchema: skills.outputSchema,
+      runtimeConfig: skills.runtimeConfig,
+      compatibleRoles: skills.compatibleRoles,
+    })
+    .from(skills)
+    .where(
+      and(
+        inArray(skills.id, ids),
+        or(eq(skills.organizationId, orgId), isNull(skills.organizationId))
+      )
+    );
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    category: r.category as SkillCategory,
+    type: r.type,
+    version: r.version,
+    description: r.description,
+    content: r.content ?? "",
+    inputSchema: r.inputSchema ?? null,
+    outputSchema: r.outputSchema ?? null,
+    runtimeConfig: r.runtimeConfig ?? null,
+    compatibleRoles: (r.compatibleRoles as string[]) ?? [],
+  }));
+}
 
 export async function importSkillPackage(data: {
   name: string;

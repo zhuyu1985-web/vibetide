@@ -1,0 +1,55 @@
+<h2>展示形式选择</h2>
+<p class="subtitle">从PPT翻页式改为信息密度更高的形式</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案A：技术白皮书式长页面（推荐）</h3>
+      <p><strong>形式：</strong>一个连续滚动的长页面，类似技术博客/白皮书。每个章节是一个完整区块，包含架构图 + 文字说明 + 设计理由。</p>
+      <p><strong>特点：</strong></p>
+      <ul style="text-align:left;font-size:14px;color:#999;line-height:1.8">
+        <li>信息密度高 — 图文并排，一屏能展示完整的架构图 + 详细解释</li>
+        <li>左侧固定目录导航，点击跳转对应章节</li>
+        <li>架构图用 SVG/Canvas 绘制，支持交互（hover 显示详情、点击展开）</li>
+        <li>滚动触发动画，但不影响阅读流畅度</li>
+        <li>适合投屏讲解时跟着滚动，也适合事后分享链接自行阅读</li>
+      </ul>
+      <p style="color:#4ade80"><strong>优势：</strong>信息密度最高，架构图能画大画全，讲解最自由</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案B：交互式架构探索器</h3>
+      <p><strong>形式：</strong>以一张大型交互式架构图为核心，点击不同层级/模块展开详细说明面板。类似 Figma 的画布体验。</p>
+      <p><strong>特点：</strong></p>
+      <ul style="text-align:left;font-size:14px;color:#999;line-height:1.8">
+        <li>主视图是一张完整的分层架构图，可缩放、拖拽</li>
+        <li>点击任意模块弹出详情侧边栏（设计理由、模块关系、场景说明）</li>
+        <li>预设几条"导览路线"（如：认知闭环路线、工作流路线），自动高亮+连线</li>
+        <li>适合深度探索，但线性讲解时操作稍复杂</li>
+      </ul>
+      <p style="color:#4ade80"><strong>优势：</strong>交互最丰富，探索性最强</p>
+      <p style="color:#f59e0b"><strong>劣势：</strong>演示时操作要求高，开发复杂度大</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>方案C：章节式分区页面</h3>
+      <p><strong>形式：</strong>介于PPT和长页面之间。页面分为4-5个大章节，每个章节占一个视口高度但内部内容丰富（图+文+交互），可上下滚动切换章节。</p>
+      <p><strong>特点：</strong></p>
+      <ul style="text-align:left;font-size:14px;color:#999;line-height:1.8">
+        <li>每个章节对应你的4个核心问题之一</li>
+        <li>章节内部可以滚动查看更多内容（图、表、说明）</li>
+        <li>章节之间有明确的视觉分隔和过渡动画</li>
+        <li>顶部Tab栏可快速跳转章节</li>
+      </ul>
+      <p style="color:#4ade80"><strong>优势：</strong>结构清晰，内容充分，兼顾演示和阅读</p>
+      <p style="color:#f59e0b"><strong>劣势：</strong>章节内滚动+整体滚动可能有体验冲突</p>
+    </div>
+  </div>
+</div>

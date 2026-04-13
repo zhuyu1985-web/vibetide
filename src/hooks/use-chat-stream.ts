@@ -82,6 +82,15 @@ export interface UseChatStreamReturn {
 
   /** Clear all messages and intent state. */
   clearMessages: () => void;
+
+  /**
+   * Regenerate the assistant response at `assistantIndex`. Truncates the
+   * conversation up to (but not including) the user message that triggered
+   * it, then re-runs the full intent-aware sendMessage pipeline on the same
+   * user prompt. If the assistant message is followed by later turns, those
+   * later turns are discarded — mirroring the behavior of most chat clients.
+   */
+  regenerate: (assistantIndex: number) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +402,32 @@ export function useChatStream({
     setIntentLoading(false);
   }, []);
 
+  // ── Regenerate an assistant message ──
+  const regenerate = useCallback(
+    async (assistantIndex: number) => {
+      const current = messagesRef.current;
+      const userIdx = assistantIndex - 1;
+      const userMsg = current[userIdx];
+      if (!userMsg || userMsg.role !== "user") return;
+
+      const userText = userMsg.content;
+      // Truncate to the history BEFORE that user message. sendMessage will
+      // re-add it. We mutate the ref synchronously so sendMessage's closure
+      // picks up the truncated history even before React re-renders.
+      const truncated = current.slice(0, userIdx);
+      setMessages(truncated);
+      messagesRef.current = truncated;
+
+      // Clear any stale intent state from the previous run
+      setPendingIntent(null);
+      setPendingMessage("");
+      setIntentProgress([]);
+
+      await sendMessage(userText);
+    },
+    [sendMessage]
+  );
+
   // ── Clear all messages and intent state ──
   const clearMessages = useCallback(() => {
     setMessages([]);
@@ -430,5 +465,6 @@ export function useChatStream({
     executeIntent: executeIntentFn,
     cancelIntent,
     clearMessages,
+    regenerate,
   };
 }

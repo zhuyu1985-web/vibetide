@@ -8,6 +8,27 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { startMission } from "@/app/actions/missions";
+import {
+  BUILTIN_TEMPLATES,
+  type BuiltinTemplate,
+} from "@/lib/workflow-templates";
+import { buildBuiltinTemplateId } from "@/lib/dal/workflow-templates";
+
+/**
+ * Look up a virtual builtin template (from the static BUILTIN_TEMPLATES
+ * constant) by its synthesized `builtin-<hash>` ID. Returns null if the ID
+ * doesn't match any entry.
+ */
+function findBuiltinTemplateById(
+  templateId: string
+): BuiltinTemplate | null {
+  if (!templateId.startsWith("builtin-")) return null;
+  return (
+    BUILTIN_TEMPLATES.find(
+      (t) => buildBuiltinTemplateId(t.name) === templateId
+    ) ?? null
+  );
+}
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -89,6 +110,30 @@ export async function createWorkflowFromTemplate(templateId: string) {
   const user = await requireAuth();
   const orgId = await getCurrentUserOrg();
   if (!orgId) throw new Error("用户未关联组织");
+
+  // Virtual builtin templates (not yet persisted to DB) resolve from the
+  // static BUILTIN_TEMPLATES constant instead of the workflow_templates table.
+  const virtual = findBuiltinTemplateById(templateId);
+  if (virtual) {
+    const [newWorkflow] = await db
+      .insert(workflowTemplates)
+      .values({
+        organizationId: orgId,
+        name: `${virtual.name}（副本）`,
+        description: virtual.description,
+        steps: virtual.steps,
+        category: virtual.category,
+        triggerType: virtual.triggerType,
+        triggerConfig: virtual.triggerConfig ?? null,
+        isBuiltin: false,
+        isEnabled: false,
+        createdBy: user.id,
+      })
+      .returning();
+
+    revalidatePath("/workflows");
+    return newWorkflow;
+  }
 
   const template = await db.query.workflowTemplates.findFirst({
     where: eq(workflowTemplates.id, templateId),

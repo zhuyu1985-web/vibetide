@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Upload,
+  Download,
   Search,
   Pencil,
   Trash2,
@@ -20,8 +21,12 @@ import {
   ArrowDownWideNarrow,
   Clock,
   SortAsc,
+  CheckSquare,
+  Square,
 } from "lucide-react";
-import { deleteSkill } from "@/app/actions/skills";
+import { Checkbox } from "@/components/ui/checkbox";
+import { deleteSkill, getSkillsForExport } from "@/app/actions/skills";
+import { generateSkillMd } from "@/lib/skill-package";
 import type { SkillWithBindCount } from "@/lib/dal/skills";
 import type { SkillCategory } from "@/lib/types";
 
@@ -94,6 +99,8 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
   );
   const [deleting, setDeleting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
 
   // Sync with server props when they update
   useEffect(() => {
@@ -172,6 +179,74 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
     }
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const visibleIds = sorted.map((s) => s.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+    if (allSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBatchExport = async () => {
+    if (selected.size === 0) return;
+    setExporting(true);
+    try {
+      const ids = Array.from(selected);
+      const data = await getSkillsForExport(ids);
+      if (data.length === 0) return;
+
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+
+      for (const skill of data) {
+        const folderName = (skill.slug || skill.name).replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g, "_");
+        const md = generateSkillMd(skill.name, skill.description, skill.content, {
+          name: skill.slug || skill.name,
+          displayName: skill.name,
+          category: skill.category,
+          version: skill.version,
+          inputSchema: skill.inputSchema ?? undefined,
+          outputSchema: skill.outputSchema ?? undefined,
+          runtimeConfig: skill.runtimeConfig ?? undefined,
+          compatibleRoles: skill.compatibleRoles,
+        });
+        zip.file(`${folderName}/SKILL.md`, md);
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `skills-export-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSelected(new Set());
+    } catch (err) {
+      console.error("Failed to export skills:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="max-w-[1400px] mx-auto">
       <PageHeader
@@ -179,6 +254,16 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
         description="管理 AI 员工可用的技能库，添加自定义技能或查看内置技能"
         actions={
           <div className="flex gap-2">
+            {selected.size > 0 && (
+              <Button
+                variant="ghost"
+                onClick={handleBatchExport}
+                disabled={exporting}
+              >
+                <Download size={16} className="mr-1" />
+                {exporting ? "导出中..." : `导出 (${selected.size})`}
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setImportOpen(true)}>
               <Upload size={16} className="mr-1" />
               导入技能
@@ -193,6 +278,19 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={toggleSelectAll}
+        >
+          {sorted.length > 0 && sorted.every((s) => selected.has(s.id)) ? (
+            <CheckSquare size={14} />
+          ) : (
+            <Square size={14} />
+          )}
+          全选
+        </Button>
         <div className="relative flex-1 min-w-[200px] max-w-[400px]">
           <Search
             size={16}
@@ -273,6 +371,11 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
               {/* Terminal-style top bar */}
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
                 <div className="flex items-center gap-2 min-w-0">
+                  <Checkbox
+                    checked={selected.has(skill.id)}
+                    onCheckedChange={() => toggleSelect(skill.id)}
+                    className="shrink-0"
+                  />
                   <div className="flex gap-1.5 shrink-0">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />

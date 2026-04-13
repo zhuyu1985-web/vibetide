@@ -17,6 +17,7 @@ import {
   Shield,
   BookOpen,
   Cog,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -83,11 +84,15 @@ export interface StepCardProps {
   selected: boolean;
   status?: "idle" | "pending" | "running" | "completed" | "failed";
   statusMessage?: string;
+  durationMs?: number;
+  hasResult?: boolean;
+  resultSelected?: boolean;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onViewResult?: () => void;
   isFirst: boolean;
   isLast: boolean;
 }
@@ -132,11 +137,15 @@ export function StepCard({
   selected,
   status = "idle",
   statusMessage,
+  durationMs,
+  hasResult = false,
+  resultSelected = false,
   onClick,
   onEdit,
   onDelete,
   onMoveUp,
   onMoveDown,
+  onViewResult,
   isFirst,
   isLast,
 }: StepCardProps) {
@@ -223,23 +232,69 @@ export function StepCard({
         </DropdownMenu>
       </button>
 
-      {/* Status message shown to the right of the card */}
-      {(status === "running" || status === "completed" || status === "failed") &&
-        statusMessage && (
+      {/* Status pill shown to the right of the card (test-run output) */}
+      {(status === "running" || status === "completed" || status === "failed") && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (hasResult && onViewResult) onViewResult();
+          }}
+          disabled={!hasResult || !onViewResult}
+          className={`group shrink-0 w-[240px] flex items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors border-0 ${
+            hasResult && onViewResult
+              ? "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              : "cursor-default"
+          } ${
+            resultSelected
+              ? "bg-black/[0.05] dark:bg-white/[0.08]"
+              : "bg-transparent"
+          }`}
+        >
+          <span className="shrink-0">
+            {status === "running" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+            ) : status === "completed" ? (
+              <Check className="w-3.5 h-3.5 text-green-500" />
+            ) : (
+              <X className="w-3.5 h-3.5 text-red-500" />
+            )}
+          </span>
           <span
-            className={`shrink-0 text-xs max-w-40 truncate ${
+            className={`flex-1 min-w-0 truncate text-xs leading-tight ${
               status === "completed"
-                ? "text-green-600 dark:text-green-400"
+                ? "text-green-700 dark:text-green-400"
                 : status === "failed"
                   ? "text-red-600 dark:text-red-400"
                   : "text-blue-600 dark:text-blue-400"
             }`}
+            title={statusMessage}
           >
-            {statusMessage}
+            {statusMessage ??
+              (status === "running" ? "执行中…" : "等待输出")}
           </span>
-        )}
+          {hasResult && onViewResult && (
+            <span className="shrink-0 flex items-center gap-0.5 text-[11px] text-muted-foreground group-hover:text-foreground transition-colors">
+              详情
+              <ChevronRight className="w-3 h-3" />
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
+}
+
+/**
+ * Format a duration in ms to a compact human string.
+ */
+export function formatDuration(ms?: number): string {
+  if (ms == null || !Number.isFinite(ms)) return "";
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const m = Math.floor(ms / 60_000);
+  const s = Math.round((ms % 60_000) / 1000);
+  return `${m}m ${s}s`;
 }
 
 export { SKILL_CATEGORY_CONFIG };
