@@ -1,5 +1,5 @@
 export { researchTavilyCrawl } from "./tavily-crawl";
 export { researchWhitelistCrawl } from "./whitelist-crawl";
-// Tasks 10/11 will add:
-// export { researchManualUrlIngest } from "./manual-url-ingest";
+export { researchManualUrlIngest } from "./manual-url-ingest";
+// Task 11 will add:
 // export { researchTaskStart } from "./task-start";
