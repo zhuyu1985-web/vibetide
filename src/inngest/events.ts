@@ -174,4 +174,43 @@ export type InngestEvents = {
       operation: "created" | "updated" | "deleted";
     };
   };
+  "research/task.submitted": {
+    data: {
+      taskId: string;
+    };
+  };
+  "research/task.cancelled": {
+    data: {
+      taskId: string;
+    };
+  };
+  "research/tavily.crawl": {
+    data: {
+      taskId: string;
+      topicId: string;
+      keywords: string[];
+      timeRangeStart: string;
+      timeRangeEnd: string;
+      includeDomains: string[];
+    };
+  };
+  "research/whitelist.crawl": {
+    data: {
+      taskId: string;
+      outletId: string;
+    };
+  };
+  "research/manual-url.ingest": {
+    data: {
+      taskId: string;
+      urls: string[];
+    };
+  };
+  "research/article.ingested": {
+    data: {
+      articleId: string;
+      taskId: string;
+      outletId: string | null;
+    };
+  };
 };
