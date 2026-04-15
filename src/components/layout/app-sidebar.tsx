@@ -35,6 +35,7 @@ import {
   CheckSquare,
   ChevronDown,
   Wrench,
+  Telescope,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -66,7 +67,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: "创作", href: "#creation", icon: Wand2,
     children: [
-      { label: "灵感池", href: "/inspiration", icon: Lightbulb },
+      { label: "热点发现", href: "/inspiration", icon: Lightbulb },
       { label: "同题对标", href: "/benchmarking", icon: Crosshair },
       { label: "超级创作", href: "/super-creation", icon: PenTool },
       { label: "精品聚合", href: "/premium-content", icon: Gem },
@@ -93,6 +94,14 @@ const NAV_ITEMS: NavItem[] = [
       { label: "数据看板", href: "/analytics", icon: TrendingUp },
       { label: "效果激励", href: "/leaderboard", icon: Award },
       { label: "精品提升率", href: "/content-excellence", icon: Star },
+    ],
+  },
+  {
+    label: "新闻研究", href: "/research", icon: Telescope,
+    children: [
+      { label: "研究工作台", href: "/research", icon: Telescope },
+      { label: "媒体源管理", href: "/research/admin/media-outlets", icon: Radio },
+      { label: "主题词库", href: "/research/admin/topics", icon: BookMarked },
     ],
   },
 ];
