@@ -61,7 +61,6 @@ export function SevenLayerPrompt() {
           <motion.div
             key={layer.layer}
             variants={cardVariant}
-            style={{ marginLeft: `${(layer.layer - 1) * 6}px` }}
           >
             <GlassCard
               variant="secondary"
@@ -77,7 +76,7 @@ export function SevenLayerPrompt() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm">{layer.name}</p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground">
                   {layer.content}
                 </p>
               </div>

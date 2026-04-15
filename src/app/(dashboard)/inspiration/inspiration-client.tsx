@@ -548,13 +548,13 @@ export function InspirationClient({
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto">
+    <div className="max-w-[1400px] mx-auto h-full flex flex-col">
       <PageHeader
-        title="灵感池"
+        title="热点发现"
         description="全网热点聚合 · AI 选题建议"
       />
       {/* Three-column layout */}
-      <div className="flex h-[calc(100vh-200px)] min-h-[600px] rounded-xl border border-gray-200 dark:border-white/5 overflow-hidden">
+      <div className="flex flex-1 min-h-0 rounded-xl border border-gray-200 dark:border-white/5 overflow-hidden">
         {/* ======================== Column 1: Platform Sidebar ======================== */}
         <div className="w-[140px] shrink-0 flex flex-col min-h-0 border-r border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.01]">
           <ScrollArea className="h-full">
@@ -1795,7 +1795,7 @@ function OnboardingDialog({
         <DialogHeader>
           <DialogTitle className="text-gray-900 dark:text-gray-100">选择你感兴趣的内容</DialogTitle>
           <DialogDescription className="text-gray-500 dark:text-gray-400">
-            设置订阅分类，灵感池将优先展示你关注的领域
+            设置订阅分类，热点发现将优先展示你关注的领域
           </DialogDescription>
         </DialogHeader>
         <SubscriptionCheckboxGrid

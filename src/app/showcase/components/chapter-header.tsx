@@ -6,7 +6,7 @@ interface ChapterHeaderProps {
 
 export function ChapterHeader({ number, title, subtitle }: ChapterHeaderProps) {
   return (
-    <div className="mb-8">
+    <div className="mt-8 mb-6">
       <div className="text-xs font-bold tracking-[3px] text-primary/60 uppercase mb-2">
         {number}
       </div>

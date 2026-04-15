@@ -60,7 +60,12 @@ export const researchTaskStart = inngest.createFunction(
           and(
             eq(mediaOutlets.organizationId, task.organizationId),
             eq(mediaOutlets.status, "active"),
-            inArray(mediaOutlets.tier, task.mediaTiers as any),
+            inArray(
+              mediaOutlets.tier,
+              task.mediaTiers as Array<
+                "central" | "provincial_municipal" | "industry" | "district_media"
+              >,
+            ),
             isNotNull(mediaOutlets.officialUrl),
           ),
         ),

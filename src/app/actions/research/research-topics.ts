@@ -46,7 +46,7 @@ const updateSampleSchema = z.object({
 
 // ---------- Helpers ----------
 
-type Result<T = {}> =
+type Result<T = Record<never, never>> =
   | ({ ok: true } & T)
   | { ok: false; error: string };
 

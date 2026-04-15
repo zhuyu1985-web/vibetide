@@ -114,7 +114,7 @@ export default function ShowcasePage() {
               </p>
               <p>
                 <strong className="text-foreground">业务应用层</strong>
-                ：面向用户的具体功能页面——灵感池、稿件管理、智能媒资、数据看板等 34 个路由组。不直接调用 LLM，而是通过智能体层间接驱动所有 AI 能力。
+                ：面向用户的具体功能页面——热点发现、稿件管理、智能媒资、数据看板等 34 个路由组。不直接调用 LLM，而是通过智能体层间接驱动所有 AI 能力。
               </p>
             </div>
             <div className="my-4 rounded-xl bg-primary/5 border border-primary/10 px-5 py-4 text-sm leading-relaxed">

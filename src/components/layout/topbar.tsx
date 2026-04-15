@@ -23,7 +23,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 const pageTitles: Record<string, string> = {
   "/missions": "任务中心",
   "/channel-advisor": "频道顾问",
-  "/inspiration": "灵感池",
+  "/inspiration": "热点发现",
   "/benchmarking": "同题对标",
   "/super-creation": "超级创作",
   "/premium-content": "精品聚合",

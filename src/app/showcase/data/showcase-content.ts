@@ -42,7 +42,7 @@ export const ARCH_LAYERS: ArchLayer[] = [
     name: "业务应用层",
     color: "pink",
     modules: [
-      { name: "灵感池" }, { name: "超级创作" }, { name: "视频批量" },
+      { name: "热点发现" }, { name: "超级创作" }, { name: "视频批量" },
       { name: "全渠道发布" }, { name: "竞品分析" }, { name: "数据分析" },
       { name: "智能媒资" }, { name: "审批中心" }, { name: "排行榜" },
       { name: "事件自动化" },

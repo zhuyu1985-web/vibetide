@@ -73,7 +73,7 @@ const TASK_STATUS: Record<
 
 const SOURCE_LABEL: Record<string, string> = {
   hot_topics: "灵感雷达", publishing: "全渠道发布", benchmarking: "对标监控",
-  analytics: "数据分析", creation: "超级创作", inspiration: "灵感池",
+  analytics: "数据分析", creation: "超级创作", inspiration: "热点发现",
 };
 
 const PHASE_STEPS = [

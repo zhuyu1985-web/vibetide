@@ -1,5 +1,5 @@
 // src/lib/dal/research/__tests__/cq-districts.test.ts
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { listCqDistricts } from "../cq-districts";
 
 describe("listCqDistricts", () => {

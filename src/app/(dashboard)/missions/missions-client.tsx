@@ -59,7 +59,7 @@ const SOURCE_MODULE_LABEL: Record<string, { label: string; cls: string }> = {
   benchmarking: { label: "对标监控", cls: "bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400" },
   analytics:    { label: "数据分析", cls: "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400" },
   creation:     { label: "超级创作", cls: "bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400" },
-  inspiration:  { label: "灵感池", cls: "bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400" },
+  inspiration:  { label: "热点发现", cls: "bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400" },
 };
 
 // ── Status config ───────────────────────────────────────────
