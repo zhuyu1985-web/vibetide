@@ -65,3 +65,5 @@ export * from "./roles";
 
 // Cognitive Engine (2026-04-03)
 export * from "./verification-records";
+
+export * from "./research";
