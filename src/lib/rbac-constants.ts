@@ -47,6 +47,15 @@ export const PERMISSIONS = {
   MENU_LEADERBOARD: "menu:leaderboard",
   MENU_CONTENT_EXCELLENCE: "menu:content_excellence",
   MENU_CASE_LIBRARY: "menu:case_library",
+  // Menu visibility — news research
+  MENU_RESEARCH: "menu:research",
+  // News research module
+  RESEARCH_TASK_CREATE: "research:task_create",
+  RESEARCH_TASK_VIEW_OWN: "research:task_view_own",
+  RESEARCH_TASK_VIEW_ORG: "research:task_view_org",
+  RESEARCH_TASK_EXPORT: "research:task_export",
+  RESEARCH_MEDIA_OUTLET_MANAGE: "research:media_outlet_manage",
+  RESEARCH_TOPIC_MANAGE: "research:topic_manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -92,6 +101,10 @@ export const MENU_PERMISSION_MAP: Record<string, string | undefined> = {
   "/publishing": PERMISSIONS.MENU_PUBLISHING,
   "/leaderboard": PERMISSIONS.MENU_LEADERBOARD,
   "/content-excellence": PERMISSIONS.MENU_CONTENT_EXCELLENCE,
+  // News research
+  "/research": PERMISSIONS.MENU_RESEARCH,
+  "/research/admin/media-outlets": PERMISSIONS.RESEARCH_MEDIA_OUTLET_MANAGE,
+  "/research/admin/topics": PERMISSIONS.RESEARCH_TOPIC_MANAGE,
 };
 
 // Tab-level permission map for pages with tabbed sub-sections
@@ -136,6 +149,10 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.CONTENT_WRITE,
       PERMISSIONS.ANALYTICS_READ,
       PERMISSIONS.AI_USE,
+      // News research (editor role can operate the module)
+      PERMISSIONS.RESEARCH_TASK_CREATE,
+      PERMISSIONS.RESEARCH_TASK_VIEW_OWN,
+      PERMISSIONS.RESEARCH_TASK_EXPORT,
       // Editor can see most menus
       ...ALL_MENU_PERMISSIONS,
     ],
@@ -217,7 +234,7 @@ export const PERMISSION_GROUPS = [
   {
     label: "菜单权限 — 创作者中心",
     permissions: [
-      { key: PERMISSIONS.MENU_INSPIRATION, label: "灵感池" },
+      { key: PERMISSIONS.MENU_INSPIRATION, label: "热点发现" },
       { key: PERMISSIONS.MENU_BENCHMARKING, label: "同题对标" },
       { key: PERMISSIONS.MENU_SUPER_CREATION, label: "超级创作" },
       { key: PERMISSIONS.MENU_PREMIUM_CONTENT, label: "精品聚合" },
@@ -235,6 +252,18 @@ export const PERMISSION_GROUPS = [
       { key: PERMISSIONS.MENU_LEADERBOARD, label: "效果激励" },
       { key: PERMISSIONS.MENU_CONTENT_EXCELLENCE, label: "精品率提升" },
       { key: PERMISSIONS.MENU_CASE_LIBRARY, label: "优秀案例库" },
+    ],
+  },
+  {
+    label: "新闻研究",
+    permissions: [
+      { key: PERMISSIONS.MENU_RESEARCH, label: "查看新闻研究模块" },
+      { key: PERMISSIONS.RESEARCH_TASK_CREATE, label: "创建研究任务" },
+      { key: PERMISSIONS.RESEARCH_TASK_VIEW_OWN, label: "查看自己的研究任务" },
+      { key: PERMISSIONS.RESEARCH_TASK_VIEW_ORG, label: "查看组织内所有研究任务" },
+      { key: PERMISSIONS.RESEARCH_TASK_EXPORT, label: "导出研究结果" },
+      { key: PERMISSIONS.RESEARCH_MEDIA_OUTLET_MANAGE, label: "管理媒体源" },
+      { key: PERMISSIONS.RESEARCH_TOPIC_MANAGE, label: "管理主题词库" },
     ],
   },
 ];
