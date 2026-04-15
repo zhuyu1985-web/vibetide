@@ -11,6 +11,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { requirePermission, PERMISSIONS } from "@/lib/rbac";
 import { inngest } from "@/inngest/client";
+import { getResearchTopicById } from "@/lib/dal/research/research-topics";
 
 // ---------- Schemas ----------
 
@@ -324,4 +325,13 @@ export async function removeSample(id: string): Promise<Result> {
   } catch (e) {
     return fail(e);
   }
+}
+
+// ---------- Detail fetch ----------
+
+export async function getTopicDetail(id: string) {
+  const { organizationId } = await requirePermission(
+    PERMISSIONS.RESEARCH_TOPIC_MANAGE,
+  );
+  return getResearchTopicById(id, organizationId);
 }
