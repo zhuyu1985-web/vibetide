@@ -164,4 +164,14 @@ export type InngestEvents = {
       organizationId: string;
     };
   };
+
+  // ─── Research Module Events ───
+
+  "research/topic.sample.changed": {
+    data: {
+      sampleId: string;
+      topicId: string;
+      operation: "created" | "updated" | "deleted";
+    };
+  };
 };
