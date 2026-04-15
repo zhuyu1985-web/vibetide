@@ -134,6 +134,13 @@
       "when": 1775984099305,
       "tag": "0018_crazy_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1776234829807,
+      "tag": "0019_bizarre_anthem",
+      "breakpoints": true
     }
   ]
 }
