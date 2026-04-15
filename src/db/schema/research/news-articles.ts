@@ -32,12 +32,17 @@ export const newsArticles = pgTable(
     embedding: jsonb("embedding"),
     embeddingStatus: researchEmbeddingStatusEnum("embedding_status").notNull().default("pending"),
     rawMetadata: jsonb("raw_metadata"),
+    firstSeenResearchTaskId: uuid("first_seen_research_task_id").references(
+      () => researchTasks.id,
+      { onDelete: "set null" },
+    ),
   },
   (t) => ({
     urlHashUq: uniqueIndex("research_news_articles_url_hash_uq").on(t.urlHash),
     outletPublishedIdx: index("research_news_articles_outlet_published_idx").on(t.outletId, t.publishedAt),
     districtPublishedIdx: index("research_news_articles_district_published_idx").on(t.districtIdSnapshot, t.publishedAt),
     embeddingStatusIdx: index("research_news_articles_embedding_status_idx").on(t.embeddingStatus),
+    taskLookupIdx: index("research_news_articles_task_idx").on(t.firstSeenResearchTaskId),
   }),
 );
 

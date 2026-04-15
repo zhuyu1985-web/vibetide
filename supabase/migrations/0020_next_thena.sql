@@ -1,0 +1,3 @@
+ALTER TABLE "research_news_articles" ADD COLUMN "first_seen_research_task_id" uuid;--> statement-breakpoint
+ALTER TABLE "research_news_articles" ADD CONSTRAINT "research_news_articles_first_seen_research_task_id_research_tasks_id_fk" FOREIGN KEY ("first_seen_research_task_id") REFERENCES "public"."research_tasks"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "research_news_articles_task_idx" ON "research_news_articles" USING btree ("first_seen_research_task_id");
