@@ -23,6 +23,12 @@ import {
 import { hotTopicEnrichmentPipeline } from "./hot-topic-enrichment";
 import { employeeStatusGuard } from "./employee-status-guard";
 import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
+import {
+  researchTaskStart,
+  researchTavilyCrawl,
+  researchWhitelistCrawl,
+  researchManualUrlIngest,
+} from "./research";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -53,4 +59,9 @@ export const functions = [
   employeeStatusGuard,
   // Knowledge base
   knowledgeBaseVectorize,
+  // News Research (S2)
+  researchTaskStart,
+  researchTavilyCrawl,
+  researchWhitelistCrawl,
+  researchManualUrlIngest,
 ];
