@@ -103,6 +103,7 @@ export const MENU_PERMISSION_MAP: Record<string, string | undefined> = {
   "/content-excellence": PERMISSIONS.MENU_CONTENT_EXCELLENCE,
   // News research
   "/research": PERMISSIONS.MENU_RESEARCH,
+  "/research/admin/tasks": PERMISSIONS.RESEARCH_TASK_CREATE,
   "/research/admin/media-outlets": PERMISSIONS.RESEARCH_MEDIA_OUTLET_MANAGE,
   "/research/admin/topics": PERMISSIONS.RESEARCH_TOPIC_MANAGE,
 };
@@ -255,7 +256,7 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
-    label: "新闻研究",
+    label: "研究",
     permissions: [
       { key: PERMISSIONS.MENU_RESEARCH, label: "查看新闻研究模块" },
       { key: PERMISSIONS.RESEARCH_TASK_CREATE, label: "创建研究任务" },

@@ -56,7 +56,7 @@ export async function createResearchTask(
       data: { taskId: task.id },
     });
 
-    revalidatePath("/research");
+    revalidatePath("/research/admin/tasks");
     return { ok: true, id: task.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -85,8 +85,8 @@ export async function cancelResearchTask(
       data: { taskId: id },
     });
 
-    revalidatePath("/research");
-    revalidatePath(`/research/tasks/${id}`);
+    revalidatePath("/research/admin/tasks");
+    revalidatePath(`/research/admin/tasks/${id}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

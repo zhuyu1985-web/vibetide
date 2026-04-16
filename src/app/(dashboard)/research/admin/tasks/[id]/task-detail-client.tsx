@@ -117,7 +117,7 @@ export function TaskDetailClient({
     <div className="p-6 space-y-6">
       <div>
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href="/research"><ArrowLeft className="h-3.5 w-3.5 mr-1" />返回任务列表</Link>
+          <Link href="/research/admin/tasks"><ArrowLeft className="h-3.5 w-3.5 mr-1" />返回任务列表</Link>
         </Button>
         <div className="flex items-start justify-between gap-4">
           <div>

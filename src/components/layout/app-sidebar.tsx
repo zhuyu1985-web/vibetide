@@ -98,10 +98,10 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: "新闻研究", href: "/research", icon: Telescope,
+    label: "研究", href: "/research", icon: Telescope,
     children: [
-      { label: "研究工作台", href: "/research", icon: Telescope },
-      { label: "新建任务", href: "/research/new", icon: Plus },
+      { label: "检索工作台", href: "/research", icon: Telescope },
+      { label: "采集任务", href: "/research/admin/tasks", icon: FileText },
       { label: "媒体源管理", href: "/research/admin/media-outlets", icon: Radio },
       { label: "主题词库", href: "/research/admin/topics", icon: BookMarked },
     ],

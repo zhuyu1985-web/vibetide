@@ -75,7 +75,7 @@ export function NewTaskClient({
         dedupLevel: "district",
       });
       if (!res.ok) setError(res.error);
-      else router.push(`/research/tasks/${res.id}`);
+      else router.push(`/research/admin/tasks/${res.id}`);
     });
   }
 
@@ -222,7 +222,7 @@ export function NewTaskClient({
       </section>
 
       <div className="flex gap-3 pt-4">
-        <Button variant="ghost" onClick={() => router.push("/research")}>
+        <Button variant="ghost" onClick={() => router.push("/research/admin/tasks")}>
           取消
         </Button>
         <Button variant="ghost" onClick={submit} disabled={pending}>
