@@ -28,6 +28,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Plus, X, Star, Trash2 } from "lucide-react";
+import { GlassCard } from "@/components/shared/glass-card";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import {
   createTopic,
@@ -84,10 +85,10 @@ const EMBED_STATUS_LABEL: Record<SampleItem["embeddingStatus"], string> = {
 };
 
 const EMBED_STATUS_CLASS: Record<SampleItem["embeddingStatus"], string> = {
-  pending: "bg-slate-100 text-slate-700 hover:bg-slate-100",
-  processing: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  done: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
-  failed: "bg-rose-100 text-rose-700 hover:bg-rose-100",
+  pending: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/40",
+  processing: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30",
+  done: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30",
+  failed: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/30",
 };
 
 export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
@@ -312,11 +313,11 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
   const aliasKeywords = detail.keywords.filter((k) => !k.isPrimary);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">主题词库管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">主题词库管理</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             管理研究主题、共词别名与语义样本
           </p>
         </div>
@@ -327,38 +328,42 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
       </div>
 
       {topics.length === 0 ? (
-        <div className="rounded-xl bg-card py-16 text-center text-muted-foreground">
-          还没有主题，点击右上角「新增主题」开始创建
-        </div>
+        <GlassCard variant="default" padding="lg">
+          <div className="text-center text-gray-500 dark:text-gray-400 py-10">
+            还没有主题，点击右上角「新增主题」开始创建
+          </div>
+        </GlassCard>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {topics.map((t) => (
-            <button
+            <GlassCard
               key={t.id}
-              type="button"
+              variant="interactive"
+              padding="md"
+              hover
               onClick={() => openEdit(t)}
-              className="text-left rounded-xl bg-card p-4 hover:bg-accent/50 transition-colors"
+              className="text-left cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-lg font-semibold leading-tight">
                   {t.name}
                 </h3>
                 {t.isPreset && (
-                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 shrink-0">
+                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 shrink-0">
                     预置
                   </Badge>
                 )}
               </div>
               <div className="mt-3 text-sm">
-                <span className="text-muted-foreground">共词：</span>
+                <span className="text-gray-500 dark:text-gray-400">共词：</span>
                 <span className="font-medium">
                   {t.primaryKeyword ?? "未设置"}
                 </span>
               </div>
-              <div className="mt-2 text-xs text-muted-foreground">
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 别名 {t.aliasCount} 条 · 样本 {t.sampleCount} 条
               </div>
-            </button>
+            </GlassCard>
           ))}
         </div>
       )}
@@ -374,7 +379,7 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
             <DialogTitle>
               {dialog.kind === "edit" ? "编辑主题" : "新增主题"}
               {detail.isPreset && (
-                <Badge className="ml-2 bg-blue-100 text-blue-700 hover:bg-blue-100 align-middle">
+                <Badge className="ml-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 align-middle">
                   预置
                 </Badge>
               )}

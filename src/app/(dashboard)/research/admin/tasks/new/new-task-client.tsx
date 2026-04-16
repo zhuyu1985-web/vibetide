@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/shared/date-picker";
+import { GlassCard } from "@/components/shared/glass-card";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 import { createResearchTask } from "@/app/actions/research/research-tasks";
@@ -82,10 +83,10 @@ export function NewTaskClient({
   }
 
   return (
-    <div className="p-6 max-w-3xl space-y-8">
+    <div className="max-w-3xl space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">新建研究任务</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">新建研究任务</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           选择主题、区县、媒体层级和时间范围，系统将自动采集全网与白名单媒体数据
         </p>
       </div>
@@ -97,19 +98,19 @@ export function NewTaskClient({
       )}
 
       <section className="space-y-3">
-        <h2 className="font-medium">① 任务名称</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">① 任务名称</h2>
         <Input value={name} onChange={(e) => setName(e.target.value)} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-medium">② 时间范围</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">② 时间范围</h2>
         <div className="flex gap-3 items-center">
           <DatePicker
             value={timeStart ? new Date(timeStart) : null}
             onChange={(d) => setTimeStart(d ? format(d, "yyyy-MM-dd") : "")}
             placeholder="开始日期"
           />
-          <span className="text-muted-foreground text-sm">至</span>
+          <span className="text-gray-500 dark:text-gray-400 text-sm">至</span>
           <DatePicker
             value={timeEnd ? new Date(timeEnd) : null}
             onChange={(d) => setTimeEnd(d ? format(d, "yyyy-MM-dd") : "")}
@@ -120,7 +121,7 @@ export function NewTaskClient({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-medium">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
             ③ 主题（{topicIds.length}/{topics.length}）
           </h2>
           <Button
@@ -139,7 +140,7 @@ export function NewTaskClient({
           {topics.map((t) => (
             <label
               key={t.id}
-              className="flex items-center gap-2 rounded-md bg-card px-3 py-2 cursor-pointer hover:bg-accent"
+              className="flex items-center gap-2 rounded-lg glass-card px-3 py-2 cursor-pointer hover:brightness-95 dark:hover:brightness-110 transition"
             >
               <Checkbox
                 checked={topicIds.includes(t.id)}
@@ -153,7 +154,7 @@ export function NewTaskClient({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-medium">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
             ④ 区县（{districtIds.length}/{districts.length}）
           </h2>
           <Button
@@ -174,7 +175,7 @@ export function NewTaskClient({
           {districts.map((d) => (
             <label
               key={d.id}
-              className="flex items-center gap-2 rounded-md bg-card px-2 py-1.5 cursor-pointer hover:bg-accent text-xs"
+              className="flex items-center gap-2 rounded-lg glass-card px-2 py-1.5 cursor-pointer hover:brightness-95 dark:hover:brightness-110 transition text-xs"
             >
               <Checkbox
                 checked={districtIds.includes(d.id)}
@@ -189,12 +190,12 @@ export function NewTaskClient({
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-medium">⑤ 媒体层级</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">⑤ 媒体层级</h2>
         <div className="flex flex-wrap gap-2">
           {TIERS.map((t) => (
             <label
               key={t.value}
-              className="flex items-center gap-2 rounded-md bg-card px-3 py-2 cursor-pointer hover:bg-accent"
+              className="flex items-center gap-2 rounded-lg glass-card px-3 py-2 cursor-pointer hover:brightness-95 dark:hover:brightness-110 transition"
             >
               <Checkbox
                 checked={tiers.includes(t.value)}
@@ -207,9 +208,9 @@ export function NewTaskClient({
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-medium">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
           ⑥ 手动粘贴 URL{" "}
-          <span className="text-muted-foreground text-xs">
+          <span className="text-gray-500 dark:text-gray-400 text-xs font-normal">
             （可选，每行一个）
           </span>
         </h2>

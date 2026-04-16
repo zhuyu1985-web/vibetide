@@ -35,6 +35,8 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { GlassCard } from "@/components/shared/glass-card";
 import { searchArticles, advancedSearchArticles } from "@/app/actions/research/article-search";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 import type { MediaOutletSummary } from "@/lib/dal/research/media-outlets";
@@ -53,10 +55,10 @@ const TIER_OPTIONS = [
 ];
 
 const TIER_BADGE_CLASS: Record<string, string> = {
-  central: "bg-blue-100 text-blue-700",
-  provincial_municipal: "bg-emerald-100 text-emerald-700",
-  industry: "bg-amber-100 text-amber-700",
-  district_media: "bg-violet-100 text-violet-700",
+  central: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  provincial_municipal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  industry: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  district_media: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
 };
 
 const TIER_LABELS: Record<string, string> = {
@@ -363,36 +365,36 @@ export function SearchWorkbenchClient({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="space-y-6">
       {/* Top bar */}
-      <div className="p-6 pb-0 space-y-4">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">新闻研究工作台</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">新闻研究工作台</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               检索数据库中的新闻文章，筛选后批量分析
             </p>
           </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
             <Link
               href="/research/admin/media-outlets"
-              className="inline-flex items-center gap-1 hover:text-foreground transition"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
             >
               <Settings className="h-3.5 w-3.5" />
               媒体源管理
             </Link>
-            <span>·</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
             <Link
               href="/research/admin/topics"
-              className="inline-flex items-center gap-1 hover:text-foreground transition"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
             >
               <FileText className="h-3.5 w-3.5" />
               主题词库
             </Link>
-            <span>·</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
             <Link
               href="/research/admin/tasks"
-              className="inline-flex items-center gap-1 hover:text-foreground transition"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
             >
               <Database className="h-3.5 w-3.5" />
               采集任务
@@ -402,23 +404,31 @@ export function SearchWorkbenchClient({
 
         {/* Mode toggle */}
         <div className="flex gap-1 mb-3">
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
             onClick={() => setMode("simple")}
-            className={mode === "simple" ? "bg-accent" : ""}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+              mode === "simple"
+                ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
+                : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+            )}
           >
             快速搜索
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+          </button>
+          <button
+            type="button"
             onClick={() => setMode("advanced")}
-            className={mode === "advanced" ? "bg-accent" : ""}
+            className={cn(
+              "inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+              mode === "advanced"
+                ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
+                : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+            )}
           >
             <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
             高级检索
-          </Button>
+          </button>
         </div>
 
         {/* Simple mode */}
@@ -430,7 +440,7 @@ export function SearchWorkbenchClient({
                 onChange={(e) => setKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="输入关键词搜索新闻标题和正文..."
-                className="flex-1"
+                className="flex-1 bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] rounded-lg focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
               />
               <Button variant="ghost" onClick={handleSearch} disabled={pending}>
                 <Search className="h-4 w-4 mr-1" />
@@ -440,7 +450,7 @@ export function SearchWorkbenchClient({
 
             <div className="flex flex-wrap items-center gap-2">
               <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-36 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
                   <SelectValue placeholder="媒体层级" />
                 </SelectTrigger>
                 <SelectContent>
@@ -454,7 +464,7 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-32 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
                   <SelectValue placeholder="区县" />
                 </SelectTrigger>
                 <SelectContent>
@@ -468,7 +478,7 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={outletFilter} onValueChange={setOutletFilter}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-36 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
                   <SelectValue placeholder="具体媒体" />
                 </SelectTrigger>
                 <SelectContent>
@@ -482,7 +492,7 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={channelFilter} onValueChange={setChannelFilter}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-32 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
                   <SelectValue placeholder="采集来源" />
                 </SelectTrigger>
                 <SelectContent>
@@ -501,7 +511,7 @@ export function SearchWorkbenchClient({
                   onChange={(d) => setTimeStart(d ? format(d, "yyyy-MM-dd") : "")}
                   placeholder="开始日期"
                 />
-                <span className="text-muted-foreground text-xs">至</span>
+                <span className="text-gray-500 dark:text-gray-400 text-xs">至</span>
                 <DatePicker
                   value={timeEnd ? new Date(timeEnd) : null}
                   onChange={(d) => setTimeEnd(d ? format(d, "yyyy-MM-dd") : "")}
@@ -519,21 +529,24 @@ export function SearchWorkbenchClient({
               <div key={row.id}>
                 {/* Logic connector between rows */}
                 {idx > 0 && (
-                  <div className="flex items-center gap-2 my-1 ml-2">
-                    <Select
-                      value={row.logic}
-                      onValueChange={(v) =>
-                        updateCondition(row.id, { logic: v as "and" | "or" })
-                      }
-                    >
-                      <SelectTrigger className="w-20 h-7 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="and">AND</SelectItem>
-                        <SelectItem value="or">OR</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center gap-2 my-1.5 ml-2">
+                    <div className="flex gap-1">
+                      {(["and", "or"] as const).map((logic) => (
+                        <button
+                          key={logic}
+                          type="button"
+                          onClick={() => updateCondition(row.id, { logic })}
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[11px] font-medium transition-all",
+                            row.logic === logic
+                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                              : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5"
+                          )}
+                        >
+                          {logic.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {/* Condition row */}
@@ -543,7 +556,7 @@ export function SearchWorkbenchClient({
                     value={row.field}
                     onValueChange={(v) => handleFieldChange(row.id, v as AdvancedSearchField)}
                   >
-                    <SelectTrigger className="w-44">
+                    <SelectTrigger className="w-44 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -560,7 +573,7 @@ export function SearchWorkbenchClient({
                       updateCondition(row.id, { operator: v as AdvancedSearchOperator })
                     }
                   >
-                    <SelectTrigger className="w-28">
+                    <SelectTrigger className="w-28 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -612,19 +625,23 @@ export function SearchWorkbenchClient({
       </div>
 
       {/* Results (shared) */}
-      <div className="flex-1 overflow-auto p-6 pt-4">
+      <div>
         {!result ? (
-          <div className="rounded-xl bg-card p-16 text-center text-muted-foreground">
-            输入关键词或筛选条件后点击搜索，查询数据库中已采集的新闻
-          </div>
+          <GlassCard variant="default" padding="lg">
+            <div className="text-center text-gray-500 dark:text-gray-400 py-10">
+              输入关键词或筛选条件后点击搜索，查询数据库中已采集的新闻
+            </div>
+          </GlassCard>
         ) : result.articles.length === 0 ? (
-          <div className="rounded-xl bg-card p-16 text-center text-muted-foreground">
-            未找到匹配的新闻文章，请调整搜索条件
-          </div>
+          <GlassCard variant="default" padding="lg">
+            <div className="text-center text-gray-500 dark:text-gray-400 py-10">
+              未找到匹配的新闻文章，请调整搜索条件
+            </div>
+          </GlassCard>
         ) : (
           <div className="space-y-3">
             {/* Count + pagination info */}
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
               <span>
                 共 <strong className="text-foreground">{result.total}</strong> 条结果
                 {totalPages > 1 &&
@@ -655,7 +672,7 @@ export function SearchWorkbenchClient({
             </div>
 
             {/* Table */}
-            <div className="rounded-xl bg-card">
+            <GlassCard variant="default" padding="none">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -725,14 +742,14 @@ export function SearchWorkbenchClient({
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </GlassCard>
           </div>
         )}
       </div>
 
       {/* Bottom action bar (shared) */}
       {selected.size > 0 && (
-        <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-6 py-3 flex items-center gap-3">
+        <div className="sticky bottom-0 bg-[var(--glass-panel-bg)] backdrop-blur-xl border-t border-gray-200 dark:border-white/5 px-6 py-3 flex items-center gap-3">
           <span className="text-sm font-medium">
             已选 {selected.size} 篇
           </span>

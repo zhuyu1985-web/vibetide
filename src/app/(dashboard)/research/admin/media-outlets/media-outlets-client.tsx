@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, X, Pencil, Archive, RotateCcw } from "lucide-react";
+import { GlassCard } from "@/components/shared/glass-card";
 import type {
   MediaOutletSummary,
   MediaTier,
@@ -49,10 +50,10 @@ const TIER_LABELS: Record<MediaTier, string> = {
 };
 
 const TIER_BADGE_CLASS: Record<MediaTier, string> = {
-  central: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  provincial_municipal: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
-  industry: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  district_media: "bg-violet-100 text-violet-700 hover:bg-violet-100",
+  central: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30",
+  provincial_municipal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30",
+  industry: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30",
+  district_media: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30",
 };
 
 type DialogMode =
@@ -216,10 +217,10 @@ export function MediaOutletsClient({
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">媒体源管理</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">媒体源管理</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           管理央、市、行业、区县四级媒体登记
         </p>
       </div>
@@ -229,13 +230,13 @@ export function MediaOutletsClient({
           placeholder="按名称搜索..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
+          className="max-w-xs bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] rounded-lg focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
         />
         <Select
           value={tierFilter}
           onValueChange={(v) => setTierFilter(v as "all" | MediaTier)}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-44 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
             <SelectValue placeholder="层级" />
           </SelectTrigger>
           <SelectContent>
@@ -252,7 +253,7 @@ export function MediaOutletsClient({
             setStatusFilter(v as "all" | "active" | "archived")
           }
         >
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
             <SelectValue placeholder="状态" />
           </SelectTrigger>
           <SelectContent>
@@ -268,7 +269,7 @@ export function MediaOutletsClient({
         </Button>
       </div>
 
-      <div className="rounded-xl bg-card">
+      <GlassCard variant="default" padding="none">
         <Table>
           <TableHeader>
             <TableRow>
@@ -360,7 +361,7 @@ export function MediaOutletsClient({
             )}
           </TableBody>
         </Table>
-      </div>
+      </GlassCard>
 
       <Dialog
         open={dialog.kind !== "closed"}
