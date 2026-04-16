@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/shared/date-picker";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 import { createResearchTask } from "@/app/actions/research/research-tasks";
@@ -102,18 +104,16 @@ export function NewTaskClient({
       <section className="space-y-3">
         <h2 className="font-medium">② 时间范围</h2>
         <div className="flex gap-3 items-center">
-          <Input
-            type="date"
-            value={timeStart}
-            onChange={(e) => setTimeStart(e.target.value)}
-            className="w-44"
+          <DatePicker
+            value={timeStart ? new Date(timeStart) : null}
+            onChange={(d) => setTimeStart(d ? format(d, "yyyy-MM-dd") : "")}
+            placeholder="开始日期"
           />
           <span className="text-muted-foreground text-sm">至</span>
-          <Input
-            type="date"
-            value={timeEnd}
-            onChange={(e) => setTimeEnd(e.target.value)}
-            className="w-44"
+          <DatePicker
+            value={timeEnd ? new Date(timeEnd) : null}
+            onChange={(d) => setTimeEnd(d ? format(d, "yyyy-MM-dd") : "")}
+            placeholder="结束日期"
           />
         </div>
       </section>

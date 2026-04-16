@@ -2,8 +2,10 @@
 
 import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/shared/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -334,18 +336,16 @@ export function SearchWorkbenchClient({
       case "publishedAt":
         return (
           <div className="flex items-center gap-1">
-            <Input
-              type="date"
-              value={row.value}
-              onChange={(e) => updateCondition(row.id, { value: e.target.value })}
-              className="w-36"
+            <DatePicker
+              value={row.value ? new Date(row.value) : null}
+              onChange={(d) => updateCondition(row.id, { value: d ? format(d, "yyyy-MM-dd") : "" })}
+              placeholder="开始"
             />
-            <span className="text-muted-foreground text-xs">至</span>
-            <Input
-              type="date"
-              value={row.value2}
-              onChange={(e) => updateCondition(row.id, { value2: e.target.value })}
-              className="w-36"
+            <span className="text-xs text-muted-foreground">至</span>
+            <DatePicker
+              value={row.value2 ? new Date(row.value2) : null}
+              onChange={(d) => updateCondition(row.id, { value2: d ? format(d, "yyyy-MM-dd") : "" })}
+              placeholder="结束"
             />
           </div>
         );
@@ -496,18 +496,16 @@ export function SearchWorkbenchClient({
               </Select>
 
               <div className="flex items-center gap-1">
-                <Input
-                  type="date"
-                  value={timeStart}
-                  onChange={(e) => setTimeStart(e.target.value)}
-                  className="w-36"
+                <DatePicker
+                  value={timeStart ? new Date(timeStart) : null}
+                  onChange={(d) => setTimeStart(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="开始日期"
                 />
                 <span className="text-muted-foreground text-xs">至</span>
-                <Input
-                  type="date"
-                  value={timeEnd}
-                  onChange={(e) => setTimeEnd(e.target.value)}
-                  className="w-36"
+                <DatePicker
+                  value={timeEnd ? new Date(timeEnd) : null}
+                  onChange={(d) => setTimeEnd(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="结束日期"
                 />
               </div>
             </div>
