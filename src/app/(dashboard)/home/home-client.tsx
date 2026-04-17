@@ -15,6 +15,9 @@ import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { ScenarioDetailSheet } from "@/components/home/scenario-detail-sheet";
 import { RecentSection } from "@/components/home/recent-section";
+import { EMPLOYEE_META } from "@/lib/constants";
+import type { ScenarioCardData } from "@/lib/types";
+import { Sparkles } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,7 +37,7 @@ interface HomeClientProps {
     employeeSlug: string;
     updatedAt: string;
   }>;
-  scenarioMap?: Record<string, unknown[]>;
+  scenarioMap?: Record<string, ScenarioCardData[]>;
   employeeDbIdMap?: Record<string, string>;
 }
 
@@ -45,6 +48,8 @@ interface HomeClientProps {
 export function HomeClient({
   recentMissions,
   recentConversations,
+  scenarioMap = {},
+  employeeDbIdMap = {},
 }: HomeClientProps) {
   const router = useRouter();
 
@@ -57,6 +62,9 @@ export function HomeClient({
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
+
+  // Per-employee scenarios from DB
+  const employeeScenarios: ScenarioCardData[] = scenarioMap[effectiveEmployee] ?? [];
 
   // ── Handlers ──
 
@@ -84,6 +92,22 @@ export function HomeClient({
     setSelectedScenario(key);
     setSheetOpen(true);
   }, []);
+
+  // Click employee scenario chip → navigate to chat with scenario context
+  const handleEmployeeScenarioClick = useCallback(
+    (scenario: ScenarioCardData) => {
+      sessionStorage.setItem(
+        "chat-handoff",
+        JSON.stringify({
+          employeeSlug: effectiveEmployee,
+          scenarioId: scenario.id,
+          scenarioName: scenario.name,
+        })
+      );
+      router.push(`/chat?handoff=1&employee=${effectiveEmployee}`);
+    },
+    [effectiveEmployee, router]
+  );
 
   const handleCustomScenario = useCallback(() => {
     router.push("/workflows?action=create");
@@ -156,6 +180,32 @@ export function HomeClient({
             onEmployeeClick={handleSelectEmployee}
           />
         </div>
+
+        {/* Layer 2.5: Per-employee scenario chips */}
+        {employeeScenarios.length > 0 && (
+          <div className="px-4 mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles size={13} className="text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                {EMPLOYEE_META[effectiveEmployee]?.title} 的场景
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {employeeScenarios.map((sc) => (
+                <button
+                  key={sc.id}
+                  onClick={() => handleEmployeeScenarioClick(sc)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs
+                    bg-accent/50 hover:bg-accent text-foreground/80 hover:text-foreground
+                    transition-all duration-200"
+                >
+                  {sc.icon && <span>{sc.icon}</span>}
+                  {sc.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Layer 3: Scenario grid */}
         <div className="px-4 mt-6">
