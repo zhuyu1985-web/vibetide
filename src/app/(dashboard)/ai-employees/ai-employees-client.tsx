@@ -98,9 +98,8 @@ export function AiEmployeesClient({
           </p>
         </div>
         <button
-          disabled
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-sm text-gray-300 dark:text-white/30 cursor-not-allowed border-0 transition-all"
-          title="即将上线"
+          onClick={() => router.push("/ai-employees/create")}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 cursor-pointer border-0 transition-all"
         >
           <UserPlus className="w-4 h-4" />
           创建新员工
