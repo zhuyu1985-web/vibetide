@@ -73,7 +73,7 @@
 | 输入框 | hover 发光边框 + 阴影扩散 | CSS transition |
 | 员工头像 | 专属微动效（见3.3节）+ hover上浮 | Lottie / CSS animation |
 | 场景卡片 | hover 发光边框 + translateY(-2px) | CSS transition |
-| 背景 | 粒子系统 + 渐变光晕 | Canvas（沿用 landing 页 HeroBackground） |
+| 背景 | 粒子系统 + 渐变光晕 | Canvas（从 `src/app/landing/components/hero-background.tsx` 提取为 `src/components/shared/ParticleBackground.tsx` 共享组件） |
 | 模式切换 | 用户发送消息后 Hero 区收起，无缝过渡到对话界面 | Framer Motion layoutAnimation |
 
 ### 2.4 输入框智能路由
@@ -111,7 +111,15 @@
 | 7 | xiaofa | 小发 | **渠道运营师** | #14b8a6 青色 | publish_strategy, platform_adapt, audience_analysis, translation |
 | 8 | xiaoshu | 小数 | **数据分析师** | #f97316 橙色 | data_report, competitor_analysis, heat_scoring, trend_monitor |
 
-**策略**：保留 slug 不变，仅修改 `EMPLOYEE_META` 中的 `nickname` 和 `title` 字段，避免数据迁移。`leader` 和 `advisor` 保持不变。
+**变更范围**：大部分员工 `title` 已与新名称一致，实际需改动的仅有：
+- `xiaolei`：title 从"热点猎手"改为"热点分析师"
+- `xiaozi`：title 从"素材管家"改为"素材研究员"
+- 所有8个员工：去掉昵称（小雷/小策等），前端统一使用 title 作为显示名称
+- `leader` 和 `advisor` 保持不变
+
+**策略**：保留 slug 不变，修改 `EMPLOYEE_META` 中的 `nickname`/`title` 字段。前端所有引用 `nickname` 的地方改为引用 `title`。
+
+**技能说明**：表中核心技能与 `EMPLOYEE_CORE_SKILLS` 对齐。其中 `xiaoshen` 的 `sensitive_check` 为新增技能（Phase 2 合规体系实现时添加），Phase 1 暂用现有 `sentiment_analysis`。`xiaozi` 的 `kb_search` 是知识库模块动态注入的工具，非静态绑定。
 
 ### 3.2 头像方案
 
@@ -119,6 +127,7 @@
 - **素材**：AI 生成（Midjourney/DALL-E）3D 卡通人物，每人配有职业特征（数据眼镜、话筒、笔等）
 - **格式**：静态 PNG（用于小尺寸场景）+ Lottie JSON（用于首页/详情页动效）
 - **存放**：`public/avatars/{slug}.png` + `public/avatars/{slug}.json`
+- **过渡方案**：Lottie 资源未就绪前，使用 PNG 静态头像 + CSS 微动效（见3.3节）作为 fallback。组件内通过 `useMemo` 检测 `.json` 文件是否存在，自动降级
 
 ### 3.3 头像动态效果
 
@@ -334,6 +343,10 @@ Step 3: 渠道运营师 → 分发排期
 
 场景的 `employeeScenarios` 表记录保持不变，用于对话中心内的员工专属场景。首页场景卡片直接映射到 `SCENARIO_CONFIG` 中的6个预设。
 
+**与现有场景的关系**：现有 `SCENARIO_CONFIG` 中的8个泛化场景（`breaking_news`, `flash_report`, `press_conference` 等）保留不动，仍可在对话中心和任务创建中使用。首页6个新场景是面向具体媒体生产的"高级场景"，使用新的 key（`lianghui_coverage`, `marathon_live`, `emergency_response`, `theme_promotion`, `livelihood_service`, `quick_publish`）。两套场景共存，不做迁移。
+
+**突发应急组的"循环追踪"实现**：现有 Mission 系统是 DAG 结构，不支持循环。突发场景的"循环 Step 2→4"通过以下方式实现：每轮追踪完成后，系统创建一个新的 follow-up Mission（标记 `parentMissionId` 关联），而非在同一 Mission 内循环。用户也可以在对话模式中手动触发下一轮追踪。
+
 ---
 
 ## 5. 自定义员工 & 场景
@@ -362,7 +375,8 @@ Step 3: 预览 & 发布
 ```
 
 **技术实现**：
-- 存入 `ai_employees` 表，新增 `is_custom: boolean` 字段
+- 存入 `ai_employees` 表，使用现有 `is_preset` 字段（`is_preset = 0` 表示自定义员工，无需新增字段）
+- 自定义员工的 slug 使用 `custom_{uuid}` 格式。前端需将 `EmployeeId` 类型从封闭 union 放宽为 `string`，`EMPLOYEE_META` 查找逻辑增加 DB fallback（预设员工走内存常量，自定义员工走数据库查询）
 - 自定义 instructions 注入 agent assembly pipeline 第一层 Identity prompt
 - 技能绑定复用 `employee_skills` 表
 - 知识库绑定复用 `employee_knowledge_bases` 表
@@ -425,18 +439,31 @@ Step 3: 预览 & 发布
 | 文件 | 文件卡片 | 文件消息 |
 | 任务进度 | ActionCard（带按钮） | 模板卡片消息 |
 
-### 6.3 技术实现
+### 6.3 安全与容错
+
+**Webhook 签名验证**：
+- 钉钉：HMAC-SHA256 签名验证（使用 `DINGTALK_ROBOT_SECRET` + timestamp）
+- 企业微信：AES 消息加解密（使用 `WECHAT_WORK_ENCODING_AES_KEY`）+ URL Token 验证
+
+**多租户路由**：每个 `channel_configs` 记录绑定一个 `organization_id`。Webhook URL 中包含 channel config ID（如 `/api/channels/dingtalk/webhook/{configId}`），网关据此确定所属组织。
+
+**容错处理**：
+- 意图识别失败 → 回复"我没有理解您的指令，请尝试更具体的描述"+ 场景快捷指令提示
+- 消息发送限流 → 使用 Inngest 队列化出站消息，自动退避重试
+- 平台 API 异常 → 记录失败日志，不阻塞 Mission 流程
+
+### 6.4 技术实现
 
 新增路由：
-- `src/app/api/channels/dingtalk/webhook` — 钉钉消息回调
-- `src/app/api/channels/wechat/webhook` — 企业微信消息回调
+- `src/app/api/channels/dingtalk/webhook/[configId]` — 钉钉消息回调
+- `src/app/api/channels/wechat/webhook/[configId]` — 企业微信消息回调
 - `src/app/api/channels/notify` — 统一出站推送
 
 新增 DB 表：
-- `channel_configs` — 渠道配置（webhook URL、密钥、启用状态）
-- `channel_messages` — 消息记录（入站/出站、关联 mission_id）
+- `channel_configs` — 渠道配置（organization_id, platform, webhook URL、密钥、启用状态）
+- `channel_messages` — 消息记录（入站/出站、关联 mission_id、organization_id）
 
-### 6.4 环境变量
+### 6.5 环境变量
 
 ```env
 # 钉钉
@@ -530,7 +557,30 @@ WECHAT_WORK_ENCODING_AES_KEY=
 └─ 审核统计（通过率、平均审核时长、常见问题类型分布）
 ```
 
-### 7.5 数据模型
+### 7.5 审核与 Mission 系统集成
+
+**触发时机**：当 Mission 中"质量审核官"的 task 完成时，自动创建 `audit_records` 记录（初审）。如果审核配置为人工复审/终审，将对应 MissionTask 状态设置为新增的 `awaiting_review`（需在 `missionTaskStatusEnum` 中添加），Mission 管线在此暂停。
+
+**审核流转**：
+```
+MissionTask(质量审核官) 完成
+  → 创建 audit_record (stage=review_1, result=auto)
+  → 检查场景审核配置：
+     ├─ 全自动：自动创建 review_2 audit_record → review_3 → 继续 Mission
+     ├─ 需人工：设置下一个 task 为 awaiting_review → 推送到审核中心
+     └─ 快审模式（突发场景）：仅 review_1，跳过 review_2/3
+```
+
+**退回处理**：审核中心"退回"操作 → 在当前 Mission 中创建一个新的修订 task（assignee=内容创作师，inputContext=审核意见），而非重开已完成 task。修订完成后重新进入审核流程。
+
+### 7.6 审核评分规则
+
+每个维度使用三级评分：`pass`（通过）/ `warning`（需关注）/ `fail`（不通过）。综合判定逻辑：
+- 任一维度 `fail` → 整体标记 🔴需人工
+- 任一维度 `warning` 且无 `fail` → 整体标记 🟡需修改
+- 全部 `pass` → 整体标记 🟢通过
+
+### 7.7 数据模型
 
 新增表：
 - `audit_records` — 审核记录（关联 mission_id/article_id、阶段、结果、意见）
