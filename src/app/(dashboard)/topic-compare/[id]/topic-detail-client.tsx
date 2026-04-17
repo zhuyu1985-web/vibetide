@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { generateTopicCompareAISummary } from "@/app/actions/topic-compare";
 import {
   ArrowLeft,
   RefreshCw,
@@ -73,11 +72,10 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
   const handleRefresh = () => {
     setRefreshError(null);
     startRefresh(async () => {
-      const result = await generateTopicCompareAISummary(article.id);
-      if (result.success) {
+      try {
         router.refresh();
-      } else {
-        setRefreshError(result.error ?? "刷新失败");
+      } catch (err) {
+        setRefreshError(err instanceof Error ? err.message : "刷新失败");
       }
     });
   };

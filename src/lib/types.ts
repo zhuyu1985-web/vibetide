@@ -1346,12 +1346,29 @@ export interface CompetitorGroup {
 export interface CompetitorOutlet {
   outletName: string;
   articles: {
+    /** Optional: platform_content.id — required for AI interpretation lookup.
+     *  Absent when the row comes from demo/mock data. */
+    contentId?: string;
     title: string;
     subject: string;
     publishedAt: string;
     channel: string;
     sourceUrl: string;
   }[];
+}
+
+/** 漏题筛查 - AI 分析（4个通用板块 + 补充报道建议） */
+export interface MissingTopicAIAnalysis extends BenchmarkAISummary {
+  supplementAdvice: {
+    /** 建议紧急度 */
+    urgency: "immediate" | "today" | "scheduled" | "skip";
+    /** 紧急度说明（如："最佳报道窗口 < 2 小时"） */
+    urgencyReason: string;
+    /** 建议报道角度（2-3 条） */
+    angles: Array<{ title: string; description: string }>;
+    /** 风险提示（政策敏感、事实待核实等） */
+    risks: string;
+  };
 }
 
 /** 漏题筛查 - KPI 看板数据 */
@@ -1397,7 +1414,7 @@ export interface MissingTopicDetail {
     name: string;
     level: "central" | "provincial" | "city" | "industry" | "self_media";
   }[];
-  aiAnalysis: BenchmarkAISummary | null;
+  aiAnalysis: MissingTopicAIAnalysis | null;
   linkedArticleId: string | null;
   linkedArticleTitle: string | null;
   pushedAt: string | null;
