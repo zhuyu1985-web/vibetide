@@ -70,3 +70,6 @@ export * from "./research";
 
 // Audit system (三级审核体系, 2026-04-17)
 export * from "./audit";
+
+// Channel integrations (钉钉 / 企业微信, 2026-04-17)
+export * from "./channels";

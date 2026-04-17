@@ -569,3 +569,22 @@ export const trailStageEnum = pgEnum("trail_stage", [
   "review_3",
   "publishing",
 ]);
+
+// Channel integration enums (钉钉 / 企业微信)
+
+export const channelPlatformEnum = pgEnum("channel_platform", [
+  "dingtalk",
+  "wechat_work",
+]);
+
+export const channelMessageDirectionEnum = pgEnum(
+  "channel_message_direction",
+  ["inbound", "outbound"]
+);
+
+export const channelMessageStatusEnum = pgEnum("channel_message_status", [
+  "received",
+  "processed",
+  "sent",
+  "failed",
+]);
