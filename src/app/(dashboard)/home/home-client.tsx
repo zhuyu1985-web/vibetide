@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -9,6 +9,8 @@ import {
   type AdvancedScenarioKey,
 } from "@/lib/constants";
 import { startMission } from "@/app/actions/missions";
+import { Mic, Paperclip, ArrowUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { ParticleBackground } from "@/components/shared/particle-background";
 import { HeroSection } from "@/components/home/hero-section";
@@ -61,7 +63,9 @@ export function HomeClient({
   const [selectedScenario, setSelectedScenario] = useState<AdvancedScenarioKey | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
   const [inlineScenario, setInlineScenario] = useState<ScenarioCardData | null>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
 
@@ -150,7 +154,30 @@ export function HomeClient({
 
   const handleCloseChat = useCallback(() => {
     setChatOpen(false);
+    setChatInput("");
   }, []);
+
+  // Send message from chat-mode input box
+  const handleChatSend = useCallback(() => {
+    if (!chatInput.trim() || chat.isStreaming) return;
+    const text = chatInput;
+    setChatInput("");
+    // Reset textarea height
+    if (chatTextareaRef.current) {
+      chatTextareaRef.current.style.height = "auto";
+    }
+    chat.sendMessage(text);
+  }, [chatInput, chat]);
+
+  const handleChatKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleChatSend();
+      }
+    },
+    [handleChatSend]
+  );
 
   const handleCustomScenario = useCallback(() => {
     router.push("/workflows?action=create");
@@ -216,6 +243,91 @@ export function HomeClient({
               onCancelScenario={handleCancelScenario}
               embedded
             />
+          </div>
+
+          {/* Row 2 — pinned input box */}
+          <div className="w-full">
+            <div
+              className={cn(
+                "rounded-2xl overflow-hidden",
+                "bg-background",
+                "border border-border",
+                "shadow-sm",
+                "focus-within:border-indigo-500/40",
+                "focus-within:shadow-[0_4px_20px_rgba(99,102,241,0.1)]",
+                "transition-all duration-300"
+              )}
+            >
+              {/* Textarea */}
+              <div className="px-4 pt-3 pb-1">
+                <textarea
+                  ref={chatTextareaRef}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={handleChatKeyDown}
+                  placeholder="继续对话..."
+                  rows={1}
+                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none outline-none min-h-[36px] max-h-[100px] leading-relaxed"
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = "auto";
+                    target.style.height = `${Math.min(target.scrollHeight, 100)}px`;
+                  }}
+                />
+              </div>
+
+              {/* Scenario chips inside chat input */}
+              {employeeScenarios.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 px-4 pb-2">
+                  {employeeScenarios.map((sc) => (
+                    <button
+                      key={sc.id}
+                      onClick={() => handleEmployeeScenarioClick(sc)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px]
+                        bg-accent/60 hover:bg-accent text-muted-foreground hover:text-foreground
+                        transition-all duration-150"
+                    >
+                      {sc.icon && <span className="text-xs">{sc.icon}</span>}
+                      {sc.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Toolbar */}
+              <div className="flex items-center justify-between px-3 pb-3 pt-1">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleVoiceToggle}
+                    className={cn(
+                      "p-2 rounded-xl transition-all duration-200",
+                      isRecording
+                        ? "bg-red-500/20 text-red-400"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    )}
+                  >
+                    <Mic size={16} />
+                  </button>
+                  <button
+                    className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
+                  >
+                    <Paperclip size={16} />
+                  </button>
+                </div>
+                <button
+                  onClick={handleChatSend}
+                  disabled={!chatInput.trim() || chat.isStreaming}
+                  className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200",
+                    chatInput.trim() && !chat.isStreaming
+                      ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.4)] hover:scale-105 cursor-pointer"
+                      : "bg-muted text-muted-foreground/40 cursor-not-allowed"
+                  )}
+                >
+                  <ArrowUp size={16} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
