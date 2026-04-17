@@ -352,7 +352,7 @@ export function HomeClient({
 
   // ── Render: Homepage mode ──
   return (
-    <div className="relative h-full overflow-y-auto">
+    <div className="relative h-full overflow-y-auto scrollbar-thin">
       {/* Particle background */}
       <ParticleBackground
         particleCount={60}
