@@ -6,6 +6,12 @@ import { Mic, Paperclip, ArrowUp, ChevronDown, MessageSquare, ArrowRight } from 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+interface ScenarioChip {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
 interface HeroSectionProps {
   inputValue: string;
   onInputChange: (value: string) => void;
@@ -15,6 +21,8 @@ interface HeroSectionProps {
   isRecording: boolean;
   onVoiceToggle: () => void;
   disabled?: boolean;
+  employeeScenarios?: ScenarioChip[];
+  onScenarioChipClick?: (scenario: ScenarioChip) => void;
 }
 
 const MODEL_OPTIONS = [
@@ -33,6 +41,8 @@ export function HeroSection({
   isRecording,
   onVoiceToggle,
   disabled = false,
+  employeeScenarios = [],
+  onScenarioChipClick,
 }: HeroSectionProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
@@ -168,6 +178,24 @@ export function HeroSection({
                 style={{ maxHeight: "160px", overflowY: "auto" }}
               />
             </div>
+
+            {/* Employee scenario chips (inside input box) */}
+            {employeeScenarios.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-5 pb-3">
+                {employeeScenarios.map((sc) => (
+                  <button
+                    key={sc.id}
+                    onClick={() => onScenarioChipClick?.(sc)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px]
+                      bg-accent/60 hover:bg-accent text-muted-foreground hover:text-foreground
+                      transition-all duration-150"
+                  >
+                    {sc.icon && <span className="text-xs">{sc.icon}</span>}
+                    {sc.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Toolbar */}
             <div className="flex items-center justify-between px-4 pb-4 pt-1">
