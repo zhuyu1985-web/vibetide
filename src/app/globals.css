@@ -977,3 +977,22 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ================================================================
+   Input Box Animated Border
+   ================================================================ */
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes border-rotate {
+  to { --border-angle: 360deg; }
+}
+.input-box-wrapper:hover .input-box-border-glow {
+  animation: border-rotate 3s linear infinite;
+  opacity: 1;
+}
+.input-box-border-glow {
+  background: conic-gradient(from var(--border-angle, 0deg), #6366f1, #8b5cf6, #06b6d4, #6366f1);
+}

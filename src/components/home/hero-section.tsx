@@ -128,19 +128,16 @@ export function HeroSection({
         transition={{ duration: 0.5, delay: 0.16, ease: "easeOut" }}
       >
         <div
-          className="relative rounded-2xl p-[1px]"
+          className="input-box-wrapper relative rounded-2xl p-[1px]"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
           {/* Animated border — conic gradient that rotates on hover */}
           <div
             className={cn(
-              "absolute inset-0 rounded-2xl transition-opacity duration-500",
+              "input-box-border-glow absolute inset-0 rounded-2xl transition-opacity duration-500",
               hovered ? "opacity-100" : "opacity-0"
             )}
-            style={{
-              background: "conic-gradient(from var(--border-angle, 0deg), #6366f1, #8b5cf6, #06b6d4, #6366f1)",
-            }}
           />
           {/* Static border when not hovered */}
           <div
@@ -320,20 +317,6 @@ export function HeroSection({
         </div>
       </motion.div>
 
-      {/* CSS for animated border rotation */}
-      <style jsx global>{`
-        @property --border-angle {
-          syntax: '<angle>';
-          initial-value: 0deg;
-          inherits: false;
-        }
-        @keyframes border-rotate {
-          to { --border-angle: 360deg; }
-        }
-        .relative:hover > div:first-child {
-          animation: border-rotate 3s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }
