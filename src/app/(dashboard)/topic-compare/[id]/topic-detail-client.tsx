@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { generateTopicCompareAISummary } from "@/app/actions/topic-compare";
 import {
   ArrowLeft,
   RefreshCw,
@@ -63,12 +65,21 @@ interface Props {
 }
 
 export function TopicDetailClient({ detail, reports, competitorGroups }: Props) {
+  const router = useRouter();
   const { article, stats } = detail;
-  const [refreshing, setRefreshing] = useState(false);
+  const [isRefreshing, startRefresh] = useTransition();
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
+    setRefreshError(null);
+    startRefresh(async () => {
+      const result = await generateTopicCompareAISummary(article.id);
+      if (result.success) {
+        router.refresh();
+      } else {
+        setRefreshError(result.error ?? "刷新失败");
+      }
+    });
   };
 
   return (
@@ -125,16 +136,23 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
               </div>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="border-0 shrink-0"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
-            刷新数据
-          </Button>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="border-0"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              {isRefreshing ? "刷新中..." : "刷新数据"}
+            </Button>
+            {refreshError && (
+              <span className="text-[11px] text-red-600 dark:text-red-400">
+                {refreshError}
+              </span>
+            )}
+          </div>
         </div>
       </GlassCard>
 
