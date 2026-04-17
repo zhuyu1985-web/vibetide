@@ -1306,6 +1306,132 @@ export interface WeeklyReport {
   gapList: { area: string; gap: string; suggestion: string }[];
 }
 
+// 2.2b - Topic Compare & Missing Topics (redesigned benchmarking)
+
+/** 同题对比 - 作品列表项 */
+export interface TopicCompareArticle {
+  id: string;
+  title: string;
+  publishedAt: string;
+  channels: string[];
+  contentType: "text" | "video" | "live" | "short_video";
+  readCount: number;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  benchmarkCount: number;
+  hasAnalysis: boolean;
+}
+
+/** 同题对比 - 详情页全网报道概览 */
+export interface TopicCompareDetail {
+  article: TopicCompareArticle;
+  stats: {
+    totalReports: number;
+    centralCount: number;
+    provincialCount: number;
+    otherCount: number;
+    earliestTime: string;
+    latestTime: string;
+    trendDelta: number;
+  };
+  aiSummary: BenchmarkAISummary | null;
+  lastAnalyzedAt: string | null;
+}
+
+/** 同题对比 - 全网报道文章 */
+export interface NetworkReport {
+  id: string;
+  title: string;
+  sourceOutlet: string;
+  mediaLevel: "central" | "provincial" | "city" | "industry" | "self_media";
+  publishedAt: string;
+  author: string;
+  summary: string;
+  sourceUrl: string;
+  contentType: string;
+  aiInterpretation: ArticleAIInterpretation | null;
+}
+
+/** 单篇文章AI解读 */
+export interface ArticleAIInterpretation {
+  coreAngle: string;
+  keyInformation: string[];
+  uniqueContent: string;
+  writingTechnique: string;
+  sourceAnalysis: string;
+  referenceValue: { level: "high" | "medium" | "low"; reason: string };
+}
+
+/** 竞品媒体对标 - 分组数据 */
+export interface CompetitorGroup {
+  level: "central" | "provincial" | "city" | "other";
+  levelLabel: string;
+  levelColor: string;
+  outlets: CompetitorOutlet[];
+}
+
+export interface CompetitorOutlet {
+  outletName: string;
+  articles: {
+    title: string;
+    subject: string;
+    publishedAt: string;
+    channel: string;
+    sourceUrl: string;
+  }[];
+}
+
+/** 漏题筛查 - KPI 看板数据 */
+export interface MissingTopicKPIs {
+  totalClues: number;
+  suspectedMissed: number;
+  confirmedMissed: number;
+  handled: number;
+  coverageRate: number;
+}
+
+/** 漏题筛查 - 线索列表项 */
+export interface MissingTopicClue {
+  id: string;
+  title: string;
+  sourceType: "social_hot" | "sentiment_event" | "benchmark_media";
+  sourceDetail: string;
+  heatScore: number;
+  discoveredAt: string;
+  status: "covered" | "suspected" | "confirmed" | "excluded" | "pushed";
+  urgency: "urgent" | "normal" | "watch";
+  isMultiSource: boolean;
+  competitors: string[];
+}
+
+/** 漏题详情 - 完整数据 */
+export interface MissingTopicDetail {
+  id: string;
+  title: string;
+  sourceType: "social_hot" | "sentiment_event" | "benchmark_media";
+  sourceDetail: string;
+  sourceTags: string[];
+  sourceUrl: string;
+  heatScore: number;
+  discoveredAt: string;
+  publishedAt: string;
+  status: "covered" | "suspected" | "confirmed" | "excluded" | "pushed";
+  urgency: "urgent" | "normal" | "watch";
+  isMultiSource: boolean;
+  contentSummary: string;
+  contentLength: number;
+  reportedBy: {
+    name: string;
+    level: "central" | "provincial" | "city" | "industry" | "self_media";
+  }[];
+  aiAnalysis: BenchmarkAISummary | null;
+  linkedArticleId: string | null;
+  linkedArticleTitle: string | null;
+  pushedAt: string | null;
+  pushedToSystem: string | null;
+}
+
 // 2.4 - Batch Production
 export interface BatchTopic {
   id: string;
