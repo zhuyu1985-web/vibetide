@@ -137,7 +137,7 @@ export function HomeClient({
       />
 
       {/* Four-layer content */}
-      <div className="relative z-10 max-w-3xl mx-auto pb-12">
+      <div className="relative z-10 max-w-5xl mx-auto px-6 pb-12">
         {/* Layer 1: Hero — title + unified input */}
         <HeroSection
           inputValue={inputValue}
