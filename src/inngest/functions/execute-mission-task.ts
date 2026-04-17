@@ -427,6 +427,48 @@ export const executeMissionTask = inngest.createFunction(
       });
     });
 
+    // 13. Audit hook — check if this was a review task (xiaoshen)
+    // If so, create audit records and optionally pause for human review.
+    // TODO: integrate audit hook here — uncomment when ready for production
+    //
+    // if (task.assignedEmployeeId) {
+    //   const auditResult = await step.run("audit-review-hook", async () => {
+    //     const employee = await db.query.aiEmployees.findFirst({
+    //       where: eq(aiEmployees.id, task.assignedEmployeeId!),
+    //       columns: { slug: true },
+    //     });
+    //     if (employee?.slug !== "xiaoshen") return null;
+    //
+    //     const { handleReviewTaskCompletion } = await import("@/lib/audit/mission-integration");
+    //     const output = executionResult.output;
+    //     return handleReviewTaskCompletion({
+    //       missionId,
+    //       taskId,
+    //       organizationId,
+    //       contentOutput: output.summary || JSON.stringify(output),
+    //       reviewDimensions: (output.dimensions as Record<string, string>) ?? {},
+    //       issues: (output.issues as Array<{ type: string; severity: string; description: string; suggestion?: string }>) ?? [],
+    //     });
+    //   });
+    //
+    //   if (auditResult?.needsHumanReview) {
+    //     await step.run("pause-for-human-review", async () => {
+    //       // Find downstream tasks and set them to "in_review" status
+    //       const downstreamTasks = await db.query.missionTasks.findMany({
+    //         where: eq(missionTasks.missionId, missionId),
+    //       });
+    //       for (const dt of downstreamTasks) {
+    //         const deps = (dt.dependencies as string[]) || [];
+    //         if (deps.includes(taskId) && dt.status === "pending") {
+    //           await db.update(missionTasks)
+    //             .set({ status: "in_review" })
+    //             .where(eq(missionTasks.id, dt.id));
+    //         }
+    //       }
+    //     });
+    //   }
+    // }
+
     return {
       status: "completed",
       taskId,

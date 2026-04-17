@@ -7,6 +7,7 @@ import {
   contentTrailLogs,
   sensitiveWordLists,
 } from "@/db/schema/audit";
+import { missionTasks } from "@/db/schema/missions";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -371,4 +372,143 @@ export async function logTrailEntry(input: {
     comment: input.comment ?? null,
     metadata: input.metadata ?? null,
   });
+}
+
+// ---------------------------------------------------------------------------
+// 9. createAuditRecordInternal — no auth required, for background jobs/Inngest
+// ---------------------------------------------------------------------------
+
+export async function createAuditRecordInternal(input: {
+  organizationId: string;
+  missionId?: string;
+  articleId?: string;
+  contentType: string;
+  contentId: string;
+  stage: AuditStage;
+  mode: AuditMode;
+  reviewerType: "ai" | "human";
+  reviewerId: string;
+  dimensions?: Record<string, unknown>;
+  overallResult: "pass" | "warning" | "fail";
+  issues?: AuditIssue[];
+  comment?: string;
+  contentSnapshot?: string;
+  diff?: Record<string, unknown>;
+}) {
+  const [created] = await db
+    .insert(auditRecords)
+    .values({
+      organizationId: input.organizationId,
+      missionId: input.missionId ?? null,
+      articleId: input.articleId ?? null,
+      contentType: input.contentType,
+      contentId: input.contentId,
+      stage: input.stage,
+      mode: input.mode,
+      reviewerType: input.reviewerType,
+      reviewerId: input.reviewerId,
+      dimensions: input.dimensions ?? null,
+      overallResult: input.overallResult,
+      issues: input.issues ?? [],
+      comment: input.comment ?? null,
+      contentSnapshot: input.contentSnapshot ?? null,
+      diff: input.diff ?? null,
+    })
+    .returning();
+
+  return created;
+}
+
+// ---------------------------------------------------------------------------
+// 10. createRevisionTask — reject flow: create a revision task in mission
+// ---------------------------------------------------------------------------
+
+export async function createRevisionTask(params: {
+  missionId: string;
+  auditRecordId: string;
+  comment: string;
+  issues: Array<{
+    type: string;
+    severity: string;
+    description: string;
+    suggestion?: string;
+  }>;
+}) {
+  const orgId = await requireOrg();
+
+  // 1. Find the audit record to determine which content task was reviewed
+  const auditRecord = await db.query.auditRecords.findFirst({
+    where: and(
+      eq(auditRecords.id, params.auditRecordId),
+      eq(auditRecords.organizationId, orgId)
+    ),
+  });
+  if (!auditRecord) throw new Error("审核记录不存在或无权访问");
+
+  const reviewedTaskId = auditRecord.contentId;
+
+  // 2. Find the original content creation task in the mission
+  //    The reviewed task may be a review task; look for its dependency (the content task)
+  const reviewedTask = await db.query.missionTasks.findFirst({
+    where: eq(missionTasks.id, reviewedTaskId),
+  });
+
+  // Try to find the original content task by walking dependencies
+  let originalTask = reviewedTask;
+  if (reviewedTask?.dependencies && (reviewedTask.dependencies as string[]).length > 0) {
+    const depIds = reviewedTask.dependencies as string[];
+    // Pick the first dependency as the original content task
+    const depTask = await db.query.missionTasks.findFirst({
+      where: eq(missionTasks.id, depIds[0]),
+    });
+    if (depTask) {
+      originalTask = depTask;
+    }
+  }
+
+  if (!originalTask) throw new Error("无法找到原始内容创作任务");
+
+  // 3. Create a new revision task
+  const [revisionTask] = await db
+    .insert(missionTasks)
+    .values({
+      missionId: params.missionId,
+      title: `修订: ${originalTask.title}`,
+      description: `根据审核意见进行内容修订。\n\n审核意见: ${params.comment}\n\n问题列表:\n${params.issues.map((i, idx) => `${idx + 1}. [${i.severity}] ${i.description}${i.suggestion ? `\n   建议: ${i.suggestion}` : ""}`).join("\n")}`,
+      expectedOutput: "修订后的内容，需解决所有审核问题",
+      assignedEmployeeId: originalTask.assignedEmployeeId,
+      status: "ready",
+      dependencies: [reviewedTaskId],
+      priority: originalTask.priority + 1, // Higher priority than original
+      inputContext: {
+        auditRecordId: params.auditRecordId,
+        auditComment: params.comment,
+        auditIssues: params.issues,
+        originalTaskId: originalTask.id,
+        originalTaskTitle: originalTask.title,
+      },
+    })
+    .returning();
+
+  // 4. Log trail entry
+  await logTrailEntry({
+    organizationId: orgId,
+    contentId: reviewedTaskId,
+    contentType: "mission_task",
+    operator: (await requireAuth()).id,
+    operatorType: "human",
+    action: "reject",
+    stage: (auditRecord.stage as TrailStage) ?? "review_1",
+    comment: params.comment,
+    metadata: {
+      auditRecordId: params.auditRecordId,
+      revisionTaskId: revisionTask.id,
+      issueCount: params.issues.length,
+    },
+  });
+
+  revalidatePath("/audit-center");
+  revalidatePath(`/missions/${params.missionId}`);
+
+  return revisionTask;
 }
