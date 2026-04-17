@@ -63,7 +63,7 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick }: ScenarioGridPro
                     key={memberId}
                     employeeId={memberId}
                     size="xs"
-                    className="ring-1 ring-black/20"
+                    className=""
                   />
                 ))}
               </div>

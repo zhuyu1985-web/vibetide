@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Mic, Paperclip, ArrowUp, ChevronDown } from "lucide-react";
+import { Mic, Paperclip, ArrowUp, ChevronDown, MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface HeroSectionProps {
@@ -101,10 +102,8 @@ export function HeroSection({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.08, ease: "easeOut" }}
       >
-        <h1 className="text-4xl font-bold tracking-tight">
-          <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 dark:from-indigo-400 dark:via-violet-400 dark:to-purple-400 bg-clip-text text-transparent">
-            你的智媒工作空间
-          </span>
+        <h1 className="text-4xl font-bold tracking-tight text-foreground">
+          你的智媒工作空间
         </h1>
         <p className="text-base text-muted-foreground">
           与 AI 团队协作，高效完成内容生产
@@ -255,10 +254,20 @@ export function HeroSection({
           </div>
         </div>
 
-        {/* Hint */}
-        <p className="text-center text-[11px] text-muted-foreground/50 mt-2">
-          按 Enter 发送 · Shift+Enter 换行
-        </p>
+        {/* Hint + 对话中心入口 */}
+        <div className="flex items-center justify-center gap-3 mt-2">
+          <p className="text-[11px] text-muted-foreground/50">
+            按 Enter 发送 · Shift+Enter 换行
+          </p>
+          <span className="text-muted-foreground/30">|</span>
+          <Link
+            href="/chat"
+            className="inline-flex items-center gap-1 text-[11px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+          >
+            <MessageSquare size={11} />
+            进入对话中心
+          </Link>
+        </div>
       </motion.div>
     </div>
   );
