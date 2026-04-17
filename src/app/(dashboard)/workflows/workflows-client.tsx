@@ -158,7 +158,7 @@ export function WorkflowsClient({
         </div>
         <button
           onClick={() => router.push("/workflows/new")}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-sm text-gray-700 dark:text-white/70 border-0 cursor-pointer transition-all hover:bg-black/[0.08] dark:hover:bg-white/[0.12] hover:text-gray-900 dark:hover:text-white/90"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50/80 dark:bg-blue-500/[0.08] backdrop-blur-sm text-sm text-blue-600 dark:text-blue-400 border-0 cursor-pointer transition-all hover:bg-blue-100/90 dark:hover:bg-blue-500/[0.15] hover:text-blue-700 dark:hover:text-blue-300"
         >
           <Plus className="w-4 h-4" />
           新建工作流
@@ -172,7 +172,7 @@ export function WorkflowsClient({
         </h2>
 
         {myWorkflows.length === 0 ? (
-          <div className="bg-black/[0.02] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
+          <div className="bg-slate-50/80 dark:bg-white/[0.05] rounded-2xl py-12 flex flex-col items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <Inbox className="w-10 h-10 text-gray-400 dark:text-white/30" />
             <p className="text-sm text-gray-500 dark:text-white/60">
               还没有工作流，从模板开始或创建自定义工作流
@@ -233,7 +233,7 @@ export function WorkflowsClient({
 
         {/* Template grid */}
         {filteredTemplates.length === 0 ? (
-          <div className="bg-black/[0.02] dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] rounded-2xl py-12 flex flex-col items-center gap-3">
+          <div className="bg-slate-50/80 dark:bg-white/[0.05] rounded-2xl py-12 flex flex-col items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <Inbox className="w-10 h-10 text-gray-400 dark:text-white/30" />
             <p className="text-sm text-gray-500 dark:text-white/60">
               该分类暂无模板

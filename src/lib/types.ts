@@ -60,34 +60,6 @@ export interface HotTopic {
   summary: string;
 }
 
-export type WorkflowStepStatus =
-  | "completed"
-  | "active"
-  | "pending"
-  | "skipped"
-  | "waiting_approval"
-  | "failed";
-
-export interface WorkflowInstance {
-  id: string;
-  topicId: string;
-  topicTitle: string;
-  steps: WorkflowStepState[];
-  startedAt: string;
-  estimatedCompletion: string;
-}
-
-export interface WorkflowStepState {
-  key: string;
-  label: string;
-  employeeId: EmployeeId;
-  status: WorkflowStepStatus;
-  progress: number;
-  startedAt?: string;
-  completedAt?: string;
-  output?: string;
-}
-
 export type MessageType =
   | "alert"
   | "decision_request"

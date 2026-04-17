@@ -138,23 +138,46 @@ export async function POST(req: Request) {
                   model: getLanguageModel({
                     provider: "openai",
                     model: process.env.OPENAI_MODEL || "deepseek-chat",
-                    temperature: 0.6,
-                    maxTokens: 1500,
+                    temperature: 0.7,
+                    maxTokens: 4000,
                   }),
                   messages: [
                     {
-                      role: "user",
-                      content: `你是媒体内容工作流测试助手。请模拟执行下列任务并给出可读的执行过程与结果。
-任务：${skillName}
-说明：${stepDescription}
+                      role: "system",
+                      content: `你是一位资深媒体内容工作流模拟引擎。你的任务是为工作流的每个步骤生成高度逼真、具体且有信息量的模拟输出，让用户能直观判断该工作流是否满足需求。
 
-请严格按以下格式输出（中文，300 字以内，不要多余客套）：
-【执行摘要】一句话总结本步骤做了什么、产出是什么（≤40字）
-【执行过程】3-5 条要点，展示推理与关键动作
-【产出结果】列出核心数据、示例或关键结论（可包含 JSON/列表/链接示意）`,
+规则：
+- 生成的内容必须贴合任务场景，包含具体的示例数据（标题、数字、来源等），而非抽象描述
+- 模拟过程应展示专业的分析推理链，让用户看到 AI 员工"如何思考"
+- 产出结果要结构清晰、可直接使用，优先使用列表/表格等结构化格式`,
+                    },
+                    {
+                      role: "user",
+                      content: `请模拟执行以下工作流步骤，并生成详实的执行报告。
+
+🔧 任务名称：${skillName}
+📝 任务说明：${stepDescription}
+${employeeName ? `👤 执行员工：${employeeName}` : ""}
+
+请严格按以下格式输出（中文，600 字左右）：
+
+【执行摘要】一句话总结本步骤的核心产出（≤50字）
+
+【执行过程】
+- 列出 4-6 条关键执行动作，每条说明做了什么、为什么这么做
+- 体现专业分析思路和决策依据
+
+【产出结果】
+- 给出具体、可用的示例输出（如：标题列表、数据表格、分析结论、内容片段等）
+- 使用列表让结果一目了然
+- 包含 2-3 个具体示例数据点
+
+【质量评估】
+- 可信度：高/中/低
+- 建议改进：一句话建议（如无则写"无"）`,
                     },
                   ],
-                  maxOutputTokens: 600,
+                  maxOutputTokens: 1500,
                   abortSignal: abortController.signal,
                 });
 
@@ -174,9 +197,9 @@ export async function POST(req: Request) {
                 resultText = `【执行摘要】「${skillName}」模拟执行完成\n【执行过程】本次为本地模拟运行，未连接真实技能工具。\n【产出结果】无实际数据输出（请在正式运行时查看）。`;
               }
 
-              // Safety cap — 4000 chars should be plenty for a step summary
-              if (resultText.length > 4000) {
-                resultText = resultText.slice(0, 3997) + "...";
+              // Safety cap — 6000 chars for richer step output
+              if (resultText.length > 6000) {
+                resultText = resultText.slice(0, 5997) + "...";
               }
 
               // Derive a short summary for inline display (first 【执行摘要】line

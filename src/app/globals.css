@@ -968,6 +968,13 @@
 .animate-chart-bounce { animation: chart-bounce 1.5s ease-in-out infinite; }
 .animate-chart-rotate { animation: film-rotate 6s linear infinite; }
 
+/* Typewriter cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink { animation: blink 0.8s step-end infinite; }
+
 /* ================================================================
    Scrollbar Hide Utility
    ================================================================ */
