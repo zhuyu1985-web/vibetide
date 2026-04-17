@@ -1,26 +1,65 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ADVANCED_SCENARIO_CONFIG, ADVANCED_SCENARIO_KEYS, type AdvancedScenarioKey } from "@/lib/constants";
+import { Settings2, Workflow } from "lucide-react";
+import {
+  ADVANCED_SCENARIO_CONFIG,
+  ADVANCED_SCENARIO_KEYS,
+  type AdvancedScenarioKey,
+} from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ScenarioGridProps {
   onScenarioClick: (key: AdvancedScenarioKey) => void;
   onCustomClick: () => void;
 }
 
-export function ScenarioGrid({ onScenarioClick, onCustomClick }: ScenarioGridProps) {
+export function ScenarioGrid({ onScenarioClick, onCustomClick: _onCustomClick }: ScenarioGridProps) {
+  const router = useRouter();
+
   return (
     <div className="space-y-2.5">
       {/* Section header */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-foreground/80">场景快捷启动</span>
-        <button
-          onClick={onCustomClick}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer border-0"
-        >
-          + 自定义场景
-        </button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer border-0">
+              + 自定义场景
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" sideOffset={8} className="w-56 p-2">
+            <div className="space-y-0.5">
+              <p className="text-xs text-muted-foreground px-2 pt-1 pb-2 font-medium">选择创建方式</p>
+              <button
+                onClick={() => router.push("/scenarios/customize")}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition-colors duration-150 cursor-pointer text-left"
+              >
+                <Settings2 size={14} className="text-indigo-500 shrink-0" />
+                <div>
+                  <p className="font-medium leading-tight">基于现有场景修改</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">从预设场景调参</p>
+                </div>
+              </button>
+              <button
+                onClick={() => router.push("/workflows/new")}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition-colors duration-150 cursor-pointer text-left"
+              >
+                <Workflow size={14} className="text-violet-500 shrink-0" />
+                <div>
+                  <p className="font-medium leading-tight">从零创建工作流</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">完全自定义步骤</p>
+                </div>
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* 3x2 grid */}
