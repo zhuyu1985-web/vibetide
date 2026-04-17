@@ -335,20 +335,16 @@ export function HomeClient({
   // ── Render: Chat mode ──
   if (chatOpen) {
     return (
-      <div className="relative flex-1 min-h-0 flex flex-col items-center px-4 pb-4 overflow-hidden">
+      <div className="relative h-full flex flex-col overflow-hidden">
         {/* Background */}
         <ParticleBackground
           particleCount={40}
           className="fixed inset-0 z-0 pointer-events-none dark:opacity-30 opacity-10"
         />
 
-        {/* Grid: Row 1 = chat (scrollable), Row 2 = input (pinned at bottom) */}
-        <div
-          className="relative z-10 w-full max-w-3xl flex-1 min-h-0 grid gap-3"
-          style={{ gridTemplateRows: "minmax(0, 1fr) auto" }}
-        >
-          {/* Row 1 — embedded chat panel */}
-          <div className="min-h-0 overflow-hidden flex flex-col">
+        {/* Chat messages — fills all available space, scrolls internally */}
+        <div className="relative z-10 flex-1 min-h-0 flex justify-center overflow-hidden">
+          <div className="w-full max-w-3xl min-h-0 flex flex-col">
             <EmbeddedChatPanel
               activeEmployee={effectiveEmployee}
               chat={chat}
@@ -360,8 +356,13 @@ export function HomeClient({
               embedded
             />
           </div>
-          {/* Row 2 — input pinned at absolute bottom */}
-          <div>{renderInputBox()}</div>
+        </div>
+
+        {/* Input box — fixed at absolute bottom of the page */}
+        <div className="relative z-10 flex-shrink-0 px-4 pb-4 pt-2 flex justify-center">
+          <div className="w-full max-w-3xl">
+            {renderInputBox()}
+          </div>
         </div>
       </div>
     );
