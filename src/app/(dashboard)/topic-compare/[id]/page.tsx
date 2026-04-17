@@ -1,28 +1,27 @@
 import { notFound } from "next/navigation";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { getTopicCompareDetail } from "@/lib/dal/topic-compare";
 import { topicCompareArticles } from "@/data/benchmarking-data";
-import type { TopicCompareDetail, NetworkReport, CompetitorGroup } from "@/lib/types";
+import type {
+  TopicCompareDetail,
+  NetworkReport,
+  CompetitorGroup,
+} from "@/lib/types";
 import { TopicDetailClient } from "./topic-detail-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function TopicDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-
-  let orgId: string | null = null;
-  try {
-    orgId = await getCurrentUserOrg();
-  } catch {
-    // continue with mock data
-  }
-  void orgId;
-
-  const article = topicCompareArticles.find((a) => a.id === id);
-  if (!article) notFound();
+/**
+ * Fallback mock payload for demo mode when no real data exists for this article.
+ * Used only when we can't identify an org or when the org has no matching crawled content.
+ */
+function buildMockPayload(articleId: string): {
+  detail: TopicCompareDetail;
+  reports: NetworkReport[];
+  competitorGroups: CompetitorGroup[];
+} | null {
+  const article = topicCompareArticles.find((a) => a.id === articleId);
+  if (!article) return null;
 
   const detail: TopicCompareDetail = {
     article,
@@ -37,13 +36,13 @@ export default async function TopicDetailPage({
     },
     aiSummary: {
       centralMediaReport:
-        "央级媒体对本话题的报道主要集中在产业政策和国际竞争力两个维度。人民日报侧重从产业链安全角度分析AI手机对国产芯片的带动效应，强调自主可控的战略意义；新华社则从消费者权益视角切入，通过实地走访多城市卖场，呈现了价格战对普通消费者购机决策的影响；央视新闻从国际横向对比角度，分析中美AI手机技术差距及其背后的产业生态差异。整体来看，央媒报道注重宏观视角和政策导向，报道深度较强。",
+        "央级媒体对本话题的报道主要集中在产业政策和国际竞争力两个维度。人民日报侧重从产业链安全角度分析AI手机对国产芯片的带动效应；新华社从消费者权益视角切入，呈现了价格战对普通消费者购机决策的影响；央视新闻从国际横向对比角度，分析中美AI手机技术差距。",
       otherMediaReport:
-        "省级及其他媒体的报道更偏向产品评测和市场分析。澎湃新闻数码组进行了三款旗舰机的全方位性能横评，数据翔实且图表丰富；第一财经从供应链成本角度拆解了AI手机的BOM成本结构，为行业分析提供了独特视角。自媒体方面，多个科技博主进行了开箱评测和上手体验分享，在社交媒体上引发较高互动。",
+        "省级及其他媒体的报道更偏向产品评测和市场分析。澎湃新闻数码组进行了三款旗舰机的全方位性能横评；第一财经从供应链成本角度拆解了AI手机的BOM成本结构。",
       highlights:
-        "1. 人民日报首次将AI手机与国家芯片战略进行深度关联分析\n2. 新华社采用了大规模消费者走访调研方式，数据来源扎实\n3. 央视新闻的中美对比视角提供了国际化分析框架\n4. 澎湃的横评测试方法论严谨，覆盖了续航、AI功能响应速度等关键指标",
+        "1. 人民日报首次将AI手机与国家芯片战略进行深度关联分析\n2. 新华社采用了大规模消费者走访调研方式\n3. 央视新闻的中美对比视角提供了国际化分析框架",
       overallSummary:
-        "本话题全网报道共47篇，覆盖央级、省级、市级及自媒体多个层级。整体报道趋势呈现多角度、多层次的特点。央级媒体聚焦政策与战略层面，省级媒体侧重产品与市场分析，形成了互补的报道格局。我方报道在时效性和互动策略上表现良好，但在深度分析和独家视角方面仍有提升空间，建议参考人民日报的产业链分析框架和新华社的实地调研方法。",
+        "本话题全网报道共47篇，覆盖央级、省级、市级及自媒体多个层级。央级媒体聚焦政策与战略层面，省级媒体侧重产品与市场分析。我方报道在时效性和互动策略上表现良好，但在深度分析和独家视角方面仍有提升空间。",
       sourceArticles: [],
       generatedAt: "2026-04-17T12:00:00Z",
     },
@@ -180,11 +179,44 @@ export default async function TopicDetailPage({
     },
   ];
 
+  return { detail, reports, competitorGroups };
+}
+
+export default async function TopicDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  // Try real data from DB
+  let payload: {
+    detail: TopicCompareDetail;
+    reports: NetworkReport[];
+    competitorGroups: CompetitorGroup[];
+  } | null = null;
+
+  try {
+    const orgId = await getCurrentUserOrg();
+    if (orgId) {
+      payload = await getTopicCompareDetail(orgId, id);
+    }
+  } catch (err) {
+    console.error("[topic-compare/detail] failed to load real data:", err);
+  }
+
+  // Fall back to mock if no real data available for this article
+  if (!payload) {
+    payload = buildMockPayload(id);
+  }
+
+  if (!payload) notFound();
+
   return (
     <TopicDetailClient
-      detail={detail}
-      reports={reports}
-      competitorGroups={competitorGroups}
+      detail={payload.detail}
+      reports={payload.reports}
+      competitorGroups={payload.competitorGroups}
     />
   );
 }

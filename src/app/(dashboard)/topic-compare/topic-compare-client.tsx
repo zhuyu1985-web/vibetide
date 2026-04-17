@@ -101,9 +101,10 @@ type SortField = "publishedAt" | "readCount";
 
 interface Props {
   articles: TopicCompareArticle[];
+  usingMock?: boolean;
 }
 
-export function TopicCompareClient({ articles }: Props) {
+export function TopicCompareClient({ articles, usingMock }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [keyword, setKeyword] = useState("");
   const [sortField, setSortField] = useState<SortField>("publishedAt");
@@ -156,6 +157,12 @@ export function TopicCompareClient({ articles }: Props) {
         title="同题对比"
         description="以我方已发布作品为起点，对比全网媒体对同一话题的报道情况"
       />
+
+      {usingMock && (
+        <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2">
+          当前展示为演示数据。组织内尚无已发布作品，或数据库尚未同步。发布稿件后将自动替换为真实数据。
+        </div>
+      )}
 
       {/* ── KPI 统计概览 ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
