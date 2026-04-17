@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { cn } from "@/lib/utils";
 
 const DISPLAY_EMPLOYEES: EmployeeId[] = [
@@ -17,63 +18,80 @@ const DISPLAY_EMPLOYEES: EmployeeId[] = [
 ];
 
 interface EmployeeQuickPanelProps {
-  onSelectEmployee: (slug: EmployeeId) => void;
+  activeEmployee?: EmployeeId | null;
+  onEmployeeClick: (id: EmployeeId) => void;
 }
 
-export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps) {
-  const router = useRouter();
+const containerVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
 
+const cardVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" as const } },
+};
+
+export function EmployeeQuickPanel({
+  activeEmployee,
+  onEmployeeClick,
+}: EmployeeQuickPanelProps) {
   return (
-    <div className="flex flex-wrap gap-3">
-      {DISPLAY_EMPLOYEES.map((id) => {
-        const emp = EMPLOYEE_META[id];
-        const Icon = emp.icon;
+    <div className="w-full">
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        <span className="text-xs font-medium text-slate-400">AI 专家团队</span>
+        <Link
+          href="/ai-employees"
+          className="text-xs text-slate-500 hover:text-slate-300 transition-colors duration-200"
+        >
+          全部员工 →
+        </Link>
+      </div>
 
-        return (
-          <button
-            key={id}
-            onClick={() => onSelectEmployee(id)}
-            className={cn(
-              "flex flex-col items-center gap-1.5 p-2 rounded-xl cursor-pointer",
-              "transition-all duration-300 ease-out",
-              "hover:scale-[1.08] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:backdrop-blur-sm"
-            )}
-          >
-            {/* Icon square */}
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-              style={{ backgroundColor: emp.bgColor }}
-            >
-              <Icon size={24} style={{ color: emp.color }} />
-            </div>
-
-            {/* Nickname */}
-            <span className="text-xs text-gray-800 dark:text-white/80 leading-none">{emp.title}</span>
-
-            {/* Title */}
-            <span className="text-[10px] text-gray-400 dark:text-white/40 leading-none">{emp.title}</span>
-          </button>
-        );
-      })}
-
-      {/* 全部员工 entry */}
-      <button
-        onClick={() => router.push("/ai-employees")}
-        className={cn(
-          "flex flex-col items-center gap-1.5 p-2 rounded-xl cursor-pointer",
-          "transition-all duration-300 ease-out",
-          "hover:scale-[1.08] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:backdrop-blur-sm"
-        )}
+      {/* Horizontal scroll row */}
+      <motion.div
+        className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
       >
-        {/* Icon square */}
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-black/5 dark:from-white/10 to-black/[0.03] dark:to-white/5 border border-black/[0.08] dark:border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-          <Sparkles size={24} className="text-gray-600 dark:text-white/60" />
-        </div>
+        {DISPLAY_EMPLOYEES.map((id) => {
+          const emp = EMPLOYEE_META[id];
+          const isActive = activeEmployee === id;
 
-        {/* Label lines */}
-        <span className="text-xs text-gray-800 dark:text-white/80 leading-none">全部</span>
-        <span className="text-[10px] text-gray-400 dark:text-white/40 leading-none">员工</span>
-      </button>
+          return (
+            <motion.button
+              key={id}
+              variants={cardVariants}
+              onClick={() => onEmployeeClick(id)}
+              whileHover={{ y: -1 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className={cn(
+                "flex-shrink-0 w-[88px] flex flex-col items-center gap-2 py-3 px-2 rounded-xl",
+                "cursor-pointer transition-colors duration-200",
+                isActive
+                  ? "bg-white/[0.08] ring-1 ring-white/15"
+                  : "bg-white/[0.02] hover:bg-white/[0.06]"
+              )}
+            >
+              <EmployeeAvatar employeeId={id} size="lg" animated />
+              <span
+                className={cn(
+                  "text-[11px] text-center leading-tight",
+                  isActive ? "text-slate-200" : "text-slate-500"
+                )}
+              >
+                {emp.title}
+              </span>
+            </motion.button>
+          );
+        })}
+      </motion.div>
     </div>
   );
 }

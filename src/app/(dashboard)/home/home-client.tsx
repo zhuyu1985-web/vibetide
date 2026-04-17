@@ -623,8 +623,11 @@ export function HomeClient({
           </div>
 
           {/* Employee quick panel (fixed) */}
-          <div className="w-full max-w-3xl mb-3 flex justify-center flex-shrink-0">
-            <EmployeeQuickPanel onSelectEmployee={handleSelectEmployee} />
+          <div className="w-full max-w-3xl mb-3 flex-shrink-0">
+            <EmployeeQuickPanel
+              activeEmployee={activeEmployee}
+              onEmployeeClick={handleSelectEmployee}
+            />
           </div>
 
           {/* Recent section — internal scroll if content exceeds remaining space */}
