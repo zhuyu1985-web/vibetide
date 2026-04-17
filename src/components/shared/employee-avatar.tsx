@@ -12,7 +12,7 @@ const MICRO_ANIMATION: Record<string, string> = {
   xiaojian: "animate-film-rotate",
   xiaoshen: "animate-magnify-scan",
   xiaofa: "animate-signal-wave",
-  xiaoshu: "animate-chart-bounce",
+  xiaoshu: "animate-chart-rotate",
 };
 
 interface EmployeeAvatarProps {
