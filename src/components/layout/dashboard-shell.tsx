@@ -34,7 +34,7 @@ export function DashboardShell({
           onToggleSidebar={() => setSidebarExpanded(!sidebarExpanded)}
         />
         <main className="flex-1 overflow-hidden bg-page bg-glow">
-          <div className="relative z-10 p-6 h-full overflow-y-auto">{children}</div>
+          <div className="relative z-10 p-6 h-full overflow-y-auto scrollbar-thin">{children}</div>
         </main>
       </div>
     </div>
