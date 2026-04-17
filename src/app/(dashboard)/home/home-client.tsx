@@ -69,8 +69,12 @@ export function HomeClient({
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
 
-  // Per-employee scenarios from DB
-  const employeeScenarios: ScenarioCardData[] = scenarioMap[effectiveEmployee] ?? [];
+  // Per-employee scenarios from DB — only when user explicitly selected an employee
+  const allEmployeeScenarios: ScenarioCardData[] = activeEmployee
+    ? (scenarioMap[activeEmployee] ?? [])
+    : [];
+  // Normal mode: top 3; Chat mode: all
+  const activeScenarios = chatOpen ? allEmployeeScenarios : allEmployeeScenarios.slice(0, 3);
 
   // ── Chat stream hook ──
   const chat = useChatStream({ employeeSlug: effectiveEmployee });
@@ -114,7 +118,7 @@ export function HomeClient({
   // Click employee scenario chip → open chat with inline scenario form
   const handleEmployeeScenarioClick = useCallback(
     (scenario: { id: string; name: string; icon?: string }) => {
-      const fullScenario = employeeScenarios.find((s) => s.id === scenario.id);
+      const fullScenario = allEmployeeScenarios.find((s) => s.id === scenario.id);
       if (fullScenario) {
         if (fullScenario.inputFields?.length > 0) {
           // Show inline scenario form in chat
@@ -129,7 +133,7 @@ export function HomeClient({
         }
       }
     },
-    [employeeScenarios, chat]
+    [allEmployeeScenarios, chat]
   );
 
   // Inline scenario form submit
@@ -216,6 +220,101 @@ export function HomeClient({
     [chat]
   );
 
+  // ── Shared input box (used in both normal and chat modes) ──
+  const renderInputBox = () => (
+    <div className="w-full">
+      <div
+        className={cn(
+          "rounded-2xl overflow-hidden",
+          "bg-background",
+          "border border-border",
+          "shadow-sm",
+          "focus-within:border-indigo-500/40",
+          "focus-within:shadow-[0_4px_20px_rgba(99,102,241,0.1)]",
+          "transition-all duration-300"
+        )}
+      >
+        {/* Textarea */}
+        <div className="px-5 pt-4 pb-2">
+          <textarea
+            ref={chatTextareaRef}
+            value={chatOpen ? chatInput : inputValue}
+            onChange={(e) => chatOpen ? setChatInput(e.target.value) : setInputValue(e.target.value)}
+            onKeyDown={chatOpen ? handleChatKeyDown : (e: KeyboardEvent<HTMLTextAreaElement>) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder={chatOpen ? "继续对话..." : "有什么想法？告诉 AI 团队…"}
+            rows={chatOpen ? 1 : 2}
+            className={cn(
+              "w-full bg-transparent text-[15px] leading-relaxed",
+              "text-foreground placeholder:text-muted-foreground/50",
+              "resize-none outline-none",
+              chatOpen ? "min-h-[36px] max-h-[100px]" : "min-h-[52px] max-h-[160px]"
+            )}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = "auto";
+              const maxH = chatOpen ? 100 : 160;
+              target.style.height = `${Math.min(target.scrollHeight, maxH)}px`;
+            }}
+          />
+        </div>
+
+        {/* Scenario chips — only when an employee is actively selected */}
+        {activeEmployee && activeScenarios.length > 0 && (
+          <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+            {activeScenarios.map((scenario) => (
+              <button
+                key={scenario.id}
+                onClick={() => handleEmployeeScenarioClick(scenario)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors cursor-pointer"
+              >
+                {scenario.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-4 pb-3 pt-1">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleVoiceToggle}
+              className={cn(
+                "p-2 rounded-xl transition-all duration-200",
+                isRecording
+                  ? "bg-red-500/20 text-red-400"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+            >
+              <Mic size={16} />
+            </button>
+            <button
+              className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
+            >
+              <Paperclip size={16} />
+            </button>
+          </div>
+          <button
+            onClick={chatOpen ? handleChatSend : handleSubmit}
+            disabled={chatOpen ? (!chatInput.trim() || chat.isStreaming) : !inputValue.trim()}
+            className={cn(
+              "flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200",
+              (chatOpen ? (chatInput.trim() && !chat.isStreaming) : inputValue.trim())
+                ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.4)] hover:scale-105 cursor-pointer"
+                : "bg-muted text-muted-foreground/40 cursor-not-allowed"
+            )}
+          >
+            <ArrowUp size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   // ── Render: Chat mode ──
   if (chatOpen) {
     return (
@@ -226,7 +325,7 @@ export function HomeClient({
           className="fixed inset-0 z-0 pointer-events-none dark:opacity-30 opacity-10"
         />
 
-        {/* Grid layout: Row 1 = chat (scrollable), Row 2 = input (pinned) */}
+        {/* Grid: Row 1 = chat (scrollable), Row 2 = input (pinned at bottom) */}
         <div
           className="relative z-10 w-full max-w-3xl flex-1 min-h-0 grid gap-3"
           style={{ gridTemplateRows: "minmax(0, 1fr) auto" }}
@@ -244,91 +343,8 @@ export function HomeClient({
               embedded
             />
           </div>
-
-          {/* Row 2 — pinned input box */}
-          <div className="w-full">
-            <div
-              className={cn(
-                "rounded-2xl overflow-hidden",
-                "bg-background",
-                "border border-border",
-                "shadow-sm",
-                "focus-within:border-indigo-500/40",
-                "focus-within:shadow-[0_4px_20px_rgba(99,102,241,0.1)]",
-                "transition-all duration-300"
-              )}
-            >
-              {/* Textarea */}
-              <div className="px-4 pt-3 pb-1">
-                <textarea
-                  ref={chatTextareaRef}
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={handleChatKeyDown}
-                  placeholder="继续对话..."
-                  rows={1}
-                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 resize-none outline-none min-h-[36px] max-h-[100px] leading-relaxed"
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = "auto";
-                    target.style.height = `${Math.min(target.scrollHeight, 100)}px`;
-                  }}
-                />
-              </div>
-
-              {/* Scenario chips inside chat input */}
-              {employeeScenarios.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 px-4 pb-2">
-                  {employeeScenarios.map((sc) => (
-                    <button
-                      key={sc.id}
-                      onClick={() => handleEmployeeScenarioClick(sc)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px]
-                        bg-accent/60 hover:bg-accent text-muted-foreground hover:text-foreground
-                        transition-all duration-150"
-                    >
-                      {sc.icon && <span className="text-xs">{sc.icon}</span>}
-                      {sc.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Toolbar */}
-              <div className="flex items-center justify-between px-3 pb-3 pt-1">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleVoiceToggle}
-                    className={cn(
-                      "p-2 rounded-xl transition-all duration-200",
-                      isRecording
-                        ? "bg-red-500/20 text-red-400"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                    )}
-                  >
-                    <Mic size={16} />
-                  </button>
-                  <button
-                    className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
-                  >
-                    <Paperclip size={16} />
-                  </button>
-                </div>
-                <button
-                  onClick={handleChatSend}
-                  disabled={!chatInput.trim() || chat.isStreaming}
-                  className={cn(
-                    "flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200",
-                    chatInput.trim() && !chat.isStreaming
-                      ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.4)] hover:scale-105 cursor-pointer"
-                      : "bg-muted text-muted-foreground/40 cursor-not-allowed"
-                  )}
-                >
-                  <ArrowUp size={16} strokeWidth={2.5} />
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* Row 2 — input pinned at absolute bottom */}
+          <div>{renderInputBox()}</div>
         </div>
       </div>
     );
@@ -345,21 +361,16 @@ export function HomeClient({
 
       {/* Four-layer content */}
       <div className="relative z-10 max-w-4xl mx-auto px-6 pb-12">
-        {/* Layer 1: Hero — title + unified input */}
-        <HeroSection
-          inputValue={inputValue}
-          onInputChange={setInputValue}
-          onSubmit={handleSubmit}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-          isRecording={isRecording}
-          onVoiceToggle={handleVoiceToggle}
-          employeeScenarios={employeeScenarios}
-          onScenarioChipClick={handleEmployeeScenarioClick}
-        />
+        {/* Layer 1: Hero title + badge */}
+        <HeroSection />
+
+        {/* Layer 1.5: Shared input box */}
+        <div className="max-w-3xl mx-auto mt-2">
+          {renderInputBox()}
+        </div>
 
         {/* Layer 2: Employee quick panel */}
-        <div className="px-4 mt-2">
+        <div className="px-4 mt-4">
           <EmployeeQuickPanel
             activeEmployee={activeEmployee}
             onEmployeeClick={handleSelectEmployee}
