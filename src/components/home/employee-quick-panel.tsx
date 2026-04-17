@@ -75,8 +75,8 @@ export function EmployeeQuickPanel({
                 "flex-shrink-0 w-[88px] flex flex-col items-center gap-2 py-3 px-2 rounded-xl",
                 "cursor-pointer transition-colors duration-200 border-0",
                 isActive
-                  ? "bg-accent ring-1 ring-border"
-                  : "bg-muted/30 hover:bg-muted/60"
+                  ? "bg-accent"
+                  : "bg-transparent hover:bg-muted/50"
               )}
             >
               <EmployeeAvatar employeeId={id} size="lg" animated />
