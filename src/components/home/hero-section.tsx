@@ -88,7 +88,7 @@ export function HeroSection({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
           </span>
-          <span className="text-xs font-medium text-indigo-300">
+          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
             超级个体已就绪 · 8 位专家待命
           </span>
         </div>
@@ -102,11 +102,11 @@ export function HeroSection({
         transition={{ duration: 0.45, delay: 0.08, ease: "easeOut" }}
       >
         <h1 className="text-4xl font-bold tracking-tight">
-          <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 dark:from-indigo-400 dark:via-violet-400 dark:to-purple-400 bg-clip-text text-transparent">
             你的智媒工作空间
           </span>
         </h1>
-        <p className="text-base text-white/50">
+        <p className="text-base text-muted-foreground">
           与 AI 团队协作，高效完成内容生产
         </p>
       </motion.div>
@@ -120,9 +120,9 @@ export function HeroSection({
       >
         <div
           className={cn(
-            "rounded-2xl bg-white/[0.04] backdrop-blur-xl",
-            "border border-white/[0.08]",
-            "shadow-[0_4px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)]",
+            "rounded-2xl bg-muted/50 backdrop-blur-xl",
+            "border border-border",
+            "shadow-[0_4px_24px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.06)]",
             "transition-all duration-200",
             "focus-within:border-indigo-500/40 focus-within:shadow-[0_4px_32px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.06)]"
           )}
@@ -139,7 +139,7 @@ export function HeroSection({
               rows={1}
               className={cn(
                 "w-full resize-none bg-transparent outline-none",
-                "text-sm text-white/90 placeholder:text-white/30",
+                "text-sm text-foreground placeholder:text-muted-foreground/50",
                 "leading-relaxed min-h-[24px]",
                 "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
@@ -160,7 +160,7 @@ export function HeroSection({
                   "disabled:opacity-40 disabled:cursor-not-allowed",
                   isRecording
                     ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                    : "text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                 )}
                 title={isRecording ? "停止录音" : "语音输入"}
               >
@@ -172,7 +172,7 @@ export function HeroSection({
                 disabled={disabled}
                 className={cn(
                   "p-2 rounded-xl transition-all duration-200 border-0",
-                  "text-white/40 hover:text-white/70 hover:bg-white/[0.06]",
+                  "text-muted-foreground hover:text-foreground hover:bg-accent/50",
                   "disabled:opacity-40 disabled:cursor-not-allowed"
                 )}
                 title="添加附件"
@@ -187,9 +187,9 @@ export function HeroSection({
                   disabled={disabled}
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all duration-200 border-0",
-                    "text-white/40 hover:text-white/70 hover:bg-white/[0.06]",
+                    "text-muted-foreground hover:text-foreground hover:bg-accent/50",
                     "disabled:opacity-40 disabled:cursor-not-allowed",
-                    modelOpen && "bg-white/[0.06] text-white/70"
+                    modelOpen && "bg-accent/50 text-foreground"
                   )}
                 >
                   <span className="text-xs font-medium">{selectedModelLabel}</span>
@@ -208,9 +208,9 @@ export function HeroSection({
                     className={cn(
                       "absolute bottom-full left-0 mb-1.5 z-50",
                       "w-36 rounded-xl py-1",
-                      "bg-gray-900/95 backdrop-blur-xl",
-                      "shadow-[0_8px_32px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.3)]",
-                      "border border-white/[0.08]",
+                      "bg-popover backdrop-blur-xl",
+                      "shadow-[0_8px_32px_rgba(0,0,0,0.2),0_2px_8px_rgba(0,0,0,0.1)]",
+                      "border border-border",
                       "animate-in fade-in zoom-in-95 duration-150"
                     )}
                   >
@@ -224,8 +224,8 @@ export function HeroSection({
                         className={cn(
                           "w-full text-left px-3 py-2 text-xs transition-colors duration-150 border-0",
                           opt.value === selectedModel
-                            ? "text-indigo-300 bg-indigo-500/10"
-                            : "text-white/60 hover:text-white/90 hover:bg-white/[0.06]"
+                            ? "text-indigo-600 dark:text-indigo-300 bg-indigo-500/10"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                         )}
                       >
                         {opt.label}
@@ -246,7 +246,7 @@ export function HeroSection({
                 "flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 border-0",
                 canSubmit
                   ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.4)] hover:shadow-[0_2px_16px_rgba(99,102,241,0.55)] hover:scale-105 cursor-pointer"
-                  : "bg-white/[0.06] text-white/20 cursor-not-allowed"
+                  : "bg-muted text-muted-foreground/40 cursor-not-allowed"
               )}
               title="发送 (Enter)"
             >
@@ -256,7 +256,7 @@ export function HeroSection({
         </div>
 
         {/* Hint */}
-        <p className="text-center text-[11px] text-white/20 mt-2">
+        <p className="text-center text-[11px] text-muted-foreground/50 mt-2">
           按 Enter 发送 · Shift+Enter 换行
         </p>
       </motion.div>

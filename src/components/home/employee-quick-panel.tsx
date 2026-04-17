@@ -44,10 +44,10 @@ export function EmployeeQuickPanel({
     <div className="w-full">
       {/* Section header */}
       <div className="flex items-center justify-between mb-2 px-1">
-        <span className="text-xs font-medium text-slate-400">AI 专家团队</span>
+        <span className="text-xs font-medium text-muted-foreground">AI 专家团队</span>
         <Link
           href="/ai-employees"
-          className="text-xs text-slate-500 hover:text-slate-300 transition-colors duration-200"
+          className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200"
         >
           全部员工 →
         </Link>
@@ -73,17 +73,17 @@ export function EmployeeQuickPanel({
               transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
                 "flex-shrink-0 w-[88px] flex flex-col items-center gap-2 py-3 px-2 rounded-xl",
-                "cursor-pointer transition-colors duration-200",
+                "cursor-pointer transition-colors duration-200 border-0",
                 isActive
-                  ? "bg-white/[0.08] ring-1 ring-white/15"
-                  : "bg-white/[0.02] hover:bg-white/[0.06]"
+                  ? "bg-accent ring-1 ring-border"
+                  : "bg-muted/30 hover:bg-muted/60"
               )}
             >
               <EmployeeAvatar employeeId={id} size="lg" animated />
               <span
                 className={cn(
                   "text-[11px] text-center leading-tight",
-                  isActive ? "text-slate-200" : "text-slate-500"
+                  isActive ? "text-foreground" : "text-muted-foreground"
                 )}
               >
                 {emp.title}

@@ -14,10 +14,10 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick }: ScenarioGridPro
     <div className="space-y-2.5">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-white/70">场景快捷启动</span>
+        <span className="text-sm font-medium text-foreground/80">场景快捷启动</span>
         <button
           onClick={onCustomClick}
-          className="text-xs text-white/40 hover:text-white/70 transition-colors duration-200 cursor-pointer"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer border-0"
         >
           + 自定义场景
         </button>
@@ -35,9 +35,9 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick }: ScenarioGridPro
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.06, ease: "easeOut" }}
               whileHover={{ y: -2 }}
-              className="text-left rounded-xl px-3 py-2.5 cursor-pointer transition-shadow duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
+              className="text-left rounded-xl px-3 py-2.5 cursor-pointer transition-shadow duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-0"
               style={{
-                background: `linear-gradient(135deg, ${sc.bgColor}, ${sc.bgColor.replace(/[\d.]+\)$/, "0.05)")}`,
+                background: `linear-gradient(135deg, ${sc.bgColor}, ${sc.bgColor.replace(/[\d.]+\)$/, "0.05)")})`,
               }}
             >
               {/* Emoji */}
@@ -52,7 +52,7 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick }: ScenarioGridPro
               </div>
 
               {/* Description */}
-              <div className="text-[10px] text-white/40 leading-tight mb-2 line-clamp-1">
+              <div className="text-[10px] text-foreground/50 leading-tight mb-2 line-clamp-1">
                 {sc.description}
               </div>
 

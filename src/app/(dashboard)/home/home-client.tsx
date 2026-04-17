@@ -133,7 +133,7 @@ export function HomeClient({
       {/* Particle background */}
       <ParticleBackground
         particleCount={60}
-        className="fixed inset-0 z-0 pointer-events-none opacity-50"
+        className="fixed inset-0 z-0 pointer-events-none dark:opacity-50 opacity-20"
       />
 
       {/* Four-layer content */}
