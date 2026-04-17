@@ -7,6 +7,7 @@ import {
   ADVANCED_SCENARIO_CONFIG,
   ADVANCED_SCENARIO_KEYS,
   type AdvancedScenarioKey,
+  type EmployeeId,
 } from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import {
@@ -15,12 +16,29 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+export interface CustomScenario {
+  id: string;
+  name: string;
+  baseKey: AdvancedScenarioKey;
+  teamMembers: EmployeeId[];
+  workflowSteps: unknown[];
+  inputFields: unknown[];
+  createdAt: string;
+}
+
 interface ScenarioGridProps {
   onScenarioClick: (key: AdvancedScenarioKey) => void;
   onCustomClick: () => void;
+  customScenarios?: CustomScenario[];
+  onCustomScenarioClick?: (scenario: CustomScenario) => void;
 }
 
-export function ScenarioGrid({ onScenarioClick, onCustomClick: _onCustomClick }: ScenarioGridProps) {
+export function ScenarioGrid({
+  onScenarioClick,
+  onCustomClick: _onCustomClick,
+  customScenarios = [],
+  onCustomScenarioClick,
+}: ScenarioGridProps) {
   const router = useRouter();
 
   return (
@@ -62,7 +80,7 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick: _onCustomClick }:
         </Popover>
       </div>
 
-      {/* 3x2 grid */}
+      {/* Preset 3x2 grid */}
       <div className="grid grid-cols-3 gap-2.5">
         {ADVANCED_SCENARIO_KEYS.map((key, index) => {
           const sc = ADVANCED_SCENARIO_CONFIG[key];
@@ -112,6 +130,81 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick: _onCustomClick }:
           );
         })}
       </div>
+
+      {/* Custom scenarios */}
+      {customScenarios.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          <span className="text-xs text-muted-foreground/60 font-medium">我的场景</span>
+          <div className="grid grid-cols-3 gap-2.5">
+            {customScenarios.map((scenario, index) => {
+              const baseConfig = ADVANCED_SCENARIO_CONFIG[scenario.baseKey];
+              return (
+                <motion.button
+                  key={scenario.id}
+                  onClick={() => onCustomScenarioClick?.(scenario)}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.3,
+                    delay: (ADVANCED_SCENARIO_KEYS.length + index) * 0.06,
+                    ease: "easeOut",
+                  }}
+                  whileHover={{ y: -2 }}
+                  className="text-left rounded-xl px-3 py-2.5 cursor-pointer transition-shadow duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1)] border-0 relative"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04))",
+                    boxShadow: "inset 0 0 0 1px rgba(99,102,241,0.18)",
+                  }}
+                >
+                  {/* 自定义 badge */}
+                  <div className="absolute top-2 right-2">
+                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500">
+                      自定义
+                    </span>
+                  </div>
+
+                  {/* Base scenario icon */}
+                  <div className="mb-1.5">
+                    {baseConfig ? (
+                      <baseConfig.icon size={22} style={{ color: baseConfig.color }} />
+                    ) : (
+                      <Settings2 size={22} className="text-indigo-400" />
+                    )}
+                  </div>
+
+                  {/* Name */}
+                  <div className="text-xs font-semibold leading-tight mb-0.5 text-indigo-500 pr-10">
+                    {scenario.name}
+                  </div>
+
+                  {/* Base label */}
+                  <div className="text-[10px] text-foreground/40 leading-tight mb-2 line-clamp-1">
+                    基于 {baseConfig?.label ?? scenario.baseKey}
+                  </div>
+
+                  {/* Team member avatars */}
+                  <div className="flex items-center -space-x-1">
+                    {scenario.teamMembers.slice(0, 5).map((memberId) => (
+                      <EmployeeAvatar
+                        key={memberId}
+                        employeeId={memberId}
+                        size="xs"
+                        className=""
+                      />
+                    ))}
+                    {scenario.teamMembers.length > 5 && (
+                      <span className="text-[9px] text-muted-foreground ml-1">
+                        +{scenario.teamMembers.length - 5}
+                      </span>
+                    )}
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

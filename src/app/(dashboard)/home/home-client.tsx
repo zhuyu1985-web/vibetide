@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, type KeyboardEvent } from "react";
+import { useState, useCallback, useRef, useEffect, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,7 @@ import { useChatStream } from "@/hooks/use-chat-stream";
 import { ParticleBackground } from "@/components/shared/particle-background";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
-import { ScenarioGrid } from "@/components/home/scenario-grid";
+import { ScenarioGrid, type CustomScenario } from "@/components/home/scenario-grid";
 import { ScenarioDetailSheet } from "@/components/home/scenario-detail-sheet";
 import { RecentSection } from "@/components/home/recent-section";
 import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
@@ -57,6 +57,7 @@ export function HomeClient({
 
   // ── State ──
   const [inputValue, setInputValue] = useState("");
+  const [customScenarios, setCustomScenarios] = useState<CustomScenario[]>([]);
   const [activeEmployee, setActiveEmployee] = useState<EmployeeId | null>(null);
   const [selectedModel, setSelectedModel] = useState("auto");
   const [isRecording, setIsRecording] = useState(false);
@@ -66,6 +67,16 @@ export function HomeClient({
   const [chatInput, setChatInput] = useState("");
   const [inlineScenario, setInlineScenario] = useState<ScenarioCardData | null>(null);
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load custom scenarios from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("vibetide_custom_scenarios");
+      if (raw) setCustomScenarios(JSON.parse(raw) as CustomScenario[]);
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
 
@@ -186,6 +197,12 @@ export function HomeClient({
   const handleCustomScenario = useCallback(() => {
     router.push("/workflows?action=create");
   }, [router]);
+
+  const handleCustomScenarioClick = useCallback((scenario: CustomScenario) => {
+    // Open the base scenario detail sheet as a starting point
+    setSelectedScenario(scenario.baseKey);
+    setSheetOpen(true);
+  }, []);
 
   const handleScenarioLaunch = useCallback(
     async (key: AdvancedScenarioKey, inputs: Record<string, string>) => {
@@ -382,6 +399,8 @@ export function HomeClient({
           <ScenarioGrid
             onScenarioClick={handleScenarioClick}
             onCustomClick={handleCustomScenario}
+            customScenarios={customScenarios}
+            onCustomScenarioClick={handleCustomScenarioClick}
           />
         </div>
 
