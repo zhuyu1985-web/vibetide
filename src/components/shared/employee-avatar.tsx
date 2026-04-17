@@ -4,12 +4,24 @@ import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { User } from "lucide-react";
 
+const MICRO_ANIMATION: Record<string, string> = {
+  xiaolei: "animate-radar-pulse",
+  xiaoce: "animate-bulb-flicker",
+  xiaozi: "animate-page-flip",
+  xiaowen: "animate-pen-write",
+  xiaojian: "animate-film-rotate",
+  xiaoshen: "animate-magnify-scan",
+  xiaofa: "animate-signal-wave",
+  xiaoshu: "animate-chart-bounce",
+};
+
 interface EmployeeAvatarProps {
   employeeId: EmployeeId | string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   showStatus?: boolean;
   status?: "working" | "idle" | "learning" | "reviewing";
   className?: string;
+  animated?: boolean;
 }
 
 const sizeMap = {
@@ -33,6 +45,7 @@ export function EmployeeAvatar({
   showStatus = false,
   status,
   className,
+  animated = false,
 }: EmployeeAvatarProps) {
   const meta = EMPLOYEE_META[employeeId as EmployeeId];
   const Icon = meta?.icon ?? User;
@@ -51,6 +64,15 @@ export function EmployeeAvatar({
       >
         <Icon size={s.icon} style={{ color }} strokeWidth={2} />
       </div>
+      {animated && MICRO_ANIMATION[employeeId as string] && (
+        <span
+          className={cn(
+            "absolute inset-[-3px] rounded-full opacity-40",
+            MICRO_ANIMATION[employeeId as string]
+          )}
+          style={{ borderColor: meta.color, borderWidth: 2, borderStyle: "solid" }}
+        />
+      )}
       {showStatus && status && (
         <span
           className={cn(
