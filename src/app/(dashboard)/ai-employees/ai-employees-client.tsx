@@ -46,7 +46,7 @@ export function AiEmployeesClient({
   const [statusFilter, setStatusFilter] = useState("all");
 
   // ── Filtering & sorting ──
-  const filteredEmployees = useMemo(() => {
+  const { presetEmployees, customEmployees } = useMemo(() => {
     let result = [...employees].sort((a, b) => {
       const ia = EMPLOYEE_ORDER.indexOf(a.id);
       const ib = EMPLOYEE_ORDER.indexOf(b.id);
@@ -67,8 +67,16 @@ export function AiEmployeesClient({
       );
     }
 
-    return result;
+    return {
+      presetEmployees: result.filter((e) => !String(e.id).startsWith("custom_")),
+      customEmployees: result.filter((e) => String(e.id).startsWith("custom_")),
+    };
   }, [employees, statusFilter, searchText]);
+
+  const filteredEmployees = useMemo(
+    () => [...presetEmployees, ...customEmployees],
+    [presetEmployees, customEmployees]
+  );
 
   // ── Handlers ──
   const handleDispatchTask = useCallback(
@@ -148,16 +156,46 @@ export function AiEmployeesClient({
 
       {/* ── Grid ── */}
       {filteredEmployees.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredEmployees.map((emp) => (
-            <EmployeeAgentCard
-              key={emp.dbId}
-              employee={emp}
-              hotTasks={EMPLOYEE_HOT_TASKS[emp.id] || []}
-              onDispatchTask={handleDispatchTask}
-              onHotTaskClick={handleHotTaskClick}
-            />
-          ))}
+        <div className="space-y-8">
+          {/* Preset employees */}
+          {presetEmployees.length > 0 && (
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {presetEmployees.map((emp) => (
+                  <EmployeeAgentCard
+                    key={emp.dbId}
+                    employee={emp}
+                    hotTasks={EMPLOYEE_HOT_TASKS[emp.id] || []}
+                    onDispatchTask={handleDispatchTask}
+                    onHotTaskClick={handleHotTaskClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Custom employees */}
+          {customEmployees.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-xs font-medium text-gray-400 dark:text-white/40">
+                  自定义员工
+                </span>
+                <div className="flex-1 h-px bg-black/[0.06] dark:bg-white/[0.06]" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {customEmployees.map((emp) => (
+                  <EmployeeAgentCard
+                    key={emp.dbId}
+                    employee={emp}
+                    hotTasks={EMPLOYEE_HOT_TASKS[emp.id] || []}
+                    onDispatchTask={handleDispatchTask}
+                    onHotTaskClick={handleHotTaskClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20">

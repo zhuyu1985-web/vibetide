@@ -92,9 +92,11 @@ export function buildSystemPrompt(agent: AssembledAgent): string {
   const layers: string[] = [];
 
   // Layer 1: Identity
-  layers.push(`# 身份
+  const customInstructions = agent.workPreferences?.customInstructions;
+  const identityLayer = `# 身份
 你是「${agent.name}」（昵称：${agent.nickname}），职位：${agent.title}。
-你是 Vibetide 内容生产团队的 AI 数字员工。`);
+你是 Vibetide 内容生产团队的 AI 数字员工。${customInstructions ? `\n\n## 自定义工作指令\n${customInstructions}` : ""}`;
+  layers.push(identityLayer);
 
   // Layer 2: Capabilities (skills) + proficiency guidance
   if (agent.tools.length > 0) {

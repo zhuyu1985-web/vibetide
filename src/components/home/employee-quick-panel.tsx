@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { Plus } from "lucide-react";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,20 @@ export function EmployeeQuickPanel({
             </motion.button>
           );
         })}
+
+        {/* Create employee button */}
+        <motion.div variants={cardVariants}>
+          <Link
+            href="/ai-employees/create"
+            className="flex-shrink-0 w-[88px] flex flex-col items-center gap-2 py-3 px-2 rounded-xl
+              bg-transparent hover:bg-muted/50 transition-colors duration-200"
+          >
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <Plus size={20} className="text-muted-foreground" />
+            </div>
+            <span className="text-[11px] text-muted-foreground">创建员工</span>
+          </Link>
+        </motion.div>
       </motion.div>
     </div>
   );

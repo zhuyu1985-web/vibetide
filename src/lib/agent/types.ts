@@ -55,6 +55,8 @@ export interface AssembledAgent {
     autonomyLevel: number;
     communicationStyle: string;
     workingHours: string;
+    /** Custom instructions for custom employees — appended to Identity layer */
+    customInstructions?: string;
   } | null;
   sensitiveTopics?: string[];
   skillContents?: Record<string, string>;
