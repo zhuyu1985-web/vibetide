@@ -531,3 +531,41 @@ export const workflowTriggerTypeEnum = pgEnum("workflow_trigger_type", [
   "manual",
   "scheduled",
 ]);
+
+// Audit system enums (三级审核体系)
+
+export const auditStageEnum = pgEnum("audit_stage", [
+  "review_1",
+  "review_2",
+  "review_3",
+]);
+
+export const auditResultEnum = pgEnum("audit_result", [
+  "pass",
+  "warning",
+  "fail",
+]);
+
+export const auditModeEnum = pgEnum("audit_mode", [
+  "auto",
+  "human",
+  "hybrid",
+]);
+
+export const trailActionEnum = pgEnum("trail_action", [
+  "create",
+  "edit",
+  "review",
+  "approve",
+  "reject",
+  "publish",
+]);
+
+export const trailStageEnum = pgEnum("trail_stage", [
+  "planning",
+  "writing",
+  "review_1",
+  "review_2",
+  "review_3",
+  "publishing",
+]);

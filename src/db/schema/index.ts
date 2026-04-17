@@ -67,3 +67,6 @@ export * from "./roles";
 export * from "./verification-records";
 
 export * from "./research";
+
+// Audit system (三级审核体系, 2026-04-17)
+export * from "./audit";
