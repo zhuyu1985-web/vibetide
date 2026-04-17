@@ -67,6 +67,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "工作流", href: "/workflows", icon: GitBranch },
   { label: "任务", href: "/missions", icon: Target },
   { label: "审核中心", href: "/audit-center", icon: ShieldCheck },
+  { label: "渠道集成", href: "/settings/channels", icon: Radio },
   {
     label: "创作", href: "#creation", icon: Wand2,
     children: [
