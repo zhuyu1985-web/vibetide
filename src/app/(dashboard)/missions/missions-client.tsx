@@ -45,6 +45,7 @@ import {
 import { startMission } from "@/app/actions/missions";
 import {
   SCENARIO_CONFIG,
+  ADVANCED_SCENARIO_CONFIG,
   SCENARIO_CATEGORIES,
   EMPLOYEE_META,
   type EmployeeId,
@@ -329,6 +330,9 @@ export function MissionsClient({
               {Object.entries(SCENARIO_CONFIG).map(([k, c]) => (
                 <SelectItem key={k} value={k}>{c.label}</SelectItem>
               ))}
+              {Object.entries(ADVANCED_SCENARIO_CONFIG).map(([k, c]) => (
+                <SelectItem key={k} value={k}>{c.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -396,7 +400,7 @@ function MissionRow({
     : m.totalTaskCount > 0 ? Math.round((m.completedTaskCount / m.totalTaskCount) * 100) : 0;
   const progressCls = PROGRESS_CLASS[m.status] ?? "bg-gray-400";
   const skippedCount = isDone ? m.totalTaskCount - m.completedTaskCount - m.inProgressTaskCount : 0;
-  const scCfg = SCENARIO_CONFIG[m.scenario];
+  const scCfg = SCENARIO_CONFIG[m.scenario] ?? ADVANCED_SCENARIO_CONFIG[m.scenario as keyof typeof ADVANCED_SCENARIO_CONFIG];
   const isActive = ["executing", "consolidating"].includes(m.status);
 
   // Extract error message from finalOutput for failed missions
