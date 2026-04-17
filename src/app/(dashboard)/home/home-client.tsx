@@ -9,12 +9,14 @@ import {
   type AdvancedScenarioKey,
 } from "@/lib/constants";
 import { startMission } from "@/app/actions/missions";
+import { useChatStream } from "@/hooks/use-chat-stream";
 import { ParticleBackground } from "@/components/shared/particle-background";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { ScenarioDetailSheet } from "@/components/home/scenario-detail-sheet";
 import { RecentSection } from "@/components/home/recent-section";
+import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
 import type { ScenarioCardData } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -58,29 +60,43 @@ export function HomeClient({
   const [isRecording, setIsRecording] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<AdvancedScenarioKey | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [inlineScenario, setInlineScenario] = useState<ScenarioCardData | null>(null);
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
 
   // Per-employee scenarios from DB
   const employeeScenarios: ScenarioCardData[] = scenarioMap[effectiveEmployee] ?? [];
 
+  // ── Chat stream hook ──
+  const chat = useChatStream({ employeeSlug: effectiveEmployee });
+
   // ── Handlers ──
 
+  // Submit from input box → open embedded chat and send message
   const handleSubmit = useCallback(() => {
     if (!inputValue.trim()) return;
-    sessionStorage.setItem(
-      "chat-handoff",
-      JSON.stringify({
-        employeeSlug: effectiveEmployee,
-        initialMessage: inputValue,
-      })
-    );
-    router.push(`/chat?handoff=1&employee=${effectiveEmployee}`);
-  }, [inputValue, effectiveEmployee, router]);
+    const text = inputValue;
+    setInputValue("");
+    setChatOpen(true);
+    // Send message after state update
+    setTimeout(() => {
+      chat.sendMessage(text);
+    }, 0);
+  }, [inputValue, chat]);
 
   const handleSelectEmployee = useCallback((slug: EmployeeId) => {
     setActiveEmployee(slug);
-  }, []);
+    // If already in chat, clear messages for new employee
+    if (chatOpen) {
+      chat.clearMessages();
+    }
+  }, [chatOpen, chat]);
+
+  const handleSwitchEmployee = useCallback((slug: EmployeeId) => {
+    setActiveEmployee(slug);
+    chat.clearMessages();
+  }, [chat]);
 
   const handleVoiceToggle = useCallback(() => {
     setIsRecording((prev) => !prev);
@@ -91,21 +107,50 @@ export function HomeClient({
     setSheetOpen(true);
   }, []);
 
-  // Click employee scenario chip → navigate to chat with scenario context
+  // Click employee scenario chip → open chat with inline scenario form
   const handleEmployeeScenarioClick = useCallback(
     (scenario: { id: string; name: string; icon?: string }) => {
-      sessionStorage.setItem(
-        "chat-handoff",
-        JSON.stringify({
-          employeeSlug: effectiveEmployee,
-          scenarioId: scenario.id,
-          scenarioName: scenario.name,
-        })
-      );
-      router.push(`/chat?handoff=1&employee=${effectiveEmployee}`);
+      const fullScenario = employeeScenarios.find((s) => s.id === scenario.id);
+      if (fullScenario) {
+        if (fullScenario.inputFields?.length > 0) {
+          // Show inline scenario form in chat
+          setInlineScenario(fullScenario);
+          setChatOpen(true);
+        } else {
+          // Execute directly
+          setChatOpen(true);
+          setTimeout(() => {
+            chat.sendMessage(`执行场景：${fullScenario.name}`);
+          }, 0);
+        }
+      }
     },
-    [effectiveEmployee, router]
+    [employeeScenarios, chat]
   );
+
+  // Inline scenario form submit
+  const handleScenarioFormSubmit = useCallback(
+    (scenario: ScenarioCardData, inputs: Record<string, string>) => {
+      setInlineScenario(null);
+      const summary = Object.entries(inputs)
+        .filter(([, v]) => v)
+        .map(([k, v]) => {
+          const field = scenario.inputFields.find((f) => f.name === k);
+          return `${field?.label ?? k}: ${v}`;
+        })
+        .join("\n");
+      chat.sendMessage(`场景：${scenario.name}\n${summary}`);
+    },
+    [chat]
+  );
+
+  const handleCancelScenario = useCallback(() => {
+    setInlineScenario(null);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setChatOpen(false);
+  }, []);
 
   const handleCustomScenario = useCallback(() => {
     router.push("/workflows?action=create");
@@ -136,20 +181,39 @@ export function HomeClient({
   const handleScenarioChat = useCallback(
     (key: AdvancedScenarioKey) => {
       const sc = ADVANCED_SCENARIO_CONFIG[key];
-      sessionStorage.setItem(
-        "chat-handoff",
-        JSON.stringify({
-          employeeSlug: sc.teamMembers[0],
-          scenarioKey: key,
-        })
-      );
+      setActiveEmployee(sc.teamMembers[0]);
       setSheetOpen(false);
-      router.push(`/chat?handoff=1&employee=${sc.teamMembers[0]}`);
+      setChatOpen(true);
+      chat.clearMessages();
     },
-    [router]
+    [chat]
   );
 
-  // ── Render ──
+  // ── Render: Chat mode ──
+  if (chatOpen) {
+    return (
+      <div className="relative h-full flex flex-col">
+        <ParticleBackground
+          particleCount={40}
+          className="fixed inset-0 z-0 pointer-events-none dark:opacity-30 opacity-10"
+        />
+        <div className="relative z-10 flex-1 min-h-0">
+          <EmbeddedChatPanel
+            activeEmployee={effectiveEmployee}
+            chat={chat}
+            onClose={handleCloseChat}
+            embedded
+            onSwitchEmployee={handleSwitchEmployee}
+            inlineScenario={inlineScenario}
+            onScenarioFormSubmit={handleScenarioFormSubmit}
+            onCancelScenario={handleCancelScenario}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: Homepage mode ──
   return (
     <div className="relative h-full overflow-y-auto">
       {/* Particle background */}
