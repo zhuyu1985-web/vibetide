@@ -19,6 +19,10 @@ import {
   Wand2,
   Newspaper,
   BookOpen,
+  Building2,
+  Timer,
+  Target,
+  Home,
   type LucideIcon,
 } from "lucide-react";
 
@@ -550,3 +554,189 @@ export const SCENARIO_CONFIG: Record<string, ScenarioConfig> = {
     templateInstruction: "",
   },
 };
+
+// ---------------------------------------------------------------------------
+// Advanced Media Scenario Configurations
+// ---------------------------------------------------------------------------
+
+export type AdvancedScenarioKey =
+  | "lianghui_coverage"
+  | "marathon_live"
+  | "emergency_response"
+  | "theme_promotion"
+  | "livelihood_service"
+  | "quick_publish";
+
+export interface AdvancedScenarioConfig {
+  key: AdvancedScenarioKey;
+  label: string;
+  icon: LucideIcon;
+  emoji: string;
+  color: string;
+  bgColor: string;
+  description: string;
+  teamMembers: EmployeeId[];
+  teamDescription: string;
+  timeTarget: string;
+  inputFields: {
+    name: string;
+    label: string;
+    type: "text" | "textarea" | "select";
+    required: boolean;
+    placeholder?: string;
+    options?: string[];
+  }[];
+  workflowSteps: {
+    employeeSlug: EmployeeId;
+    title: string;
+    skills: string[];
+    description: string;
+    dependsOn?: number[];
+    parallel?: boolean;
+  }[];
+}
+
+export const ADVANCED_SCENARIO_CONFIG: Record<AdvancedScenarioKey, AdvancedScenarioConfig> = {
+  lianghui_coverage: {
+    key: "lianghui_coverage",
+    label: "两会报道团",
+    icon: Building2,
+    emoji: "🏛️",
+    color: "#ef4444",
+    bgColor: "rgba(239, 68, 68, 0.1)",
+    description: "全程直播 · 深度解读 · 多端同步",
+    teamMembers: ["xiaolei", "xiaoce", "xiaowen", "xiaoshen"],
+    teamDescription: "4人协同 · 全流程",
+    timeTarget: "快讯10min",
+    inputFields: [
+      { name: "conference_name", label: "会议名称", type: "text", required: true, placeholder: "例：2026年全国两会" },
+      { name: "focus_topics", label: "关注议题", type: "textarea", required: false, placeholder: "可选，多个议题用换行分隔" },
+      { name: "output_channels", label: "输出渠道", type: "select", required: false, options: ["全平台", "微信优先", "微博优先", "客户端优先"] },
+    ],
+    workflowSteps: [
+      { employeeSlug: "xiaolei", title: "全网热点扫描", skills: ["web_search", "trending_topics", "social_listening"], description: "扫描会议相关热点、政策要点、舆情焦点" },
+      { employeeSlug: "xiaoce", title: "报道角度设计", skills: ["topic_extraction", "angle_design"], description: "设计四级内容流水线（快讯/短视频/深度/数据新闻）", dependsOn: [0] },
+      { employeeSlug: "xiaowen", title: "分级内容生产", skills: ["content_generate", "headline_generate", "script_generate"], description: "快讯10min、短视频30min、深度2h、数据新闻图文", dependsOn: [1] },
+      { employeeSlug: "xiaoshen", title: "政治合规审核", skills: ["quality_review", "compliance_check", "fact_check"], description: "政治合规 + 事实核查 + 三审留痕", dependsOn: [2] },
+      { employeeSlug: "xiaowen", title: "审核修订", skills: ["content_generate", "style_rewrite"], description: "根据审核意见修订终稿", dependsOn: [3] },
+    ],
+  },
+  marathon_live: {
+    key: "marathon_live",
+    label: "马拉松直击队",
+    icon: Timer,
+    emoji: "🏃",
+    color: "#3b82f6",
+    bgColor: "rgba(59, 130, 246, 0.1)",
+    description: "即拍即发 · 多机位 · 短视频爆款",
+    teamMembers: ["xiaolei", "xiaowen", "xiaojian"],
+    teamDescription: "3人协同 · 即拍即发",
+    timeTarget: "关键镜头5min",
+    inputFields: [
+      { name: "event_name", label: "赛事名称", type: "text", required: true, placeholder: "例：2026安阳马拉松" },
+      { name: "event_time", label: "赛事时间", type: "text", required: false, placeholder: "例：2026-05-01 08:00" },
+      { name: "focus_points", label: "重点关注", type: "select", required: false, options: ["冠军冲线", "人物故事", "城市风貌", "综合报道"] },
+    ],
+    workflowSteps: [
+      { employeeSlug: "xiaolei", title: "赛事信息汇总", skills: ["web_search", "trending_topics"], description: "参赛阵容、赛道路线、历史数据" },
+      { employeeSlug: "xiaowen", title: "预热内容", skills: ["content_generate", "headline_generate"], description: "赛前预告稿 + 选手/城市故事稿", dependsOn: [0] },
+      { employeeSlug: "xiaowen", title: "即时快讯", skills: ["content_generate"], description: "关键节点5min出稿", dependsOn: [1], parallel: true },
+      { employeeSlug: "xiaojian", title: "视频方案", skills: ["video_edit_plan", "thumbnail_generate"], description: "高光片段脚本 + 剪辑方案", dependsOn: [1], parallel: true },
+      { employeeSlug: "xiaolei", title: "舆情监控", skills: ["social_listening", "heat_scoring"], description: "实时话题热度追踪", dependsOn: [1], parallel: true },
+      { employeeSlug: "xiaowen", title: "赛后总结", skills: ["content_generate", "script_generate"], description: "纪录片脚本、人物专访稿、城市宣传文案", dependsOn: [2, 3, 4] },
+    ],
+  },
+  emergency_response: {
+    key: "emergency_response",
+    label: "突发应急组",
+    icon: Zap,
+    emoji: "⚡",
+    color: "#f59e0b",
+    bgColor: "rgba(245, 158, 11, 0.1)",
+    description: "15min首发 · 权威核实 · 舆情引导",
+    teamMembers: ["xiaolei", "xiaowen", "xiaoshen"],
+    teamDescription: "极速响应 · 15min",
+    timeTarget: "首发15min",
+    inputFields: [
+      { name: "event_description", label: "事件描述", type: "textarea", required: true, placeholder: "简述事件经过" },
+      { name: "event_type", label: "事件类型", type: "select", required: true, options: ["自然灾害", "安全事故", "公共卫生", "社会事件", "其他"] },
+      { name: "urgency", label: "紧急程度", type: "select", required: true, options: ["特急", "紧急", "较急"] },
+    ],
+    workflowSteps: [
+      { employeeSlug: "xiaolei", title: "紧急信息采集", skills: ["web_search", "social_listening", "trending_topics"], description: "事件经过、官方通报、现场信息（标注信源可信度）" },
+      { employeeSlug: "xiaoshen", title: "信息核实", skills: ["fact_check", "compliance_check"], description: "交叉验证信源、识别谣言", dependsOn: [0] },
+      { employeeSlug: "xiaowen", title: "应急内容生产", skills: ["content_generate", "headline_generate"], description: "快讯首发15min、滚动更新、辟谣/预警、服务型内容", dependsOn: [1] },
+      { employeeSlug: "xiaolei", title: "持续追踪", skills: ["web_search", "social_listening"], description: "救援进展、舆情变化、后续处理", dependsOn: [2] },
+    ],
+  },
+  theme_promotion: {
+    key: "theme_promotion",
+    label: "主题宣传队",
+    icon: Target,
+    emoji: "🎯",
+    color: "#8b5cf6",
+    bgColor: "rgba(139, 92, 246, 0.1)",
+    description: "创意策划 · 精品制作 · IP化传播",
+    teamMembers: ["xiaoce", "xiaowen", "xiaojian", "xiaofa"],
+    teamDescription: "精品策划 · IP化",
+    timeTarget: "按日历排期",
+    inputFields: [
+      { name: "theme", label: "宣传主题", type: "text", required: true, placeholder: "例：建党105周年" },
+      { name: "audience", label: "目标受众", type: "text", required: false, placeholder: "例：年轻网民、党员干部" },
+      { name: "period", label: "传播周期", type: "text", required: false, placeholder: "例：2周" },
+      { name: "channels", label: "重点渠道", type: "select", required: false, options: ["全平台", "短视频平台", "微信生态", "电视+新媒体"] },
+    ],
+    workflowSteps: [
+      { employeeSlug: "xiaoce", title: "主题拆解与策划", skills: ["topic_extraction", "angle_design", "task_planning"], description: "模块化拆解、系列化IP方案、传播节奏表" },
+      { employeeSlug: "xiaowen", title: "批量内容生产", skills: ["content_generate", "script_generate", "headline_generate"], description: "短视频脚本、长视频脚本、图文海报文案", dependsOn: [0] },
+      { employeeSlug: "xiaojian", title: "视觉方案", skills: ["video_edit_plan", "layout_design", "thumbnail_generate"], description: "视频分镜、封面海报设计方案", dependsOn: [0], parallel: true },
+      { employeeSlug: "xiaofa", title: "分发策略", skills: ["publish_strategy", "audience_analysis"], description: "多平台适配、KOL联动、话题运营策略", dependsOn: [1, 2] },
+    ],
+  },
+  livelihood_service: {
+    key: "livelihood_service",
+    label: "民生服务组",
+    icon: Home,
+    emoji: "🏘️",
+    color: "#10b981",
+    bgColor: "rgba(16, 185, 129, 0.1)",
+    description: "线索采集 · 2h闭环 · 舆论监督",
+    teamMembers: ["xiaolei", "xiaowen"],
+    teamDescription: "2h闭环 · 贴近群众",
+    timeTarget: "线索到发布2h",
+    inputFields: [
+      { name: "topic", label: "民生线索/话题", type: "textarea", required: true, placeholder: "描述需要关注的民生问题" },
+      { name: "domain", label: "涉及领域", type: "select", required: false, options: ["交通", "医疗", "教育", "消费", "环境", "住房", "其他"] },
+      { name: "report_type", label: "报道类型", type: "select", required: false, options: ["调查报道", "政策解读", "服务指南", "舆论监督"] },
+    ],
+    workflowSteps: [
+      { employeeSlug: "xiaolei", title: "线索深挖", skills: ["web_search", "trending_topics", "social_listening"], description: "相关政策梳理、类似案例检索、舆情热度分析" },
+      { employeeSlug: "xiaowen", title: "民生内容生产", skills: ["content_generate", "script_generate"], description: "短视频稿（竖屏口语化）、图文稿、服务型内容", dependsOn: [0] },
+      { employeeSlug: "xiaolei", title: "反馈追踪", skills: ["social_listening", "trending_topics"], description: "评论区舆情、问题解决进展追踪（报道→反馈→解决闭环）", dependsOn: [1] },
+    ],
+  },
+  quick_publish: {
+    key: "quick_publish",
+    label: "快发流水线",
+    icon: Newspaper,
+    emoji: "📰",
+    color: "#14b8a6",
+    bgColor: "rgba(20, 184, 166, 0.1)",
+    description: "标准化流水线 · 先网后台 · 高效率",
+    teamMembers: ["xiaolei", "xiaowen", "xiaofa"],
+    teamDescription: "标准化 · 高效率",
+    timeTarget: "首发率90%",
+    inputFields: [
+      { name: "news_source", label: "新闻线索/通稿", type: "textarea", required: true, placeholder: "粘贴通稿内容或描述新闻线索" },
+      { name: "priority", label: "发稿优先级", type: "select", required: true, options: ["紧急", "重点", "一般"] },
+      { name: "target_channels", label: "目标渠道", type: "select", required: false, options: ["全平台", "微博+微信", "客户端优先", "视频号优先"] },
+    ],
+    workflowSteps: [
+      { employeeSlug: "xiaolei", title: "信息汇聚与筛选", skills: ["web_search", "trending_topics"], description: "信息聚合、按优先级分类" },
+      { employeeSlug: "xiaowen", title: "标准化快速生产", skills: ["content_generate", "headline_generate", "style_rewrite"], description: "新媒体首发稿 + 多平台适配版本", dependsOn: [0] },
+      { employeeSlug: "xiaofa", title: "分发排期", skills: ["publish_strategy", "audience_analysis"], description: "三波次推送（求快→求全→求深）、最佳发布时间", dependsOn: [1] },
+    ],
+  },
+};
+
+export const ADVANCED_SCENARIO_KEYS = Object.keys(ADVANCED_SCENARIO_CONFIG) as AdvancedScenarioKey[];
