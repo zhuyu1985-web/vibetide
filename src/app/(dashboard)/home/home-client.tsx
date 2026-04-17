@@ -192,22 +192,31 @@ export function HomeClient({
   // ── Render: Chat mode ──
   if (chatOpen) {
     return (
-      <div className="relative h-full flex flex-col">
+      <div className="relative flex-1 min-h-0 flex flex-col items-center px-4 pb-4 overflow-hidden">
+        {/* Background */}
         <ParticleBackground
           particleCount={40}
           className="fixed inset-0 z-0 pointer-events-none dark:opacity-30 opacity-10"
         />
-        <div className="relative z-10 flex-1 min-h-0">
-          <EmbeddedChatPanel
-            activeEmployee={effectiveEmployee}
-            chat={chat}
-            onClose={handleCloseChat}
-            embedded
-            onSwitchEmployee={handleSwitchEmployee}
-            inlineScenario={inlineScenario}
-            onScenarioFormSubmit={handleScenarioFormSubmit}
-            onCancelScenario={handleCancelScenario}
-          />
+
+        {/* Grid layout: Row 1 = chat (scrollable), Row 2 = input (pinned) */}
+        <div
+          className="relative z-10 w-full max-w-3xl flex-1 min-h-0 grid gap-3"
+          style={{ gridTemplateRows: "minmax(0, 1fr) auto" }}
+        >
+          {/* Row 1 — embedded chat panel */}
+          <div className="min-h-0 overflow-hidden flex flex-col">
+            <EmbeddedChatPanel
+              activeEmployee={effectiveEmployee}
+              chat={chat}
+              onClose={handleCloseChat}
+              onSwitchEmployee={handleSwitchEmployee}
+              inlineScenario={inlineScenario}
+              onScenarioFormSubmit={handleScenarioFormSubmit}
+              onCancelScenario={handleCancelScenario}
+              embedded
+            />
+          </div>
         </div>
       </div>
     );
