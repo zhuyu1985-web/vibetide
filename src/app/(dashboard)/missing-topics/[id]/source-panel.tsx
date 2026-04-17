@@ -73,7 +73,7 @@ export function SourcePanel({ detail }: Props) {
       </p>
 
       {/* Title */}
-      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">
+      <h2 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-3">
         {detail.title}
       </h2>
 

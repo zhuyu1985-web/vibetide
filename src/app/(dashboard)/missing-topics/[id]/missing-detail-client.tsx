@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { MissingTopicDetail } from "@/lib/types";
 import { SourcePanel } from "./source-panel";
@@ -65,9 +66,10 @@ export function MissingDetailClient({ detail }: Props) {
       <div className="flex items-center justify-between mb-5">
         <Link
           href="/missing-topics"
-          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
         >
-          &larr; 返回漏题列表
+          <ArrowLeft className="h-4 w-4" />
+          返回漏题列表
         </Link>
 
         <div className="flex items-center gap-3">
@@ -77,7 +79,7 @@ export function MissingDetailClient({ detail }: Props) {
       </div>
 
       {/* ── Title ── */}
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-5">
+      <h1 className="text-xl text-gray-900 dark:text-gray-100 mb-5">
         {detail.title}
       </h1>
 

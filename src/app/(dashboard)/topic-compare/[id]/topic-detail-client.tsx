@@ -91,7 +91,7 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
       <GlassCard className="mb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 leading-relaxed">
+            <h1 className="text-lg text-gray-900 dark:text-gray-100 leading-relaxed">
               {article.title}
             </h1>
             <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -153,7 +153,7 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
           <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">
             央级媒体报道
           </p>
-          <p className="mt-1 text-2xl font-bold text-red-700 dark:text-red-300">
+          <p className="mt-1 text-2xl font-semibold text-red-700 dark:text-red-300">
             {stats.centralCount}
             <span className="text-sm font-normal text-red-500 dark:text-red-400 ml-1">篇</span>
           </p>
@@ -162,7 +162,7 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
           <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">
             省级媒体报道
           </p>
-          <p className="mt-1 text-2xl font-bold text-blue-700 dark:text-blue-300">
+          <p className="mt-1 text-2xl font-semibold text-blue-700 dark:text-blue-300">
             {stats.provincialCount}
             <span className="text-sm font-normal text-blue-500 dark:text-blue-400 ml-1">篇</span>
           </p>
@@ -172,7 +172,7 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             报道时间跨度
           </p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {computeTimeSpan(stats.earliestTime, stats.latestTime)}
           </p>
         </GlassCard>
@@ -180,17 +180,17 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
 
       {/* ── Tabs ── */}
       <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview" className="gap-1.5 border-0">
-            <Globe className="h-4 w-4" />
+        <TabsList className="mb-4 bg-transparent border-0 p-0 h-auto gap-1">
+          <TabsTrigger value="overview" className="text-xs gap-1.5 border-0 data-[state=active]:bg-accent">
+            <Globe className="h-3.5 w-3.5" />
             全网报道概览
           </TabsTrigger>
-          <TabsTrigger value="articles" className="gap-1.5 border-0">
-            <Newspaper className="h-4 w-4" />
+          <TabsTrigger value="articles" className="text-xs gap-1.5 border-0 data-[state=active]:bg-accent">
+            <Newspaper className="h-3.5 w-3.5" />
             全网报道列表
           </TabsTrigger>
-          <TabsTrigger value="competitors" className="gap-1.5 border-0">
-            <Users className="h-4 w-4" />
+          <TabsTrigger value="competitors" className="text-xs gap-1.5 border-0 data-[state=active]:bg-accent">
+            <Users className="h-3.5 w-3.5" />
             竞品媒体对标
           </TabsTrigger>
         </TabsList>
