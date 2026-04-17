@@ -77,7 +77,7 @@ export function HeroSection({
   const canSubmit = inputValue.trim().length > 0 && !disabled;
 
   return (
-    <div className="flex flex-col items-center gap-6 pt-10 pb-4">
+    <div className="flex flex-col items-center gap-6 pt-4 pb-4">
       {/* Status badge */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
