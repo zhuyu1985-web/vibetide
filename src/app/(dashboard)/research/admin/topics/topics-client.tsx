@@ -313,7 +313,7 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
   const aliasKeywords = detail.keywords.filter((k) => !k.isPrimary);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1400px] mx-auto w-full space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">主题词库管理</h1>

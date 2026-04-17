@@ -365,7 +365,7 @@ export function SearchWorkbenchClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1400px] mx-auto w-full space-y-6">
       {/* Top bar */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">

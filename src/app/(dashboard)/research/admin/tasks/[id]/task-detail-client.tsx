@@ -115,7 +115,7 @@ export function TaskDetailClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-[1400px] mx-auto w-full space-y-6">
       <div>
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href="/research/admin/tasks"><ArrowLeft className="h-3.5 w-3.5 mr-1" />返回任务列表</Link>
