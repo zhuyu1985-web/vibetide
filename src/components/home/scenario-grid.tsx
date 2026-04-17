@@ -40,8 +40,10 @@ export function ScenarioGrid({ onScenarioClick, onCustomClick }: ScenarioGridPro
                 background: `linear-gradient(135deg, ${sc.bgColor}, ${sc.bgColor.replace(/[\d.]+\)$/, "0.05)")})`,
               }}
             >
-              {/* Emoji */}
-              <div className="text-2xl leading-none mb-1.5">{sc.emoji}</div>
+              {/* Icon */}
+              <div className="mb-1.5">
+                <sc.icon size={22} style={{ color: sc.color }} />
+              </div>
 
               {/* Label */}
               <div

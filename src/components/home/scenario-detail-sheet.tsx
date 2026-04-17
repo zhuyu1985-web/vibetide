@@ -57,7 +57,9 @@ export function ScenarioDetailSheet({
         {/* ── Header ── */}
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-border">
           <div className="flex items-start gap-3">
-            <span className="text-4xl leading-none mt-0.5">{sc.emoji}</span>
+            <div className="mt-1">
+              <sc.icon size={28} style={{ color: sc.color }} />
+            </div>
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-foreground text-lg font-semibold leading-tight mb-1">
                 {sc.label}
