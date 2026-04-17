@@ -688,14 +688,14 @@ export function SearchWorkbenchClient({
                 </TableHeader>
                 <TableBody>
                   {result.articles.map((a: ArticleSearchResult) => (
-                    <TableRow key={a.id}>
+                    <TableRow key={a.id} className="[&>td]:py-4">
                       <TableCell>
                         <Checkbox
                           checked={selected.has(a.id)}
                           onCheckedChange={() => toggleSelect(a.id)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium max-w-md">
+                      <TableCell className="max-w-md">
                         <div className="truncate" title={a.title}>
                           {a.title}
                         </div>
