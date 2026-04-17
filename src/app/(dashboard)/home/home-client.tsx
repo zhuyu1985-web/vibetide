@@ -226,12 +226,12 @@ export function HomeClient({
       <div
         className={cn(
           "rounded-2xl overflow-hidden",
-          "bg-background",
-          "border border-border",
-          "shadow-sm",
-          "focus-within:border-indigo-500/40",
-          "focus-within:shadow-[0_4px_20px_rgba(99,102,241,0.1)]",
-          "transition-all duration-300"
+          "bg-white dark:bg-white/[0.06]",
+          "border border-gray-200 dark:border-white/[0.1]",
+          "shadow-[0_2px_12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
+          "focus-within:border-indigo-400 dark:focus-within:border-white/[0.18]",
+          "focus-within:shadow-[0_2px_20px_rgba(99,102,241,0.15)] dark:focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.12)]",
+          "transition-all duration-300 ease-out"
         )}
       >
         {/* Textarea */}
