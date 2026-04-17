@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Mic, Paperclip, ArrowUp, ChevronDown, MessageSquare } from "lucide-react";
+import { Mic, Paperclip, ArrowUp, ChevronDown, MessageSquare, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -36,14 +36,15 @@ export function HeroSection({
 }: HeroSectionProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Auto-resize textarea up to 120px
+  // Auto-resize textarea up to 160px
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [inputValue]);
 
   // Close model dropdown on outside click
@@ -84,7 +85,6 @@ export function HeroSection({
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10">
-          {/* Green pulse dot */}
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
@@ -110,165 +110,202 @@ export function HeroSection({
         </p>
       </motion.div>
 
-      {/* Input box */}
+      {/* Input box — with animated border on hover */}
       <motion.div
-        className="w-full max-w-2xl mx-auto"
+        className="w-full max-w-3xl mx-auto"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.16, ease: "easeOut" }}
       >
         <div
-          className={cn(
-            "rounded-2xl bg-muted/50 backdrop-blur-xl",
-            "border border-border",
-            "shadow-[0_4px_24px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.06)]",
-            "transition-all duration-200",
-            "focus-within:border-indigo-500/40 focus-within:shadow-[0_4px_32px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.06)]"
-          )}
+          className="relative rounded-2xl p-[1px]"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
         >
-          {/* Textarea */}
-          <div className="px-4 pt-4 pb-2">
-            <textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => onInputChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={disabled}
-              placeholder="有什么想法？告诉 AI 团队…"
-              rows={1}
-              className={cn(
-                "w-full resize-none bg-transparent outline-none",
-                "text-sm text-foreground placeholder:text-muted-foreground/50",
-                "leading-relaxed min-h-[24px]",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-              style={{ maxHeight: "120px", overflowY: "auto" }}
-            />
-          </div>
+          {/* Animated border — conic gradient that rotates on hover */}
+          <div
+            className={cn(
+              "absolute inset-0 rounded-2xl transition-opacity duration-500",
+              hovered ? "opacity-100" : "opacity-0"
+            )}
+            style={{
+              background: "conic-gradient(from var(--border-angle, 0deg), #6366f1, #8b5cf6, #06b6d4, #6366f1)",
+            }}
+          />
+          {/* Static border when not hovered */}
+          <div
+            className={cn(
+              "absolute inset-0 rounded-2xl border border-border transition-opacity duration-500",
+              hovered ? "opacity-0" : "opacity-100"
+            )}
+          />
 
-          {/* Toolbar */}
-          <div className="flex items-center justify-between px-3 pb-3 pt-1">
-            {/* Left: voice + attachment + model selector */}
-            <div className="flex items-center gap-1">
-              {/* Voice button */}
-              <button
-                onClick={onVoiceToggle}
+          {/* Inner content */}
+          <div
+            className={cn(
+              "relative rounded-2xl bg-background backdrop-blur-xl",
+              "shadow-[0_4px_24px_rgba(0,0,0,0.08)]",
+              "transition-shadow duration-300",
+              hovered && "shadow-[0_4px_32px_rgba(99,102,241,0.12)]"
+            )}
+          >
+            {/* Textarea */}
+            <div className="px-5 pt-5 pb-3">
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => onInputChange(e.target.value)}
+                onKeyDown={handleKeyDown}
                 disabled={disabled}
+                placeholder="有什么想法？告诉 AI 团队…"
+                rows={2}
                 className={cn(
-                  "p-2 rounded-xl transition-all duration-200 border-0",
-                  "disabled:opacity-40 disabled:cursor-not-allowed",
-                  isRecording
-                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  "w-full resize-none bg-transparent outline-none",
+                  "text-base text-foreground placeholder:text-muted-foreground/50",
+                  "leading-relaxed min-h-[48px]",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
-                title={isRecording ? "停止录音" : "语音输入"}
-              >
-                <Mic size={16} />
-              </button>
-
-              {/* Attachment button */}
-              <button
-                disabled={disabled}
-                className={cn(
-                  "p-2 rounded-xl transition-all duration-200 border-0",
-                  "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-                  "disabled:opacity-40 disabled:cursor-not-allowed"
-                )}
-                title="添加附件"
-              >
-                <Paperclip size={16} />
-              </button>
-
-              {/* Model selector */}
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setModelOpen((v) => !v)}
-                  disabled={disabled}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all duration-200 border-0",
-                    "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-                    "disabled:opacity-40 disabled:cursor-not-allowed",
-                    modelOpen && "bg-accent/50 text-foreground"
-                  )}
-                >
-                  <span className="text-xs font-medium">{selectedModelLabel}</span>
-                  <ChevronDown
-                    size={13}
-                    className={cn(
-                      "transition-transform duration-200",
-                      modelOpen && "rotate-180"
-                    )}
-                  />
-                </button>
-
-                {/* Dropdown */}
-                {modelOpen && (
-                  <div
-                    className={cn(
-                      "absolute bottom-full left-0 mb-1.5 z-50",
-                      "w-36 rounded-xl py-1",
-                      "bg-popover backdrop-blur-xl",
-                      "shadow-[0_8px_32px_rgba(0,0,0,0.2),0_2px_8px_rgba(0,0,0,0.1)]",
-                      "border border-border",
-                      "animate-in fade-in zoom-in-95 duration-150"
-                    )}
-                  >
-                    {MODEL_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          onModelChange(opt.value);
-                          setModelOpen(false);
-                        }}
-                        className={cn(
-                          "w-full text-left px-3 py-2 text-xs transition-colors duration-150 border-0",
-                          opt.value === selectedModel
-                            ? "text-indigo-600 dark:text-indigo-300 bg-indigo-500/10"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                style={{ maxHeight: "160px", overflowY: "auto" }}
+              />
             </div>
 
-            {/* Right: send button */}
-            <button
-              onClick={() => {
-                if (canSubmit) onSubmit();
-              }}
-              disabled={!canSubmit}
-              className={cn(
-                "flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 border-0",
-                canSubmit
-                  ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.4)] hover:shadow-[0_2px_16px_rgba(99,102,241,0.55)] hover:scale-105 cursor-pointer"
-                  : "bg-muted text-muted-foreground/40 cursor-not-allowed"
-              )}
-              title="发送 (Enter)"
-            >
-              <ArrowUp size={16} strokeWidth={2.5} />
-            </button>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-4 pb-4 pt-1">
+              {/* Left: voice + attachment + model selector */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onVoiceToggle}
+                  disabled={disabled}
+                  className={cn(
+                    "p-2 rounded-xl transition-all duration-200 border-0",
+                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                    isRecording
+                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  )}
+                  title={isRecording ? "停止录音" : "语音输入"}
+                >
+                  <Mic size={18} />
+                </button>
+
+                <button
+                  disabled={disabled}
+                  className={cn(
+                    "p-2 rounded-xl transition-all duration-200 border-0",
+                    "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                    "disabled:opacity-40 disabled:cursor-not-allowed"
+                  )}
+                  title="添加附件"
+                >
+                  <Paperclip size={18} />
+                </button>
+
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setModelOpen((v) => !v)}
+                    disabled={disabled}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all duration-200 border-0",
+                      "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                      "disabled:opacity-40 disabled:cursor-not-allowed",
+                      modelOpen && "bg-accent/50 text-foreground"
+                    )}
+                  >
+                    <span className="text-xs font-medium">{selectedModelLabel}</span>
+                    <ChevronDown
+                      size={13}
+                      className={cn(
+                        "transition-transform duration-200",
+                        modelOpen && "rotate-180"
+                      )}
+                    />
+                  </button>
+
+                  {modelOpen && (
+                    <div
+                      className={cn(
+                        "absolute bottom-full left-0 mb-1.5 z-50",
+                        "w-36 rounded-xl py-1",
+                        "bg-popover backdrop-blur-xl",
+                        "shadow-[0_8px_32px_rgba(0,0,0,0.2),0_2px_8px_rgba(0,0,0,0.1)]",
+                        "border border-border",
+                        "animate-in fade-in zoom-in-95 duration-150"
+                      )}
+                    >
+                      {MODEL_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            onModelChange(opt.value);
+                            setModelOpen(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-3 py-2 text-xs transition-colors duration-150 border-0",
+                            opt.value === selectedModel
+                              ? "text-indigo-600 dark:text-indigo-300 bg-indigo-500/10"
+                              : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: send button */}
+              <button
+                onClick={() => {
+                  if (canSubmit) onSubmit();
+                }}
+                disabled={!canSubmit}
+                className={cn(
+                  "flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 border-0",
+                  canSubmit
+                    ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.4)] hover:shadow-[0_2px_16px_rgba(99,102,241,0.55)] hover:scale-105 cursor-pointer"
+                    : "bg-muted text-muted-foreground/40 cursor-not-allowed"
+                )}
+                title="发送 (Enter)"
+              >
+                <ArrowUp size={18} strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Hint + 对话中心入口 */}
-        <div className="flex items-center justify-center gap-3 mt-2">
+        <div className="flex items-center justify-between mt-3 px-1">
           <p className="text-[11px] text-muted-foreground/50">
             按 Enter 发送 · Shift+Enter 换行
           </p>
-          <span className="text-muted-foreground/30">|</span>
           <Link
             href="/chat"
-            className="inline-flex items-center gap-1 text-[11px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+              text-indigo-600 dark:text-indigo-400 bg-indigo-500/8 hover:bg-indigo-500/15
+              transition-all duration-200 group"
           >
-            <MessageSquare size={11} />
+            <MessageSquare size={13} />
             进入对话中心
+            <ArrowRight size={12} className="transition-transform duration-200 group-hover:translate-x-0.5" />
           </Link>
         </div>
       </motion.div>
+
+      {/* CSS for animated border rotation */}
+      <style jsx global>{`
+        @property --border-angle {
+          syntax: '<angle>';
+          initial-value: 0deg;
+          inherits: false;
+        }
+        @keyframes border-rotate {
+          to { --border-angle: 360deg; }
+        }
+        .relative:hover > div:first-child {
+          animation: border-rotate 3s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }
