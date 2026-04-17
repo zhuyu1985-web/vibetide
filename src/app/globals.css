@@ -984,13 +984,10 @@
    ================================================================ */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: rgba(99,102,241,0.15) transparent;
 }
-.scrollbar-thin:hover {
-  scrollbar-color: rgba(0,0,0,0.15) transparent;
-}
-:is(.dark) .scrollbar-thin:hover {
-  scrollbar-color: rgba(255,255,255,0.1) transparent;
+:is(.dark) .scrollbar-thin {
+  scrollbar-color: rgba(129,140,248,0.12) transparent;
 }
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
@@ -999,15 +996,17 @@
   background: transparent;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: rgba(99,102,241,0.15);
   border-radius: 3px;
-  transition: background 0.2s;
 }
-.scrollbar-thin:hover::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.12);
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(99,102,241,0.3);
 }
-:is(.dark) .scrollbar-thin:hover::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.08);
+:is(.dark) .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(129,140,248,0.12);
+}
+:is(.dark) .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(129,140,248,0.25);
 }
 
 /* ================================================================
