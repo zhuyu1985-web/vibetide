@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { getChannelConfigForOrg } from "@/lib/dal/channels";
 import type { ChannelPlatform, ChannelMessageStatus } from "@/lib/dal/channels";
 
 // ---------------------------------------------------------------------------
@@ -234,4 +235,46 @@ export async function updateMessageStatus(
       errorMessage: errorMessage ?? null,
     })
     .where(eq(channelMessages.id, messageId));
+}
+
+// ---------------------------------------------------------------------------
+// 8. testChannelConfig — send a test message to verify a config works
+// ---------------------------------------------------------------------------
+
+export async function testChannelConfig(
+  configId: string
+): Promise<{ success: boolean; message: string }> {
+  const orgId = await requireOrg();
+
+  // Get config with ownership check
+  const config = await getChannelConfigForOrg(configId, orgId);
+  if (!config) {
+    return { success: false, message: "配置不存在或无权限" };
+  }
+
+  // Send a test message
+  try {
+    const { sendChannelMessage } = await import("@/lib/channels/outbound");
+    const result = await sendChannelMessage({
+      config,
+      // DingTalk webhook sends to the bot's group regardless of chatId;
+      // WeChat Work requires a real touser — "@all" broadcasts to all app users.
+      chatId: config.platform === "wechat_work" ? "@all" : "",
+      type: "text",
+      content: `🔧 VibeTide 渠道连接测试 — ${new Date().toLocaleString("zh-CN")}`,
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        message: "测试消息发送成功，请查看对应的钉钉/企业微信",
+      };
+    }
+    return { success: false, message: result.error ?? "发送失败" };
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "未知错误",
+    };
+  }
 }

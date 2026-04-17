@@ -15,6 +15,10 @@ import {
   Loader2,
   Webhook,
   Filter,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +42,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { GlassCard } from "@/components/shared/glass-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { cn } from "@/lib/utils";
@@ -46,6 +55,7 @@ import {
   updateChannelConfig,
   deleteChannelConfig,
   toggleChannelConfig,
+  testChannelConfig,
 } from "@/app/actions/channels";
 import type {
   ChannelConfigRow,
@@ -559,12 +569,19 @@ export function ChannelsClient({
                 />
               </div>
 
+              {/* Configuration guide */}
+              <ConfigurationGuide
+                platform={form.platform}
+                defaultOpen={!editTarget}
+              />
+
               {/* DingTalk fields */}
               {form.platform === "dingtalk" && (
                 <>
                   <SecretField
                     id="ch-appKey"
-                    label="Webhook URL (appKey)"
+                    label="Webhook URL"
+                    helper="钉钉机器人的 Webhook 地址"
                     value={form.appKey}
                     masked={editTarget ? !showSecrets["appKey"] : false}
                     showToggle={!!editTarget}
@@ -574,7 +591,8 @@ export function ChannelsClient({
                   />
                   <SecretField
                     id="ch-robotSecret"
-                    label="加签密钥 (robotSecret)"
+                    label="加签密钥"
+                    helper="以 SEC 开头的签名密钥"
                     value={form.robotSecret}
                     masked={editTarget ? !showSecrets["robotSecret"] : false}
                     showToggle={!!editTarget}
@@ -590,7 +608,8 @@ export function ChannelsClient({
                 <>
                   <SecretField
                     id="ch-appKey"
-                    label="企业 ID (CorpID / appKey)"
+                    label="企业ID (CorpID)"
+                    helper="企业微信管理后台 → 我的企业"
                     value={form.appKey}
                     masked={editTarget ? !showSecrets["appKey"] : false}
                     showToggle={!!editTarget}
@@ -600,7 +619,8 @@ export function ChannelsClient({
                   />
                   <SecretField
                     id="ch-appSecret"
-                    label="应用密钥 (AppSecret)"
+                    label="应用 Secret"
+                    helper="自建应用详情页获取"
                     value={form.appSecret}
                     masked={editTarget ? !showSecrets["appSecret"] : false}
                     showToggle={!!editTarget}
@@ -609,17 +629,21 @@ export function ChannelsClient({
                     placeholder="AppSecret"
                   />
                   <div className="space-y-2">
-                    <Label htmlFor="ch-agentId">AgentID</Label>
+                    <Label htmlFor="ch-agentId">应用 AgentId</Label>
                     <Input
                       id="ch-agentId"
                       value={form.agentId}
                       onChange={(e) => setField("agentId", e.target.value)}
                       placeholder="1000002"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      自建应用详情页的数字ID
+                    </p>
                   </div>
                   <SecretField
                     id="ch-token"
                     label="Token"
+                    helper="在应用的接收消息配置中自定义"
                     value={form.token}
                     masked={editTarget ? !showSecrets["token"] : false}
                     showToggle={!!editTarget}
@@ -630,6 +654,7 @@ export function ChannelsClient({
                   <SecretField
                     id="ch-encodingAesKey"
                     label="EncodingAESKey"
+                    helper="43位随机字符串，接收消息配置页可生成"
                     value={form.encodingAesKey}
                     masked={editTarget ? !showSecrets["encodingAesKey"] : false}
                     showToggle={!!editTarget}
@@ -705,6 +730,7 @@ function ChannelConfigCard({
   onToggle: (enabled: boolean) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [testing, setTesting] = useState(false);
   const webhookUrl = buildWebhookUrl(config.platform, config.id);
   const platformCfg = PLATFORM_CFG[config.platform];
 
@@ -713,6 +739,23 @@ function ChannelConfigCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function handleTest() {
+    if (testing) return;
+    setTesting(true);
+    try {
+      const res = await testChannelConfig(config.id);
+      if (res.success) {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err) {
+      toast.error((err as Error).message ?? "测试失败");
+    } finally {
+      setTesting(false);
+    }
   }
 
   return (
@@ -767,7 +810,22 @@ function ChannelConfigCard({
         <span className="text-[11px] text-muted-foreground">
           创建于 {relativeTime(config.createdAt)}
         </span>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={handleTest}
+            disabled={testing || !config.isEnabled}
+            title={config.isEnabled ? "发送测试消息" : "请先启用渠道"}
+          >
+            {testing ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Zap size={12} />
+            )}
+            {testing ? "测试中..." : "测试"}
+          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="编辑">
             <Pencil size={13} />
           </Button>
@@ -791,6 +849,7 @@ function ChannelConfigCard({
 function SecretField({
   id,
   label,
+  helper,
   value,
   masked,
   showToggle,
@@ -800,6 +859,7 @@ function SecretField({
 }: {
   id: string;
   label: string;
+  helper?: string;
   value: string;
   masked: boolean;
   showToggle: boolean;
@@ -830,7 +890,68 @@ function SecretField({
           </button>
         )}
       </div>
+      {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
     </div>
+  );
+}
+
+// ── ConfigurationGuide ───────────────────────────────────────
+
+const DINGTALK_STEPS = [
+  "登录钉钉群 → 群设置 → 智能群助手 → 添加机器人 → 自定义机器人",
+  "填写机器人名称，安全设置选择“加签”",
+  "创建后获得 Webhook URL（形如 https://oapi.dingtalk.com/robot/send?access_token=xxx）和加签密钥（SEC 开头）",
+  "将 URL 和密钥填入下方表单",
+  "如需接收消息回复，需使用“企业内部应用 + 消息接收机器人”（参考钉钉开发者文档）",
+];
+
+const WECHAT_WORK_STEPS = [
+  "登录企业微信管理后台 → 应用管理 → 自建 → 创建应用",
+  "获取 企业ID (CorpID) — 在“我的企业”页面",
+  "获取 应用 AgentId 和 Secret — 在应用详情页",
+  "在应用“接收消息”配置中：自定义 Token，生成 EncodingAESKey",
+  "将信息填入下方表单，保存后复制生成的 Webhook URL，贴回企业微信后台完成验证",
+];
+
+function ConfigurationGuide({
+  platform,
+  defaultOpen,
+}: {
+  platform: ChannelPlatform;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const steps = platform === "dingtalk" ? DINGTALK_STEPS : WECHAT_WORK_STEPS;
+  const title = platform === "dingtalk" ? "钉钉配置指南" : "企业微信配置指南";
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="rounded-xl border border-border/60 bg-muted/30">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <BookOpen size={14} className="text-primary" />
+              <span className="text-sm font-medium">配置指南 · {title}</span>
+            </div>
+            {open ? (
+              <ChevronUp size={14} className="text-muted-foreground" />
+            ) : (
+              <ChevronDown size={14} className="text-muted-foreground" />
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ol className="list-decimal space-y-2 px-5 pb-4 pl-8 pr-4 text-xs leading-relaxed text-muted-foreground">
+            {steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }
 
