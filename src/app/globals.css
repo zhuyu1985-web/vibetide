@@ -984,10 +984,10 @@
    ================================================================ */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgba(99,102,241,0.15) transparent;
+  scrollbar-color: rgba(59,130,246,0.1) transparent;
 }
 :is(.dark) .scrollbar-thin {
-  scrollbar-color: rgba(129,140,248,0.12) transparent;
+  scrollbar-color: rgba(96,165,250,0.08) transparent;
 }
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
@@ -996,17 +996,17 @@
   background: transparent;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(99,102,241,0.15);
+  background: rgba(59,130,246,0.1);
   border-radius: 3px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(99,102,241,0.3);
+  background: rgba(59,130,246,0.2);
 }
 :is(.dark) .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(129,140,248,0.12);
+  background: rgba(96,165,250,0.08);
 }
 :is(.dark) .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(129,140,248,0.25);
+  background: rgba(96,165,250,0.18);
 }
 
 /* ================================================================
