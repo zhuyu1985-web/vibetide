@@ -10,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   AlertCircle,
+  SendHorizonal,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -92,6 +93,24 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
     });
   }, []);
 
+  // Build API messages from chat history (exclude thinking/error, map roles)
+  const buildApiMessages = useCallback(
+    (extraUserMsg: string) => {
+      const apiMsgs: Array<{ role: "user" | "assistant"; content: string }> =
+        [];
+      for (const msg of chatMessages) {
+        if (msg.type === "thinking" || msg.type === "error") continue;
+        apiMsgs.push({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
+        });
+      }
+      apiMsgs.push({ role: "user", content: extraUserMsg });
+      return apiMsgs;
+    },
+    [chatMessages]
+  );
+
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || generating) return;
     const userMessage = chatInput.trim();
@@ -106,10 +125,12 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
     setGenerating(true);
 
     try {
+      const apiMessages = buildApiMessages(userMessage);
+
       const res = await fetch("/api/workflows/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: userMessage }),
+        body: JSON.stringify({ messages: apiMessages }),
       });
 
       if (!res.ok || !res.body) {
@@ -143,12 +164,14 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
               const data = JSON.parse(line.slice(6));
 
               if (eventType === "thinking") {
+                // Don't accumulate thinking messages, just show spinner
+              } else if (eventType === "reply") {
+                // Conversational reply — AI is asking questions or confirming
                 setChatMessages((prev) => [
                   ...prev,
                   {
                     role: "ai",
                     content: data.message as string,
-                    type: "thinking",
                   },
                 ]);
                 scrollChatToBottom();
@@ -223,7 +246,7 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
                   ...prev,
                   {
                     role: "ai",
-                    content: `已生成 ${newSteps.length} 个步骤的工作流「${generated.name}」`,
+                    content: `已生成 ${newSteps.length} 个步骤的工作流「${generated.name}」，你可以在画布上查看和调整。`,
                     type: "result",
                   },
                 ]);
@@ -260,7 +283,7 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
     } finally {
       setGenerating(false);
     }
-  }, [chatInput, generating, scrollChatToBottom, onWorkflowGenerated]);
+  }, [chatInput, generating, scrollChatToBottom, onWorkflowGenerated, buildApiMessages]);
 
   return (
     <div className="w-[360px] border-r border-border flex flex-col shrink-0 bg-muted/30">
@@ -364,7 +387,7 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
               }
             }}
             placeholder="描述要自动化的内容..."
-            rows={2}
+            rows={5}
             className="w-full rounded-xl bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring transition-colors border-0"
           />
         </div>
@@ -482,6 +505,17 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
               </div>
             </PopoverContent>
           </Popover>
+
+          {/* Spacer + Send button */}
+          <div className="flex-1" />
+          <button
+            onClick={handleChatSend}
+            disabled={!chatInput.trim() || generating}
+            className="p-1.5 rounded-lg border-0 bg-blue-500 text-white cursor-pointer transition-all hover:bg-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
+            title="发送"
+          >
+            <SendHorizonal className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>

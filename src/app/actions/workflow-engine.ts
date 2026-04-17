@@ -287,7 +287,9 @@ export async function executeWorkflow(id: string) {
     .sort((a, b) => a.order - b.order)
     .map((step, idx) => {
       const skillName = step.config?.skillName ?? step.config?.skillSlug ?? "自动分配";
-      return `${idx + 1}. ${step.name} — ${skillName}`;
+      const desc = step.config?.description?.trim();
+      const base = `${idx + 1}. ${step.name} — ${skillName}`;
+      return desc ? `${base}\n   任务说明：${desc}` : base;
     })
     .join("\n");
 

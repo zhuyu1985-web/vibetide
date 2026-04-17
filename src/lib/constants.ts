@@ -35,6 +35,7 @@ export type EmployeeId =
   | "xiaoshen"
   | "xiaofa"
   | "xiaoshu"
+  | "xiaotan"
   | "advisor"
   | "leader";
 
@@ -130,6 +131,16 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     color: "#f97316",
     bgColor: "rgba(249,115,22,0.12)",
   },
+  xiaotan: {
+    id: "xiaotan",
+    name: "深度调查员",
+    nickname: "深度调查员",
+    title: "深度调查员",
+    description: "深度调查与专题追踪，挖掘新闻背后的真相",
+    icon: FileSearch,
+    color: "#0ea5e9",
+    bgColor: "rgba(14,165,233,0.12)",
+  },
   advisor: {
     id: "advisor",
     name: "频道顾问",
@@ -143,7 +154,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   leader: {
     id: "leader",
     name: "任务总监",
-    nickname: "小领",
+    nickname: "任务总监",
     title: "智能项目管理与任务调度",
     description: "智能项目管理，多员工协同任务调度",
     icon: Crown,

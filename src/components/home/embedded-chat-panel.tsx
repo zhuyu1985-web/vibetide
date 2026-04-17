@@ -57,6 +57,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Radar,
@@ -143,6 +144,7 @@ export function EmbeddedChatPanel({
 
   const meta = EMPLOYEE_META[activeEmployee] as typeof EMPLOYEE_META[EmployeeId] | undefined;
   const Icon = meta?.icon ?? UserCog;
+  const SvgAvatar = EMPLOYEE_AVATAR_MAP[activeEmployee];
 
   // ── Auto-scroll on new content ──
   useEffect(() => {
@@ -312,10 +314,14 @@ export function EmbeddedChatPanel({
             <PopoverTrigger asChild>
               <button className="flex items-center gap-2.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.05] rounded-lg px-1.5 py-1 -ml-1.5 transition-colors border-0 bg-transparent cursor-pointer">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: meta?.bgColor ?? "rgba(107,114,128,0.15)" }}
+                  className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
+                  style={SvgAvatar ? undefined : { backgroundColor: meta?.bgColor ?? "rgba(107,114,128,0.15)" }}
                 >
-                  <Icon size={16} style={{ color: meta?.color ?? "#6b7280" }} />
+                  {SvgAvatar ? (
+                    <SvgAvatar className="w-full h-full" />
+                  ) : (
+                    <Icon size={16} style={{ color: meta?.color ?? "#6b7280" }} />
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium text-gray-900 dark:text-white/90">
@@ -330,6 +336,7 @@ export function EmbeddedChatPanel({
                 {SWITCHABLE_EMPLOYEES.map((slug) => {
                   const emp = EMPLOYEE_META[slug];
                   const EmpIcon = emp.icon;
+                  const EmpSvg = EMPLOYEE_AVATAR_MAP[slug];
                   const isActive = slug === activeEmployee;
                   return (
                     <button
@@ -347,10 +354,14 @@ export function EmbeddedChatPanel({
                       )}
                     >
                       <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: emp.bgColor }}
+                        className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center"
+                        style={EmpSvg ? undefined : { backgroundColor: emp.bgColor }}
                       >
-                        <EmpIcon size={18} style={{ color: emp.color }} />
+                        {EmpSvg ? (
+                          <EmpSvg className="w-full h-full" />
+                        ) : (
+                          <EmpIcon size={18} style={{ color: emp.color }} />
+                        )}
                       </div>
                       <span className={cn(
                         "text-[10px] leading-none",
@@ -620,12 +631,16 @@ export function EmbeddedChatPanel({
           {inlineScenario && !chat.loading && (
             <div className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                style={{
+                className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={SvgAvatar ? undefined : {
                   backgroundColor: meta?.bgColor ?? "rgba(107,114,128,0.15)",
                 }}
               >
-                <Icon size={16} style={{ color: meta?.color ?? "#6b7280" }} />
+                {SvgAvatar ? (
+                  <SvgAvatar className="w-full h-full" />
+                ) : (
+                  <Icon size={16} style={{ color: meta?.color ?? "#6b7280" }} />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30 px-5 py-4">

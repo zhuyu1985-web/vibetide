@@ -108,34 +108,30 @@ export function AuditCenterClient({
         <StatsCard
           label="待审内容"
           value={stats.pendingCount}
-          icon={<Shield size={18} />}
+          icon={<Shield size={20} />}
           accentCls="text-orange-500 dark:text-orange-400"
           bgCls="bg-orange-50 dark:bg-orange-950/20"
-          borderCls="border-l-orange-400"
         />
         <StatsCard
           label="今日通过"
           value={stats.approvedToday}
-          icon={<CheckCircle size={18} />}
+          icon={<CheckCircle size={20} />}
           accentCls="text-emerald-500 dark:text-emerald-400"
           bgCls="bg-emerald-50 dark:bg-emerald-950/20"
-          borderCls="border-l-emerald-400"
         />
         <StatsCard
           label="今日退回"
           value={stats.rejectedToday}
-          icon={<XCircle size={18} />}
+          icon={<XCircle size={20} />}
           accentCls="text-red-500 dark:text-red-400"
           bgCls="bg-red-50 dark:bg-red-950/20"
-          borderCls="border-l-red-400"
         />
         <StatsCard
           label="平均审核时长"
           value="—"
-          icon={<Clock size={18} />}
+          icon={<Clock size={20} />}
           accentCls="text-blue-500 dark:text-blue-400"
           bgCls="bg-blue-50 dark:bg-blue-950/20"
-          borderCls="border-l-blue-400"
         />
       </div>
 
@@ -260,31 +256,31 @@ function StatsCard({
   icon,
   accentCls,
   bgCls,
-  borderCls,
 }: {
   label: string;
   value: number | string;
   icon: React.ReactNode;
   accentCls: string;
   bgCls: string;
-  borderCls: string;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-xl p-4 border-l-4 flex items-center gap-4",
-        bgCls,
-        borderCls
-      )}
-    >
-      <div className={cn("shrink-0", accentCls)}>{icon}</div>
-      <div>
-        <p className={cn("text-2xl font-bold font-mono", accentCls)}>
+    <GlassCard padding="md" className="flex items-center gap-4">
+      <div
+        className={cn(
+          "shrink-0 h-11 w-11 rounded-xl flex items-center justify-center",
+          bgCls,
+          accentCls
+        )}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-semibold font-mono text-foreground leading-none">
           {value}
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+        <p className="text-xs text-muted-foreground mt-2">{label}</p>
       </div>
-    </div>
+    </GlassCard>
   );
 }
 

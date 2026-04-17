@@ -59,28 +59,17 @@ function buildEmployeeCatalog(
 }
 
 function buildSkillCatalog(): string {
+  // Compact format: slug(name) per line, no descriptions (saves ~50% tokens)
   const byCategory = new Map<string, string[]>();
   for (const s of getAllBuiltinSkills()) {
     const list = byCategory.get(s.category) || [];
-    list.push(`${s.slug}（${s.name}）：${s.description}`);
+    list.push(`${s.slug}(${s.name})`);
     byCategory.set(s.category, list);
   }
 
-  const categoryLabels: Record<string, string> = {
-    perception: "感知类",
-    analysis: "分析类",
-    generation: "生成类",
-    production: "制作类",
-    management: "管理类",
-    knowledge: "知识类",
-  };
-
   return Array.from(byCategory.entries())
-    .map(
-      ([cat, skills]) =>
-        `### ${categoryLabels[cat] || cat}\n${skills.map((s) => `  - ${s}`).join("\n")}`
-    )
-    .join("\n\n");
+    .map(([cat, skills]) => `${cat}: ${skills.join(", ")}`)
+    .join("\n");
 }
 
 function buildWorkflowCatalog(workflows: AvailableWorkflow[]): string {
@@ -119,55 +108,45 @@ function buildFewShotExamples(memories: IntentMemoryEntry[]): string {
 // Core recognition function
 // ---------------------------------------------------------------------------
 
-const INTENT_PROMPT = `你是一个智能意图识别引擎。请分析用户的输入，识别其真实意图，并规划最优的执行方案。
+const INTENT_PROMPT = `意图识别引擎。分析用户输入，输出JSON执行方案。
 
-## 意图类型
-- information_retrieval：信息检索（搜索、聚合、监控）
-- content_creation：内容创作（写文章、脚本、标题）
-- deep_analysis：深度分析（调研+分析，通常需要先搜索再分析）
-- data_analysis：数据分析（指标、受众、竞品）
-- content_review：内容审核（质量检查、合规、事实核查）
-- media_production：媒体制作（视频、音频、排版方案）
-- publishing：发布运营（发布策略、渠道分发）
-- general_chat：日常闲聊（不需要特定技能）
+意图类型：information_retrieval/content_creation/deep_analysis/data_analysis/content_review/media_production/publishing/general_chat
 
-## 可用技能目录
+## 技能目录
 {SKILL_CATALOG}
 
-## 可用AI员工
+## 员工
 {EMPLOYEE_CATALOG}
 {WORKFLOW_CATALOG}{FEW_SHOT}
 ## 规则
-1. 根据用户输入判断最匹配的意图类型
-2. 选择完成任务所需的最少技能组合（不要贪多）
-3. 为每个步骤分配最合适的员工（根据员工的技能专长）
-4. 如果任务需要多个员工协作，按依赖关系排列步骤
-5. 如果是简单闲聊（打招呼、问好、聊天），返回 general_chat
-6. confidence 评分标准：
-   - 0.9-1.0：意图非常明确，用户明确说了要做什么
-   - 0.7-0.89：意图较明确，但有一定模糊性
-   - 0.5-0.69：意图不太明确，可能有多种理解
-   - <0.5：意图非常模糊，建议让用户澄清
+- 选最少技能组合，避免冗余
+- 按依赖关系排列步骤
+- 闲聊/问候返回 general_chat 且 steps=[]
+- confidence: 明确>0.8, 较明确0.6-0.8, 模糊<0.6
 
-请以JSON格式返回（不要包含markdown代码块标记）：
+输出JSON（不含markdown）：
 {
-  "intentType": "意图类型",
-  "summary": "一句话描述执行方案（中文）",
-  "confidence": 0.0-1.0,
-  "steps": [
-    {
-      "employeeSlug": "员工slug",
-      "employeeName": "员工昵称",
-      "skills": ["技能slug列表"],
-      "taskDescription": "该步骤的具体任务描述（中文）",
-      "dependsOn": null 或前置步骤的index
-    }
-  ],
-  "reasoning": "推理过程（中文）",
-  "workflowId": "如果匹配到已配置的工作流，填写其 id，否则省略",
-  "workflowName": "如果匹配到已配置的工作流，填写其名称，否则省略",
-  "executionMode": "skill 或 workflow，默认 skill"
+  "intentType": "...",
+  "summary": "一句话方案",
+  "confidence": 0-1,
+  "steps": [{"employeeSlug":"", "employeeName":"", "skills":[], "taskDescription":"", "dependsOn": null}],
+  "reasoning": "简短推理（1-2句）",
+  "workflowId": "可选",
+  "workflowName": "可选",
+  "executionMode": "skill | workflow"
 }`;
+
+// Fast-path patterns that skip LLM entirely
+const GREETING_PATTERNS = /^(你好|您好|hi|hello|hey|在吗|在么|早|晚安|嗨|哈喽|哈罗|在不在|嘿|啊|嗯|好的|收到|谢谢|thanks|thank you|ok|okay)[\s!！。.?？~～]*$/i;
+const SHORT_CHAT_THRESHOLD = 6; // Messages this short are almost always chat
+
+function isGreeting(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed.length <= SHORT_CHAT_THRESHOLD && GREETING_PATTERNS.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
 
 export async function recognizeIntent(
   message: string,
@@ -176,10 +155,21 @@ export async function recognizeIntent(
   userMemories: IntentMemoryEntry[] = [],
   availableWorkflows: AvailableWorkflow[] = []
 ): Promise<IntentResult> {
+  // Fast path: simple greetings skip LLM entirely
+  if (isGreeting(message)) {
+    return {
+      intentType: "general_chat",
+      summary: "日常对话",
+      confidence: 0.95,
+      steps: [],
+      reasoning: "检测到问候语，直接进入自由对话",
+    };
+  }
+
   const skillCatalog = buildSkillCatalog();
   const employeeCatalog = buildEmployeeCatalog(availableEmployees);
   const workflowCatalog = buildWorkflowCatalog(availableWorkflows);
-  const fewShot = buildFewShotExamples(userMemories);
+  const fewShot = buildFewShotExamples(userMemories.slice(0, 5)); // reduce from 10 to 5
 
   const systemPrompt = INTENT_PROMPT
     .replace("{SKILL_CATALOG}", skillCatalog)
@@ -190,18 +180,30 @@ export async function recognizeIntent(
   const userPrompt = `当前选中的员工：${currentEmployeeSlug}\n用户输入：${message}`;
 
   try {
-    const result = await generateText({
+    // Add timeout — if LLM takes > 15s, abort and fallback to free chat
+    const INTENT_TIMEOUT_MS = 15000;
+    const generatePromise = generateText({
       model: getLanguageModel({
         provider: "openai",
         model: process.env.OPENAI_MODEL || "deepseek-chat",
-        temperature: 0.3,
-        maxTokens: 2048,
+        temperature: 0.2,
+        maxTokens: 1024, // reduced from 2048 — JSON output rarely exceeds 500 tokens
       }),
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
-      temperature: 0.3,
-      maxOutputTokens: 2048,
+      temperature: 0.2,
+      maxOutputTokens: 1024,
     });
+
+    const result = await Promise.race([
+      generatePromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("意图识别超时（15秒）")),
+          INTENT_TIMEOUT_MS
+        )
+      ),
+    ]);
 
     // Strip markdown code fences if present
     let text = result.text.trim();

@@ -3,6 +3,7 @@
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { User } from "lucide-react";
+import { EMPLOYEE_AVATAR_MAP } from "./employee-svg-avatars";
 
 const MICRO_ANIMATION: Record<string, string> = {
   xiaolei: "animate-radar-pulse",
@@ -52,17 +53,22 @@ export function EmployeeAvatar({
   const color = meta?.color ?? "#6b7280";
   const bgColor = meta?.bgColor ?? "rgba(107,114,128,0.12)";
   const s = sizeMap[size];
+  const SvgAvatar = EMPLOYEE_AVATAR_MAP[employeeId as EmployeeId];
 
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
       <div
         className={cn(
           s.container,
-          "rounded-full flex items-center justify-center"
+          "rounded-full overflow-hidden flex items-center justify-center"
         )}
-        style={{ backgroundColor: bgColor }}
+        style={SvgAvatar ? undefined : { backgroundColor: bgColor }}
       >
-        <Icon size={s.icon} style={{ color }} strokeWidth={2} />
+        {SvgAvatar ? (
+          <SvgAvatar className="w-full h-full" />
+        ) : (
+          <Icon size={s.icon} style={{ color }} strokeWidth={2} />
+        )}
       </div>
       {animated && MICRO_ANIMATION[employeeId as string] && (
         <span

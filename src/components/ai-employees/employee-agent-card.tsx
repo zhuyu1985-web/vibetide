@@ -6,6 +6,7 @@ import type { AIEmployee } from "@/lib/types";
 import type { HotTask } from "@/lib/employee-tasks";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Plus, UserCog } from "lucide-react";
+import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
 
 const STATUS_CONFIG = {
   working: { label: "工作中", dotColor: "bg-emerald-400", textColor: "text-emerald-400/80" },
@@ -32,6 +33,7 @@ export function EmployeeAgentCard({
   const meta = EMPLOYEE_META[employee.id as EmployeeId] as typeof EMPLOYEE_META[EmployeeId] | undefined;
   const statusCfg = STATUS_CONFIG[employee.status];
   const Icon = meta?.icon ?? UserCog;
+  const SvgAvatar = EMPLOYEE_AVATAR_MAP[employee.id as EmployeeId];
   const isWorking = employee.status === "working";
 
   const iconBg = meta?.bgColor ?? "rgba(107,114,128,0.15)";
@@ -54,16 +56,20 @@ export function EmployeeAgentCard({
         onClick={() => router.push(`/employee/${employee.id}`)}
       >
         <div
-          className="relative w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-          style={{ backgroundColor: iconBg }}
+          className="relative w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0"
+          style={SvgAvatar ? undefined : { backgroundColor: iconBg }}
         >
           {isWorking && (
             <span
-              className="absolute inset-0 rounded-lg animate-ping opacity-60"
+              className="absolute inset-0 rounded-lg animate-ping opacity-60 z-10 pointer-events-none"
               style={{ backgroundColor: iconBg }}
             />
           )}
-          <Icon className="relative w-4.5 h-4.5" style={{ color: iconColor }} />
+          {SvgAvatar ? (
+            <SvgAvatar className="relative w-full h-full" />
+          ) : (
+            <Icon className="relative w-4.5 h-4.5" style={{ color: iconColor }} />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">

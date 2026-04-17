@@ -85,9 +85,12 @@ export function StepDetailPanel({
                 },
               })
             }
-            placeholder="输入步骤说明"
+            placeholder="例如：撰写面向科技读者的 1500 字深度评论，结构为'现象-数据-观点-展望'"
             className="min-h-[80px] resize-none"
           />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            告诉 AI 这一步具体要做什么、有哪些约束（受众、字数、风格、渠道等）。说明越具体，测试/执行结果越贴合预期。
+          </p>
         </div>
 
         {/* Current skill display */}

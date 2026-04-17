@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
+import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -613,13 +614,21 @@ function TeamMemberCard({ employee, isLeader = false, currentTask, allTasksDone 
   if (!meta) return null;
 
   const Icon = meta.icon;
+  const SvgAvatar = EMPLOYEE_AVATAR_MAP[employee.id as EmployeeId];
   const hasTask = !!currentTask;
 
   return (
     <div className="rounded-xl p-3 bg-gray-50 dark:bg-white/[0.03] hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors space-y-2">
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: meta.bgColor }}>
-          <Icon size={17} style={{ color: meta.color }} />
+        <div
+          className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0"
+          style={SvgAvatar ? undefined : { backgroundColor: meta.bgColor }}
+        >
+          {SvgAvatar ? (
+            <SvgAvatar className="w-full h-full" />
+          ) : (
+            <Icon size={17} style={{ color: meta.color }} />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">

@@ -181,7 +181,7 @@ export async function POST(req: Request) {
             });
           }
 
-          // Phase 4: LLM recognition
+          // Phase 4: LLM recognition with heartbeat
           send("progress", {
             phase: "analyzing",
             label: "正在分析意图、匹配技能组合...",
@@ -197,13 +197,28 @@ export async function POST(req: Request) {
             })
           );
 
-          const intentResult = await recognizeIntent(
-            message,
-            employeeSlug || uniqueEmps[0]?.slug || "xiaolei",
-            availableEmployees,
-            userMemories,
-            availableWorkflows
-          );
+          // Heartbeat: send progress updates every 3s while LLM is running
+          let elapsed = 0;
+          const heartbeat = setInterval(() => {
+            elapsed += 3;
+            send("progress", {
+              phase: "analyzing",
+              label: `正在思考中... (${elapsed}s)`,
+            });
+          }, 3000);
+
+          let intentResult;
+          try {
+            intentResult = await recognizeIntent(
+              message,
+              employeeSlug || uniqueEmps[0]?.slug || "xiaolei",
+              availableEmployees,
+              userMemories,
+              availableWorkflows
+            );
+          } finally {
+            clearInterval(heartbeat);
+          }
 
           // Phase 5: Result
           send("result", intentResult as unknown as Record<string, unknown>);
