@@ -427,7 +427,7 @@ export function ChatPanel({
         />
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-            {employee.nickname}
+            {employee.title}
           </h2>
           <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate">
             {employee.title}
@@ -489,7 +489,7 @@ export function ChatPanel({
                 className="mb-4"
               />
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                你好，我是{employee.nickname}
+                你好，我是{employee.title}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center max-w-md">
                 {employee.motto || `${employee.title}，随时为你服务`}
@@ -604,8 +604,8 @@ export function ChatPanel({
                         )}
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                           {msg.durationMs
-                            ? `${employee.nickname}思考完成`
-                            : `${employee.nickname}正在输出...`}
+                            ? `${employee.title}思考完成`
+                            : `${employee.title}正在输出...`}
                         </span>
                         {msg.durationMs &&
                           msg.referenceCount != null &&
@@ -764,7 +764,7 @@ export function ChatPanel({
                           className="animate-spin text-blue-500"
                         />
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                          {employee.nickname}正在思考...
+                          {employee.title}正在思考...
                         </span>
                         {currentRefCount > 0 && (
                           <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -1049,7 +1049,7 @@ export function ChatPanel({
                   ref={textareaRef}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 resize-none px-4 pt-3 pb-1 border-0 min-h-[72px]"
                   rows={3}
-                  placeholder={`和${employee.nickname}自由对话...`}
+                  placeholder={`和${employee.title}自由对话...`}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onFocus={() => setInputFocused(true)}

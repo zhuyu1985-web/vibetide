@@ -48,7 +48,7 @@ export function EmployeeQuickPanel({ onSelectEmployee }: EmployeeQuickPanelProps
             </div>
 
             {/* Nickname */}
-            <span className="text-xs text-gray-800 dark:text-white/80 leading-none">{emp.nickname}</span>
+            <span className="text-xs text-gray-800 dark:text-white/80 leading-none">{emp.title}</span>
 
             {/* Title */}
             <span className="text-[10px] text-gray-400 dark:text-white/40 leading-none">{emp.title}</span>

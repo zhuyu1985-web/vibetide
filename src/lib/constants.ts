@@ -48,9 +48,9 @@ export interface EmployeeMeta {
 export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaolei: {
     id: "xiaolei",
-    name: "热点猎手",
-    nickname: "小雷",
-    title: "热点猎手",
+    name: "热点分析师",
+    nickname: "热点分析师",
+    title: "热点分析师",
     description: "实时捕捉全网热点，第一时间发现新闻线索",
     icon: Telescope,
     color: "#f59e0b",
@@ -59,7 +59,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaoce: {
     id: "xiaoce",
     name: "选题策划师",
-    nickname: "小策",
+    nickname: "选题策划师",
     title: "选题策划师",
     description: "挖掘独特选题角度，策划高价值内容主题",
     icon: Lightbulb,
@@ -68,9 +68,9 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   },
   xiaozi: {
     id: "xiaozi",
-    name: "素材管家",
-    nickname: "小资",
-    title: "素材管家",
+    name: "素材研究员",
+    nickname: "素材研究员",
+    title: "素材研究员",
     description: "整合多源素材资源，构建可检索媒资知识库",
     icon: Package,
     color: "#10b981",
@@ -79,7 +79,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaowen: {
     id: "xiaowen",
     name: "内容创作师",
-    nickname: "小文",
+    nickname: "内容创作师",
     title: "内容创作师",
     description: "多风格内容生成，标题摘要脚本一键产出",
     icon: PenTool,
@@ -89,7 +89,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaojian: {
     id: "xiaojian",
     name: "视频制片人",
-    nickname: "小剪",
+    nickname: "视频制片人",
     title: "视频制片人",
     description: "视频剪辑方案设计，封面排版音频一体化",
     icon: Film,
@@ -99,7 +99,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaoshen: {
     id: "xiaoshen",
     name: "质量审核官",
-    nickname: "小审",
+    nickname: "质量审核官",
     title: "质量审核官",
     description: "多维内容审核，把关事实、质量与合规",
     icon: Search,
@@ -109,7 +109,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaofa: {
     id: "xiaofa",
     name: "渠道运营师",
-    nickname: "小发",
+    nickname: "渠道运营师",
     title: "渠道运营师",
     description: "渠道策略制定，多平台精准适配分发",
     icon: Radio,
@@ -119,7 +119,7 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   xiaoshu: {
     id: "xiaoshu",
     name: "数据分析师",
-    nickname: "小数",
+    nickname: "数据分析师",
     title: "数据分析师",
     description: "数据洞察分析，效果追踪与内容复盘",
     icon: BarChart3,

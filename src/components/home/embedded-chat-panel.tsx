@@ -319,7 +319,7 @@ export function EmbeddedChatPanel({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium text-gray-900 dark:text-white/90">
-                    {meta?.nickname ?? "AI 助手"}
+                    {meta?.title ?? "AI 助手"}
                   </span>
                   <ChevronDown size={12} className="text-gray-400 dark:text-white/30" />
                 </div>
@@ -358,7 +358,7 @@ export function EmbeddedChatPanel({
                           ? "text-gray-900 dark:text-white font-medium"
                           : "text-gray-500 dark:text-white/50"
                       )}>
-                        {emp.nickname}
+                        {emp.title}
                       </span>
                     </button>
                   );

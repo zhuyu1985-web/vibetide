@@ -1,5 +1,7 @@
 import type { EmployeeId } from "./constants";
 
+export type AnyEmployeeId = EmployeeId | (string & {});
+
 export type EmployeeStatus = "working" | "idle" | "learning" | "reviewing";
 
 export interface AIEmployee {
