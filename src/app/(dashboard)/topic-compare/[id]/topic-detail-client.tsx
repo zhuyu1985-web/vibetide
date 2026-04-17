@@ -5,9 +5,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   RefreshCw,
-  Globe,
-  Newspaper,
-  Users,
   Eye,
   Heart,
   MessageCircle,
@@ -181,16 +178,13 @@ export function TopicDetailClient({ detail, reports, competitorGroups }: Props) 
       {/* ── Tabs ── */}
       <Tabs defaultValue="overview">
         <TabsList className="mb-4 bg-transparent border-0 p-0 h-auto gap-1">
-          <TabsTrigger value="overview" className="text-xs gap-1.5 border-0 data-[state=active]:bg-accent">
-            <Globe className="h-3.5 w-3.5" />
+          <TabsTrigger value="overview" className="text-xs border-0 data-[state=active]:bg-accent">
             全网报道概览
           </TabsTrigger>
-          <TabsTrigger value="articles" className="text-xs gap-1.5 border-0 data-[state=active]:bg-accent">
-            <Newspaper className="h-3.5 w-3.5" />
+          <TabsTrigger value="articles" className="text-xs border-0 data-[state=active]:bg-accent">
             全网报道列表
           </TabsTrigger>
-          <TabsTrigger value="competitors" className="text-xs gap-1.5 border-0 data-[state=active]:bg-accent">
-            <Users className="h-3.5 w-3.5" />
+          <TabsTrigger value="competitors" className="text-xs border-0 data-[state=active]:bg-accent">
             竞品媒体对标
           </TabsTrigger>
         </TabsList>
