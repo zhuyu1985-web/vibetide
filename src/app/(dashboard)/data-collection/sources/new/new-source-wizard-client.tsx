@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -85,61 +85,128 @@ export function NewSourceWizardClient({ adapterMetas }: NewSourceWizardClientPro
     }
   };
 
+  const STEP_LABELS = ["选择源类型", "配置参数", "调度与分类", "命名与确认"];
+
   return (
     <div className="max-w-3xl mx-auto flex flex-col gap-6">
       <div className="flex items-center gap-2">
         <Link href="/data-collection/sources" className="text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="inline h-4 w-4" />返回
+          <ChevronLeft className="inline h-4 w-4" />返回源列表
         </Link>
       </div>
-      <h2 className="text-2xl font-semibold">新建采集源</h2>
-
-      <div className="flex items-center gap-2">
-        {[1, 2, 3, 4].map((n) => (
-          <div key={n} className={`flex-1 h-1 rounded ${n <= step ? "bg-primary" : "bg-muted"}`} />
-        ))}
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight">新建采集源</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          4 步完成配置,采集到的内容会自动派生到指定业务模块。
+        </p>
       </div>
 
+      {/* Numbered step indicator */}
+      <ol className="flex items-center gap-0">
+        {STEP_LABELS.map((label, idx) => {
+          const n = idx + 1;
+          const done = n < step;
+          const active = n === step;
+          return (
+            <li key={n} className="flex items-center flex-1 last:flex-none">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={[
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors",
+                    done
+                      ? "bg-primary text-primary-foreground"
+                      : active
+                        ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
+                        : "bg-muted text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {done ? <Check className="h-3.5 w-3.5" /> : n}
+                </div>
+                <span
+                  className={[
+                    "text-xs whitespace-nowrap",
+                    active ? "font-medium text-foreground" : "text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {label}
+                </span>
+              </div>
+              {idx < STEP_LABELS.length - 1 && (
+                <div className={["mx-3 h-px flex-1", done ? "bg-primary" : "bg-border"].join(" ")} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      {/* Step content card */}
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
       {step === 1 && (
         <section className="flex flex-col gap-4">
-          <h3 className="text-lg font-medium">1. 选择源类型</h3>
+          <div>
+            <h3 className="text-base font-medium">选择要添加的源类型</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              不同类型对应不同的采集方式,选择最符合目标数据的那种。
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {adapterMetas.map((m) => (
-              <button
-                key={m.type}
-                type="button"
-                onClick={() => { setSourceType(m.type); setConfig({}); }}
-                className={`text-left p-4 rounded-lg border transition-colors ${
-                  sourceType === m.type ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
-                }`}
-              >
-                <div className="font-medium">{m.displayName}</div>
-                <div className="text-xs text-muted-foreground mt-1">{m.description}</div>
-                <div className="text-xs text-muted-foreground mt-2">类型: {m.category}</div>
-              </button>
-            ))}
+            {adapterMetas.map((m) => {
+              const picked = sourceType === m.type;
+              return (
+                <button
+                  key={m.type}
+                  type="button"
+                  onClick={() => { setSourceType(m.type); setConfig({}); }}
+                  className={[
+                    "text-left p-4 rounded-lg border-2 transition-all",
+                    picked
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-transparent bg-muted/30 hover:bg-muted/60 hover:border-border",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-medium">{m.displayName}</div>
+                    {picked && <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{m.description}</p>
+                  <div className="mt-3 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {m.category}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
 
       {step === 2 && selectedMeta && (
-        <section className="flex flex-col gap-4">
-          <h3 className="text-lg font-medium">2. 配置 {selectedMeta.displayName}</h3>
-          {selectedMeta.configFields.map((f) => (
-            <ConfigFieldInput
-              key={f.key}
-              field={f}
-              value={config[f.key]}
-              onChange={(v) => setConfig({ ...config, [f.key]: v })}
-            />
-          ))}
+        <section className="flex flex-col gap-5">
+          <div>
+            <h3 className="text-base font-medium">配置 {selectedMeta.displayName}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{selectedMeta.description}</p>
+          </div>
+          <div className="flex flex-col gap-5">
+            {selectedMeta.configFields.map((f) => (
+              <ConfigFieldInput
+                key={f.key}
+                field={f}
+                value={config[f.key]}
+                onChange={(v) => setConfig({ ...config, [f.key]: v })}
+              />
+            ))}
+          </div>
         </section>
       )}
 
       {step === 3 && (
-        <section className="flex flex-col gap-4">
-          <h3 className="text-lg font-medium">3. 调度与分类</h3>
+        <section className="flex flex-col gap-5">
           <div>
+            <h3 className="text-base font-medium">调度与分类</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              决定这个源什么时候运行,以及采集到的内容如何被下游使用。
+            </p>
+          </div>
+          <div className="space-y-1.5">
             <Label>调度频率</Label>
             <Select value={scheduleCron} onValueChange={setScheduleCron}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -149,69 +216,104 @@ export function NewSourceWizardClient({ adapterMetas }: NewSourceWizardClientPro
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground mt-1">选择"手工触发"后源只能手动运行。</p>
+            <p className="text-xs text-muted-foreground">选择"手工触发"后源只能手动运行。</p>
           </div>
-          <div>
-            <Label>归属模块(采集到的内容会派生到这些模块)</Label>
-            <div className="flex flex-col gap-2 mt-2">
-              {TARGET_MODULES.map((m) => (
-                <label key={m.value} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={targetModules.includes(m.value)}
-                    onCheckedChange={(checked) => {
-                      if (checked) setTargetModules([...targetModules, m.value]);
-                      else setTargetModules(targetModules.filter((v) => v !== m.value));
-                    }}
-                  />
-                  {m.label}
-                </label>
-              ))}
+          <div className="space-y-1.5">
+            <Label>归属模块</Label>
+            <p className="text-xs text-muted-foreground">采集到的内容会派生到这些模块,后续可在内容浏览页按此筛选。</p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {TARGET_MODULES.map((m) => {
+                const on = targetModules.includes(m.value);
+                return (
+                  <label
+                    key={m.value}
+                    className={[
+                      "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm cursor-pointer transition-colors",
+                      on ? "bg-primary/5" : "bg-muted/30 hover:bg-muted/50",
+                    ].join(" ")}
+                  >
+                    <Checkbox
+                      checked={on}
+                      onCheckedChange={(checked) => {
+                        if (checked) setTargetModules([...targetModules, m.value]);
+                        else setTargetModules(targetModules.filter((v) => v !== m.value));
+                      }}
+                    />
+                    {m.label}
+                  </label>
+                );
+              })}
             </div>
           </div>
-          <div>
-            <Label htmlFor="defaultCategory">默认分类(可选)</Label>
-            <Input
-              id="defaultCategory"
-              value={defaultCategory}
-              onChange={(e) => setDefaultCategory(e.target.value)}
-              placeholder="如:要闻/科技/体育"
-            />
-          </div>
-          <div>
-            <Label htmlFor="defaultTags">默认标签(可选,逗号分隔)</Label>
-            <Input
-              id="defaultTags"
-              value={defaultTagsRaw}
-              onChange={(e) => setDefaultTagsRaw(e.target.value)}
-              placeholder="如:热榜,每日"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="defaultCategory">默认分类 <span className="text-muted-foreground font-normal">(可选)</span></Label>
+              <Input
+                id="defaultCategory"
+                value={defaultCategory}
+                onChange={(e) => setDefaultCategory(e.target.value)}
+                placeholder="如: 要闻 / 科技 / 体育"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="defaultTags">默认标签 <span className="text-muted-foreground font-normal">(可选,逗号分隔)</span></Label>
+              <Input
+                id="defaultTags"
+                value={defaultTagsRaw}
+                onChange={(e) => setDefaultTagsRaw(e.target.value)}
+                placeholder="如: 热榜, 每日"
+              />
+            </div>
           </div>
         </section>
       )}
 
       {step === 4 && selectedMeta && (
-        <section className="flex flex-col gap-4">
-          <h3 className="text-lg font-medium">4. 命名 & 确认</h3>
+        <section className="flex flex-col gap-5">
           <div>
+            <h3 className="text-base font-medium">命名并确认</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              给这个源起一个能区分于其他源的名字。下方可最后检查配置。
+            </p>
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="name">源名称 *</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="例如:微博抖音小红书热榜"
+              placeholder="例如: 微博 / 抖音 / 小红书 热榜"
               autoFocus
             />
           </div>
-          <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-2">
-            <div><span className="text-muted-foreground">类型: </span>{selectedMeta.displayName}</div>
-            <div><span className="text-muted-foreground">调度: </span>{CRON_PRESETS.find((p) => p.value === scheduleCron)?.label ?? "自定义"}</div>
-            <div><span className="text-muted-foreground">归属模块: </span>{targetModules.join(", ") || "无"}</div>
-            <div><span className="text-muted-foreground">配置: </span><code className="text-xs">{JSON.stringify(config)}</code></div>
+          <div className="rounded-lg bg-muted/30 p-4 text-sm space-y-2.5">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              配置预览
+            </div>
+            <div className="grid grid-cols-[80px_1fr] gap-y-1.5 text-sm">
+              <span className="text-muted-foreground">类型</span>
+              <span>{selectedMeta.displayName}</span>
+              <span className="text-muted-foreground">调度</span>
+              <span>{CRON_PRESETS.find((p) => p.value === scheduleCron)?.label ?? "自定义"}</span>
+              <span className="text-muted-foreground">归属模块</span>
+              <span>{targetModules.join(", ") || "无"}</span>
+              {defaultCategory && (
+                <>
+                  <span className="text-muted-foreground">默认分类</span>
+                  <span>{defaultCategory}</span>
+                </>
+              )}
+              <span className="text-muted-foreground self-start">参数</span>
+              <pre className="text-xs font-mono bg-background/50 rounded px-2 py-1.5 overflow-x-auto max-w-full">
+                {JSON.stringify(config, null, 2)}
+              </pre>
+            </div>
           </div>
         </section>
       )}
+      </div>
 
-      <div className="flex justify-between pt-4 border-t border-border/30">
+      <div className="flex justify-between pt-2">
         <Button
           variant="outline"
           disabled={step === 1}

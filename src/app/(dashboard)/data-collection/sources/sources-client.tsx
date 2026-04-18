@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Play, Pause, Trash2, RefreshCw, Loader2 } from "lucide-react";
+import { Plus, Play, Pause, Trash2, RefreshCw, Loader2, Radar } from "lucide-react";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ import {
   getLatestRunForSource,
   type LatestRunStatus,
 } from "@/app/actions/collection";
+import { EmptyState } from "@/components/shared/empty-state";
+import { formatRelativeTime, formatAbsoluteTime, formatNumber } from "@/lib/format";
 
 export interface SourceListItem {
   id: string;
@@ -250,10 +252,26 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                  {initialSources.length === 0
-                    ? "还没有采集源。点击右上角「新建源」开始。"
-                    : "没有匹配的记录"}
+                <TableCell colSpan={8} className="p-0">
+                  {initialSources.length === 0 ? (
+                    <EmptyState
+                      icon={Radar}
+                      title="还没有采集源"
+                      description="点击右上角「新建源」开始配置第一个采集源（RSS/站点/热榜/关键词搜索都支持）。"
+                      action={
+                        <Button asChild size="sm">
+                          <Link href="/data-collection/sources/new">
+                            <Plus className="mr-1.5 h-4 w-4" />新建源
+                          </Link>
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      title="没有匹配的记录"
+                      description="尝试调整搜索或筛选条件。"
+                    />
+                  )}
                 </TableCell>
               </TableRow>
             )}
@@ -274,29 +292,41 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
                     {s.scheduleCron ?? "手工"}
                   </TableCell>
                   <TableCell>{s.targetModules.join(", ") || "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {s.lastRunAt
-                      ? new Date(s.lastRunAt).toLocaleString("zh-CN")
-                      : "未运行"}
+                  <TableCell
+                    className="text-muted-foreground text-sm whitespace-nowrap"
+                    title={s.lastRunAt ? formatAbsoluteTime(s.lastRunAt) : ""}
+                  >
+                    {s.lastRunAt ? formatRelativeTime(s.lastRunAt) : "未运行"}
                   </TableCell>
-                  <TableCell className="text-right">{s.totalItemsCollected}</TableCell>
+                  <TableCell className="text-right">
+                    <span className={s.totalItemsCollected > 0 ? "font-medium tabular-nums" : "text-muted-foreground tabular-nums"}>
+                      {formatNumber(s.totalItemsCollected)}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     {isRunning ? (
-                      <Badge
-                        variant="default"
-                        className="gap-1 bg-primary/10 text-primary border-primary/30"
-                      >
+                      <Badge className="gap-1 bg-blue-50 text-blue-700 hover:bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         采集中
                       </Badge>
                     ) : !s.enabled ? (
-                      <Badge variant="outline">暂停</Badge>
+                      <Badge variant="outline" className="text-muted-foreground">
+                        暂停
+                      </Badge>
                     ) : s.lastRunStatus === "failed" ? (
-                      <Badge variant="destructive">失败</Badge>
+                      <Badge className="bg-red-50 text-red-700 hover:bg-red-50 dark:bg-red-950/40 dark:text-red-300">
+                        失败
+                      </Badge>
                     ) : s.lastRunStatus === "partial" ? (
-                      <Badge variant="secondary">部分失败</Badge>
+                      <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300">
+                        部分失败
+                      </Badge>
+                    ) : s.lastRunStatus === "success" ? (
+                      <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        正常
+                      </Badge>
                     ) : (
-                      <Badge variant="default">启用</Badge>
+                      <Badge variant="outline">待运行</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
