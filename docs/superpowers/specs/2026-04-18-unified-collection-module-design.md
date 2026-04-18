@@ -539,11 +539,11 @@ export const enrichHotTopic = inngest.createFunction(
 - 改造 **热榜富化** → 订阅 `collection/item.created` ✅ (`collectionHotTopicBridge` 桥接到 hot_topics 并重派发现有 `hot-topics/enrich-requested` 事件,保留 `hotTopicEnrichmentPipeline` 无改动)
 - 验收：老的 `hot-topic-crawl.ts` 已移除 ✅;热榜页面数据不中断需手工验收（hot_topics.titleHash 走旧 `normalizeTitleKey` 公式保留去重兼容）
 
-### Phase 3：list_scraper + RSS + 研究任务 3 分支（1.5 周）
-- `list_scraper` Adapter（融合白名单列表 + CSS 选择器两种提取模式）
-- `rss` Adapter
-- 迁移研究任务 3 个分支（Tavily / 白名单 / 手工 URL）
-- 验收：老的 `research/*-crawl.ts` 全部替换
+### Phase 3：list_scraper + RSS + 研究任务 3 分支（1.5 周）✅ Adapter 部分完成 2026-04-18;研究任务迁移推迟到 Phase 4
+- `list_scraper` Adapter（融合白名单列表 + CSS 选择器两种提取模式） ✅
+- `rss` Adapter ✅
+- 迁移研究任务 3 个分支（Tavily / 白名单 / 手工 URL） ⏸️ 推到 Phase 4（独立做用户感知不到价值,与内容浏览页 + benchmarking 打包更合理）
+- 验收：老的 `research/*-crawl.ts` 全部替换 ⏸️ Phase 4
 
 ### Phase 4：知识库 + 内容浏览/监控页（2 周）
 - 迁移 **知识库 URL 入库** → `jina_url` adapter + `derived_modules=["knowledge"]`
