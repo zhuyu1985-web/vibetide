@@ -5,9 +5,8 @@ export const dynamic = "force-dynamic";
 
 const tabs = [
   { href: "/data-collection/sources", label: "源管理" },
-  // 预留,Phase 4 启用
-  // { href: "/data-collection/content", label: "内容浏览" },
-  // { href: "/data-collection/monitoring", label: "监控面板" },
+  { href: "/data-collection/content", label: "内容浏览" },
+  { href: "/data-collection/monitoring", label: "监控面板" },
 ];
 
 export default function DataCollectionLayout({ children }: { children: ReactNode }) {
