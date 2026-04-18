@@ -364,6 +364,7 @@ export const artifactTypeEnum = pgEnum("artifact_type", [
   "publish_plan",
   "analytics_report",
   "generic",
+  "cms_publication", // P1 新增（spec §11.3 扩展）
 ]);
 
 // Benchmarking deep-dive enums
@@ -588,3 +589,19 @@ export const channelMessageStatusEnum = pgEnum("channel_message_status", [
   "sent",
   "failed",
 ]);
+
+// =====================================================================
+// Phase 1 — CMS 适配层新增
+// =====================================================================
+
+// 顺序严格与 spec §11.3 一致；修改顺序需配套 ALTER TYPE 迁移
+export const cmsPublicationStateEnum = pgEnum("cms_publication_state", [
+  "submitting",
+  "submitted",
+  "synced",
+  "rejected_by_cms",
+  "failed",
+  "retrying",
+]);
+
+export const reviewTierEnum = pgEnum("review_tier", ["strict", "relaxed"]);
