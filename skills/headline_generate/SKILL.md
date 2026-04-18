@@ -1,115 +1,426 @@
 ---
 name: headline_generate
-displayName: 标题生成
-description: 生成多版本吸引力标题
+displayName: 标题生成（场景化重写版）
+description: 为各类稿件生成高质量标题，按 9 大 APP 栏目场景分化风格（新闻严肃 / 时政规范 / 体育情绪 / 综艺娱乐 / 民生亲切 / 短剧悬念 / 每日专题 / 首页推荐）。支持主标题+副标题+短标题三种形态（对应 CMS title/subTitle/shortTitle）。输出含 A/B 多版本、SEO 优化、钩子强度评分、合规扫描。
+version: 5.0.0
 category: generation
-version: "2.3"
-inputSchema:
-  content: 文章内容
-  platform: 目标平台
-  count: 生成数量
-  constraints: 约束条件
-outputSchema:
-  headlines: 标题列表
-  recommended: 推荐标题
-  strategies: 策略说明
-runtimeConfig:
-  type: llm_generation
-  avgLatencyMs: 5000
-  maxConcurrency: 5
-  modelDependency: zhipu:glm-4-plus
-compatibleRoles:
-  - content_creator
-  - content_strategist
+metadata:
+  scenario_tags: [news, politics, sports, variety, livelihood, drama, daily_brief]
+  compatibleEmployees: [xiaowen, xiaoce]
+  runtime:
+    type: llm_generation
+    avgLatencyMs: 5000
+    maxConcurrency: 10
+    modelDependency: anthropic:claude-opus-4-7
 ---
 
-# 标题生成
+# 标题生成（headline_generate）
 
-你是标题优化专家，擅长为同一内容创作多版本高点击率标题。你深谙中文互联网各平台的标题规则和用户心理，能在"吸引点击"和"不做标题党"之间找到最佳平衡点。
+## Language
 
-## 输入规格
+简体中文；按场景匹配风格（新华体 / 网感 / 正式 / 娱乐化等）。
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| content | string | 是 | 文章内容或摘要 |
-| platform | string | 否 | 目标平台：wechat/weibo/toutiao/douyin/zhihu |
-| count | number | 否 | 生成数量，默认8 |
-| constraints | string | 否 | 约束条件（如字数限制、禁用词） |
+## When to Use
 
-## 执行流程
+✅ **应调用场景**：
+- 基于已生成的正文内容提取/优化标题
+- 为未定稿内容先出标题方案（多版本 A/B）
+- 旧标题重做（如 SEO 优化、改风格）
+- CMS 入库前自动生成 listTitle / shortTitle
 
-1. **核心提炼**：提取文章的核心信息点、数据亮点、情感触发点和争议性观点
-2. **策略选择**：从4种标题策略（悬念型/数据型/情感型/时效型）各生成2-3个变体
-3. **平台适配**：按平台特性调整标题长度——微信<22字、微博<40字、头条<30字、抖音<20字
-4. **评分预测**：为每个标题预估点击率（CTR）评分（1-10），基于信息增量、情绪唤起和好奇缺口
-5. **排序推荐**：按预估CTR降序排列，标注推荐等级
+❌ **不应调用场景**：
+- 没有任何内容 brief 时（标题应基于内容写）
+- 分集短剧标题（走 `duanju_script` 内建的分集标题）
 
-## 输出规格
+## Input Schema
 
-### 输出结构
-
-```markdown
-## 标题方案
-
-### ⭐ 推荐标题
-1. **{标题}** | CTR预估：{X}/10 | 策略：{策略类型}
-
-### 全部候选
-| 序号 | 标题 | 策略 | CTR预估 | 平台适配 | 字数 |
-|------|------|------|---------|----------|------|
-
-### 标题策略说明
-- **悬念型**: {为什么选这个角度}
-- **数据型**: {核心数据是什么}
-- **情感型**: {触发什么情感}
-- **时效型**: {时效亮点是什么}
+```typescript
+export const HeadlineGenerateInputSchema = z.object({
+  contentSummary: z.string(),               // 正文或核心要点
+  scenario: z.enum([
+    "news_standard", "politics_shenzhen", "sports_chuanchao",
+    "variety_highlight", "livelihood_zhongcao", "livelihood_tandian",
+    "livelihood_podcast", "drama_serial", "daily_brief",
+  ]),
+  style: z.enum([
+    "declarative",       // 陈述型（新闻/时政）
+    "question",          // 疑问型（民生/娱乐）
+    "numerical",         // 数字型（榜单/盘点）
+    "reversal",          // 反转型（综艺/娱乐）
+    "emotional",         // 情感型（体育/民生）
+    "suspense",          // 悬念型（短剧/综艺）
+  ]).optional(),
+  keywords: z.array(z.string()).optional(),  // SEO 关键词
+  variantCount: z.number().int().min(1).max(5).default(3),  // 生成几个版本
+  generateSubtitles: z.boolean().default(true),
+  generateShortTitle: z.boolean().default(true),  // CMS 短标题
+  maxMainTitleLength: z.number().int().default(28),
+  maxSubtitleLength: z.number().int().default(40),
+  maxShortTitleLength: z.number().int().default(15),
+});
 ```
 
-### 输出示例
+## Output Schema
 
-```markdown
-## 标题方案
-
-### ⭐ 推荐标题
-1. **月薪3万的运营总监，正在被AI Agent团队取代** | CTR预估：9/10 | 策略：悬念型
-
-### 全部候选
-| 序号 | 标题 | 策略 | CTR预估 | 平台适配 | 字数 |
-|------|------|------|---------|----------|------|
-| 1 | 月薪3万的运营总监，正在被AI Agent团队取代 | 悬念型 | 9/10 | 微信✓ 头条✓ | 19字 |
-| 2 | 实测：8个AI员工一天产出300篇内容，质量评分超人工 | 数据型 | 8/10 | 头条✓ 知乎✓ | 24字 |
-| 3 | 我用AI团队跑了一个月，成本降了90%，老板哭了 | 情感型 | 8/10 | 微信✓ 微博✓ | 22字 |
-| 4 | 2026年Q1爆火的AI Agent，终于有人讲清楚了 | 时效型 | 7/10 | 微信✓ 知乎✓ | 21字 |
-| 5 | AI员工vs人类员工：一场300篇内容的效率对决 | 悬念型 | 7/10 | B站✓ 知乎✓ | 21字 |
-| 6 | 从日产50到日产300：AI Agent重新定义内容生产力 | 数据型 | 7/10 | 微信✓ 头条✓ | 23字 |
-| 7 | 别再观望了！你的竞争对手已经用上AI Agent团队 | 情感型 | 6/10 | 微博✓ 头条✓ | 22字 |
-| 8 | 刚刚，某媒体集团宣布AI Agent团队日产内容提升6倍 | 时效型 | 6/10 | 微博✓ 头条✓ | 24字 |
-
-### 标题策略说明
-- **悬念型**: 用"正在被取代"制造紧迫感和好奇缺口，目标读者会想"真的吗？"
-- **数据型**: "300篇""90%"等具体数字增加可信度和信息增量
-- **情感型**: "老板哭了"引发情感共鸣，降低理性防线
-- **时效型**: "2026年Q1爆火""刚刚"制造新鲜感和紧迫感
+```typescript
+export const HeadlineGenerateOutputSchema = z.object({
+  variants: z.array(z.object({
+    title: z.string(),                        // 主标题
+    subtitle: z.string().optional(),          // 副标题
+    shortTitle: z.string().optional(),        // 短标题（CMS listTitle）
+    style: z.string(),                         // 命中风格
+    scores: z.object({
+      attractiveness: z.number().min(0).max(100),  // 吸引力
+      clarity: z.number().min(0).max(100),         // 清晰度
+      seoScore: z.number().min(0).max(100),        // SEO 分
+      styleMatch: z.number().min(0).max(100),      // 风格匹配
+      overall: z.number().min(0).max(100),
+    }),
+    charCount: z.number(),
+    keywordsCovered: z.array(z.string()),
+    hookPattern: z.string().optional(),       // 命中钩子模式
+    warnings: z.array(z.string()),
+  })),
+  recommended: z.number().int(),              // 推荐 variant 的 index
+  complianceCheck: z.object({
+    passed: z.boolean(),
+    flaggedVariants: z.array(z.number()),     // 被 flag 的 variant index
+  }),
+});
 ```
 
-## 质量标准
+## 9 场景标题风格规范
 
-| 维度 | 要求 | 权重 |
-|------|------|------|
-| 吸引力 | 标题能激发点击欲望，有信息增量或好奇缺口 | 35% |
-| 准确性 | 标题与正文内容一致，不做标题党，不夸大事实 | 25% |
-| 多样性 | 各标题策略差异明显，覆盖不同用户心理触发点 | 20% |
-| 平台适配 | 字数和风格匹配目标平台规范，避免截断 | 20% |
+### 场景 1: news_standard（新闻标题）
 
-## 边界情况
+**原则**：**事实先行 + 关键要素 + 简洁有力**
 
-- **文章内容极短（<100字）**：基于有限信息生成标题，降低数量至4个，标注"素材有限，建议补充内容后重新生成"
-- **多平台同时发布**：为每个平台各生成TOP3标题，附平台差异化说明
-- **涉及负面或争议话题**：避免煽动性表达，使用中性客观措辞，标注"敏感话题，建议人工终审"
-- **约束条件冲突**（如字数限制极短+要求包含长关键词）：优先满足字数限制，关键词放在副标题或摘要中
-- **纯技术/学术内容**：降低情感型标题权重，提升数据型和权威型标题比例
+**模板**：
+- "{主体} {动作} {客体/量级}" → 深圳发布 AI 产业政策 5 年投 200 亿
+- "{事件}：{核心结果}" → 深圳两会闭幕：9 大民生举措落地
+
+**禁忌**：
+- ❌ 夸张感叹（"震惊！""惊现！"）
+- ❌ 标题党（"你绝对想不到……"）
+- ❌ 模糊主体（"某人""有关方面"）
+
+**长度**：主 16-25 字 / 副 25-40 字 / 短 8-12 字
+
+---
+
+### 场景 2: politics_shenzhen（时政标题）
+
+**原则**：**官方表述 + 权威感 + 严谨**
+
+**模板**：
+- "{会议/领导} {动作/表述}" → 深圳市委常委会召开会议 研究部署 AI 产业发展
+- "{政策名称}发布 {关键信息}" → 《深圳 AI 产业若干措施》发布 5 年投 200 亿
+
+**要求**：
+- 会议/政策名完整
+- 领导姓名完整规范
+- 不用情感色彩词
+
+**禁忌**：
+- ❌ 对政策评价（"重大政策""力度空前"）
+- ❌ 口语化（"聊聊""说说"）
+- ❌ 网络用语
+
+**长度**：主 20-30 字 / 副 30-45 字 / 短 10-15 字
+
+**审核档位**：严
+
+---
+
+### 场景 3: sports_chuanchao（体育标题）
+
+**原则**：**比分/关键球员 + 情绪张力 + 现场感**
+
+**模板**：
+- 战报："{比分} {关键动作}" → 2-1 绝杀！成都蓉城补时头球破门
+- 预告："{对阵} {看点}" → 蓉城 VS 四川 FC 今晚打响德比战
+- 球星："{球员} {数据/表现}" → 冯潇霆补时头球绝杀 生涯第 50 球
+
+**允许词**：绝杀、力克、完胜、险胜、惊天逆转、致命一击、开门红
+
+**禁忌**：
+- ❌ 地域攻击（"川超就是水")
+- ❌ 球员侮辱（"XX 就是水")
+
+**长度**：主 14-25 字（越冲击越好）
+
+---
+
+### 场景 4: variety_highlight（综艺标题）
+
+**原则**：**名场面 + 梗感 + 榜单/反转**
+
+**模板**：
+- 榜单："{数字} 大看点 {关键词}" → 春晚 5 大看点 第 3 个让人破防
+- 名场面："{艺人} 这段 {动作}" → 沈腾贾玲这段 真的整活儿了
+- 反转："以为是 X 结果是 Y" → 以为是催泪戏 结果演成了搞笑 Top1
+
+**允许词**：炸场、封神、整活儿、出圈、YYDS（谨慎）、顶流、翻车、绝绝子（谨慎）
+
+**禁忌**：
+- ❌ 艺人对比引战
+- ❌ 恶意嘲讽
+- ❌ 伪造瓜
+
+**长度**：主 14-25 字
+
+---
+
+### 场景 5: livelihood_zhongcao（种草标题）
+
+**原则**：**痛点/反差 + 具象感官 + CTA 暗示**
+
+**模板**：
+- 痛点："{用户痛点}的姐妹必看 这款……"
+- 反差："我以为 {预期} 没想到 {实际}"
+- 数字："{价格/时长/对比}" → "89 块的粉底 凭什么吊打大牌"
+
+**允许词**：宝子、冲、绝了、天花板、顶了、真的爱
+
+**禁忌**：
+- ❌ 广告法极限词（最/第一/绝对/100%）
+- ❌ 硬广腔
+
+**长度**：主 12-25 字（短红书式）
+
+---
+
+### 场景 6: livelihood_tandian（探店标题）
+
+**原则**：**地点 + 品类 + 记忆点 + 人均**
+
+**模板**：
+- 宝藏型："藏在 {地点} 的 {品类} {特色}"
+- 反差型："在 {城市} 吃 {异地美食}？这家真的行"
+- 性价比型："人均 {金额} 吃 {品类} 我服了"
+
+**允许词**：宝藏、藏、巷子、烟火气、本地人、必打卡
+
+**长度**：主 14-25 字
+
+---
+
+### 场景 7: livelihood_podcast（播客标题）
+
+**原则**：**主题 + 亲切感 + 可听性**
+
+**模板**：
+- 早间型："{日期} 早资讯：{3 个关键词}"
+- 主题型："今天聊聊 {主题}"
+- 系列型："{节目名} 第 {X} 期：{副题}"
+
+**允许**：口语化、亲切称呼（朋友/你们）
+
+**长度**：主 15-25 字 / 副 25-35 字
+
+---
+
+### 场景 8: drama_serial（短剧标题）
+
+**原则**：**悬念 + 钩子 + 分集标识**
+
+**模板**：
+- 系列名 + 集数 + 集副标题
+  - "裴总的掌心梨｜第 3 集：她发现了"
+- 集副标题独立有悬念
+  - "离婚后，前夫悔断肠｜第 1 集：她穿着婚纱，摔在他脚下"
+
+**允许词**：悬念词（她发现了、他的秘密、原来如此、反转）
+
+**长度**：主 20-35 字（含系列名）
+
+**审核档位**：严
+
+---
+
+### 场景 9: daily_brief（每日专题标题）
+
+**原则**：**日期 + 主题 + 亮点预告**
+
+**模板**：
+- "{日期} {主题}：{1 句亮点}"
+- 例：4 月 17 日科技早资讯：深圳 AI 200 亿新政上线
+
+**长度**：主 18-30 字
+
+---
+
+## CoT 工作流程
+
+```
+标题生成：
+- [ ] Step 0: 理解 contentSummary + scenario + style
+- [ ] Step 1: 识别核心要素（5W1H / 金句 / 数字 / 对比）
+- [ ] Step 2: 选择模板（按场景风格规范）
+- [ ] Step 3: 生成 variantCount 个主标题
+- [ ] Step 4: 为每个主标题生成副标题 + 短标题
+- [ ] Step 5: 评分（吸引力/清晰度/SEO/风格匹配）
+- [ ] Step 6: 合规扫描（广告法/敏感词/场景禁忌）
+- [ ] Step 7: 选出推荐 variant
+```
+
+## 评分规则
+
+```typescript
+function scoreHeadline(title: string, scenario: string, keywords: string[]): Scores {
+  return {
+    attractiveness: calcAttractiveness(title),   // 钩子模式命中 + 情绪词 + 数字
+    clarity: calcClarity(title),                  // 主体清晰 + 动词强 + 无歧义
+    seoScore: calcSeoScore(title, keywords),      // 关键词覆盖 + 密度
+    styleMatch: calcStyleMatch(title, scenario),  // 场景风格词典命中
+    overall: weightedAvg(...)                     // 加权
+  };
+}
+```
+
+## Few-shot 正例（多场景对比）
+
+### 输入：相同主题，不同场景输出
+
+**contentSummary**: "深圳发布人工智能产业新政策，5 年投 200 亿，设立 3 个产业园，最高补贴 5000 万"
+
+| scenario | 主标题 | 副标题 | shortTitle |
+|----------|-------|--------|-----------|
+| news_standard | 深圳发布 AI 产业新政策 5 年投入 200 亿元 | 设立 3 个产业园 最高补贴 5000 万 | 深圳 AI 新政 |
+| politics_shenzhen | 《深圳市促进人工智能产业高质量发展若干措施》发布 | 明确 5 年投入 200 亿元 重点建设三大国家级产业园 | AI 产业若干措施 |
+| sports_chuanchao | —（不适用） | — | — |
+| daily_brief | 4 月 17 日科技资讯：深圳 200 亿押注 AI | 最高补贴 5000 万 3 个产业园启动 | 深圳 AI 200 亿 |
+
+## 合规扫描
+
+```typescript
+// 按场景走对应的扫描器
+const compliance = scanHeadline(title, {
+  scenario: input.scenario,
+  rules: [
+    ...commonRules,           // 广告法极限词（全场景通用）
+    ...scenarioRules[scenario],
+  ],
+});
+```
+
+## 质量自检
+
+| # | 检查点 | 阈值 |
+|---|-------|-----|
+| 1 | 主标题字数 | ≤ maxMainTitleLength |
+| 2 | 副标题字数 | ≤ maxSubtitleLength |
+| 3 | 短标题字数 | ≤ maxShortTitleLength |
+| 4 | 关键词覆盖 | ≥ 60% |
+| 5 | 场景风格匹配 | styleMatch ≥ 70 |
+| 6 | 合规 | passed |
+| 7 | variant 间差异度 | 不雷同（编辑距离 ≥ 5） |
+
+## 典型失败模式
+
+### 失败 1: 标题党
+
+**表现**：用夸张感叹（"震惊！"）
+**修正**：场景合规扫描禁用词
+
+### 失败 2: 场景错配
+
+**表现**：时政用了娱乐风格
+**修正**：Step 0 按 scenario 锁定模板
+
+### 失败 3: 关键词堆砌
+
+**表现**：关键词全塞进去，读起来很怪
+**修正**：SEO 密度 ≤ 30%
+
+### 失败 4: 多个 variant 雷同
+
+**表现**：3 个版本只差一个字
+**修正**：variant 间强制差异度校验
+
+## EXTEND.md 用户配置
+
+```yaml
+default_variant_count: 3
+default_generate_subtitles: true
+default_generate_short_title: true
+
+scenario_length_overrides:
+  politics_shenzhen:
+    max_main: 32
+  livelihood_zhongcao:
+    max_main: 25
+
+brand_prefix:
+  app_news: "【新闻】"          # 不启用时为空
+  app_politics: ""
+
+seo_keyword_weight: 0.3         # SEO 分在 overall 中的权重
+```
+
+## Feature Comparison
+
+| Feature | headline_generate v5 | content_generate 内部标题 |
+|---------|----------------------|--------------------------|
+| 独立 A/B 多版本 | ✓ | ✗ |
+| 副 + 短标题 | ✓ | 单标题 |
+| 评分系统 | ✓ | ✗ |
+| 场景差异化 | 9 场景 | 9 场景 |
+| 合规扫描 | ✓ | ✓ |
+
+## Prerequisites
+
+- ✅ LLM
+- ✅ `contentSummary` + `scenario`
+
+## Troubleshooting
+
+| 问题 | 解决 |
+|------|------|
+| 标题党命中 | 合规扫描强制，LLM 重写 |
+| 字数超限 | maxTitle 硬裁剪 + 重生成 |
+| 场景匹配度低 | 加载场景词典 |
+| variant 雷同 | 强制差异度 |
+
+## Completion Report
+
+```
+📰 标题生成完成！
+
+🎯 场景：{scenario}
+📋 Variants（{variants.length}）
+
+{variants.map((v, i) => `
+  #${i + 1}{i === recommended ? " 👑 推荐" : ""}
+    主：${v.title}
+    副：${v.subtitle ?? "—"}
+    短：${v.shortTitle ?? "—"}
+    评分：${v.scores.overall}/100（吸引力 ${v.scores.attractiveness} / 清晰度 ${v.scores.clarity} / SEO ${v.scores.seoScore}）
+`).join("\n")}
+
+✅ 合规：{complianceCheck.passed}
+📝 关键词覆盖：{avgKeywordCoverage}%
+```
 
 ## 上下游协作
 
-- **上游输入**：小文（内容写手）提供完成的文章正文；小策（内容策划师）提供选题方向和目标受众定位
-- **下游输出**：小发（渠道运营）根据标题方案进行各平台分发；小剪（视频导演）参考标题角度设计视频封面文案
+### 上游
+- `content_generate` 产生的文章 → 优化标题
+- 运营手动指定主题 → 出 A/B 方案
+
+### 下游
+- `cms_publish`：选定版本入 CMS（title / subTitle / shortTitle）
+- A/B 测试框架（未来）
+
+## Changelog
+
+| Version | Date | 变更 |
+|---------|------|------|
+| 5.0.0 | 2026-04-18 | 重写：9 场景分化风格 + 评分系统 + A/B 多版本 |
+
+## 参考实现文件
+
+| 文件 | 路径 |
+|------|------|
+| Skill Runtime | `src/lib/agent/tools/headline-generate.ts` |
+| 评分器 | `src/lib/content/headline-scorer.ts` |
