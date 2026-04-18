@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Play, Pause, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronLeft, Play, Pause, RefreshCw, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +20,12 @@ import {
   triggerCollectionSource,
   toggleCollectionSourceEnabled,
   deleteCollectionSource,
+  getLatestRunForSource,
+  type LatestRunStatus,
 } from "@/app/actions/collection";
+
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_ATTEMPTS = 45;
 
 export interface SourceDetail {
   id: string;
@@ -72,13 +77,72 @@ interface SourceDetailClientProps {
 export function SourceDetailClient({ source, runs, items }: SourceDetailClientProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const baselineRunId = useRef<string | null>(null);
+
+  const pollUntilDone = async () => {
+    let attempts = 0;
+    const tick = async () => {
+      attempts++;
+      let latest: LatestRunStatus;
+      try {
+        latest = await getLatestRunForSource(source.id);
+      } catch {
+        if (attempts < POLL_MAX_ATTEMPTS) setTimeout(tick, POLL_INTERVAL_MS);
+        else finalize(null);
+        return;
+      }
+      if (
+        latest.runId &&
+        latest.runId !== baselineRunId.current &&
+        (latest.status === "success" ||
+          latest.status === "partial" ||
+          latest.status === "failed")
+      ) {
+        finalize(latest);
+        return;
+      }
+      if (attempts >= POLL_MAX_ATTEMPTS) {
+        finalize(null);
+        return;
+      }
+      setTimeout(tick, POLL_INTERVAL_MS);
+    };
+    tick();
+  };
+
+  const finalize = (finalRun: LatestRunStatus | null) => {
+    setRunning(false);
+    baselineRunId.current = null;
+    if (!finalRun) {
+      toast.warning("采集超时,请稍后手动刷新查看结果");
+      router.refresh();
+      return;
+    }
+    if (finalRun.status === "success") {
+      toast.success(
+        `采集完成:新增 ${finalRun.itemsInserted} · 合并 ${finalRun.itemsMerged}`,
+      );
+    } else if (finalRun.status === "partial") {
+      toast.warning(
+        `部分失败:新增 ${finalRun.itemsInserted} · 合并 ${finalRun.itemsMerged} · 失败 ${finalRun.itemsFailed}`,
+      );
+    } else if (finalRun.status === "failed") {
+      toast.error(`采集失败: ${finalRun.errorSummary ?? "未知错误"}`);
+    }
+    router.refresh();
+  };
 
   const handleTrigger = async () => {
+    if (running) return;
     setBusy(true);
     try {
+      const before = await getLatestRunForSource(source.id);
+      baselineRunId.current = before.runId;
       await triggerCollectionSource(source.id);
-      toast.success("已触发一次采集,约 10-30 秒后刷新查看结果");
-      setTimeout(() => router.refresh(), 15_000);
+      setRunning(true);
+      pollUntilDone();
+      toast("已触发采集,等待完成...", { duration: 3000 });
     } catch (err) {
       toast.error(`触发失败: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -130,8 +194,12 @@ export function SourceDetailClient({ source, runs, items }: SourceDetailClientPr
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleTrigger} disabled={busy || !source.enabled}>
-            <RefreshCw className="mr-2 h-4 w-4" />立即触发
+          <Button onClick={handleTrigger} disabled={busy || running || !source.enabled}>
+            {running ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />采集中...</>
+            ) : (
+              <><RefreshCw className="mr-2 h-4 w-4" />立即触发</>
+            )}
           </Button>
           <Button variant="outline" onClick={handleToggle} disabled={busy}>
             {source.enabled ? (

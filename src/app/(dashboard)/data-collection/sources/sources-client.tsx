@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Play, Pause, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Play, Pause, Trash2, RefreshCw, Loader2 } from "lucide-react";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ import {
   toggleCollectionSourceEnabled,
   deleteCollectionSource,
   triggerCollectionSource,
+  getLatestRunForSource,
+  type LatestRunStatus,
 } from "@/app/actions/collection";
 
 export interface SourceListItem {
@@ -47,12 +49,19 @@ interface SourcesClientProps {
   adapterMetas: AdapterMeta[];
 }
 
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_ATTEMPTS = 45; // 45 * 2s = 90s ceiling
+
 export function SourcesClient({ initialSources, adapterMetas }: SourcesClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** Source IDs currently running (live-polled) */
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
+  /** Baseline run ID at trigger time — used to detect a new run completed */
+  const baselineRunIds = useRef<Map<string, string | null>>(new Map());
 
   const filtered = initialSources.filter((s) => {
     if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -61,6 +70,69 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
     if (statusFilter === "disabled" && s.enabled) return false;
     return true;
   });
+
+  const pollLatest = useCallback(
+    async (sourceId: string) => {
+      const baseline = baselineRunIds.current.get(sourceId) ?? null;
+      let attempts = 0;
+      const tick = async () => {
+        attempts++;
+        let latest: LatestRunStatus;
+        try {
+          latest = await getLatestRunForSource(sourceId);
+        } catch {
+          // keep polling — transient errors
+          if (attempts < POLL_MAX_ATTEMPTS) setTimeout(tick, POLL_INTERVAL_MS);
+          else finishPolling(sourceId, null);
+          return;
+        }
+
+        // A NEW run appeared AND finished — we're done
+        if (
+          latest.runId &&
+          latest.runId !== baseline &&
+          (latest.status === "success" ||
+            latest.status === "partial" ||
+            latest.status === "failed")
+        ) {
+          finishPolling(sourceId, latest);
+          return;
+        }
+
+        if (attempts >= POLL_MAX_ATTEMPTS) {
+          finishPolling(sourceId, null);
+          return;
+        }
+        setTimeout(tick, POLL_INTERVAL_MS);
+      };
+      tick();
+    },
+    [],
+  );
+
+  const finishPolling = (sourceId: string, finalRun: LatestRunStatus | null) => {
+    setRunningIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sourceId);
+      return next;
+    });
+    baselineRunIds.current.delete(sourceId);
+    if (!finalRun) {
+      toast.warning("采集超时,请稍后在详情页查看运行记录");
+      return;
+    }
+    if (finalRun.status === "success") {
+      const msg = `采集完成:新增 ${finalRun.itemsInserted} · 合并 ${finalRun.itemsMerged}`;
+      toast.success(msg);
+    } else if (finalRun.status === "partial") {
+      toast.warning(
+        `部分失败:新增 ${finalRun.itemsInserted} · 合并 ${finalRun.itemsMerged} · 失败 ${finalRun.itemsFailed}`,
+      );
+    } else if (finalRun.status === "failed") {
+      toast.error(`采集失败: ${finalRun.errorSummary ?? "未知错误"}`);
+    }
+    router.refresh();
+  };
 
   const handleToggle = async (id: string, enabled: boolean) => {
     setBusyId(id);
@@ -76,10 +148,18 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
   };
 
   const handleTrigger = async (id: string) => {
+    if (runningIds.has(id)) return;
     setBusyId(id);
     try {
+      // Snapshot baseline run (the run BEFORE trigger) so poller knows to wait for a new one
+      const before = await getLatestRunForSource(id);
+      baselineRunIds.current.set(id, before.runId);
+
       await triggerCollectionSource(id);
-      toast.success("已触发一次采集,请稍后刷新查看结果");
+
+      setRunningIds((prev) => new Set(prev).add(id));
+      pollLatest(id);
+      toast("已触发采集,等待完成...", { duration: 3000 });
     } catch (err) {
       toast.error(`触发失败: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -100,6 +180,13 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
       setBusyId(null);
     }
   };
+
+  // Clean up on unmount (avoid setState after unmount)
+  useEffect(() => {
+    return () => {
+      baselineRunIds.current.clear();
+    };
+  }, []);
 
   const typeLabel = (type: string) =>
     adapterMetas.find((m) => m.type === type)?.displayName ?? type;
@@ -170,73 +257,90 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>
-                  <Link
-                    href={`/data-collection/sources/${s.id}`}
-                    className="text-primary hover:underline"
-                  >
-                    {s.name}
-                  </Link>
-                </TableCell>
-                <TableCell>{typeLabel(s.sourceType)}</TableCell>
-                <TableCell className="font-mono text-xs">{s.scheduleCron ?? "手工"}</TableCell>
-                <TableCell>{s.targetModules.join(", ") || "—"}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString("zh-CN") : "未运行"}
-                </TableCell>
-                <TableCell className="text-right">{s.totalItemsCollected}</TableCell>
-                <TableCell>
-                  {s.enabled ? (
-                    s.lastRunStatus === "failed" ? (
+            {filtered.map((s) => {
+              const isRunning = runningIds.has(s.id);
+              return (
+                <TableRow key={s.id} className={isRunning ? "bg-primary/5" : undefined}>
+                  <TableCell>
+                    <Link
+                      href={`/data-collection/sources/${s.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {s.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{typeLabel(s.sourceType)}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {s.scheduleCron ?? "手工"}
+                  </TableCell>
+                  <TableCell>{s.targetModules.join(", ") || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {s.lastRunAt
+                      ? new Date(s.lastRunAt).toLocaleString("zh-CN")
+                      : "未运行"}
+                  </TableCell>
+                  <TableCell className="text-right">{s.totalItemsCollected}</TableCell>
+                  <TableCell>
+                    {isRunning ? (
+                      <Badge
+                        variant="default"
+                        className="gap-1 bg-primary/10 text-primary border-primary/30"
+                      >
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        采集中
+                      </Badge>
+                    ) : !s.enabled ? (
+                      <Badge variant="outline">暂停</Badge>
+                    ) : s.lastRunStatus === "failed" ? (
                       <Badge variant="destructive">失败</Badge>
                     ) : s.lastRunStatus === "partial" ? (
                       <Badge variant="secondary">部分失败</Badge>
                     ) : (
                       <Badge variant="default">启用</Badge>
-                    )
-                  ) : (
-                    <Badge variant="outline">暂停</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={busyId === s.id || !s.enabled}
-                      onClick={() => handleTrigger(s.id)}
-                      title="立即触发"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={busyId === s.id}
-                      onClick={() => handleToggle(s.id, s.enabled)}
-                      title={s.enabled ? "暂停" : "启用"}
-                    >
-                      {s.enabled ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={busyId === s.id}
-                      onClick={() => handleDelete(s.id, s.name)}
-                      title="删除"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={busyId === s.id || !s.enabled || isRunning}
+                        onClick={() => handleTrigger(s.id)}
+                        title="立即触发"
+                      >
+                        {isRunning ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={busyId === s.id || isRunning}
+                        onClick={() => handleToggle(s.id, s.enabled)}
+                        title={s.enabled ? "暂停" : "启用"}
+                      >
+                        {s.enabled ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={busyId === s.id || isRunning}
+                        onClick={() => handleDelete(s.id, s.name)}
+                        title="删除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

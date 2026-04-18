@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { collectionSources } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { collectionSources, collectionRuns } from "@/db/schema";
+import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
@@ -171,4 +171,62 @@ export async function triggerCollectionSource(sourceId: string) {
 
   revalidatePath(`/data-collection/sources/${sourceId}`);
   return { success: true };
+}
+
+// ──────────────────────────────────────────────────────
+// getLatestRunForSource: poll endpoint for live trigger status
+// ──────────────────────────────────────────────────────
+
+export interface LatestRunStatus {
+  runId: string | null;
+  status: "running" | "success" | "partial" | "failed" | "none";
+  startedAt: string | null;
+  finishedAt: string | null;
+  itemsInserted: number;
+  itemsMerged: number;
+  itemsFailed: number;
+  errorSummary: string | null;
+}
+
+export async function getLatestRunForSource(
+  sourceId: string,
+): Promise<LatestRunStatus> {
+  const orgId = await requireOrg();
+  await assertSourceOwnership(sourceId, orgId);
+
+  const [run] = await db
+    .select()
+    .from(collectionRuns)
+    .where(
+      and(
+        eq(collectionRuns.sourceId, sourceId),
+        eq(collectionRuns.organizationId, orgId),
+      ),
+    )
+    .orderBy(desc(collectionRuns.startedAt))
+    .limit(1);
+
+  if (!run) {
+    return {
+      runId: null,
+      status: "none",
+      startedAt: null,
+      finishedAt: null,
+      itemsInserted: 0,
+      itemsMerged: 0,
+      itemsFailed: 0,
+      errorSummary: null,
+    };
+  }
+
+  return {
+    runId: run.id,
+    status: run.status as LatestRunStatus["status"],
+    startedAt: run.startedAt.toISOString(),
+    finishedAt: run.finishedAt?.toISOString() ?? null,
+    itemsInserted: run.itemsInserted,
+    itemsMerged: run.itemsMerged,
+    itemsFailed: run.itemsFailed,
+    errorSummary: run.errorSummary,
+  };
 }
