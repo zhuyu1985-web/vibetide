@@ -527,10 +527,11 @@ export const enrichHotTopic = inngest.createFunction(
 - `Writer` 管道 + 去重 + 事件发送
 - Inngest 事件 `collection/item.created` 骨架 + smoke consumer
 
-### Phase 1：源管理页 + 灵感池迁移（1 周）
+### Phase 1：源管理页 + 灵感池迁移（1 周）✅ 完成 2026-04-18
 - 源管理页（列表 + 新建向导 + 基础筛选）
 - 迁移 **灵感池 SSE** → `tophub` adapter 手工触发
 - 验收：运营能在后台建一个 TopHub 源并触发
+- 实际交付：`/data-collection/sources` 列表 + 4 步向导 + 详情页(3 tabs) + 暂停/删除/立即触发操作;灵感池 SSE 改为派发 `collection/source.run-requested` 事件(旧 hotTopicCrawlScheduler cron 保留避免回退,Phase 2 再完全切换)
 
 ### Phase 2：热榜 & 对标迁移（1 周）
 - 迁移 **热榜 cron** → `tophub` adapter cron 调度
