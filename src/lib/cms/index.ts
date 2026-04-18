@@ -17,7 +17,19 @@ export {
 // —— 后续 Task 会追加 ——
 // export { CmsClient } from "./client";
 // export { saveArticle, getArticleDetail, getChannels, getAppList, getCatalogTree } from "./api-endpoints";
-// export { CmsAuthError, CmsBusinessError, CmsNetworkError, CmsSchemaError, CmsConfigError } from "./errors";
 // export { mapArticleToCms, determineType } from "./article-mapper";
 // export { syncCmsCatalogs } from "./catalog-sync";
 // export { classifyState, isRetriableError } from "./status-machine";
+
+// —— 错误类型 ——
+export {
+  CmsError,
+  CmsAuthError,
+  CmsBusinessError,
+  CmsNetworkError,
+  CmsSchemaError,
+  CmsConfigError,
+  isRetriableCmsError,
+  classifyCmsError,
+  type CmsErrorStage,
+} from "./errors";
