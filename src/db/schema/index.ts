@@ -76,3 +76,6 @@ export * from "./channels";
 
 // Collection Hub (统一数据采集, 2026-04-18)
 export * from "./collection";
+
+// CMS Adapter Phase 1 (2026-04-19) — Task 7-10 追加 4 张表
+export * from "./cms-mapping";
