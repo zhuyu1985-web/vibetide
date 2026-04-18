@@ -213,4 +213,25 @@ export type InngestEvents = {
       outletId: string | null;
     };
   };
+
+  // ─── Collection Hub Events (2026-04-18) ───
+
+  "collection/source.run-requested": {
+    data: {
+      sourceId: string;
+      organizationId: string;
+      trigger: "cron" | "manual" | "event";
+      /** optional override of source.config (used when triggering via UI "试运行") */
+      configOverride?: Record<string, unknown>;
+    };
+  };
+  "collection/item.created": {
+    data: {
+      itemId: string;
+      sourceId: string;
+      organizationId: string;
+      targetModules: string[];
+      firstSeenChannel: string;
+    };
+  };
 };
