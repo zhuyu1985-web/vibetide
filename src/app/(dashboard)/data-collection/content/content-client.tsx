@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, LayoutGrid, Table2 } from "lucide-react";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
-import type { CollectedItemRow } from "@/lib/dal/collected-items";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,15 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ItemDetailDrawer } from "./item-detail-drawer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,8 +46,29 @@ export interface ClientFilters {
   platform?: string;
 }
 
+/** Serializable subset of CollectedItemRow passed from the server page. */
+export interface CollectedItemViewModel {
+  id: string;
+  title: string;
+  summary: string | null;
+  firstSeenChannel: string;
+  firstSeenAt: string; // ISO string
+  publishedAt: string | null; // ISO string
+  category: string | null;
+  tags: string[] | null;
+  derivedModules: string[];
+  enrichmentStatus: string;
+  sourceChannels: Array<{
+    channel: string;
+    url?: string;
+    sourceId: string;
+    runId: string;
+    capturedAt: string;
+  }>;
+}
+
 interface ContentClientProps {
-  items: CollectedItemRow[];
+  items: CollectedItemViewModel[];
   total: number;
   adapterMetas: AdapterMeta[];
   initialFilters: ClientFilters;
@@ -127,6 +157,9 @@ export function ContentClient({
   const handleViewChange = (view: "card" | "table") => {
     updateUrl({ view: view === "card" ? undefined : view });
   };
+
+  // ── Detail drawer ───────────────────────────────────────────────────────────
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
 
   // ── Filter Sheet state ──────────────────────────────────────────────────────
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -241,12 +274,116 @@ export function ContentClient({
         </div>
       </div>
 
-      {/* Placeholder main area */}
-      <div className="rounded-lg border bg-muted/10 p-8 text-center text-sm text-muted-foreground">
-        {items.length === 0
-          ? "暂无采集内容。配置源并触发采集后,这里会展示数据。"
-          : `找到 ${total} 条记录。(${initialView === "card" ? "卡片" : "表格"} 视图将在 P4-T3 实现)`}
-      </div>
+      {/* Total count */}
+      {total > 0 && (
+        <p className="text-xs text-muted-foreground">共 {total} 条记录</p>
+      )}
+
+      {/* Card view */}
+      {initialView === "card" && items.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setDetailItemId(item.id)}
+              className="flex flex-col gap-2 text-left rounded-lg border bg-card p-4 hover:bg-accent transition-colors"
+            >
+              <h3 className="font-medium line-clamp-2">{item.title}</h3>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="font-mono">{item.firstSeenChannel}</span>
+                <span>·</span>
+                <span>
+                  {new Date(item.firstSeenAt).toLocaleString("zh-CN", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                {item.publishedAt && (
+                  <>
+                    <span>·</span>
+                    <span>
+                      发布于 {new Date(item.publishedAt).toLocaleDateString("zh-CN")}
+                    </span>
+                  </>
+                )}
+              </div>
+              {item.summary && (
+                <p className="text-sm text-muted-foreground line-clamp-2">{item.summary}</p>
+              )}
+              <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+                {item.category && <Badge variant="secondary">{item.category}</Badge>}
+                {item.derivedModules.map((m) => (
+                  <Badge key={m} variant="outline" className="text-[10px]">
+                    → {m}
+                  </Badge>
+                ))}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Table view */}
+      {initialView === "table" && items.length > 0 && (
+        <div className="rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>标题</TableHead>
+                <TableHead>首抓源</TableHead>
+                <TableHead>首抓时间</TableHead>
+                <TableHead>渠道数</TableHead>
+                <TableHead>分类</TableHead>
+                <TableHead>富化</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow
+                  key={item.id}
+                  className="cursor-pointer"
+                  onClick={() => setDetailItemId(item.id)}
+                >
+                  <TableCell className="max-w-md truncate font-medium">
+                    {item.title}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {item.firstSeenChannel}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(item.firstSeenAt).toLocaleString("zh-CN")}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {Array.isArray(item.sourceChannels) ? item.sourceChannels.length : 1}
+                  </TableCell>
+                  <TableCell>{item.category ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={item.enrichmentStatus === "enriched" ? "default" : "outline"}
+                      className="text-[10px]"
+                    >
+                      {item.enrichmentStatus}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {items.length === 0 && (
+        <div className="rounded-lg border bg-muted/10 p-8 text-center text-sm text-muted-foreground">
+          暂无匹配的采集内容。试试调整筛选条件或触发采集源。
+        </div>
+      )}
+
+      {/* Detail drawer */}
+      <ItemDetailDrawer itemId={detailItemId} onClose={() => setDetailItemId(null)} />
 
       {/* Filter Sheet */}
       <Sheet open={sheetOpen} onOpenChange={handleSheetOpenChange}>

@@ -5,7 +5,7 @@ import {
   type ContentFilters,
 } from "@/lib/dal/collected-items";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
-import { ContentClient } from "./content-client";
+import { ContentClient, type CollectedItemViewModel } from "./content-client";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +58,24 @@ export default async function ContentPage({ searchParams }: PageProps) {
     platformAlias: params.platform || undefined,
   };
 
-  const [{ items, total }, adapterMetas] = await Promise.all([
+  const [{ items: rawItems, total }, adapterMetas] = await Promise.all([
     listCollectedItems(orgId, filters, { limit: 50, offset: 0 }),
     Promise.resolve(listAdapterMetas()),
   ]);
+
+  const items: CollectedItemViewModel[] = rawItems.map((i) => ({
+    id: i.id,
+    title: i.title,
+    summary: i.summary,
+    firstSeenChannel: i.firstSeenChannel,
+    firstSeenAt: i.firstSeenAt.toISOString(),
+    publishedAt: i.publishedAt?.toISOString() ?? null,
+    category: i.category,
+    tags: i.tags,
+    derivedModules: i.derivedModules,
+    enrichmentStatus: i.enrichmentStatus,
+    sourceChannels: (i.sourceChannels ?? []) as CollectedItemViewModel["sourceChannels"],
+  }));
 
   return (
     <ContentClient
