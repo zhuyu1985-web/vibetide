@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
@@ -12,8 +12,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import { organizations } from "./users";
-import { userProfiles } from "./users";
+import { organizations, userProfiles } from "./users";
 
 // ───────────────────────────────────────────────────────────
 // ① 源注册表: 所有采集源配置的 SSOT (多租户)
@@ -48,6 +47,7 @@ export const collectionSources = pgTable(
   (t) => ({
     uniqueOrgName: unique("collection_sources_org_name_unique").on(t.organizationId, t.name),
     enabledIdx: index("collection_sources_org_enabled_idx").on(t.organizationId, t.enabled),
+    cronIdx: index("collection_sources_cron_idx").on(t.scheduleCron).where(sql`enabled = true`),
   }),
 );
 
@@ -73,7 +73,16 @@ export const collectedItems = pgTable(
     }),
     firstSeenChannel: text("first_seen_channel").notNull(),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
-    sourceChannels: jsonb("source_channels").notNull().default(sql`'[]'::jsonb`),
+    sourceChannels: jsonb("source_channels")
+      .$type<Array<{
+        channel: string;
+        url?: string;
+        sourceId: string;
+        runId: string;
+        capturedAt: string;
+      }>>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     category: text("category"),
     tags: text("tags").array(),
     language: text("language"),
@@ -89,7 +98,7 @@ export const collectedItems = pgTable(
       t.contentFingerprint,
     ),
     pubIdx: index("collected_items_org_pub_idx").on(t.organizationId, t.publishedAt),
-    urlHashIdx: index("collected_items_url_hash_idx").on(t.canonicalUrlHash),
+    urlHashIdx: index("collected_items_url_hash_idx").on(t.canonicalUrlHash).where(sql`canonical_url_hash IS NOT NULL`),
     categoryIdx: index("collected_items_org_category_idx").on(t.organizationId, t.category),
     tagsIdx: index("collected_items_tags_gin").using("gin", t.tags),
     derivedIdx: index("collected_items_derived_gin").using("gin", t.derivedModules),
@@ -159,3 +168,33 @@ export const collectionLogs = pgTable(
     runLoggedIdx: index("collection_logs_run_logged_idx").on(t.runId, t.loggedAt),
   }),
 );
+
+// ───────────────────────────────────────────────────────────
+// Relations
+// ───────────────────────────────────────────────────────────
+export const collectionSourcesRelations = relations(collectionSources, ({ many }) => ({
+  runs: many(collectionRuns),
+  items: many(collectedItems),
+}));
+
+export const collectedItemsRelations = relations(collectedItems, ({ one }) => ({
+  firstSeenSource: one(collectionSources, {
+    fields: [collectedItems.firstSeenSourceId],
+    references: [collectionSources.id],
+  }),
+}));
+
+export const collectionRunsRelations = relations(collectionRuns, ({ one, many }) => ({
+  source: one(collectionSources, {
+    fields: [collectionRuns.sourceId],
+    references: [collectionSources.id],
+  }),
+  logs: many(collectionLogs),
+}));
+
+export const collectionLogsRelations = relations(collectionLogs, ({ one }) => ({
+  run: one(collectionRuns, {
+    fields: [collectionLogs.runId],
+    references: [collectionRuns.id],
+  }),
+}));

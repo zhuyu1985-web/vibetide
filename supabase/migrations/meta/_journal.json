@@ -169,6 +169,13 @@
       "when": 1776493990092,
       "tag": "0023_collection_hub_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776495262918,
+      "tag": "0024_goofy_falcon",
+      "breakpoints": true
     }
   ]
 }
