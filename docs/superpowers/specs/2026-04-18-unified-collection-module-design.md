@@ -545,11 +545,11 @@ export const enrichHotTopic = inngest.createFunction(
 - 迁移研究任务 3 个分支（Tavily / 白名单 / 手工 URL） ⏸️ 推到 Phase 4（独立做用户感知不到价值,与内容浏览页 + benchmarking 打包更合理）
 - 验收：老的 `research/*-crawl.ts` 全部替换 ⏸️ Phase 4
 
-### Phase 4：知识库 + 内容浏览/监控页（2 周）
-- 迁移 **知识库 URL 入库** → `jina_url` adapter + `derived_modules=["knowledge"]`
-- 改造 **KB 分块/向量化** → 订阅 `collection/item.created`
-- 内容浏览页（双视图、筛选抽屉、详情抽屉、trigram 全文搜索）
-- 监控面板（KPI / 趋势图 / 错误明细）
+### Phase 4：知识库 + 内容浏览/监控页（2 周）✅ UI 部分完成 2026-04-18;迁移推到 Phase 5
+- 迁移 **知识库 URL 入库** → `jina_url` adapter + `derived_modules=["knowledge"]` ⏸️ Phase 5
+- 改造 **KB 分块/向量化** → 订阅 `collection/item.created` ⏸️ Phase 5
+- 内容浏览页（双视图、筛选抽屉、详情抽屉、trigram 全文搜索） ✅
+- 监控面板（KPI / 趋势图 / 错误明细） ✅
 
 ### Phase 5：清理 + 观察期（0.5-1 周）
 - 删除已迁移的旧采集代码
