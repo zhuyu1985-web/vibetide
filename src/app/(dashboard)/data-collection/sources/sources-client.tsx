@@ -242,7 +242,7 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
       {/* Table panel */}
       <GlassCard variant="panel" padding="none">
         {/* Header row (missions style) */}
-        <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-200 dark:border-gray-700/60">
+        <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-300 dark:border-gray-600/70">
           <div className="flex-1 min-w-0 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">名称</div>
           <div className="w-24 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">类型</div>
           <div className="w-20 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">调度</div>
@@ -284,7 +284,7 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
               <div
                 key={s.id}
                 className={cn(
-                  "group flex items-center gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-700/60 last:border-b-0 transition-colors duration-200",
+                  "group flex items-center gap-3 px-5 py-4 border-b border-gray-300 dark:border-gray-600/70 last:border-b-0 transition-colors duration-200",
                   isRunning ? "bg-blue-50/60 dark:bg-blue-950/20" : "hover:bg-gray-50/50 dark:hover:bg-gray-800/20",
                 )}
               >
