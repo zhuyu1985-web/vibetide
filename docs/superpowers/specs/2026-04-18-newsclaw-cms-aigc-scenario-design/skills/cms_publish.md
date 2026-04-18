@@ -50,9 +50,18 @@ import { z } from "zod";
 
 export const CmsPublishInputSchema = z.object({
   articleId: z.string().uuid(),
+  // ★ 与 §9.2 规范化 9 APP 栏目一致（来源：主文档 §2.1 / §9.2 / §11.5 seed）
+  // 运行时通过 app_channels 表校验是否存在；此处枚举仅作为文档型约束
   appChannelSlug: z.enum([
-    "app_home", "app_news", "app_politics", "app_sports",
-    "app_variety", "app_livelihood", "app_drama",
+    "app_home",
+    "app_news",
+    "app_politics",
+    "app_sports",
+    "app_variety",
+    "app_livelihood_zhongcao",
+    "app_livelihood_tandian",
+    "app_livelihood_podcast",
+    "app_drama",
   ]),
   // 可选：覆盖栏目默认 catalogId（多栏目场景）
   overrideCatalogId: z.string().optional(),
@@ -76,9 +85,14 @@ export const CmsPublishOutputSchema = z.object({
   success: z.boolean(),
   publicationId: z.string().uuid(),       // cms_publications.id
   cmsArticleId: z.string().optional(),    // 成功时返回
+  // ★ 与 §3.6 状态机 + §11.3 cmsPublicationStateEnum 严格一致
   cmsState: z.enum([
-    "submitting", "submitted", "synced",
-    "rejected_by_cms", "failed"
+    "submitting",
+    "submitted",
+    "synced",
+    "retrying",
+    "rejected_by_cms",
+    "failed",
   ]),
   previewUrl: z.string().url().optional(),
   publishedUrl: z.string().url().optional(),
@@ -602,7 +616,7 @@ CMS 入库失败
 
 ### 数据准备
 - ✅ `cms_catalog_sync` 至少跑过一次（栏目映射表非空）
-- ✅ `app_channels` 表已配置 7 个 APP 栏目的映射
+- ✅ `app_channels` 表已配置 9 个 APP 栏目的映射（见 §9.2 规范化清单）
 - ✅ 稿件已通过审核（`publishStatus ≥ approved`）
 
 ### 稿件内容准备

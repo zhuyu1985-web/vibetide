@@ -37,9 +37,9 @@ metadata:
 - 每日 AIGC 专题里的"每日短剧"任务
 
 ❌ **不应调用场景**：
-- 非分集类单集故事（应走 `script_generate` 的 drama 子模板）
+- 非分集类单集故事（超出本 skill 范围；可走 `content_generate[drama_serial]` 输出单篇剧本文字稿）
 - 长剧集（>12 集，本期不支持；建议拆为多个短系列）
-- 纪录片剧本（应走 `script_generate` 的 documentary 子模板）
+- 纪录片剧本（应走 `script_generate` 的 `documentary_short` 子模板）
 - 非剧本的文案创作（应走 `content_generate`）
 
 ## Input Schema

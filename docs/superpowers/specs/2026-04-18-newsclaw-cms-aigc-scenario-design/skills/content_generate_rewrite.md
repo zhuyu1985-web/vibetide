@@ -5,7 +5,9 @@ description: 生成高质量文章/稿件内容的核心 skill。按 APP 栏目 
 version: 5.0.0
 category: generation
 metadata:
-  scenario_tags: [news, politics, sports, variety, livelihood, daily_brief, deep_report]
+  # ★ tags 为 skill 元信息检索标签（自由文本），不是 scenario enum
+  # 详见主文档 §2.0 规范化术语表
+  tags: [news, politics, sports, variety, livelihood, daily_brief, deep_analysis]
   compatibleEmployees: [xiaowen, xiaoce, xiaotan]
   runtime:
     type: llm_generation
@@ -53,6 +55,19 @@ metadata:
 ```typescript
 export const ContentGenerateInputSchema = z.object({
   topic: z.string(),                               // 内容主题
+  // ★ scenario 必填，严格使用主文档 §2.0.2 的 9 个枚举值
+  scenario: z.enum([
+    "home_digest",
+    "news_standard",
+    "politics_shenzhen",
+    "sports_chuanchao",
+    "variety_highlight",
+    "livelihood_zhongcao",
+    "livelihood_tandian",
+    "livelihood_podcast",
+    "drama_serial",
+  ]),
+  // subtemplate 为 content_generate 内部维度（9 个，同名 8 场景 + daily_brief）
   subtemplate: z.enum([
     "news_standard",
     "politics_shenzhen",
@@ -440,7 +455,8 @@ const reviewTier = getTierForSubtemplate(input.subtemplate);
 
 const flagged = await scanByTier(draft, {
   tier: reviewTier,
-  scenario: input.subtemplate,
+  scenario: input.scenario,              // 规范化 scenario（§2.0.2 枚举）
+  subtemplate: input.subtemplate,        // 子模板维度，规则引擎可单独匹配
   catalog: input.targetCatalog,
 });
 ```

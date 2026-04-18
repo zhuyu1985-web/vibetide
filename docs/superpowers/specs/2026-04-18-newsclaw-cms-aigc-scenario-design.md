@@ -345,6 +345,81 @@ skills/
 
 # 第 2 章 · 9 大场景 × APP 栏目映射总览
 
+## 2.0 规范化术语表（强制遵循）
+
+**所有章节、skill MD、seed 数据、DDL 一律引用此表术语。任何"接近但不同"的拼写视为 bug。**
+
+### 2.0.1 APP 栏目 Slug（恰好 9 个，永不新增 APP 级独立栏目）
+
+```
+app_home
+app_news
+app_politics
+app_sports
+app_variety
+app_livelihood_zhongcao
+app_livelihood_tandian
+app_livelihood_podcast
+app_drama
+```
+
+> 任何"每日/每周/专题"类产出**不独立占用 APP 栏目 slug**，而是通过
+> `daily_content_plans.appChannelSlug` 归属到上述 9 个之一。
+
+### 2.0.2 Scenario 枚举（恰好 9 个，对应 9 个 APP 栏目）
+
+```
+home_digest                 # S1 首页（不独立生产，聚合其他 8 个）
+news_standard               # S2 新闻
+politics_shenzhen           # S3 时政
+sports_chuanchao            # S4 体育
+variety_highlight           # S5 综艺
+livelihood_zhongcao         # S6 民生种草
+livelihood_tandian          # S7 民生探店
+livelihood_podcast          # S8 民生播客
+drama_serial                # S9 短剧
+```
+
+### 2.0.3 Subtemplate（属于 `content_generate` / `script_generate` 的内部维度，**不是 scenario**）
+
+`content_generate` subtemplate（9 个，同名于 scenario + `daily_brief`）：
+```
+news_standard / politics_shenzhen / sports_chuanchao / variety_highlight
+livelihood_zhongcao / livelihood_tandian / livelihood_podcast / drama_serial
+daily_brief   # ← 专题简报风格，使用时需配合 scenario 字段使用
+```
+
+`script_generate` subtemplate（5 个）：
+```
+news_video / politics_explainer / sports_commentary
+variety_highlight_video / documentary_short
+```
+
+### 2.0.4 daily_content_plans 使用约定
+
+| 字段 | 取值范围 |
+|-----|---------|
+| `scenario` | §2.0.2 的 9 个之一 |
+| `appChannelSlug` | §2.0.1 的 9 个之一 |
+| `inputParams.subtemplate` | 可选，若 scenario 需细分到子模板（如 daily_brief） |
+
+**示例**：每日 AI 资讯 = `scenario=news_standard` + `appChannelSlug=app_news` + `inputParams.subtemplate=daily_brief`。
+
+### 2.0.5 审核档位枚举（恰好 2 个）
+
+```
+strict    # 严档
+relaxed   # 松档
+```
+
+### 2.0.6 元信息字段 vs 运行时枚举（消歧义）
+
+skill MD frontmatter 中的 `metadata.tags` / `metadata.scenario_tags`（如存在）**仅作为检索/文档标签**，
+允许自由文本，**不参与运行时路由或规则匹配**。运行时唯一合法的 scenario 值域是 §2.0.2 的 9 个。
+
+未来任何新 skill 若需要新增 metadata 便签，请使用 `tags:` 字段名（避免与 `scenario` 歧义）；
+现有 skill MD 中 `scenario_tags:` 的内容**不应被解析器当作 scenario enum 使用**。
+
 ## 2.1 场景映射总表
 
 | ID | APP 栏目 | 场景 Slug | 本期落地产物 | CMS type | 推 AIGC | 默认员工团队 | Workflow 模板 ID | 审核档位 |
@@ -404,7 +479,7 @@ skills/
 
 本期不新增员工，通过**工作流模板预设人设**让员工切换场景能力。
 
-举例：`wt_sports_cc` 模板里 xiaowen 会被赋予"体育赛事官"人设（prompt 前缀 + 绑定 `script_generate[sports子模板]`）；到了 `wt_variety_hl` 模板里 xiaowen 变成"综艺看点官"（`script_generate[variety子模板]`）。
+举例：`wt_sports_cc` 模板里 xiaowen 会被赋予"体育赛事官"人设（prompt 前缀 + 绑定 `script_generate[sports_commentary]`）；到了 `wt_variety_hl` 模板里 xiaowen 变成"综艺看点官"（`script_generate[variety_highlight_video]`）。
 
 **人设注入机制**：
 ```typescript
@@ -907,11 +982,12 @@ function flattenTree(nodes: CmsCatalogNode[], appId: number, out: CatalogRow[]) 
 
 ## 3.6 入库状态机（`status-machine.ts`）
 
+**枚举值（与 §11.3 `cmsPublicationStateEnum` 严格一致）**：
+`submitting / submitted / synced / retrying / rejected_by_cms / failed`
+
 ```
-      ┌──────────┐
-      │ pending  │ VibeTide 触发入库
-      └────┬─────┘
-           │ cms_publish skill
+   [入口：cms_publish skill 触发，直接创建 submitting 记录]
+           │
            ▼
       ┌──────────┐     5xx/超时/网络     ┌──────────┐
       │submitting├────────────────────▶│ retrying │
@@ -1818,23 +1894,34 @@ AIGC_CALLBACK_SECRET=<与华栖云约定的 HMAC 密钥>
 | 多账号 / 多实例 | 复用 baoyu 模式 |
 | Quality Self-Eval | 执行后自检 |
 
-## 6. 13 个 Skill 索引
+## 6. Skill 索引（13 本期交付 + 2 升级复用）
 
-| Slug | 类型 | 行数 | 覆盖场景 | 审核档位 |
-|------|------|------|---------|---------|
-| `cms_publish` | B | 668 | 全场景入库 | — |
-| `aigc_script_push` | B | 520 | 全场景脚本推送 | — |
-| `cms_catalog_sync` | B | 518 | 配置层 | — |
-| `duanju_script` | A | 1211 | S9 短剧 | 严 |
-| `zhongcao_script` | A | 782 | S6 种草 | 松 |
-| `podcast_script` | A | 714 | S8 播客 | 严 |
-| `zongyi_highlight` | A | 623 | S5 综艺 | 松 |
-| `tandian_script` | A | 620 | S7 探店 | 松 |
-| `content_generate` (v5 重写) | A | 628 | 9 场景子模板 | 按场景 |
-| `script_generate` (v5 重写) | A | 476 | 5 场景子模板 | 按场景 |
-| `headline_generate` (v5 重写) | A | 426 | 9 场景标题风格 | 按场景 |
-| `style_rewrite` (v5 重写) | A | 320 | 9 目标风格切换 | — |
-| `summary_generate` (v5 重写) | A | 258 | 3 类 × 9 场景 | — |
+**本期新增 / 重写**（13 个，详见 `skills/` 子目录）：
+
+| Slug | 类型 | 行数 | 改造类型 | 覆盖场景 | 审核档位 |
+|------|------|------|---------|---------|---------|
+| `cms_publish` | B | 668 | 🆕 新增 | 全场景入库 | — |
+| `aigc_script_push` | B | 520 | 🆕 新增 | 全场景脚本推送 | — |
+| `cms_catalog_sync` | B | 518 | 🆕 新增 | 配置层 | — |
+| `duanju_script` | A | 1211 | 🆕 新增 | S9 短剧 | 严 |
+| `zhongcao_script` | A | 782 | 🆕 新增 | S6 种草 | 松 |
+| `podcast_script` | A | 714 | 🆕 新增 | S8 播客 | 严 |
+| `zongyi_highlight` | A | 623 | 🆕 新增 | S5 综艺 | 松 |
+| `tandian_script` | A | 620 | 🆕 新增 | S7 探店 | 松 |
+| `content_generate` | A | 628 | ♻️ v5 重写 | 9 场景子模板 | 按场景 |
+| `script_generate` | A | 476 | ♻️ v5 重写 | 5 场景子模板 | 按场景 |
+| `headline_generate` | A | 426 | ♻️ v5 重写 | 9 场景标题风格 | 按场景 |
+| `style_rewrite` | A | 320 | ♻️ v5 重写 | 9 目标风格切换 | — |
+| `summary_generate` | A | 258 | ♻️ v5 重写 | 3 类 × 9 场景 | — |
+
+**本期升级复用**（2 个已有 skill，接入本期新规则引擎和分档审核；MD 本期不新写，在对应 skill 目录的 SKILL.md 中增量更新 changelog + inputSchema 增加 `tier` / `appChannelSlug` 字段）：
+
+| Slug | 类型 | 改造类型 | 升级内容 |
+|------|------|---------|---------|
+| `quality_review` | A | ⬆️ 升级（v2.0） | 接入 `review_rules` 规则引擎；按档位（strict/relaxed）切换阈值；输出 `flaggedIssues` / `decision` / `rulesTriggered` 字段 |
+| `compliance_check` | A | ⬆️ 升级（v2.0） | 接入三层规则合并（global/tier/app_channel）；集成广告法/广电/敏感话题/艺人名核查/官方表述 5 类扫描器 |
+
+**说明**：`quality_review` / `compliance_check` 在主文档 §7 场景路由与 §10 审核章节频繁被引用。本期不重写其完整 MD（避免范围蔓延），而是**增量升级**：在现有 skill 基础上加 inputSchema 字段与规则引擎调用；对应 seed 改造见 §11.5。
 
 ## 7. Skill 路由与场景分配（scenario × employee × skill 链）
 
@@ -1882,10 +1969,11 @@ AIGC_CALLBACK_SECRET=<与华栖云约定的 HMAC 密钥>
      │  app_politics       │        │  └─ 栏目(Catalogs)│
      │  app_sports         │        └────────┬─────────┘
      │  app_variety        │                 │
-     │  app_livelihood     │                 │ cms_catalog_sync
-     │  app_livelihood_... │                 │ （每日 cron + 手动）
-     │  app_drama          │                 ▼
-     │  app_daily_brief    │        ┌─────────────────┐
+     │  app_livelihood_    │                 │ cms_catalog_sync
+     │    zhongcao         │                 │ （每日 cron + 手动）
+     │    tandian          │                 │
+     │    podcast          │                 ▼
+     │  app_drama          │        ┌─────────────────┐
      └────────┬───────────┘         │ 本地映射表       │
               │ 运营绑定             │ cms_channels    │
               │（app_channels 表）    │ cms_apps        │
@@ -2032,7 +2120,11 @@ Step 3: getCatalogTree(appId, types=1)
 | app_livelihood_tandian | 松 | ✓ |
 | app_livelihood_podcast | 严 | ✓ |
 | app_drama | 严 | ✓ |
-| app_daily_brief | 依内容而定 | ✓ |
+
+> **注**：每日 AIGC 专题（`subtemplate=daily_brief` 或开启 `deepMode` 等参数化变体）**不独立建 APP 栏目**，
+> 其 `scenario` 字段仍严格落在 §2.0.2 的 9 个枚举值之内，通过 `daily_content_plans.appChannelSlug`
+> 指向上述 9 个栏目之一（例如"每日 AI 资讯"= scenario `news_standard` + subtemplate `daily_brief`
+> → `app_news`；"每日时政热点"= scenario `politics_shenzhen` → `app_politics`）。栏目数**恒为 9**。
 
 ## 10.3 栏目独立覆盖机制
 
@@ -2671,12 +2763,15 @@ const newSkills = [
   { slug: "podcast_script", name: "播客口播稿", category: "generation", version: "1.0.0" },
   { slug: "duanju_script", name: "短剧剧本生成", category: "generation", version: "1.0.0" },
   { slug: "zongyi_highlight", name: "综艺看点盘点", category: "generation", version: "1.0.0" },
-  // 重写版的 4 个以 version=5.0.0 更新现有记录
+  // 重写版的 5 个以 version=5.0.0 更新现有记录
   { slug: "content_generate", name: "内容生成", category: "generation", version: "5.0.0" },
   { slug: "script_generate", name: "视频脚本生成", category: "generation", version: "5.0.0" },
   { slug: "headline_generate", name: "标题生成", category: "generation", version: "5.0.0" },
   { slug: "style_rewrite", name: "风格改写", category: "generation", version: "5.0.0" },
   { slug: "summary_generate", name: "摘要生成", category: "generation", version: "5.0.0" },
+  // 升级复用的 2 个（接入规则引擎 + 分档审核）
+  { slug: "quality_review", name: "质量审核", category: "management", version: "2.0.0" },
+  { slug: "compliance_check", name: "合规检查", category: "management", version: "2.0.0" },
 ];
 
 // 3. 9 个场景化 workflow_templates（wt_news_std / wt_politics_sz 等）
@@ -2700,19 +2795,32 @@ const scenarioWorkflows = [
 ];
 
 // 4. 预置 daily_content_plans
+// ★ scenario 严格使用 §2.0.2 规范化枚举（9 个）；subtemplate 走 inputParams
 const dailyPlans = [
-  { slug: "dp_daily_ai_brief", name: "每日 AI 资讯", scenario: "daily_brief",
-    appChannelSlug: "app_news", cron: "0 7 * * *" },
-  { slug: "dp_weekend_ai_deep", name: "AI 大模型周末", scenario: "deep_report",
-    appChannelSlug: "app_news", cron: "0 10 * * 6" },
-  { slug: "dp_daily_politics", name: "每日时政热点", scenario: "politics_shenzhen",
-    appChannelSlug: "app_politics", cron: "0 8 * * *" },
-  { slug: "dp_daily_podcast", name: "每日热点播客", scenario: "livelihood_podcast",
-    appChannelSlug: "app_livelihood_podcast", cron: "0 6 * * *" },
-  { slug: "dp_daily_tandian", name: "每日探店", scenario: "livelihood_tandian",
-    appChannelSlug: "app_livelihood_tandian", cron: "0 18 * * *" },
-  { slug: "dp_daily_sports_report", name: "每日川超战报", scenario: "sports_chuanchao",
-    appChannelSlug: "app_sports", cron: "30 22 * * *" },  // 赛后 22:30
+  { slug: "dp_daily_ai_brief", name: "每日 AI 资讯",
+    scenario: "news_standard", appChannelSlug: "app_news",
+    inputParams: { subtemplate: "daily_brief", topicTag: "AI" },
+    cron: "0 7 * * *" },
+  { slug: "dp_weekend_ai_deep", name: "AI 大模型周末",
+    scenario: "news_standard", appChannelSlug: "app_news",
+    inputParams: { subtemplate: "daily_brief", deepMode: true, targetWordCount: 3000, topicTag: "AI" },
+    cron: "0 10 * * 6" },
+  { slug: "dp_daily_politics", name: "每日时政热点",
+    scenario: "politics_shenzhen", appChannelSlug: "app_politics",
+    inputParams: {},
+    cron: "0 8 * * *" },
+  { slug: "dp_daily_podcast", name: "每日热点播客",
+    scenario: "livelihood_podcast", appChannelSlug: "app_livelihood_podcast",
+    inputParams: { format: "daily_brief" },  // 播客的 format 字段
+    cron: "0 6 * * *" },
+  { slug: "dp_daily_tandian", name: "每日探店",
+    scenario: "livelihood_tandian", appChannelSlug: "app_livelihood_tandian",
+    inputParams: {},
+    cron: "0 18 * * *" },
+  { slug: "dp_daily_sports_report", name: "每日川超战报",
+    scenario: "sports_chuanchao", appChannelSlug: "app_sports",
+    inputParams: {},
+    cron: "30 22 * * *" },  // 赛后 22:30
 ];
 
 // 5. 默认 review_rules
@@ -2844,14 +2952,14 @@ Tab 4: **运行记录**
 
 ### 本期预置 6 个专题
 
-| Slug | 名称 | 场景 | 频率 |
-|-----|------|------|-----|
-| dp_daily_ai_brief | 每日 AI 资讯 | news_standard | 每天 07:00 |
-| dp_weekend_ai_deep | AI 大模型周末 | deep_report | 每周六 10:00 |
-| dp_daily_politics | 每日时政热点 | politics_shenzhen | 每天 08:00 |
-| dp_daily_podcast | 每日热点播客 | livelihood_podcast | 每天 06:00 |
-| dp_daily_tandian | 每日探店 | livelihood_tandian | 每天 18:00 |
-| dp_daily_sports_report | 每日川超战报 | sports_chuanchao | 每赛后 22:30 |
+| Slug | 名称 | scenario | subtemplate/format | 频率 |
+|-----|------|---------|-------------------|-----|
+| dp_daily_ai_brief | 每日 AI 资讯 | news_standard | subtemplate=daily_brief | 每天 07:00 |
+| dp_weekend_ai_deep | AI 大模型周末 | news_standard | subtemplate=daily_brief, deepMode=true | 每周六 10:00 |
+| dp_daily_politics | 每日时政热点 | politics_shenzhen | — | 每天 08:00 |
+| dp_daily_podcast | 每日热点播客 | livelihood_podcast | format=daily_brief | 每天 06:00 |
+| dp_daily_tandian | 每日探店 | livelihood_tandian | — | 每天 18:00 |
+| dp_daily_sports_report | 每日川超战报 | sports_chuanchao | — | 每赛后 22:30 |
 
 ## 12.3 栏目映射配置页
 
