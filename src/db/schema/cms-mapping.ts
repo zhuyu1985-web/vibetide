@@ -7,6 +7,7 @@ import {
   timestamp,
   uniqueIndex,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
@@ -151,6 +152,44 @@ export const cmsCatalogs = pgTable(
 export const cmsCatalogsRelations = relations(cmsCatalogs, ({ one }) => ({
   organization: one(organizations, {
     fields: [cmsCatalogs.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+// =====================================================================
+// cms_sync_logs — 栏目同步历史
+// =====================================================================
+
+export const cmsSyncLogs = pgTable(
+  "cms_sync_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id)
+      .notNull(),
+
+    state: text("state").notNull(), // running / done / failed
+    stats: jsonb("stats").$type<Record<string, number>>(),
+    warnings: jsonb("warnings").$type<string[]>(),
+    triggerSource: text("trigger_source"), // manual / scheduled / auto_repair / first_time_setup
+    operatorId: text("operator_id"),
+
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    errorMessage: text("error_message"),
+  },
+  (table) => ({
+    orgTimeIdx: index("cms_sync_logs_org_time_idx").on(
+      table.organizationId,
+      table.startedAt,
+    ),
+  }),
+);
+
+export const cmsSyncLogsRelations = relations(cmsSyncLogs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [cmsSyncLogs.organizationId],
     references: [organizations.id],
   }),
 }));
