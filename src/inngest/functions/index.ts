@@ -16,10 +16,6 @@ import {
   benchmarkingPlatformCrawler,
 } from "./benchmarking-crawl";
 import { benchmarkingAnalysisPipeline } from "./benchmarking-analysis";
-import {
-  hotTopicCrawlScheduler,
-  hotTopicCrawler,
-} from "./hot-topic-crawl";
 import { hotTopicEnrichmentPipeline } from "./hot-topic-enrichment";
 import { employeeStatusGuard } from "./employee-status-guard";
 import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
@@ -32,6 +28,8 @@ import {
 import {
   runCollectionSource,
   collectionSmokeConsumer,
+  collectionHotTopicCron,
+  collectionHotTopicBridge,
 } from "./collection";
 
 export const functions = [
@@ -55,9 +53,7 @@ export const functions = [
   benchmarkingCrawlScheduler,
   benchmarkingPlatformCrawler,
   benchmarkingAnalysisPipeline,
-  // Hot Topics
-  hotTopicCrawlScheduler,
-  hotTopicCrawler,
+  // Hot Topics (enrichment; crawler migrated to Collection Hub — see below)
   hotTopicEnrichmentPipeline,
   // Status guard
   employeeStatusGuard,
@@ -71,4 +67,6 @@ export const functions = [
   // Collection Hub (2026-04-18)
   runCollectionSource,
   collectionSmokeConsumer,
+  collectionHotTopicCron,
+  collectionHotTopicBridge,
 ];
