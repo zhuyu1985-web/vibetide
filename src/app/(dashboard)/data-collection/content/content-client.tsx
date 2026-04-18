@@ -369,23 +369,23 @@ export function ContentClient({
       {initialView === "table" && items.length > 0 && (
         <GlassCard variant="panel" padding="none">
           {/* Header row */}
-          <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-300 dark:border-gray-600/70">
-            <div className="flex-1 min-w-0 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+          <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/60 dark:bg-gray-800/30 border-b border-gray-300 dark:border-gray-600/70">
+            <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
               标题
             </div>
-            <div className="w-32 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            <div className="w-32 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
               首抓源
             </div>
-            <div className="w-20 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
               时间
             </div>
-            <div className="w-14 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider text-center">
+            <div className="w-14 text-xs text-gray-600 dark:text-gray-300 tracking-wide text-center">
               渠道
             </div>
-            <div className="w-20 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
               分类
             </div>
-            <div className="w-20 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
               富化
             </div>
           </div>

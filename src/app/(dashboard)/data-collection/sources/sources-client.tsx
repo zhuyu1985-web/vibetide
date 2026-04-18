@@ -242,15 +242,15 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
       {/* Table panel */}
       <GlassCard variant="panel" padding="none">
         {/* Header row (missions style) */}
-        <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-300 dark:border-gray-600/70">
-          <div className="flex-1 min-w-0 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">名称</div>
-          <div className="w-24 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">类型</div>
-          <div className="w-20 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">调度</div>
-          <div className="w-36 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">归属模块</div>
-          <div className="w-24 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">最近运行</div>
-          <div className="w-16 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider text-right">已采集</div>
-          <div className="w-20 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">状态</div>
-          <div className="w-24 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider text-right">操作</div>
+        <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/60 dark:bg-gray-800/30 border-b border-gray-300 dark:border-gray-600/70">
+          <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-300 tracking-wide">名称</div>
+          <div className="w-24 text-xs text-gray-600 dark:text-gray-300 tracking-wide">类型</div>
+          <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">调度</div>
+          <div className="w-36 text-xs text-gray-600 dark:text-gray-300 tracking-wide">归属模块</div>
+          <div className="w-24 text-xs text-gray-600 dark:text-gray-300 tracking-wide">最近运行</div>
+          <div className="w-16 text-xs text-gray-600 dark:text-gray-300 tracking-wide text-right">已采集</div>
+          <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">状态</div>
+          <div className="w-24 text-xs text-gray-600 dark:text-gray-300 tracking-wide text-right">操作</div>
         </div>
 
         {/* Body */}
