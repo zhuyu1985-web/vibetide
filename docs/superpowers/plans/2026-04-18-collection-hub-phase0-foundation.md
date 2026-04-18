@@ -47,7 +47,7 @@
 
 ### 修改 — Inngest 装配
 - `src/inngest/events.ts` — 注册 `collection/source.run-requested` 与 `collection/item.created` 事件
-- `src/app/api/inngest/route.ts` — 注册新 Inngest 函数
+- `src/inngest/functions/index.ts` — 在 `functions` 数组里追加两个新函数（`route.ts` 自动 pick up）
 
 ### 新建 — 测试
 - `src/lib/collection/__tests__/normalize.test.ts`（单测）
@@ -1033,31 +1033,44 @@ git commit -m "feat(collection-hub): add SourceAdapter plugin contract + registr
 
 TopHub 已有调用逻辑在 `src/lib/trending-api.ts` 里，这里包装成 Adapter。
 
-- [ ] **Step 7.1** 先阅读现有 `src/lib/trending-api.ts` 理解其接口（尤其 `fetchTrendingFromApi(nodeId)` 之类的函数签名与返回结构）：
+**已核对的实际签名（与 plan 代码直接匹配）：**
 
-```bash
-cat src/lib/trending-api.ts | head -120
+```ts
+// src/lib/trending-api.ts
+export const TOPHUB_DEFAULT_NODES: Record<string, string> = {
+  微博热搜: "KqndgxeLl9",
+  知乎热榜: "mproPpoq6O",
+  // ...中文名做 key
+};
+export const PLATFORM_ALIASES: Record<string, string[]> = {
+  微博热搜: ["weibo", "微博"],
+  // ...把英文别名映射到中文 canonical name
+};
+export function resolveNodeIds(platforms?: string[]): Record<string, string>;
+export interface TrendingItem {
+  platform: string;  // Chinese canonical (e.g. "微博热搜")
+  rank: number;
+  title: string;
+  heat: number | string;
+  url: string;
+  category?: string;
+}
+export async function fetchTrendingFromApi(
+  mode: "hot" | "platforms" | "search",
+  options: { platforms?: string[]; limit?: number; query?: string }
+): Promise<TrendingItem[]>;
 ```
 
-记下：
-- 它如何拿 `TRENDING_API_KEY` / `TRENDING_API_URL`
-- 返回数据结构（`hot_title`, `hot_desc`, `hot_rank`, etc.）
-- 平台 → nodeId 映射
+注意：`fetchTrendingFromApi("platforms", { platforms })` 内部用 `Promise.allSettled` 聚合所有平台结果，**已吞掉单平台失败**——所以 Phase 0 adapter 不做 per-platform 失败粒度，若 `fetchTrendingFromApi` 整体抛错就算整体失败（partial failure 粒度 V2 再优化）。
 
-- [ ] **Step 7.2** 写测试 `src/lib/collection/adapters/__tests__/tophub.test.ts`：
+- [ ] **Step 7.1** 写测试 `src/lib/collection/adapters/__tests__/tophub.test.ts`：
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { tophubAdapter } from "../tophub";
 
-// Mock trending-api module
 vi.mock("@/lib/trending-api", () => ({
   fetchTrendingFromApi: vi.fn(),
-  DEFAULT_PLATFORM_NODE_IDS: {
-    weibo: "node-weibo",
-    zhihu: "node-zhihu",
-    douyin: "node-douyin",
-  },
 }));
 
 import { fetchTrendingFromApi } from "@/lib/trending-api";
@@ -1083,19 +1096,12 @@ describe("tophubAdapter", () => {
     expect(result.success).toBe(true);
   });
 
-  it("execute fetches each platform and returns normalized items", async () => {
-    vi.mocked(fetchTrendingFromApi).mockImplementation(async (nodeId: string) => {
-      if (nodeId === "node-weibo") {
-        return [
-          { hot_title: "微博热点 A", hot_url: "https://weibo.com/a", hot_rank: 1 },
-          { hot_title: "微博热点 B", hot_url: "https://weibo.com/b", hot_rank: 2 },
-        ];
-      }
-      if (nodeId === "node-zhihu") {
-        return [{ hot_title: "知乎热点 X", hot_url: "https://zhihu.com/x", hot_rank: 1 }];
-      }
-      return [];
-    });
+  it("execute fetches items and normalizes to RawItem with channel", async () => {
+    vi.mocked(fetchTrendingFromApi).mockResolvedValue([
+      { platform: "微博热搜", rank: 1, title: "微博热点 A", heat: 100000, url: "https://weibo.com/a" },
+      { platform: "微博热搜", rank: 2, title: "微博热点 B", heat: 90000, url: "https://weibo.com/b" },
+      { platform: "知乎热榜", rank: 1, title: "知乎热点 X", heat: 50000, url: "https://zhihu.com/x", category: "科技" },
+    ]);
 
     const result = await tophubAdapter.execute({
       config: { platforms: ["weibo", "zhihu"] },
@@ -1106,50 +1112,50 @@ describe("tophubAdapter", () => {
     });
 
     expect(result.items).toHaveLength(3);
-    expect(result.items[0].channel).toBe("tophub/weibo");
     expect(result.items[0].title).toBe("微博热点 A");
     expect(result.items[0].url).toBe("https://weibo.com/a");
-    expect(result.items[2].channel).toBe("tophub/zhihu");
+    expect(result.items[0].channel).toBe("tophub/微博热搜");
+    expect(result.items[0].rawMetadata).toMatchObject({ rank: 1, heat: 100000 });
+    expect(result.items[2].channel).toBe("tophub/知乎热榜");
+    expect(result.items[2].rawMetadata).toMatchObject({ category: "科技" });
+    expect(fetchTrendingFromApi).toHaveBeenCalledWith("platforms", { platforms: ["weibo", "zhihu"] });
   });
 
-  it("execute records partial failures when one platform throws", async () => {
-    vi.mocked(fetchTrendingFromApi).mockImplementation(async (nodeId: string) => {
-      if (nodeId === "node-weibo") return [{ hot_title: "A", hot_url: "https://x.com/a" }];
-      if (nodeId === "node-zhihu") throw new Error("Tophub 503");
-      return [];
-    });
+  it("execute surfaces error when fetchTrendingFromApi throws", async () => {
+    vi.mocked(fetchTrendingFromApi).mockRejectedValue(new Error("Tophub 503"));
 
     const log = vi.fn();
     const result = await tophubAdapter.execute({
-      config: { platforms: ["weibo", "zhihu"] },
+      config: { platforms: ["weibo"] },
       sourceId: "src-1",
       organizationId: "org-1",
       runId: "run-1",
       log,
     });
 
-    expect(result.items).toHaveLength(1);
+    expect(result.items).toHaveLength(0);
     expect(result.partialFailures).toHaveLength(1);
     expect(result.partialFailures?.[0].message).toMatch(/Tophub 503/);
-    expect(log).toHaveBeenCalledWith("error", expect.stringContaining("zhihu"), expect.anything());
+    expect(log).toHaveBeenCalledWith("error", expect.stringMatching(/tophub/i), expect.anything());
   });
 });
 ```
 
-- [ ] **Step 7.3** 运行测试,确认失败：
+- [ ] **Step 7.2** 运行测试,确认失败：
 
 ```bash
 npm run test -- src/lib/collection/adapters/__tests__/tophub.test.ts
 ```
 
-- [ ] **Step 7.4** 创建 `src/lib/collection/adapters/tophub.ts`：
+- [ ] **Step 7.3** 创建 `src/lib/collection/adapters/tophub.ts`：
 
 ```ts
 import { z } from "zod";
 import type { SourceAdapter, RawItem } from "../types";
-import { fetchTrendingFromApi, DEFAULT_PLATFORM_NODE_IDS } from "@/lib/trending-api";
+import { fetchTrendingFromApi } from "@/lib/trending-api";
 
-const TOPHUB_PLATFORMS = [
+// Aliases understood by trending-api's resolveNodeIds()
+const TOPHUB_PLATFORM_ALIASES = [
   "weibo",
   "zhihu",
   "baidu",
@@ -1164,7 +1170,7 @@ const TOPHUB_PLATFORMS = [
 
 const configSchema = z.object({
   platforms: z
-    .array(z.enum(TOPHUB_PLATFORMS))
+    .array(z.enum(TOPHUB_PLATFORM_ALIASES))
     .min(1, "必须至少选择一个平台"),
 });
 
@@ -1183,7 +1189,7 @@ export const tophubAdapter: SourceAdapter<TophubConfig> = {
       type: "multiselect",
       required: true,
       help: "选择要抓取的平台热榜",
-      options: TOPHUB_PLATFORMS.map((p) => ({ value: p, label: platformLabel(p) })),
+      options: TOPHUB_PLATFORM_ALIASES.map((p) => ({ value: p, label: platformLabel(p) })),
     },
   ],
 
@@ -1191,39 +1197,33 @@ export const tophubAdapter: SourceAdapter<TophubConfig> = {
     const items: RawItem[] = [];
     const partialFailures: { message: string; meta?: Record<string, unknown> }[] = [];
 
-    for (const platform of config.platforms) {
-      const nodeId = DEFAULT_PLATFORM_NODE_IDS[platform];
-      if (!nodeId) {
-        log("warn", `no nodeId mapping for platform "${platform}"`, { platform });
-        continue;
+    try {
+      const results = await fetchTrendingFromApi("platforms", {
+        platforms: [...config.platforms],
+      });
+      for (const entry of results) {
+        items.push({
+          title: entry.title,
+          url: entry.url || undefined,
+          channel: `tophub/${entry.platform}`, // platform is Chinese canonical name
+          rawMetadata: {
+            rank: entry.rank,
+            heat: entry.heat,
+            category: entry.category,
+          },
+        });
       }
-      try {
-        const raw = await fetchTrendingFromApi(nodeId);
-        for (const entry of raw) {
-          items.push({
-            title: entry.hot_title ?? "",
-            url: entry.hot_url ?? undefined,
-            summary: entry.hot_desc ?? undefined,
-            channel: `tophub/${platform}`,
-            rawMetadata: {
-              rank: entry.hot_rank,
-              heat: entry.hot_heat,
-              platform,
-            },
-          });
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        partialFailures.push({ message, meta: { platform } });
-        log("error", `failed platform "${platform}": ${message}`, { platform });
-      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      partialFailures.push({ message, meta: { platforms: config.platforms } });
+      log("error", `tophub fetch failed: ${message}`, { platforms: config.platforms });
     }
 
     return { items, partialFailures };
   },
 };
 
-function platformLabel(p: (typeof TOPHUB_PLATFORMS)[number]): string {
+function platformLabel(p: (typeof TOPHUB_PLATFORM_ALIASES)[number]): string {
   const labels: Record<string, string> = {
     weibo: "微博热搜",
     zhihu: "知乎热榜",
@@ -1240,15 +1240,13 @@ function platformLabel(p: (typeof TOPHUB_PLATFORMS)[number]): string {
 }
 ```
 
-- [ ] **Step 7.5** 如果 `fetchTrendingFromApi` 的签名或返回结构与以上假设不符，根据 Step 7.1 的实际阅读**调整 Adapter 代码**（而不是改接口规范）。现有 `trending-api.ts` 里如果没 export `DEFAULT_PLATFORM_NODE_IDS`，加上 export 或在 Adapter 里内联等价 map（首选后者，避免侵入 trending-api.ts）。
-
-- [ ] **Step 7.6** 运行测试确认 PASS：
+- [ ] **Step 7.4** 运行测试确认 PASS：
 
 ```bash
 npm run test -- src/lib/collection/adapters/__tests__/tophub.test.ts
 ```
 
-- [ ] **Step 7.7** Commit：
+- [ ] **Step 7.5** Commit：
 
 ```bash
 git add src/lib/collection/adapters/tophub.ts src/lib/collection/adapters/__tests__/tophub.test.ts
@@ -1263,24 +1261,154 @@ git commit -m "feat(collection-hub): add TopHub Adapter (aggregator)"
 - Create: `src/lib/collection/adapters/tavily.ts`
 - Test: `src/lib/collection/adapters/__tests__/tavily.test.ts`
 
-- [ ] **Step 8.1** 先阅读 `src/lib/web-fetch.ts` 中的 `searchViaTavily`：
+**已核对的实际签名（重要——与直觉不同）：**
 
-```bash
-grep -n "searchViaTavily\|export function\|export async function" src/lib/web-fetch.ts
+```ts
+// src/lib/web-fetch.ts
+export async function searchViaTavily(
+  query: string,
+  options: {
+    timeRange?: WebSearchTimeRange;        // "1h"|"24h"|"7d"|"30d"|"all"
+    maxResults?: number;
+    topic?: "general" | "news" | "finance";
+    include_domains?: string[];             // snake_case!
+  }
+): Promise<{
+  items: NewsFeedItem[];                    // wrapped in .items, NOT a bare array
+  answer?: string;
+  responseTime: number;
+}>;
+
+export interface NewsFeedItem {
+  title: string;
+  snippet: string;            // short snippet (NOT "content"/"raw_content")
+  url: string;
+  source: string;             // hostname
+  publishedAt: string | null; // ISO string (NOT Date)
+  publishedAtMs: number | null;
+  engine: "google-news" | "bing-news";
+  sourceType: SourceType;
+  credibility: Credibility;
+}
 ```
 
-记下签名与返回类型（`TavilySearchResult[]`）。
+- [ ] **Step 8.1** 写测试 `src/lib/collection/adapters/__tests__/tavily.test.ts`：
 
-- [ ] **Step 8.2** 写测试 `src/lib/collection/adapters/__tests__/tavily.test.ts`（与 Task 7 类似，mock `@/lib/web-fetch`）。测试场景：
-  - 元数据检查（type/category/configFields）
-  - Zod schema 拒绝缺 `keywords` 的配置
-  - 单关键词调用返回正规化 RawItem（channel=`tavily`，包含 title/url/content/publishedAt）
-  - `includeDomains` 作为 `site:` 过滤传入 Tavily
-  - Tavily 抛错时记录到 `partialFailures`
+```ts
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { tavilyAdapter } from "../tavily";
 
-- [ ] **Step 8.3** 运行测试确认失败。
+vi.mock("@/lib/web-fetch", () => ({
+  searchViaTavily: vi.fn(),
+}));
 
-- [ ] **Step 8.4** 创建 `src/lib/collection/adapters/tavily.ts`：
+import { searchViaTavily } from "@/lib/web-fetch";
+
+describe("tavilyAdapter", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("has correct metadata", () => {
+    expect(tavilyAdapter.type).toBe("tavily");
+    expect(tavilyAdapter.category).toBe("search");
+    expect(tavilyAdapter.configFields.find((f) => f.key === "keywords")).toBeTruthy();
+  });
+
+  it("rejects empty keywords", () => {
+    expect(tavilyAdapter.configSchema.safeParse({ keywords: [] }).success).toBe(false);
+    expect(tavilyAdapter.configSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("accepts minimal valid config", () => {
+    const r = tavilyAdapter.configSchema.safeParse({ keywords: ["ai"] });
+    expect(r.success).toBe(true);
+  });
+
+  it("normalizes NewsFeedItem to RawItem with channel=tavily", async () => {
+    vi.mocked(searchViaTavily).mockResolvedValue({
+      items: [
+        {
+          title: "A 国 AI 新政策",
+          snippet: "据悉...",
+          url: "https://example.com/a",
+          source: "example.com",
+          publishedAt: "2026-04-10T08:00:00Z",
+          publishedAtMs: 1776124800000,
+          engine: "google-news",
+          sourceType: "news",
+          credibility: "high",
+        },
+      ],
+      responseTime: 123,
+    });
+
+    const result = await tavilyAdapter.execute({
+      config: { keywords: ["AI 政策"], timeRange: "7d", maxResults: 8 },
+      sourceId: "src-1",
+      organizationId: "org-1",
+      runId: "run-1",
+      log: vi.fn(),
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      title: "A 国 AI 新政策",
+      url: "https://example.com/a",
+      summary: "据悉...",
+      channel: "tavily",
+    });
+    expect(result.items[0].publishedAt).toBeInstanceOf(Date);
+    expect(result.items[0].rawMetadata).toMatchObject({
+      keyword: "AI 政策",
+      source: "example.com",
+      credibility: "high",
+    });
+  });
+
+  it("passes includeDomains as include_domains (snake_case) to searchViaTavily", async () => {
+    vi.mocked(searchViaTavily).mockResolvedValue({ items: [], responseTime: 10 });
+    await tavilyAdapter.execute({
+      config: {
+        keywords: ["x"],
+        timeRange: "24h",
+        includeDomains: ["xinhuanet.com"],
+        maxResults: 5,
+      },
+      sourceId: "s",
+      organizationId: "o",
+      runId: "r",
+      log: vi.fn(),
+    });
+    expect(searchViaTavily).toHaveBeenCalledWith("x", expect.objectContaining({
+      timeRange: "24h",
+      include_domains: ["xinhuanet.com"],
+      maxResults: 5,
+    }));
+  });
+
+  it("records partialFailures on per-keyword errors", async () => {
+    vi.mocked(searchViaTavily)
+      .mockResolvedValueOnce({ items: [], responseTime: 10 })
+      .mockRejectedValueOnce(new Error("Tavily 429"));
+
+    const log = vi.fn();
+    const result = await tavilyAdapter.execute({
+      config: { keywords: ["ok", "bad"], timeRange: "7d", maxResults: 8 },
+      sourceId: "s",
+      organizationId: "o",
+      runId: "r",
+      log,
+    });
+    expect(result.partialFailures).toHaveLength(1);
+    expect(result.partialFailures?.[0].message).toMatch(/Tavily 429/);
+    expect(result.partialFailures?.[0].meta).toMatchObject({ keyword: "bad" });
+    expect(log).toHaveBeenCalledWith("error", expect.stringContaining("bad"), expect.anything());
+  });
+});
+```
+
+- [ ] **Step 8.2** 运行确认失败。
+
+- [ ] **Step 8.3** 创建 `src/lib/collection/adapters/tavily.ts`：
 
 ```ts
 import { z } from "zod";
@@ -1326,22 +1454,24 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
 
     for (const keyword of config.keywords) {
       try {
-        const results = await searchViaTavily(keyword, {
+        const response = await searchViaTavily(keyword, {
           timeRange: config.timeRange,
-          includeDomains: config.includeDomains,
+          include_domains: config.includeDomains, // note: snake_case, matches searchViaTavily's option key
           maxResults: config.maxResults,
         });
-        for (const r of results) {
+        for (const r of response.items) {
           items.push({
             title: r.title,
             url: r.url,
-            content: r.raw_content ?? r.content,
-            summary: r.content,
-            publishedAt: r.published_date ? new Date(r.published_date) : undefined,
+            summary: r.snippet,
+            publishedAt: r.publishedAtMs ? new Date(r.publishedAtMs) : undefined,
             channel: "tavily",
             rawMetadata: {
-              score: r.score,
               keyword,
+              source: r.source,
+              sourceType: r.sourceType,
+              credibility: r.credibility,
+              engine: r.engine,
             },
           });
         }
@@ -1357,11 +1487,15 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
 };
 ```
 
-- [ ] **Step 8.5** 如果 `searchViaTavily` 的签名与上述不符，调整 Adapter 代码。
+注：Tavily 只返回 snippet 不返回正文。`RawItem.content` 留空，若下游需要正文需再调用 Jina Reader——这是刻意的（避免搜索阶段抓不必要的长文本）。
 
-- [ ] **Step 8.6** 运行测试确认 PASS。
+- [ ] **Step 8.4** 运行测试确认 PASS：
 
-- [ ] **Step 8.7** Commit：
+```bash
+npm run test -- src/lib/collection/adapters/__tests__/tavily.test.ts
+```
+
+- [ ] **Step 8.5** Commit：
 
 ```bash
 git add src/lib/collection/adapters/tavily.ts src/lib/collection/adapters/__tests__/tavily.test.ts
@@ -2056,24 +2190,37 @@ export const collectionSmokeConsumer = inngest.createFunction(
 );
 ```
 
-- [ ] **Step 13.2** 在 `src/app/api/inngest/route.ts` 注册新函数。先查看当前 route：
+- [ ] **Step 13.2** 注册新函数。**实际的 functions 数组在 `src/inngest/functions/index.ts`**（不是 `route.ts`—— `route.ts` 只是 `import { functions } from "@/inngest/functions"` 然后 `serve({...})`）。
 
-```bash
-cat src/app/api/inngest/route.ts | head -40
-```
-
-在 `functions` 数组中追加：
+在 `src/inngest/functions/index.ts` 文件顶部的 import 区块追加：
 
 ```ts
-import { runCollectionSource, collectionSmokeConsumer } from "@/inngest/functions/collection";
-
-// in the functions array:
-functions: [
-  // ... existing functions,
+import {
   runCollectionSource,
   collectionSmokeConsumer,
-],
+} from "./collection";
 ```
+
+在 `export const functions = [...]` 数组末尾追加两项（前面保留现有行）：
+
+```ts
+export const functions = [
+  // ... 现有所有函数 (保持不变) ...
+
+  // Collection Hub (2026-04-18)
+  runCollectionSource,
+  collectionSmokeConsumer,
+];
+```
+
+检查：
+
+```bash
+grep -A 1 "runCollectionSource" src/inngest/functions/index.ts
+grep -A 1 "collectionSmokeConsumer" src/inngest/functions/index.ts
+```
+
+Expected: 每个符号都在两处出现（一次 import、一次在数组里）。
 
 - [ ] **Step 13.3** Type check + build：
 
@@ -2087,7 +2234,7 @@ Expected: 无错误,build 成功。
 - [ ] **Step 13.4** Commit：
 
 ```bash
-git add src/inngest/functions/collection/smoke-consumer.ts src/app/api/inngest/route.ts
+git add src/inngest/functions/collection/smoke-consumer.ts src/inngest/functions/index.ts
 git commit -m "feat(collection-hub): add Phase 0 smoke consumer + register functions"
 ```
 
