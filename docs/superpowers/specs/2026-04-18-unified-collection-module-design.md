@@ -519,13 +519,13 @@ export const enrichHotTopic = inngest.createFunction(
 
 ## 10. 迁移计划
 
-### Phase 0：地基（1 周）
+### Phase 0：地基（1 周）✅ 完成 2026-04-18
 - **独立 migration 脚本** 启用 `pg_trgm` 扩展（必须先于表创建）：`CREATE EXTENSION IF NOT EXISTS pg_trgm;`
 - 4 张新表 schema（含 trigram GIN 索引） + Drizzle 迁移
 - `SourceAdapter` 接口 + Registry + 3 个基础 Adapter（TopHub / Tavily / Jina URL）
 - `FetchLayer`（从 `src/lib/web-fetch.ts` 提取共享逻辑）
 - `Writer` 管道 + 去重 + 事件发送
-- Inngest 事件 `collection/item.created` 骨架
+- Inngest 事件 `collection/item.created` 骨架 + smoke consumer
 
 ### Phase 1：源管理页 + 灵感池迁移（1 周）
 - 源管理页（列表 + 新建向导 + 基础筛选）
