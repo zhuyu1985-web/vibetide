@@ -533,11 +533,11 @@ export const enrichHotTopic = inngest.createFunction(
 - 验收：运营能在后台建一个 TopHub 源并触发
 - 实际交付：`/data-collection/sources` 列表 + 4 步向导 + 详情页(3 tabs) + 暂停/删除/立即触发操作;灵感池 SSE 改为派发 `collection/source.run-requested` 事件(旧 hotTopicCrawlScheduler cron 保留避免回退,Phase 2 再完全切换)
 
-### Phase 2：热榜 & 对标迁移（1 周）
-- 迁移 **热榜 cron** → `tophub` adapter cron 调度
-- 迁移 **对标抓取 cron** → `tavily` adapter + `site:` 过滤配置
-- 改造 **热榜富化** → 订阅 `collection/item.created`（重加工事件链路首次跑通）
-- 验收：老的 `hot-topic-crawl.ts` 能移除，热榜页面数据不中断
+### Phase 2：热榜 & 对标迁移（1 周）✅ 热榜部分完成 2026-04-18;**对标迁移推迟到 Phase 3**
+- 迁移 **热榜 cron** → `tophub` adapter cron 调度 ✅ (`collectionHotTopicCron` 小时级 cron)
+- 迁移 **对标抓取 cron** → `tavily` adapter + `site:` 过滤配置 ⏸️ (per-monitored-platform 架构复杂,留给 Phase 3 与调度器抽象一起做)
+- 改造 **热榜富化** → 订阅 `collection/item.created` ✅ (`collectionHotTopicBridge` 桥接到 hot_topics 并重派发现有 `hot-topics/enrich-requested` 事件,保留 `hotTopicEnrichmentPipeline` 无改动)
+- 验收：老的 `hot-topic-crawl.ts` 已移除 ✅;热榜页面数据不中断需手工验收（hot_topics.titleHash 走旧 `normalizeTitleKey` 公式保留去重兼容）
 
 ### Phase 3：list_scraper + RSS + 研究任务 3 分支（1.5 周）
 - `list_scraper` Adapter（融合白名单列表 + CSS 选择器两种提取模式）
