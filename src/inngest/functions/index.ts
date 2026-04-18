@@ -29,6 +29,10 @@ import {
   researchWhitelistCrawl,
   researchManualUrlIngest,
 } from "./research";
+import {
+  runCollectionSource,
+  collectionSmokeConsumer,
+} from "./collection";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -64,4 +68,7 @@ export const functions = [
   researchTavilyCrawl,
   researchWhitelistCrawl,
   researchManualUrlIngest,
+  // Collection Hub (2026-04-18)
+  runCollectionSource,
+  collectionSmokeConsumer,
 ];
