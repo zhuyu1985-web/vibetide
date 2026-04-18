@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, LayoutGrid, Table2 } from "lucide-react";
+import { Search, SlidersHorizontal, LayoutGrid, Table2, FileText } from "lucide-react";
+import { formatRelativeTime, formatAbsoluteTime } from "@/lib/format";
+import { EmptyState } from "@/components/shared/empty-state";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -281,48 +283,71 @@ export function ContentClient({
 
       {/* Card view */}
       {initialView === "card" && items.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setDetailItemId(item.id)}
-              className="flex flex-col gap-2 text-left rounded-lg border bg-card p-4 hover:bg-accent transition-colors"
-            >
-              <h3 className="font-medium line-clamp-2">{item.title}</h3>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="font-mono">{item.firstSeenChannel}</span>
-                <span>·</span>
-                <span>
-                  {new Date(item.firstSeenAt).toLocaleString("zh-CN", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                {item.publishedAt && (
-                  <>
-                    <span>·</span>
-                    <span>
-                      发布于 {new Date(item.publishedAt).toLocaleDateString("zh-CN")}
-                    </span>
-                  </>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {items.map((item) => {
+            const sourcePart = item.firstSeenChannel.includes("/")
+              ? item.firstSeenChannel.split("/", 2)
+              : [item.firstSeenChannel, ""];
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setDetailItemId(item.id)}
+                className="group flex flex-col gap-3 text-left rounded-xl bg-card p-4 ring-1 ring-border/60 hover:ring-border hover:shadow-md hover:-translate-y-0.5 transition-all"
+              >
+                {/* Source + time row */}
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-0.5 text-muted-foreground font-medium">
+                    <span>{sourcePart[0]}</span>
+                    {sourcePart[1] && (
+                      <span className="text-foreground/80">/ {sourcePart[1]}</span>
+                    )}
+                  </span>
+                  <span
+                    className="text-muted-foreground shrink-0"
+                    title={formatAbsoluteTime(item.firstSeenAt)}
+                  >
+                    {formatRelativeTime(item.firstSeenAt)}
+                  </span>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-[15px] font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                  {item.title}
+                </h3>
+
+                {/* Summary */}
+                {item.summary && (
+                  <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                    {item.summary}
+                  </p>
                 )}
-              </div>
-              {item.summary && (
-                <p className="text-sm text-muted-foreground line-clamp-2">{item.summary}</p>
-              )}
-              <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
-                {item.category && <Badge variant="secondary">{item.category}</Badge>}
-                {item.derivedModules.map((m) => (
-                  <Badge key={m} variant="outline" className="text-[10px]">
-                    → {m}
-                  </Badge>
-                ))}
-              </div>
-            </button>
-          ))}
+
+                {/* Footer: category + derived modules */}
+                <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
+                  {item.category && (
+                    <Badge variant="secondary" className="font-normal">
+                      {item.category}
+                    </Badge>
+                  )}
+                  {item.derivedModules.map((m) => (
+                    <Badge
+                      key={m}
+                      variant="outline"
+                      className="text-[10px] font-normal text-muted-foreground"
+                    >
+                      → {m}
+                    </Badge>
+                  ))}
+                  {item.publishedAt && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      {formatRelativeTime(item.publishedAt)}发布
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -353,8 +378,11 @@ export function ContentClient({
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {item.firstSeenChannel}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(item.firstSeenAt).toLocaleString("zh-CN")}
+                  <TableCell
+                    className="text-xs text-muted-foreground whitespace-nowrap"
+                    title={formatAbsoluteTime(item.firstSeenAt)}
+                  >
+                    {formatRelativeTime(item.firstSeenAt)}
                   </TableCell>
                   <TableCell className="text-center">
                     {Array.isArray(item.sourceChannels) ? item.sourceChannels.length : 1}
@@ -377,8 +405,12 @@ export function ContentClient({
 
       {/* Empty state */}
       {items.length === 0 && (
-        <div className="rounded-lg border bg-muted/10 p-8 text-center text-sm text-muted-foreground">
-          暂无匹配的采集内容。试试调整筛选条件或触发采集源。
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={FileText}
+            title="暂无匹配的采集内容"
+            description="当前筛选条件下没有找到内容。可以清空筛选,或到源管理页触发一次采集。"
+          />
         </div>
       )}
 
