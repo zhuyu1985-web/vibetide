@@ -6,10 +6,12 @@ import {
   jsonb,
   real,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
+import { collectedItems } from "./collection";
 import {
   topicPriorityEnum,
   topicTrendEnum,
@@ -59,6 +61,10 @@ export const hotTopics = pgTable("hot_topics", {
     >()
     .default([]),
 
+  collectedItemId: uuid("collected_item_id").references(() => collectedItems.id, {
+    onDelete: "set null",
+  }),
+
   discoveredAt: timestamp("discovered_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -70,6 +76,7 @@ export const hotTopics = pgTable("hot_topics", {
     .notNull(),
 }, (table) => [
   uniqueIndex("hot_topics_org_title_hash_uniq").on(table.organizationId, table.titleHash),
+  index("hot_topics_collected_item_idx").on(table.collectedItemId),
 ]);
 
 export const topicAngles = pgTable("topic_angles", {

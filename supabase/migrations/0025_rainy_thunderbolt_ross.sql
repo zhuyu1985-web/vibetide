@@ -1,0 +1,3 @@
+ALTER TABLE "hot_topics" ADD COLUMN "collected_item_id" uuid;--> statement-breakpoint
+ALTER TABLE "hot_topics" ADD CONSTRAINT "hot_topics_collected_item_id_collected_items_id_fk" FOREIGN KEY ("collected_item_id") REFERENCES "public"."collected_items"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "hot_topics_collected_item_idx" ON "hot_topics" USING btree ("collected_item_id");

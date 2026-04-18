@@ -176,6 +176,13 @@
       "when": 1776495262918,
       "tag": "0024_goofy_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776504312704,
+      "tag": "0025_rainy_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }
