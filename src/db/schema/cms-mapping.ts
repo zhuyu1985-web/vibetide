@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   integer,
+  boolean,
   timestamp,
   uniqueIndex,
   index,
@@ -92,6 +93,64 @@ export const cmsApps = pgTable(
 export const cmsAppsRelations = relations(cmsApps, ({ one }) => ({
   organization: one(organizations, {
     fields: [cmsApps.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+// =====================================================================
+// cms_catalogs — CMS 栏目扁平化（来自 /web/catalog/getTree）
+// =====================================================================
+
+export const cmsCatalogs = pgTable(
+  "cms_catalogs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id)
+      .notNull(),
+
+    cmsCatalogId: integer("cms_catalog_id").notNull(),
+    appId: integer("app_id").notNull(),
+    siteId: integer("site_id").notNull(),
+    name: text("name").notNull(),
+    parentId: integer("parent_id").default(0),
+    innerCode: text("inner_code"),
+    alias: text("alias"),
+    treeLevel: integer("tree_level"),
+    isLeaf: boolean("is_leaf").default(true),
+    catalogType: integer("catalog_type").default(1), // 1=新闻栏目
+
+    // 播放器 / 预览地址（入稿时可能需要）
+    videoPlayer: text("video_player"),
+    audioPlayer: text("audio_player"),
+    livePlayer: text("live_player"),
+    vlivePlayer: text("vlive_player"),
+    h5Preview: text("h5_preview"),
+    pcPreview: text("pc_preview"),
+    url: text("url"),
+
+    // 软删（CMS 侧删除 → 标记 deletedAt 不物理删，保护引用）
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqOrgCatalogId: uniqueIndex("cms_catalogs_org_catid_uniq").on(
+      table.organizationId,
+      table.cmsCatalogId,
+    ),
+    treeIdx: index("cms_catalogs_tree_idx").on(
+      table.organizationId,
+      table.parentId,
+      table.deletedAt,
+    ),
+    appIdx: index("cms_catalogs_app_idx").on(table.organizationId, table.appId),
+  }),
+);
+
+export const cmsCatalogsRelations = relations(cmsCatalogs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [cmsCatalogs.organizationId],
     references: [organizations.id],
   }),
 }));
