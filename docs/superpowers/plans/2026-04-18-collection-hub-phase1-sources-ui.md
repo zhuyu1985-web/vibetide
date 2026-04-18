@@ -450,7 +450,7 @@ export async function createCollectionSource(payload: z.infer<typeof createPaylo
       defaultCategory: parsed.defaultCategory ?? null,
       defaultTags: parsed.defaultTags ?? null,
       enabled: true,
-      createdBy: profile?.id ?? null,
+      createdBy: profile?.userId ?? null,
     })
     .returning({ id: collectionSources.id });
 
@@ -1774,15 +1774,26 @@ import { db } from "@/db";
 import { collectionSources, collectionRuns, userProfiles } from "@/db/schema";
 import { and, eq, desc, isNull } from "drizzle-orm";
 import { inngest } from "@/inngest/client";
+import { TOPHUB_DEFAULT_NODES, PLATFORM_ALIASES } from "@/lib/trending-api";
 
 export const dynamic = "force-dynamic";
 
 const DEFAULT_INSPIRATION_SOURCE_NAME = "__inspiration_default__";
-const DEFAULT_PLATFORMS = [
-  "weibo", "zhihu", "baidu", "douyin",
-  "toutiao", "36kr", "bilibili", "xiaohongshu",
-  "thepaper", "weixin",
-];
+
+/**
+ * Build the platform list from TOPHUB_DEFAULT_NODES (which honors
+ * env-configurable TRENDING_RESPONSE_MAPPING).
+ * TOPHUB_DEFAULT_NODES keys are Chinese canonical names (e.g. "微博热搜").
+ * We map each to its first English alias (the form the tophub adapter
+ * accepts in its config.platforms enum).
+ */
+function buildDefaultPlatforms(): string[] {
+  return Object.keys(TOPHUB_DEFAULT_NODES).map((chineseName) => {
+    const aliases = PLATFORM_ALIASES[chineseName];
+    return aliases?.[0] ?? chineseName.toLowerCase();
+  });
+}
+const DEFAULT_PLATFORMS = buildDefaultPlatforms();
 
 function sseEvent(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
