@@ -287,7 +287,7 @@ git commit -m "feat(collection-hub/phase2): add collectionHotTopicCron (replaces
 关键聚合字段映射：
 - 旧 `platforms[]` ← 新 `source_channels[].channel` 的 `tophub/{platform}` 提取 `{platform}`
 - 旧 `heatCurve[]` ← 暂时用空数组 `[]`,Phase 3 再补（需要时序采集支持）
-- 旧 `titleHash` ← 新 `content_fingerprint` 直接复用
+- 旧 `titleHash` ← **`MD5(normalizeTitleKey(item.title))`**（旧逻辑的哈希方案,与 `collected_items.content_fingerprint` **不同**！这是关键修正：旧哈希没有 date bucket,只截断到 20 字符；新哈希带 date bucket。**必须用旧公式生成 titleHash** 才能与已有的 hot_topics 行去重匹配,避免 dual-operation 期间产生重复行。）
 - 旧 `heatScore` ← 从 `raw_metadata.heat` 读取（如果存在）并用 `normalizeHeatScore` 归一化
 - 旧 `priority` ← 同旧逻辑：`sourceChannels.length >= 3 → P0`,`>= 2 → P1`,`else → P2`(可随后 heatScore re-rank)
 - 新 `collectedItemId` ← `event.data.itemId`
@@ -295,11 +295,16 @@ git commit -m "feat(collection-hub/phase2): add collectionHotTopicCron (replaces
 - [ ] **Step 4.2** 创建 `src/inngest/functions/collection/hot-topic-bridge.ts`：
 
 ```ts
+import crypto from "node:crypto";
 import { inngest } from "@/inngest/client";
 import { db } from "@/db";
 import { collectedItems, hotTopics } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { normalizeHeatScore, classifyByKeywords } from "@/lib/trending-api";
+import {
+  normalizeHeatScore,
+  classifyByKeywords,
+  normalizeTitleKey,
+} from "@/lib/trending-api";
 
 interface SourceChannelEntry {
   channel: string;
@@ -307,6 +312,23 @@ interface SourceChannelEntry {
   sourceId: string;
   runId: string;
   capturedAt: string;
+}
+
+/**
+ * Recompute hot_topics.titleHash using the LEGACY formula (not the collection-hub
+ * content_fingerprint). This ensures the bridge's upsert can dedup against
+ * existing rows inserted by the old hotTopicCrawler during parallel operation.
+ *
+ * OLD formula (see src/lib/trending-api.ts normalizeTitleKey):
+ *   MD5(normalizeTitleKey(title))  // lowercase, strip punct, truncate to 20 chars
+ *
+ * NEW collected_items.content_fingerprint formula (see normalize.ts):
+ *   MD5(normalizeTitle(title) + ":" + date_bucket)  // different stripping + date bucket
+ *
+ * These hash different inputs -- incompatible.
+ */
+function computeLegacyTitleHash(title: string): string {
+  return crypto.createHash("md5").update(normalizeTitleKey(title)).digest("hex");
 }
 
 /**
@@ -371,22 +393,24 @@ export const collectionHotTopicBridge = inngest.createFunction(
 
     // Step 3: Upsert hot_topics
     const hotTopicId = await step.run("upsert-hot-topic", async () => {
-      // Check for existing row by content_fingerprint (shared across collection_items and hot_topics)
-      // Note: hot_topics uses titleHash which is the SAME as collected_items.content_fingerprint
-      // because they both derive from normalized title + date bucket.
+      // CRITICAL: titleHash uses the LEGACY formula (no date bucket, 20-char truncate)
+      // so the dedup lookup can match rows previously inserted by hotTopicCrawler.
+      // See computeLegacyTitleHash above for rationale.
+      const legacyTitleHash = computeLegacyTitleHash(item.title);
+
       const [existing] = await db
         .select({ id: hotTopics.id })
         .from(hotTopics)
         .where(
           and(
             eq(hotTopics.organizationId, organizationId),
-            eq(hotTopics.titleHash, item.contentFingerprint),
+            eq(hotTopics.titleHash, legacyTitleHash),
           ),
         )
         .limit(1);
 
       if (existing) {
-        // Already bridged; update aggregates + FK
+        // Already bridged (or previously inserted by old crawler); update aggregates + FK
         await db
           .update(hotTopics)
           .set({
@@ -405,7 +429,7 @@ export const collectionHotTopicBridge = inngest.createFunction(
         .values({
           organizationId,
           title: item.title,
-          titleHash: item.contentFingerprint,
+          titleHash: legacyTitleHash, // legacy formula, not collected_items.content_fingerprint
           sourceUrl: item.canonicalUrl,
           priority: aggregated.priority,
           heatScore: aggregated.heatScore,
@@ -451,9 +475,11 @@ export const collectionHotTopicBridge = inngest.createFunction(
 );
 ```
 
-**关于 `classifyByKeywords`、`normalizeHeatScore`**: 这两个帮助函数已经从 `@/lib/trending-api` 导出（Phase 0 T7 的 TopHub Adapter 阅读过）。确认导出存在；若某个没 export,把它加上 export。
+**关于 `classifyByKeywords`、`normalizeHeatScore`、`normalizeTitleKey`**: 这三个帮助函数都已经从 `@/lib/trending-api` 导出（已确认 export 在 src/lib/trending-api.ts 行 349/384/394）。
 
 **关于 `hot-topics/enrich-requested` 事件的 data 形状**: 查看 `src/inngest/events.ts`,确认字段为 `{ organizationId, topicIds: string[] }`。若不一致,按实际定义调整。
+
+**关于与 `__inspiration_default__` 源的共存**: Phase 1 里的灵感池 SSE 已经建立了一个 per-org 的 `__inspiration_default__` 源,其 `targetModules: ["hot_topics"]` 也会触发本 bridge。这是**有意的**——两个源（系统 cron + 手工灵感池）都写同一个 `hot_topics` 表,因为 bridge 是幂等的（按 legacy titleHash 去重）。手工触发的最新数据会被自动纳入 hot_topics。这不是 bug。
 
 - [ ] **Step 4.3** Type check：`npx tsc --noEmit`
 
