@@ -73,3 +73,6 @@ export * from "./audit";
 
 // Channel integrations (钉钉 / 企业微信, 2026-04-17)
 export * from "./channels";
+
+// Collection Hub (统一数据采集, 2026-04-18)
+export * from "./collection";
