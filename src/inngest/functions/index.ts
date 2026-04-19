@@ -31,6 +31,10 @@ import {
   collectionHotTopicCron,
   collectionHotTopicBridge,
 } from "./collection";
+import {
+  cmsCatalogSyncDaily,
+  cmsCatalogSyncOnDemand,
+} from "./cms-catalog-sync";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -69,4 +73,7 @@ export const functions = [
   collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
+  // CMS P1 (2026-04-18)
+  cmsCatalogSyncDaily,
+  cmsCatalogSyncOnDemand,
 ];

@@ -234,4 +234,15 @@ export type InngestEvents = {
       firstSeenChannel: string;
     };
   };
+
+  // ─── CMS Adapter Events (2026-04-18, Phase 1) ───
+
+  "cms/catalog-sync.trigger": {
+    data: {
+      organizationId: string;
+      triggerSource?: "manual" | "scheduled" | "auto_repair" | "first_time_setup";
+      operatorId?: string;
+      deleteMissing?: boolean;
+    };
+  };
 };
