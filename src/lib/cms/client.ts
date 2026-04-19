@@ -3,6 +3,7 @@ import {
   CmsBusinessError,
   CmsNetworkError,
   CmsSchemaError,
+  isRetriableCmsError,
 } from "./errors";
 import {
   CmsResponseEnvelopeSchema,
@@ -24,20 +25,66 @@ export interface CmsRequestOptions {
   extraHeaders?: Record<string, string>;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class CmsClient {
   private readonly host: string;
   private readonly loginCmcId: string;
   private readonly loginCmcTid: string;
   private readonly defaultTimeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly retryBackoffMs: number;
 
   constructor(config: CmsClientConfig) {
     this.host = config.host.replace(/\/$/, "");
     this.loginCmcId = config.loginCmcId;
     this.loginCmcTid = config.loginCmcTid;
     this.defaultTimeoutMs = config.timeoutMs ?? 15000;
+    this.maxRetries = config.maxRetries ?? 3;
+    this.retryBackoffMs = config.retryBackoffMs ?? 1000;
   }
 
+  /** 带重试的 post —— 外部调用使用这个 */
   async post<TReq, TRes>(
+    path: string,
+    body: TReq,
+    options: CmsRequestOptions = {},
+  ): Promise<CmsResponseEnvelope<TRes>> {
+    return this.withRetry(() => this.postOnce<TReq, TRes>(path, body, options));
+  }
+
+  async get<TRes>(
+    path: string,
+    query: Record<string, string | number> = {},
+    options: CmsRequestOptions = {},
+  ): Promise<CmsResponseEnvelope<TRes>> {
+    return this.withRetry(() => this.getOnce<TRes>(path, query, options));
+  }
+
+  private buildUrl(path: string): string {
+    const safePath = path.startsWith("/") ? path : `/${path}`;
+    return `${this.host}${safePath}`;
+  }
+
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (!isRetriableCmsError(err)) throw err;
+        if (attempt === this.maxRetries) break;
+        const backoff = this.retryBackoffMs * 2 ** attempt;
+        await delay(backoff);
+      }
+    }
+    throw lastErr;
+  }
+
+  private async postOnce<TReq, TRes>(
     path: string,
     body: TReq,
     options: CmsRequestOptions = {},
@@ -77,7 +124,7 @@ export class CmsClient {
     return this.parseResponse<TRes>(response, path);
   }
 
-  async get<TRes>(
+  private async getOnce<TRes>(
     path: string,
     query: Record<string, string | number> = {},
     options: CmsRequestOptions = {},
@@ -114,11 +161,6 @@ export class CmsClient {
     }
 
     return this.parseResponse<TRes>(response, path);
-  }
-
-  private buildUrl(path: string): string {
-    const safePath = path.startsWith("/") ? path : `/${path}`;
-    return `${this.host}${safePath}`;
   }
 
   private async parseResponse<TRes>(
