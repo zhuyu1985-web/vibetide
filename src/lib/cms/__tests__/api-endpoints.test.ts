@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mockCmsFetch, restoreCmsFetch, cmsSuccessResponse } from "./test-helpers";
 import { CmsClient } from "../client";
-import { getChannels } from "../api-endpoints";
+import { getChannels, getAppList, getCatalogTree } from "../api-endpoints";
 
 const cfg = {
   host: "https://cms.example.com",
@@ -53,8 +53,6 @@ describe("getChannels", () => {
   });
 });
 
-import { getAppList } from "../api-endpoints";
-
 describe("getAppList", () => {
   afterEach(() => restoreCmsFetch());
 
@@ -82,6 +80,70 @@ describe("getAppList", () => {
       const client = new CmsClient(cfg);
       await getAppList(client, "2");
       expect(captured).toEqual({ type: "2" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("getCatalogTree", () => {
+  afterEach(() => restoreCmsFetch());
+
+  it("returns an array of catalog nodes (flat)", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse([
+        {
+          id: 9369, appid: 250, siteId: 73, name: "A", parentId: 0,
+          innerCode: "009887", alias: "a", treeLevel: 1, isLeaf: 1, type: 1,
+          childCatalog: [],
+        },
+      ]),
+    ]);
+    const client = new CmsClient(cfg);
+    const res = await getCatalogTree(client, { appId: "250", types: "1" });
+    expect(res.data).toHaveLength(1);
+    expect(res.data?.[0].id).toBe(9369);
+  });
+
+  it("handles recursive children", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse([
+        {
+          id: 9373, appid: 250, siteId: 73, name: "父", parentId: 0,
+          innerCode: "009891", alias: "p", treeLevel: 1, isLeaf: 0, type: 1,
+          childCatalog: [
+            {
+              id: 9374, appid: 250, siteId: 73, name: "子", parentId: 9373,
+              innerCode: "009891000001", alias: "c", treeLevel: 2, isLeaf: 0, type: 1,
+              childCatalog: [],
+            },
+          ],
+        },
+      ]),
+    ]);
+    const client = new CmsClient(cfg);
+    const res = await getCatalogTree(client, { appId: "250" });
+    expect(res.data?.[0].childCatalog?.[0].id).toBe(9374);
+  });
+
+  it("forwards optional params", async () => {
+    let captured: unknown;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse((init?.body as string) ?? "{}");
+      return cmsSuccessResponse([]);
+    }) as typeof globalThis.fetch;
+    try {
+      const client = new CmsClient(cfg);
+      await getCatalogTree(client, {
+        appId: "250",
+        types: "1",
+        isPrivilege: "false",
+        catalogName: "新闻",
+      });
+      expect(captured).toMatchObject({
+        appId: "250", types: "1", isPrivilege: "false", catalogName: "新闻",
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
