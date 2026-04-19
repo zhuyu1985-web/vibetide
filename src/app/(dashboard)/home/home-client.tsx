@@ -20,6 +20,7 @@ import { ScenarioDetailSheet } from "@/components/home/scenario-detail-sheet";
 import { RecentSection } from "@/components/home/recent-section";
 import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
 import type { ScenarioCardData } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +42,12 @@ interface HomeClientProps {
   }>;
   scenarioMap?: Record<string, ScenarioCardData[]>;
   employeeDbIdMap?: Record<string, string>;
+  /**
+   * B.1 Unified Scenario Workflow — enabled builtin workflow templates for the
+   * current org. Accepted here and passed through; Task 16 wires scenario-grid
+   * to consume it.
+   */
+  workflows?: WorkflowTemplateRow[];
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +59,8 @@ export function HomeClient({
   recentConversations,
   scenarioMap = {},
   employeeDbIdMap = {},
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  workflows = [],
 }: HomeClientProps) {
   const router = useRouter();
 
