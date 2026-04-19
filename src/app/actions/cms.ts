@@ -1,7 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { syncCmsCatalogs, type SyncResult } from "@/lib/cms";
+import {
+  publishArticleToCms,
+  syncCmsCatalogs,
+  type PublishInput,
+  type PublishResult,
+  type SyncResult,
+} from "@/lib/cms";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 
@@ -61,4 +67,47 @@ export async function triggerCatalogSyncAction(
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// 发布稿件到 CMS（UI / Mission 调用入口）
+// ---------------------------------------------------------------------------
+
+export interface PublishArticleToCmsActionInput {
+  articleId: string;
+  appChannelSlug: PublishInput["appChannelSlug"];
+  triggerSource?: PublishInput["triggerSource"];
+  allowUpdate?: boolean;
+}
+
+/**
+ * 将稿件推送至 CMS 的 server action 包装。
+ *
+ * - 仅登录用户可调用；operatorId 取自当前会话（组织边界由下游 publishArticleToCms 校验）
+ * - triggerSource 默认为 "manual"
+ * - 发布完成后 revalidate 稿件详情页与任务中心列表
+ * - 业务异常（CmsError / 映射失败等）会被捕获并以 `{ error }` 返回，便于 UI 层展示
+ */
+export async function publishArticleToCmsAction(
+  input: PublishArticleToCmsActionInput,
+): Promise<PublishResult | { error: string }> {
+  const { userId } = await requireUserAndOrg();
+
+  try {
+    const result = await publishArticleToCms({
+      articleId: input.articleId,
+      appChannelSlug: input.appChannelSlug,
+      operatorId: userId,
+      triggerSource: input.triggerSource ?? "manual",
+      allowUpdate: input.allowUpdate,
+    });
+
+    revalidatePath(`/articles/${input.articleId}`);
+    revalidatePath(`/missions`);
+
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: message };
+  }
 }
