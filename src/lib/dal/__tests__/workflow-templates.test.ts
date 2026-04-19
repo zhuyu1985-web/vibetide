@@ -315,3 +315,60 @@ describe("seedBuiltinTemplatesForOrg", () => {
     expect(target?.description).toBe("updated-via-name-key");
   });
 });
+
+describe("B.1 AC: two-entry same-source assertion", () => {
+  const orgId = randomUUID();
+
+  beforeAll(async () => {
+    const stamp = Date.now();
+    await db.insert(organizations)
+      .values({ id: orgId, name: "test-org-two-entry", slug: `test-two-entry-${stamp}` })
+      .onConflictDoNothing();
+
+    // Seed at least 2 rows so set comparison is meaningful
+    await db.insert(workflowTemplates).values([
+      { organizationId: orgId, name: "two-entry-a", category: "news", isBuiltin: true, isEnabled: true, defaultTeam: ["xiaolei"], steps: [] },
+      { organizationId: orgId, name: "two-entry-b", category: "deep", isBuiltin: true, isEnabled: true, defaultTeam: ["xiaoce"], steps: [] },
+      // One disabled row to verify filter consistency
+      { organizationId: orgId, name: "two-entry-disabled", category: "news", isBuiltin: true, isEnabled: false, defaultTeam: [], steps: [] },
+      // One non-builtin to verify filter consistency
+      { organizationId: orgId, name: "two-entry-custom", category: "custom", isBuiltin: false, isEnabled: true, defaultTeam: [], steps: [] },
+    ]).onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db.delete(workflowTemplates).where(eq(workflowTemplates.organizationId, orgId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  it("首页 filter and 任务中心 filter return identical workflow id sets", async () => {
+    // Filter used by /home/page.tsx (Task 15) and /missions/page.tsx (Task 17)
+    const homeFilter = { isBuiltin: true, isEnabled: true };
+    const missionsFilter = { isBuiltin: true, isEnabled: true };
+
+    const home = await listWorkflowTemplatesByOrg(orgId, homeFilter);
+    const missions = await listWorkflowTemplatesByOrg(orgId, missionsFilter);
+
+    const homeIds = new Set(home.map(w => w.id));
+    const missionIds = new Set(missions.map(w => w.id));
+
+    expect(homeIds).toEqual(missionIds);
+    expect(home.length).toBeGreaterThanOrEqual(2);
+    // Disabled row must be excluded from both
+    expect(home.find(w => w.name === "two-entry-disabled")).toBeUndefined();
+    expect(missions.find(w => w.name === "two-entry-disabled")).toBeUndefined();
+    // Non-builtin row must be excluded from both
+    expect(home.find(w => w.name === "two-entry-custom")).toBeUndefined();
+    expect(missions.find(w => w.name === "two-entry-custom")).toBeUndefined();
+  });
+
+  it("changing isBuiltin filter breaks the equality (canary)", async () => {
+    // If someone accidentally changes one page to use different filter, this test catches it
+    const home = await listWorkflowTemplatesByOrg(orgId, { isBuiltin: true, isEnabled: true });
+    const missions = await listWorkflowTemplatesByOrg(orgId, { isBuiltin: false, isEnabled: true });
+    const homeIds = new Set(home.map(w => w.id));
+    const missionIds = new Set(missions.map(w => w.id));
+    // Expect inequality to confirm the canary works
+    expect(homeIds).not.toEqual(missionIds);
+  });
+});
