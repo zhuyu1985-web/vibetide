@@ -39,10 +39,10 @@ import {
 } from "@/components/ui/sheet";
 import {
   EMPLOYEE_META,
-  SCENARIO_CONFIG,
   type EmployeeId,
   type EmployeeMeta,
 } from "@/lib/constants";
+import { resolveScenarioConfig } from "@/lib/scenario-fallback";
 import { cancelMission, retryMission, deleteMission, archiveMission } from "@/app/actions/missions";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import type {
@@ -184,8 +184,8 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
     };
   }, [isActive, mission.id, router, startTransition]);
 
-  const scenarioCfg = SCENARIO_CONFIG[mission.scenario];
-  const scenarioLabel = scenarioCfg?.label ?? mission.scenario;
+  const scenarioCfg = resolveScenarioConfig(mission);
+  const scenarioLabel = scenarioCfg.label;
 
   const taskTitleMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -884,8 +884,8 @@ function EmployeeChip({ meta }: { meta: EmployeeMeta | null }) {
 // ---------------------------------------------------------------------------
 
 function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
-  const scenarioCfg = SCENARIO_CONFIG[mission.scenario];
-  const ScenarioIcon = scenarioCfg?.icon;
+  const scenarioCfg = resolveScenarioConfig(mission);
+  const ScenarioIcon = scenarioCfg.icon;
 
   const elapsedMs = mission.completedAt
     ? new Date(mission.completedAt).getTime() - new Date(mission.createdAt).getTime()

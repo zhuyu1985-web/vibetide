@@ -219,6 +219,93 @@ INNGEST_SIGNING_KEY
 
 **Important:** Supabase may have connectivity issues. Pages that query the database at render time must add `export const dynamic = 'force-dynamic'` to avoid build-time DB connection timeouts.
 
+### CMS Integration Layer (Phase 1)
+
+Phase 1 交付的 `src/lib/cms/` 模块是 VibeTide → 华栖云 CMS 的唯一出口。
+
+**导出（只从 `@/lib/cms` import，不直接访问内部文件）：**
+- `CmsClient` + 5 接口（getChannels / getAppList / getCatalogTree / saveArticle / getArticleDetail）
+- `publishArticleToCms({ articleId, appChannelSlug, operatorId, triggerSource })` — 核心入库
+- `syncCmsCatalogs(orgId, options)` — 三步栏目同步
+- `mapArticleToCms(article, ctx)` + `loadMapperContext(orgId, slug, org)`
+- 错误类型：`CmsAuthError` / `CmsBusinessError` / `CmsNetworkError` / `CmsSchemaError` / `CmsConfigError`
+- Feature flag：`isCmsPublishEnabled()` / `isCatalogSyncEnabled()`
+
+**9 个 APP 栏目 slug（`ALL_APP_CHANNEL_SLUGS` 严格锁定）：**
+`app_home / app_news / app_politics / app_sports / app_variety / app_livelihood_zhongcao / app_livelihood_tandian / app_livelihood_podcast / app_drama`
+
+**关键 env（`.env.local`）：**
+- `CMS_HOST` / `CMS_LOGIN_CMC_ID` / `CMS_LOGIN_CMC_TID` / `CMS_TENANT_ID` / `CMS_USERNAME`
+- `VIBETIDE_CMS_PUBLISH_ENABLED`（默认 false，按 org 灰度）
+- `VIBETIDE_CATALOG_SYNC_ENABLED`（默认 true）
+
+**Inngest 函数：**
+- `cmsCatalogSyncDaily`（每天 02:00 Asia/Shanghai 跑 org 级同步）
+- `cmsCatalogSyncOnDemand`（event `cms/catalog-sync.trigger`）
+- `cmsStatusPoll`（入库后 5 次指数退避轮询，event `cms/publication.submitted`）
+- `cmsPublishRetry`（失败重试 3 次，event `cms/publication.retry`）
+
+**配置 UI：** `/settings/cms-mapping`（绑定 app_channels → cms_catalogs + 同步日志）
+
+### Scenario/Workflow 统一架构（B.1）
+
+**单一真相源：** `workflow_templates` 表是 VibeTide 所有"场景"的唯一来源。
+
+**数据流：**
+- 首页场景网格、任务中心"发起新任务" 都调用 `listWorkflowTemplatesByOrg(orgId, filter)`
+- 启动 mission 时双写 `scenario` (slug) + `workflowTemplateId` (uuid FK)
+- `mission.scenario` 继续是 slug（builtin → legacy_scenario_key；custom → `custom_${nanoid(6)}`）
+- 下游消费者（mission-executor / leader-plan / inngest / channels gateway）仍按 `mission.scenario` slug 分发（B.2 才迁到 workflowTemplateId）
+
+**Category 12 值：** news / deep / social / advanced / livelihood / podcast / drama / daily_brief / video / analytics / distribution / custom
+
+**Seed 来源（27+ builtin rows / org）：**
+- SCENARIO_CONFIG (10)：`src/lib/constants.ts:456`（@deprecated，B.2 删）
+- ADVANCED_SCENARIO_CONFIG (6)：`:610`（@deprecated）
+- employeeScenarios.xiaolei (5)：迁到 workflow_templates
+- 现有 templatesData (6)：补齐 icon/defaultTeam/appChannelSlug
+
+**关键文件：**
+- DAL: `src/lib/dal/workflow-templates.ts` (listWorkflowTemplatesByOrg / seedBuiltinTemplatesForOrg / getByLegacyKey / create / update / softDisable)
+- Slug 工具: `src/lib/workflow-template-slug.ts` (templateToScenarioSlug)
+- Seed 映射: `src/db/seed-builtin-workflows.ts` (buildBuiltinScenarioSeeds)
+- Fallback: `src/lib/scenario-fallback.ts` (resolveScenarioConfig for mission display)
+- Spec: `docs/superpowers/specs/2026-04-19-unified-scenario-workflow-source.md`
+
+**B.2 Pending（独立 spec）：** `/scenarios/customize` 重写、`channels/gateway.ts` 改读 DB、删除 SCENARIO_CONFIG 常量、DROP employee_scenarios 表、mission 下游消费者迁到 workflowTemplateId。
+
+### Skill MD 标准（Track B / baoyu-inspired）
+
+13 个 CMS/AIGC/场景 skill MD 按 baoyu-skills 规范标准化（Track B, 2026-04-19）：
+
+**主文件规模：** 每个 `skills/<name>/SKILL.md` 目标 180-320 行（总计 ≤ 3500 行）
+
+**Frontmatter 约定：**
+- 保留：name / displayName / description / version / category
+- 保留：metadata.{skill_kind, scenario_tags, compatibleEmployees, modelDependency, requires}
+- 新增：metadata.implementation.{scriptPath, testPath}
+- 新增：metadata.openclaw.{schemaPath, referenceSpec, subtemplatesPath?}
+- 删除：metadata.runtime.{avgLatencyMs, maxConcurrency, timeoutMs, type}
+
+**Body 10-12 章标准：**
+1. 使用条件（合并 When/Prereq/Pre-flight）
+2. 输入 / 输出（简要表，完整 Schema 外链）
+3. 工作流 Checklist
+4. 子模板分化（可选，摘要表）
+5. 质量把关（合并自检+失败模式）
+6. 输出模板 / 示例
+7. EXTEND.md 示例
+8. 上下游协作
+9. 常见问题
+10. 参考资料
+
+**Script-heavy skill（duanju/zhongcao/podcast）子模板规范：**
+- SKILL.md 只放摘要表（12+ / 4+ / 5+ 子类型矩阵）
+- 详细规范写入 `src/lib/agent/skills/<name>-subtemplates.ts`（当前为 stub，follow-up 填充）
+
+**Spec：** `docs/superpowers/specs/2026-04-19-skill-md-baoyu-standardization.md`
+**Plan：** `docs/superpowers/plans/2026-04-19-skill-md-baoyu-standardization-plan.md`
+
 ### API Routes
 
 `src/app/api/` has 10 route groups:

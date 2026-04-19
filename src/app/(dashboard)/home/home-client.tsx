@@ -21,6 +21,8 @@ import { ScenarioDetailSheet } from "@/components/home/scenario-detail-sheet";
 import { RecentSection } from "@/components/home/recent-section";
 import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
 import type { ScenarioCardData } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
+import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,6 +44,12 @@ interface HomeClientProps {
   }>;
   scenarioMap?: Record<string, ScenarioCardData[]>;
   employeeDbIdMap?: Record<string, string>;
+  /**
+   * B.1 Unified Scenario Workflow — enabled builtin workflow templates for the
+   * current org. Accepted here and passed through; Task 16 wires scenario-grid
+   * to consume it.
+   */
+  workflows?: WorkflowTemplateRow[];
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +61,7 @@ export function HomeClient({
   recentConversations,
   scenarioMap = {},
   employeeDbIdMap = {},
+  workflows = [],
 }: HomeClientProps) {
   const router = useRouter();
 
@@ -126,6 +135,36 @@ export function HomeClient({
     setSelectedScenario(key);
     setSheetOpen(true);
   }, []);
+
+  // B.1 Unified Scenario Workflow: when a WorkflowTemplateRow card is clicked.
+  // If the workflow maps to a legacy `AdvancedScenarioKey`, preserve the existing
+  // ScenarioDetailSheet UX (form → one-click launch). Otherwise, dispatch
+  // `startMission` directly with `workflowTemplateId` dual-write. B.2 will
+  // unify the Sheet interface so this branch collapses.
+  const handleWorkflowStart = useCallback(
+    async (wf: WorkflowTemplateRow) => {
+      const legacyKey = wf.legacyScenarioKey as AdvancedScenarioKey | null;
+      if (legacyKey && ADVANCED_SCENARIO_CONFIG[legacyKey]) {
+        setSelectedScenario(legacyKey);
+        setSheetOpen(true);
+        return;
+      }
+      // Non-legacy workflow: direct start with dual-write.
+      try {
+        const result = await startMission({
+          title: wf.name,
+          scenario: templateToScenarioSlug(wf),
+          userInstruction: wf.description ?? "",
+          workflowTemplateId: wf.id,
+        });
+        toast.success(`${wf.name} 已启动`);
+        if (result?.id) router.push(`/missions/${result.id}`);
+      } catch {
+        toast.error("启动失败，请重试");
+      }
+    },
+    [router],
+  );
 
   // Click employee scenario chip → open chat with inline scenario form
   const handleEmployeeScenarioClick = useCallback(
@@ -416,9 +455,12 @@ export function HomeClient({
           />
         </div>
 
-        {/* Layer 3: Scenario grid */}
+        {/* Layer 3: Scenario grid — B.1 driven by `workflows` prop */}
         <div className="px-4 mt-6">
           <ScenarioGrid
+            workflows={workflows}
+            currentEmployeeSlug={activeEmployee}
+            onStart={handleWorkflowStart}
             onScenarioClick={handleScenarioClick}
             onCustomClick={handleCustomScenario}
             customScenarios={customScenarios}

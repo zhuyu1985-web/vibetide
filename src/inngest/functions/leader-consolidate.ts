@@ -5,6 +5,8 @@ import {
   missionTasks,
   missionMessages,
   aiEmployees,
+  articles,
+  workflowTemplates,
 } from "@/db/schema";
 import { eq, sql, and, notInArray } from "drizzle-orm";
 import { assembleAgent, executeAgent } from "@/lib/agent";
@@ -12,6 +14,14 @@ import {
   buildConsolidatePrompt,
   mapTaskOutputsToStepOutputs,
 } from "@/lib/mission-core";
+import {
+  publishArticleToCms,
+  isCmsPublishEnabled,
+  CmsError,
+  type PublishResult,
+} from "@/lib/cms";
+import { insertWorkflowArtifact } from "@/lib/dal/workflow-artifacts";
+import type { AppChannelSlug } from "@/lib/dal/app-channels";
 
 /**
  * Leader Consolidate — triggered when all tasks in a mission are done.
@@ -131,6 +141,136 @@ export const leaderConsolidate = inngest.createFunction(
           }`,
         })
         .where(eq(missions.id, missionId));
+    });
+
+    // 5.5 Demo Phase 3 (2026-04-19): Auto-publish to CMS if workflow has appChannelSlug
+    //
+    // Flow: mission.workflowTemplateId → workflow_templates.appChannelSlug
+    //   → create article row from consolidation output → publishArticleToCms
+    //
+    // 容错：CMS 不通/凭证失效 → 仅写 warning artifact，不影响 mission 终态 completed
+    await step.run("auto-publish-to-cms", async () => {
+      if (!mission.workflowTemplateId) {
+        return { skipped: true, reason: "no_workflow_template" };
+      }
+      if (!isCmsPublishEnabled()) {
+        return { skipped: true, reason: "feature_flag_disabled" };
+      }
+
+      const [template] = await db
+        .select()
+        .from(workflowTemplates)
+        .where(eq(workflowTemplates.id, mission.workflowTemplateId))
+        .limit(1);
+
+      if (!template?.appChannelSlug) {
+        return { skipped: true, reason: "no_app_channel" };
+      }
+
+      const output = (consolidationResult.output ?? {}) as {
+        headline?: string;
+        title?: string;
+        body?: string;
+        content?: string;
+        summary?: string;
+        tags?: string[];
+      };
+
+      const articleTitle = output.headline ?? output.title ?? mission.title ?? "AI 生成稿件";
+      const articleBody =
+        output.body ??
+        output.content ??
+        `<p>${output.summary ?? "(暂无正文，待补充)"}</p>`;
+      const articleSummary = output.summary ?? articleTitle.slice(0, 100);
+      const articleTags = Array.isArray(output.tags) ? output.tags : [];
+
+      // Create article row (article.status = "approved" 直接跳过审核，demo 简化)
+      const [article] = await db
+        .insert(articles)
+        .values({
+          organizationId,
+          title: articleTitle,
+          body: articleBody,
+          summary: articleSummary,
+          tags: articleTags,
+          content: { headline: articleTitle, body: articleBody, imageNotes: [] },
+          wordCount: articleBody.length,
+          mediaType: "article",
+          status: "approved",
+          missionId,
+          priority: "P1",
+        })
+        .returning();
+
+      // Post message: 稿件已生成
+      await db.insert(missionMessages).values({
+        missionId,
+        fromEmployeeId: mission.leaderEmployeeId,
+        messageType: "result",
+        content: `📝 已生成稿件「${articleTitle}」，正在推送到华栖云 CMS（${template.appChannelSlug}）...`,
+      });
+
+      // Try real publish to Huaxiyun CMS
+      let publishResult: PublishResult | null = null;
+      let publishError: string | null = null;
+      try {
+        publishResult = await publishArticleToCms({
+          articleId: article.id,
+          appChannelSlug: template.appChannelSlug as AppChannelSlug,
+          operatorId: mission.leaderEmployeeId,
+          triggerSource: "workflow",
+          allowUpdate: true,
+        });
+      } catch (err) {
+        publishError =
+          err instanceof CmsError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : String(err);
+      }
+
+      // Insert workflow_artifact (always, success or failure)
+      await insertWorkflowArtifact({
+        missionId,
+        artifactType: "cms_publication",
+        title: `CMS 入库：${articleTitle}`,
+        content: {
+          articleId: article.id,
+          appChannelSlug: template.appChannelSlug,
+          success: !!publishResult?.success,
+          cmsArticleId: publishResult?.cmsArticleId ?? null,
+          cmsState: publishResult?.cmsState ?? (publishError ? "failed" : "unknown"),
+          publishedUrl: publishResult?.publishedUrl ?? null,
+          previewUrl: publishResult?.previewUrl ?? null,
+          error: publishError,
+          publicationId: publishResult?.publicationId ?? null,
+        },
+        producerEmployeeId: mission.leaderEmployeeId,
+      });
+
+      // Post follow-up message showing outcome
+      const successIcon = publishResult?.success ? "✅" : "⚠️";
+      const statusLine = publishResult?.success
+        ? `CMS 入库成功！cmsArticleId=${publishResult.cmsArticleId}${
+            publishResult.previewUrl ? `，预览：${publishResult.previewUrl}` : ""
+          }`
+        : `CMS 入库失败：${publishError ?? "未知错误"}。稿件已保存为 draft，可稍后手动发布。`;
+
+      await db.insert(missionMessages).values({
+        missionId,
+        fromEmployeeId: mission.leaderEmployeeId,
+        messageType: "result",
+        content: `${successIcon} ${statusLine}`,
+      });
+
+      return {
+        skipped: false,
+        articleId: article.id,
+        publishSuccess: !!publishResult?.success,
+        cmsArticleId: publishResult?.cmsArticleId,
+        error: publishError,
+      };
     });
 
     // 6. Cancel remaining non-completed tasks

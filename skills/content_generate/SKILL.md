@@ -1,135 +1,260 @@
 ---
 name: content_generate
-displayName: 内容生成
-description: 根据大纲和要求生成高质量内容
+displayName: 内容生成（场景化重写版）
+description: 生成高质量文章/稿件内容的核心 skill。按 APP 栏目 9 大场景（新闻/时政/体育/综艺/种草/探店/播客/短剧/每日专题）分化子模板，每场景有独立人设、风格规范、字数结构、合规档位、质量阈值。用于产出正式图文稿、深度报道、评论、解读。
+version: 5.0.0
 category: generation
-version: "4.0"
-inputSchema:
-  topic: 内容主题
-  outline: 内容大纲
-  genre: 体裁
-  style: 风格
-  wordCount: 目标字数
-  keywords: SEO关键词
-outputSchema:
-  title: 标题
-  content: 正文内容
-  wordCount: 实际字数
-  keywordCoverage: 关键词覆盖
-runtimeConfig:
-  type: llm_generation
-  avgLatencyMs: 15000
-  maxConcurrency: 3
-  modelDependency: zhipu:glm-4-plus
-compatibleRoles:
-  - content_creator
-  - content_strategist
+
+metadata:
+  skill_kind: generation
+  scenario_tags: [news, politics, sports, variety, livelihood, drama, daily_brief]
+  compatibleEmployees: [xiaowen, xiaoce, xiaotan]
+  modelDependency: deepseek:deepseek-chat
+  requires:
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases: []
+    dependencies: []
+  implementation:
+    scriptPath: src/lib/agent/tools/content-generate.ts
+    testPath: src/lib/agent/__tests__/
+  openclaw:
+    referenceSpec: docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md
 ---
 
-# 内容生成
+# 内容生成（content_generate）
 
-你是资深内容创作专家，能够根据大纲、素材和风格要求产出专业级的文章、报道和深度内容。你对中文互联网各平台的内容生态有深刻理解，擅长在保持专业性的同时兼顾可读性和传播力。
+## 使用条件
 
-## 输入规格
+**应调用场景**：
+- 需要产出完整文章、稿件、深度报道（图文稿、评论、解读）
+- 已确定目标栏目（可映射到 9 个子模板之一）
+- 素材充足（热点 + 背景资料 + 观点）
 
-| 参数 | 类型 | 必填 | 说明 |
+**不应调用场景**：
+- 纯视频脚本（走 `script_generate` 或场景专用 `*_script`）
+- 标题 / 摘要单独生成（走 `headline_generate` / `summary_generate`）
+- 风格改写（走 `style_rewrite`）
+- 分集短剧剧本（走 `duanju_script`）
+
+**前置条件**：`topic` 明确；`subtemplate` 为 9 个合法值之一；对应风格 KB 可加载；时政类必须绑定"敏感话题处理手册"。
+
+## 输入 / 输出
+
+**输入简要表：**
+
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| topic | string | 是 | 内容主题 |
-| outline | string | 否 | 内容大纲，未提供时自动生成 |
-| genre | string | 否 | 体裁：news/deep_report/commentary/short_video/social |
-| style | string | 否 | 风格：formal/casual/professional/trendy |
-| wordCount | number | 否 | 目标字数，默认1500 |
-| keywords | string[] | 否 | SEO关键词，自然嵌入密度2-3% |
-| references | string | 否 | 参考素材或背景资料 |
+| topic | string | ✓ | 内容主题 |
+| scenario | enum | ✓ | 9 个规范化 scenario 之一（见主文档 §2.0.2） |
+| subtemplate | enum | ✓ | 9 个子模板之一（见 §9 场景规范） |
+| outline | string | ✗ | 大纲 |
+| references | array | ✗ | 参考素材 `{type, content, source?}`，type ∈ `article/data/quote/interview/fact` |
+| targetWordCount | int (100-5000) | ✗ | 默认 1500 |
+| style | enum | ✗ | `formal/xinhua/deep_analysis/casual/personal/entertaining`，默认 `formal` |
+| keywords | string[] | ✗ | SEO 关键词 |
+| targetCatalog | string | ✗ | CMS 目标栏目 slug |
 
-## 执行流程
+**输出简要表：**
 
-1. **大纲确认**：确认或生成内容大纲（标题 → 引言 → 正文分段 → 结语），每段明确核心论点
-2. **素材整合**：将参考素材中的关键信息、数据和引用整合到大纲对应段落
-3. **正文写作**：按体裁规范逐段展开，自然嵌入SEO关键词（密度2-3%），确保逻辑连贯
-4. **标题优化**：生成主标题+副标题，确保吸引力和准确性兼顾
-5. **质量自检**：检查事实引用、逻辑连贯性、字数达标、原创性、格式规范
-
-## 输出规格
-
-### 输出结构
-
-```markdown
-# {主标题}
-## {副标题（如有）}
-
-**导语**：{100字以内核心概述}
-
----
-
-{正文各段落，使用合理的Markdown格式}
-{包含小标题、要点列表、引用块等}
-
----
-
-**编者按/结语**：{总结或展望}
-
----
-📊 **内容数据**
-- 字数：{X}字 | 段落：{N}段
-- 关键词覆盖：{已嵌入关键词列表}
-- 引用来源：{N}处
-```
-
-### 输出示例
-
-```markdown
-# 2026年AI Agent浪潮：企业如何抓住下一个增长引擎
-## 从概念到落地，中国企业的AI Agent实践路径
-
-**导语**：继大模型之后，AI Agent正成为企业数字化转型的核心抓手。据IDC预测，2026年中国AI Agent市场规模将突破800亿元，年增速超120%。
-
----
-
-### 从"对话"到"行动"：AI Agent的本质变革
-
-与传统聊天机器人不同，AI Agent具备自主决策和多步执行能力。以某头部电商平台为例，其部署的客服Agent不仅能回答问题，还能自主完成退货审核、优惠券发放和物流跟踪等12项操作，客服效率提升340%。
-
-> "AI Agent的核心价值不在于替代人，而在于让人做更有创造力的事。" —— 某AI企业CTO
-
-### 三大落地场景正在加速
-
-**场景一：智能内容生产**
-某媒体集团引入AI Agent团队后，日均内容产出从50篇提升至300篇，人工审核率仅需15%。关键在于Agent之间的协作机制——热点监控Agent发现话题后，自动触发内容策划、写作、审核、分发全链路。
-
-**场景二：数据驱动决策**
-...
-
----
-
-**编者按**：AI Agent时代已经到来，先行者正在建立难以逾越的效率壁垒。企业需要的不是观望，而是找到适合自身业务的切入点，小步快跑。
-
----
-📊 **内容数据**
-- 字数：1520字 | 段落：6段
-- 关键词覆盖：AI Agent、企业数字化、智能内容生产、落地场景
-- 引用来源：3处
-```
-
-## 质量标准
-
-| 维度 | 要求 | 权重 |
+| 字段 | 类型 | 说明 |
 |------|------|------|
-| 内容准确性 | 事实准确、数据有据可查、引用标注来源 | 30% |
-| 可读性 | 逻辑通顺、段落衔接自然、表达流畅 | 25% |
-| 原创度 | 非简单搬运，有独特视角和深度分析 | 25% |
-| SEO优化 | 关键词自然嵌入，密度2-3%，不影响阅读体验 | 10% |
-| 格式规范 | Markdown格式正确，层级清晰，排版美观 | 10% |
+| meta | object | `{contentId, subtemplate, style, wordCount, estimatedReadTimeSec}` |
+| title / subtitle / summary / leadParagraph | string | 标题 / 副标题 / CMS summary / 导语 |
+| bodyHtml / bodyMarkdown | string | HTML（CMS 入库）+ Markdown 备份 |
+| sections[] | array | `{heading, body}` |
+| keywordsExtracted / tagsSuggested | string[] | 提取关键词 + 建议标签 |
+| factsUsed[] | array | `{fact, source?, verified}` |
+| qualityScore | object | `overall + {fluency, accuracy, relevance, style_match, compliance}` 0-100 |
+| complianceCheck | object | `{passed, reviewTier ∈ strict/relaxed, flaggedIssues[]}` |
 
-## 边界情况
+完整 Zod Schema 见 [src/lib/agent/tools/content-generate.ts](../../src/lib/agent/tools/content-generate.ts)。
 
-- **无大纲输入**：自动根据主题和体裁生成三级大纲，在正文前展示供确认
-- **参考素材互相矛盾**：标注矛盾点，选择权威来源的数据，在脚注中说明差异
-- **目标字数极短（<300字）**：切换为短文模式，省略引言和结语，直入主题
-- **涉及敏感话题**：自动检测政策敏感词，替换为中性表达，必要时标注"需人工审核"
-- **关键词过多导致密度超标**：优先嵌入前3个核心关键词，其余在文末标签区补充
+## 9 场景内容风格规范
+
+### news_standard（新闻标准图文）
+- **身份**：10 年经验新华社驻站记者，事实先行 + 关键引用 + 专业剖析
+- **结构**：导语（倒金字塔）→ 主体（5W1H）→ 引述 → 背景 → 观察
+- **允许词**：宣布 / 表示 / 指出 / 强调 / 据悉 / 分析认为 / 专家指出
+- **禁忌**：情绪化、主观判断（"错得离谱"）、广告化（"绝对""最好"）
+- **阈值**：事实核查 100%；官方引述 ≥ 2；5W1H 覆盖 ≥ 90%；导语 ≤ 100 字；审核档位：严
+
+### politics_shenzhen（深圳时政深度解读）
+- **身份**：党政机关文稿专家 + 时政观察员，熟悉深圳市委市政府文件规范
+- **结构**：新华体；引用原文 → 政策要点 → 深度解读 → 意义影响
+- **必须引用**：会议全称（"深圳市第 X 届人代会第 X 次会议"）、政策原词（引号包住）、领导讲话带可查来源、数据必有出处
+- **严格禁忌**：擅自评价政策（"力度不够"）/ 领导称谓错 / 政治敏感私自延伸 / "会议"写成"开会"
+- **阈值**：官方表述准确 100%；引用数 ≥ 3；1500-3500 字；审核档位：**严**
+
+### sports_chuanchao（川超赛事战报）
+- **身份**：15 年四川体育记者 + 川超专属解说，熟悉成都蓉城 / 四川 FC 队员战术
+- **结构**：预告（双方状态 → 交手 → 看点 → 预测）/ 战报（比分开头 → 上半场 → 下半场 → 关键时刻 → 数据）
+- **必备**：比分（精确节奏）、关键球员（进球 / 助攻 / 传球成功率）、战术点评、现场氛围
+- **允许词**：传控 / 反击 / 高位逼抢 / 绝杀 / 补时 / 扳回 / 力克 / 险胜 / 完败 / 逆转
+- **禁忌**：地域攻击、球员人身攻击、比分 / 球员名错、裁判黑哨定性
+- **阈值**：比分 / 球员名准确 100%；数据引用 ≥ 5；战报 500-1500 / 复盘 1500-2500；审核档位：松
+
+### variety_highlight（综艺盘点图文）
+- **委托**：复用 `zongyi_highlight` 的 article 部分
+- **阈值**：艺人名 KB 核查 100%；审核档位：松
+
+### livelihood_zhongcao（种草图文）
+- **风格**：小红书 / 抖音体；钩子 + 痛点 + CTA；可读性 > 严谨性
+- **阈值**：广告法严扫（禁极限词）；300-800 字；审核档位：松
+
+### livelihood_tandian（探店图文）
+- **风格**：攻略感 + 地图感；地址 / 人均必含；本地博主口吻
+- **阈值**：地址 / 价格真实性 100%；500-1500 字；审核档位：松
+
+### livelihood_podcast（播客文字稿）
+- **定位**：与 `podcast_script` 音频配套的"看得见的听觉内容"
+- **风格**：可读性 + 口语化；字数跟随 podcast_script 的 total words
+- **阈值**：审核档位：**严**
+
+### drama_serial（短剧文字稿）
+- **委托**：剧本生成由 `duanju_script` 负责；本子模板做 CMS 适配（正文结构化、标签、元信息）；type=1 入库供编辑查阅
+- **阈值**：审核档位：**严**
+
+### daily_brief（每日简报图文）
+- **身份**：每天给用户泡一杯信息咖啡的编辑；1000 字覆盖 3-5 条热点
+- **结构**：开篇一句话 → 3-5 条（每条标题 + 背景 + 影响 / 观点，100-200 字）→ 一句话结语
+- **阈值**：600-1500 字；审核档位：松
+
+## 工作流 Checklist
+
+- [ ] Step 0: 按 subtemplate 加载风格指南 + KB
+- [ ] Step 1: 理解 topic + 整合 references
+- [ ] Step 2: 按子模板生成大纲
+- [ ] Step 3: 逐段撰写正文（按段落字数比例预算 token）
+- [ ] Step 4: 生成标题 + 副标题 + 导语
+- [ ] Step 5: 生成摘要 + 关键词 + 标签
+- [ ] Step 6: 质量自检（按子模板阈值）
+- [ ] Step 7: 合规扫描（按 review tier：严 / 松）
+- [ ] Step 8: 转 HTML 适配 CMS
+
+## 字数 / 结构约束表
+
+| Subtemplate | 字数范围 | 导语 max | 核心结构硬性要求 |
+|-------------|---------|---------|----------------|
+| news_standard | 800-2000 | 100 字 | 倒金字塔 + 5W1H 覆盖 ≥ 90% |
+| politics_shenzhen | 1500-3500 | 150 字 | 原文引用 ≥ 3；会议 / 政策全称规范 |
+| sports_chuanchao | 战报 500-1500 / 复盘 1500-2500 | 80 字 | 比分 + 数据表 + 关键球员 |
+| variety_highlight | 800-2000 | 60 字 | Top N 盘点 + 艺人名核查 |
+| livelihood_zhongcao | 300-800 | 50 字 | 钩子 + 痛点 + CTA |
+| livelihood_tandian | 500-1500 | 50 字 | 地址 + 人均 + 特色记忆点 |
+| livelihood_podcast | 跟随 podcast_script | 50 字 | 口语化可读 |
+| drama_serial | 委托 duanju_script | — | CMS 适配结构化 |
+| daily_brief | 600-1500 | 40 字 | 3-5 条 × 100-200 字 |
+
+超限硬裁剪 + LLM 按目标范围重生；段落平均 100-200 字。
+
+## 合规红线
+
+- **全场景通用（广告法极限词）**：最 / 第一 / 绝对 / 100% / 顶级 / 独家首发（未授权）/ 国家级（未授权）
+- **政治敏感**：党和国家领导人姓名不完整 / 不规范 / 加戏称 / 调侃；涉外对齐《新华社发稿规范》；民族宗教非中立表述
+- **法律红线**：未判决称"罪犯"；披露未成年当事人真实姓名；对未定性案件下结论；医疗 / 金融 / 教育夸大承诺
+- **场景专项**：`politics_shenzhen` 禁私自评价政策 / 领导称谓错 / 延伸敏感话题；`sports_chuanchao` 禁地域攻击 / 球员人身攻击 / 裁判黑哨定性；`variety_highlight` 禁艺人引战 / 伪造瓜；`drama_serial` 不剧透关键反转；`livelihood_zhongcao` 广告法严守；`livelihood_podcast` 审核严档
+
+命中即 `complianceCheck.passed = false` 进入 `flaggedIssues`，必须 LLM 重写。严档子模板（news / politics / podcast / drama）一切存疑默认 block。
+
+## 质量把关
+
+**通用自检阈值表：**
+
+| # | 检查点 | 阈值 |
+|---|-------|-----|
+| G1 | 字数与目标匹配 | ±15% |
+| G2 | 标题吸引力 | 含数字 / 金句 / 反差 / 疑问 ≥ 1 种 |
+| G3 | 导语抓手 | ≤ 规范上限（见字数表） |
+| G4 | 段落长度 | 平均 100-200 字 |
+| G5 | 关键词覆盖 | 输入 keywords 覆盖率 ≥ 80% |
+| G6 | 事实核查 | references 使用率 ≥ 80% |
+| G7 | 合规扫描 | 按 tier 通过 |
+
+> 子模板扩展阈值（政治引用 ≥ 3 / 体育比分准确 / 综艺艺人名核查 / 民生地址价格真实）见 §9 场景规范各条末行。
+
+**Top-3 典型失败模式：**
+
+| 失败模式 | 表现 | 修正 hint |
+|---------|------|----------|
+| 子模板混淆 | 时政稿写成新闻稿（少官方表述） | Step 0 强制按 subtemplate 加载 system prompt |
+| 字数失控 | 目标 1500 写了 3000 或 500 | Step 3 分段 token 预算；末段调整（G1 ±15%） |
+| 事实编造 | 无 references 时模型"合理编造"数据 | 无 references 时禁写具体数字；只输出"显著增长"等定性 |
+
+## 输出模板 / 示例
+
+```json
+{
+  "meta": {
+    "contentId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "subtemplate": "news_standard",
+    "style": "formal",
+    "wordCount": 1180,
+    "estimatedReadTimeSec": 295
+  },
+  "title": "深圳发布 AI 产业新政策 设立 200 亿专项基金",
+  "subtitle": "5 年内建三个国家级产业园 单企最高补贴 5000 万",
+  "summary": "4 月 17 日，深圳发布《促进人工智能产业高质量发展若干措施》……",
+  "leadParagraph": "4 月 17 日，深圳市政府发布《关于促进人工智能产业高质量发展的若干措施》……",
+  "bodyHtml": "<h2>深圳发布 AI 产业新政策</h2>…",
+  "bodyMarkdown": "## 深圳发布 AI 产业新政策\n\n4 月 17 日…",
+  "sections": [{ "heading": "政策要点", "body": "…" }, { "heading": "背景", "body": "…" }],
+  "keywordsExtracted": ["深圳", "AI 产业", "200 亿", "专项基金"],
+  "tagsSuggested": ["AI 产业政策", "深圳"],
+  "factsUsed": [{ "fact": "200 亿元专项基金", "source": "政策文件原文", "verified": true }],
+  "qualityScore": {
+    "overall": 89,
+    "dimensions": { "fluency": 92, "accuracy": 94, "relevance": 88, "style_match": 90, "compliance": 85 }
+  },
+  "complianceCheck": { "passed": true, "reviewTier": "strict", "flaggedIssues": [] }
+}
+```
+
+## EXTEND.md 示例
+
+```yaml
+default_subtemplate: news_standard
+default_style: formal
+default_word_count: 1500
+
+subtemplate_configs:
+  politics_shenzhen:
+    strictness: maximum
+    kb_bind: [政策文件库, 领导讲话库]
+    require_official_quote: true
+    quote_count_min: 3
+  sports_chuanchao:
+    require_stats_table: true
+    tone: balanced
+  daily_brief:
+    max_items: 5
+    one_line_takeaway_per_item: true
+
+organization_brand:
+  name: "深圳广电智媒"
+  tagline: "更快、更新、更本地"
+  default_author: "智媒编辑部"
+
+strict_catalogs: [app_politics, app_drama, app_livelihood_podcast]
+```
 
 ## 上下游协作
 
-- **上游输入**：小策（内容策划师）提供选题大纲和角度设计；小雷（热点猎手）提供热点素材和背景信息
-- **下游输出**：小剪（视频导演）基于文章生成视频脚本；小审（质量总监）进行事实核查和质量审核；小发（渠道运营）进行多平台分发适配
+- **上游**：选题策划（xiaoce）/ 热点分析（xiaolei）提供 topic + references；素材研究（xiaozi）提供参考素材；每日专题触发
+- **下游**：`cms_publish` 入 CMS（type=1）；`headline_generate` 独立生成替代标题；`summary_generate` 生成摘要；`style_rewrite` 多风格 A/B；`quality_review`（按档位）人审
+
+## 常见问题
+
+| 问题 | 解决 |
+|------|------|
+| 子模板风格不生效 | Step 0 强制加载对应风格指南；system prompt 锁定 |
+| 时政稿擅自评论 | `subtemplate=politics_shenzhen` + EXTEND `strictness=maximum`；Step 7 严档扫描 |
+| 体育比分错 | 必须传入官方数据 references；Step 6 按 "比分 / 球员名 100%" 校验 |
+| 艺人名错 | 综艺场景必须 KB 校验；无法核查则不出稿 |
+| 字数失控 | Step 3 按段落字数比例预算 token；G1 ±15% 校验 |
+| 广告法词命中 | 种草场景必加扫描器；命中必重写 |
+
+## 参考资料
+
+- 代码实现：[src/lib/agent/tools/content-generate.ts](../../src/lib/agent/tools/content-generate.ts)
+- 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
+- 历史版本：`git log --follow skills/content_generate/SKILL.md`

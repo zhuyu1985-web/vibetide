@@ -1,127 +1,197 @@
 ---
 name: style_rewrite
-displayName: 风格改写
-description: 按指定风格改写内容（正式/轻松/专业等）
+displayName: 风格改写（场景化重写版）
+description: 将一篇已有文章改写为另一种风格。支持 9 种目标风格（新华体 / 新闻标准 / 深度 / 网感 / 种草 / 探店 / 娱乐 / 简报 / 评论）。用于一次创作多平台分发、外部通稿适配本台调性、多风格 A/B、改头换面二次创作。保留核心事实与引用，改变表达方式。
+version: 5.0.0
 category: generation
-version: "2.0"
-inputSchema:
-  content: 原始内容
-  targetStyle: 目标风格
-  platform: 目标平台
-  tone: 语气
-outputSchema:
-  rewritten: 改写后内容
-  changes: 改动说明
-  wordCount: 字数变化
-runtimeConfig:
-  type: llm_generation
-  avgLatencyMs: 8000
-  maxConcurrency: 5
-  modelDependency: zhipu:glm-4-plus
-compatibleRoles:
-  - content_creator
-  - channel_operator
+
+metadata:
+  skill_kind: generation
+  scenario_tags: [news, politics, sports, variety, livelihood, drama, daily_brief]
+  compatibleEmployees: [xiaowen, xiaofa]
+  modelDependency: deepseek:deepseek-chat
+  requires:
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases: []
+    dependencies: []
+  implementation:
+    scriptPath: src/lib/agent/execution.ts
+    testPath: src/lib/agent/__tests__/
+  openclaw:
+    referenceSpec: docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md
 ---
 
-# 风格改写
+# 风格改写（style_rewrite）
 
-你是文本风格转换专家，能够在保持核心信息不变的前提下精准转换内容风格。你熟悉中文互联网各平台的内容调性差异，能让同一篇内容在微信公众号、小红书、知乎等不同平台上都以最原生的方式呈现。
+## 使用条件
 
-## 输入规格
+✅ **应调用场景**：
+- 一篇新闻稿要同时适配 APP 多个栏目（新闻严 / 社交网感）
+- 外部通稿改写为本台风格
+- 同一主题生成多个风格版本供 A/B 测试
+- 把"深度文"浓缩为"简报版"
 
-| 参数 | 类型 | 必填 | 说明 |
+❌ **不应调用场景**：
+- 需要完全重写结构（应调用 `content_generate`）
+- 跨语种翻译（走 `translation`）
+- 仅调整标题（走 `headline_generate`）
+
+**前置条件**：`sourceContent` ≥ 100 字；LLM 可用；`targetStyle` 与原内容场景兼容（见 §EXTEND.md 的 `style_compatibility_warnings`）。
+
+## 输入 / 输出
+
+**输入简要表：**
+
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| content | string | 是 | 原始内容 |
-| targetStyle | string | 是 | 目标风格：formal/casual/academic/trendy |
-| platform | string | 否 | 目标平台：wechat/weibo/xiaohongshu/douyin/zhihu |
-| tone | string | 否 | 语气：neutral/enthusiastic/authoritative/humorous |
+| sourceContent | string (≥100) | ✓ | 原文 |
+| sourceStyle | enum | ✗ | 源风格，默认 `unknown`（Step 0 自动识别） |
+| targetStyle | enum | ✓ | 9 种目标风格之一（见 §9 种目标风格规范） |
+| targetLengthRatio | number (0.3-2.0) | ✗ | 相对原文长度比例，默认 1.0 |
+| preserveFacts | boolean | ✗ | 事实 100% 保留，默认 true |
+| preserveQuotes | boolean | ✗ | 引语保留原话，默认 true |
+| targetAudience | string | ✗ | 目标受众提示 |
+| customInstructions | string | ✗ | 自定义改写指令 |
 
-## 执行流程
+**输出简要表：**
 
-1. **原文分析**：识别原文当前风格、核心事实、关键数据和直接引用（不可改动）
-2. **风格映射**：根据目标风格确定词汇选择、句式长度、修辞手法
-   - 正式新闻体：短句为主、客观陈述、避免感叹
-   - 轻松口语体：适当用口语词、可用感叹和疑问、段落短
-   - 专业学术体：术语准确、逻辑严密、引用规范
-   - 网络流行体：流行词汇、emoji适量、互动感强
-3. **内容改写**：逐段改写，确保核心事实和数据100%保留不变
-4. **平台适配**：调整排版格式和长度匹配目标平台规范
-5. **差异对比**：标注主要改动要点和风格转换说明
-
-## 输出规格
-
-### 输出结构
-
-```markdown
-## 风格改写结果
-**原始风格**: {X} → **目标风格**: {Y} | **平台**: {platform}
-
----
-
-{改写后的完整内容}
-
----
-
-### 改写说明
-- 风格变化：{主要风格调整说明}
-- 事实保持：{核心事实保持情况}
-- 字数变化：{原}字 → {改}字
-```
-
-### 输出示例
-
-```markdown
-## 风格改写结果
-**原始风格**: formal → **目标风格**: trendy | **平台**: xiaohongshu
-
----
-
-姐妹们！！今天必须跟你们聊聊AI Agent这个神仙工具 🔥
-
-之前我们公司内容团队50个人，每天加班到头秃也就产出50篇稿子。自从上了AI Agent团队之后——
-
-8个AI员工，日产300篇，质量还不拉胯 😱
-
-划重点！这8个AI各有分工：
-📌 小雷：24h盯热点，什么火第一时间告诉你
-📌 小策：选题策划一把好手，角度又准又新
-📌 小文：写稿效率拉满，1500字的稿子几分钟搞定
-📌 小剪：视频脚本+剪辑方案，一条龙服务
-
-最绝的是它们还能自动协作！小雷发现热点→小策出方案→小文写稿→小审把关→小发一键分发，全链路自动化！
-
-成本呢？降了90%！我老板看到数据直接在工位笑出声（真事）
-
-你们觉得AI会取代内容团队吗？评论区聊聊 👇
-
-#AI #内容创作 #效率工具 #数字化转型
-
----
-
-### 改写说明
-- 风格变化：从新闻通稿体改为小红书种草体，增加emoji、口语化表达、互动引导
-- 事实保持：核心数据（50人/50篇→8AI/300篇、成本降90%）完整保留
-- 字数变化：1520字 → 680字（小红书适配，精简为核心信息）
-```
-
-## 质量标准
-
-| 维度 | 要求 | 权重 |
+| 字段 | 类型 | 说明 |
 |------|------|------|
-| 事实保真 | 核心事实和数据100%不变，直接引用原样保留 | 35% |
-| 风格达标 | 改写后风格特征明确，符合目标风格定义 | 30% |
-| 自然流畅 | 改写后读感自然，不像"翻译"或"机器改写" | 20% |
-| 平台适配 | 字数、排版、互动元素符合目标平台规范 | 15% |
+| rewrittenContent | string | 改写后正文 |
+| transformations[] | array | 改写记录 `{ type, description, examples[] }` |
+| preservationReport | object | `{ factsPreserved, factsDropped, quotesPreserved, quotesDropped, keywordsMatched }` |
+| lengthChange | object | `{ originalChars, newChars, ratio }` |
+| qualityScore | object | `{ styleMatch, contentFidelity, readability, overall }` |
+| complianceCheck | object | `{ passed, flagged[] }` |
 
-## 边界情况
+完整 Zod Schema 见 [src/lib/agent/execution.ts](../../src/lib/agent/execution.ts) 内 skill IO 定义。
 
-- **原文和目标风格相同**：仅做微调优化，标注"原文已接近目标风格，仅做细节优化"
-- **原文含专业术语，目标为口语体**：首次出现术语时用括号补充通俗解释，后续使用简化说法
-- **原文极长（>5000字），目标为社交平台**：先压缩为核心信息（保留20-30%），再做风格改写，标注"已做内容精简"
-- **涉及法律、医疗等严肃领域**：即使目标为轻松风格，也保留专业表述的准确性，免责声明不可删除
-- **含直接引用和数据**：引用内容原样保留，仅调整引用前后的衔接语句
+## 9 种目标风格规范
+
+### xinhua（新华体）
+- **转换原则**：严谨化（去感叹/疑问）、规范化（"表示""指出""强调"替代"说""讲"）、客观化（第三人称）、重引用（官方表述带引号）
+- **示例**：
+  - before: "深圳这次真的出手了！200 亿砸向 AI！"
+  - after: "深圳市政府近日表示，将在 2026-2030 年投入 200 亿元支持人工智能产业发展。"
+
+### news_standard（新闻标准）
+- **转换原则**：倒金字塔结构；5W1H 完整；客观平衡
+
+### deep_analysis（深度分析）
+- **转换原则**：补充背景 + 多方观点；引用专家；提出问题 → 剖析 → 展望；长度通常 ≥ 1.5 倍原文
+
+### casual（口语/网感）
+- **转换原则**：增加对话感（"你""我们"）；短句化；加口语词（"然后""其实""说白了"）；减书面连词（"然而""综上"）
+- **示例**：
+  - before: "深圳市政府发布文件，明确政策方向。"
+  - after: "深圳昨天官宣了一个大新闻：接下来 5 年，要砸 200 亿搞 AI。"
+
+### zhongcao（种草）
+- **转换原则**：达人口吻（"姐妹们""宝子们"）；钩子开场；感官描述 + 情绪词；广告法严守
+
+### tandian（探店）
+- **转换原则**：本地博主口吻；现场感 + 个人体验；必含价格/地址；允许方言
+
+### entertaining（娱乐化）
+- **转换原则**：梗感 + 网感；允许夸张修辞（但不造谣）；调侃在边界内
+
+### daily_brief_compact（简报化）
+- **转换原则**：大幅精简（0.3-0.5 倍原长度）；"要点清单"结构；每点一句话
+
+### professional_commentary（评论）
+- **转换原则**：明确立场 + 论据；引用数据/案例；逻辑清晰（观点 → 论证 → 反驳 → 结论）
+
+## 工作流 Checklist
+
+- [ ] Step 0: 识别 sourceStyle（如 unknown）+ 加载 targetStyle 规范
+- [ ] Step 1: 抽取 must-preserve 清单（事实 + 引用）
+- [ ] Step 2: 分析源文结构（段落 / 逻辑）
+- [ ] Step 3: 按 targetStyle 重写各段
+- [ ] Step 4: 长度调整到 targetLengthRatio（硬约束 ±15%）
+- [ ] Step 5: 事实 / 引用 preservation 校验
+- [ ] Step 6: 合规扫描（按 targetStyle 的场景档位）
+- [ ] Step 7: 质量评分
+
+## 保真原则
+
+**`preserveFacts=true` 时**：
+- 所有数据、人名、机构名、时间、地点 100% 保留
+- 不添加未在源文中出现的事实
+
+**`preserveQuotes=true` 时**：
+- 直接引语（引号内内容）一字不改
+- 间接引语可改写但不改变含义
+
+## 字数 / 长度约束
+
+| 维度 | 硬约束 | 备注 |
+|------|-------|------|
+| targetLengthRatio | ±15% | 超出即触发重生或硬裁剪 |
+| daily_brief_compact | 0.3-0.5 倍 | 强制精简 |
+| deep_analysis | ≥ 1.5 倍 | 需补充背景/观点 |
+| 其它风格 | 默认 1.0 倍 | 可通过 targetLengthRatio 调整 |
+
+## 质量把关
+
+**自检阈值表：**
+
+| # | 检查点 | 阈值 |
+|---|-------|-----|
+| 1 | 长度比 | 与目标 ±15% |
+| 2 | 事实保留率 | ≥ 95% |
+| 3 | 引用保留率 | ≥ 95% |
+| 4 | 风格匹配度 | ≥ 75 |
+| 5 | 合规 | passed |
+
+**Top-3 典型失败模式：**
+
+| 失败模式 | 表现 | 修正 hint |
+|---------|------|----------|
+| 事实丢失 | 改写后丢失关键数字 / 人名 / 机构 | Step 1 强制抽取 must-preserve 清单 + Step 5 校验 |
+| 风格过度 | 时政稿改成网感版，场景错配 | 按 `style_compatibility_warnings` block/warn；targetStyle 与原场景匹配 |
+| 虚构引用 | 改写时"合理编造"专家引用或新数据 | 只能改写原有引用；严禁新增未在源文出现的事实 |
+
+## 输出模板 / 示例
+
+```json
+{
+  "rewrittenContent": "深圳昨天官宣了一个大新闻：接下来 5 年，要砸 200 亿搞 AI……",
+  "transformations": [
+    { "type": "tone_shift", "description": "严肃→口语；去掉被动句" },
+    { "type": "vocabulary_swap", "description": "'发布文件'→'官宣'；'明确政策方向'→'砸 200 亿搞 AI'" }
+  ],
+  "preservationReport": {
+    "factsPreserved": 5, "factsDropped": 0,
+    "quotesPreserved": 2, "quotesDropped": 0,
+    "keywordsMatched": 7
+  },
+  "lengthChange": { "originalChars": 420, "newChars": 438, "ratio": 1.04 },
+  "qualityScore": { "styleMatch": 82, "contentFidelity": 98, "readability": 88, "overall": 89 },
+  "complianceCheck": { "passed": true, "flagged": [] }
+}
+```
+
+## EXTEND.md 示例
+
+```yaml
+default_target_style: casual
+default_preserve_facts: true
+default_preserve_quotes: true
+length_tolerance: 0.15         # 长度比容差 ±15%
+
+style_compatibility_warnings:
+  politics_to_casual: warn     # 时政→网感 给 warning
+  politics_to_entertaining: block
+  drama_to_news: warn
+```
 
 ## 上下游协作
 
-- **上游输入**：小文（内容写手）提供原始内容正文；小策（内容策划师）指定目标平台和风格方向
-- **下游输出**：小发（渠道运营）将改写后内容直接用于各平台发布；小审（质量总监）审核改写后内容的事实准确性和合规性
+- **上游**：任何已有文章 / 外部通稿 / `content_generate` 产出
+- **下游**：`cms_publish`（多版本分发）/ `headline_generate`（新风格的新标题）/ `summary_generate`（新风格对应新摘要）
+
+## 参考资料
+
+- 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)（通用 agent 执行入口；skill 逻辑通过 prompt 驱动）
+- 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
+- 历史版本：`git log --follow skills/style_rewrite/SKILL.md`

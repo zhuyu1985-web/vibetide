@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { executeMissionDirect } from "@/lib/mission-executor";
+import { getWorkflowTemplateByLegacyKey } from "@/lib/dal/workflow-templates";
 
 // Soft dedup window for direct user-submitted missions. Two inserts with the
 // same org + title + instruction within this window return the existing row
@@ -34,6 +35,28 @@ async function requireAuth() {
 }
 
 /**
+ * B.1 Unified Scenario Workflow — resolve the `workflow_template_id` for a mission.
+ *
+ * Priority:
+ *   1. If caller passes `explicitId`, use it directly.
+ *   2. Otherwise, if `scenarioSlug` matches a row via `legacy_scenario_key`, return that template.id.
+ *   3. Otherwise return null (custom scenarios / unmapped legacy keys).
+ *
+ * This helper is pure (no auth dependency) so it can be unit-tested in isolation and
+ * reused by both `startMission` and `startMissionFromModule`.
+ */
+export async function resolveWorkflowTemplateId(
+  organizationId: string,
+  scenarioSlug: string | undefined,
+  explicitId: string | undefined,
+): Promise<string | null> {
+  if (explicitId) return explicitId;
+  if (!scenarioSlug) return null;
+  const tmpl = await getWorkflowTemplateByLegacyKey(organizationId, scenarioSlug);
+  return tmpl?.id ?? null;
+}
+
+/**
  * Start a new Mission: creates DB record then executes directly.
  *
  * Uses direct execution by default (does not depend on Inngest dev server).
@@ -43,6 +66,12 @@ export async function startMission(data: {
   title: string;
   scenario: string;
   userInstruction: string;
+  /**
+   * B.1 Unified Scenario Workflow: optional explicit template id. If omitted,
+   * we try to resolve it from `scenario` via `legacy_scenario_key`. Falls back
+   * to null for custom scenarios that have no matching template.
+   */
+  workflowTemplateId?: string;
 }) {
   await requireAuth();
 
@@ -112,6 +141,13 @@ export async function startMission(data: {
     return recentDuplicate;
   }
 
+  // Resolve workflow template id (explicit wins; else look up by legacy key).
+  const resolvedTemplateId = await resolveWorkflowTemplateId(
+    organizationId,
+    data.scenario,
+    data.workflowTemplateId,
+  );
+
   // Create mission record (queued → planning → executing lifecycle)
   const [mission] = await db
     .insert(missions)
@@ -122,6 +158,7 @@ export async function startMission(data: {
       userInstruction: data.userInstruction,
       leaderEmployeeId: leader.id,
       status: "queued",
+      workflowTemplateId: resolvedTemplateId,
     })
     .returning();
 
@@ -158,6 +195,11 @@ export async function startMissionFromModule(data: {
   sourceEntityId?: string;
   sourceEntityType?: string;
   sourceContext?: Record<string, unknown>;
+  /**
+   * B.1 Unified Scenario Workflow: optional explicit template id. If omitted,
+   * we try to resolve it from `scenario` via `legacy_scenario_key`.
+   */
+  workflowTemplateId?: string;
 }) {
   // Find leader
   let leader = await db.query.aiEmployees.findFirst({
@@ -205,22 +247,12 @@ export async function startMissionFromModule(data: {
     ? `${data.userInstruction}\n\n来源上下文：\n${JSON.stringify(data.sourceContext, null, 2)}`
     : data.userInstruction;
 
-  // Idempotency check: if a mission for the same (org, module, entity) already
-  // exists, return it instead of creating a duplicate. This handles at-least-
-  // once delivery from IM webhooks, Inngest event retries, etc. The partial
-  // unique index `missions_source_dedup_uidx` provides belt-and-suspenders.
-  if (data.sourceEntityId) {
-    const existing = await db.query.missions.findFirst({
-      where: and(
-        eq(missions.organizationId, data.organizationId),
-        eq(missions.sourceModule, data.sourceModule),
-        eq(missions.sourceEntityId, data.sourceEntityId),
-      ),
-    });
-    if (existing) {
-      return existing;
-    }
-  }
+  // Resolve workflow template id (explicit wins; else look up by legacy key).
+  const resolvedTemplateId = await resolveWorkflowTemplateId(
+    data.organizationId,
+    data.scenario,
+    data.workflowTemplateId,
+  );
 
   const [mission] = await db
     .insert(missions)
@@ -234,6 +266,7 @@ export async function startMissionFromModule(data: {
       sourceModule: data.sourceModule,
       sourceEntityId: data.sourceEntityId,
       sourceEntityType: data.sourceEntityType,
+      workflowTemplateId: resolvedTemplateId,
     })
     .returning();
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import * as LucideIcons from "lucide-react";
 import {
   Plus,
   Target,
@@ -20,7 +21,8 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
-  Trash2,
+  FileText,
+  type LucideIcon,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -49,7 +51,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { SearchInput } from "@/components/shared/search-input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -61,12 +63,28 @@ import { startMission, deleteMissions } from "@/app/actions/missions";
 import {
   SCENARIO_CONFIG,
   ADVANCED_SCENARIO_CONFIG,
-  SCENARIO_CATEGORIES,
+  ORDERED_CATEGORIES,
+  CATEGORY_LABELS,
   EMPLOYEE_META,
   type EmployeeId,
+  type OrderedCategory,
 } from "@/lib/constants";
+import { resolveScenarioConfig } from "@/lib/scenario-fallback";
+import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 import type { MissionSummary } from "@/lib/dal/missions";
+import type { WorkflowTemplateRow } from "@/db/types";
 import { cn } from "@/lib/utils";
+
+/**
+ * B.1 Unified Scenario Workflow: resolve a Lucide icon by its string name (as
+ * stored in `workflow_templates.icon`). Falls back to `FileText` for unknown
+ * names or null. Mirrors the helper in `components/home/scenario-grid.tsx`.
+ */
+function resolveLucideIcon(iconName: string | null | undefined): LucideIcon {
+  if (!iconName) return FileText;
+  const maybe = (LucideIcons as unknown as Record<string, LucideIcon>)[iconName];
+  return maybe ?? FileText;
+}
 
 // ── Source module labels ────────────────────────────────────
 const SOURCE_MODULE_LABEL: Record<string, { label: string; cls: string }> = {
@@ -143,8 +161,17 @@ function getPhaseIndex(status: string, hasTasks: boolean): number {
 
 export function MissionsClient({
   missions,
+  workflows,
 }: {
   missions: MissionSummary[];
+  /**
+   * B.1 Unified Scenario Workflow: workflow_templates rows for this org. The
+   * "发起新任务" Sheet iterates this list grouped by `category` as the single
+   * source of truth. Replaces the prior SCENARIO_CONFIG / SCENARIO_CATEGORIES
+   * hardcoded iteration. Mission row rendering still uses resolveScenarioConfig
+   * (Task 14) for legacy slugs / custom fallback.
+   */
+  workflows: WorkflowTemplateRow[];
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -154,18 +181,41 @@ export function MissionsClient({
   const [visibleCount, setVisibleCount] = useState(20);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // ── Workflow grouping (B.1 Task 18) ──
+  const workflowsByCategory = useMemo(() => {
+    return workflows.reduce((acc, wf) => {
+      const c = (wf.category ?? "custom") as OrderedCategory;
+      (acc[c] ??= []).push(wf);
+      return acc;
+    }, {} as Partial<Record<OrderedCategory, WorkflowTemplateRow[]>>);
+  }, [workflows]);
+
+  const activeCategoryTabs = useMemo(() => {
+    return ORDERED_CATEGORIES.filter(
+      (c) => (workflowsByCategory[c]?.length ?? 0) > 0,
+    );
+  }, [workflowsByCategory]);
+
   // Sheet creation
   const [sheetOpen, setSheetOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
-  const [scenarioCategory, setScenarioCategory] = useState("news");
+  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowTemplateRow | null>(
+    null,
+  );
+  const [scenarioCategory, setScenarioCategory] = useState<OrderedCategory>("news");
   const [title, setTitle] = useState("");
   const [instruction, setInstruction] = useState("");
 
-  // Batch selection / delete
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // Keep the active tab in sync with available categories — if "news" has no
+  // workflows for this org, snap to the first tab that does.
+  useEffect(() => {
+    if (
+      activeCategoryTabs.length > 0 &&
+      !activeCategoryTabs.includes(scenarioCategory)
+    ) {
+      setScenarioCategory(activeCategoryTabs[0]);
+    }
+  }, [activeCategoryTabs, scenarioCategory]);
 
   // Auto-refresh
   const hasActive = missions.some((m) =>
@@ -300,22 +350,43 @@ export function MissionsClient({
     return () => observer.disconnect();
   }, [hasMore]);
 
-  // Create
+  // Create — B.1 dual-write scenario slug + workflowTemplateId
   async function handleCreate() {
-    if (!title.trim() || !instruction.trim() || !selectedScenario) return;
+    if (!title.trim() || !instruction.trim() || !selectedWorkflow) return;
     setCreating(true);
     try {
-      await startMission({ title: title.trim(), scenario: selectedScenario, userInstruction: instruction.trim() });
+      await startMission({
+        title: title.trim() || selectedWorkflow.name,
+        scenario: templateToScenarioSlug(selectedWorkflow),
+        workflowTemplateId: selectedWorkflow.id,
+        userInstruction: instruction.trim(),
+      });
       setSheetOpen(false);
       resetForm();
       router.refresh();
-    } catch { /* noop */ } finally { setCreating(false); }
+    } catch {
+      /* noop */
+    } finally {
+      setCreating(false);
+    }
   }
-  function resetForm() { setSelectedScenario(null); setScenarioCategory("news"); setTitle(""); setInstruction(""); }
-  function pickScenario(key: string) {
-    setSelectedScenario(key);
-    const cfg = SCENARIO_CONFIG[key];
-    if (cfg?.templateInstruction) setInstruction(cfg.templateInstruction);
+  function resetForm() {
+    setSelectedWorkflow(null);
+    setScenarioCategory(activeCategoryTabs[0] ?? "news");
+    setTitle("");
+    setInstruction("");
+  }
+  function pickWorkflow(wf: WorkflowTemplateRow) {
+    setSelectedWorkflow(wf);
+    // Pre-fill instruction from legacy config when the workflow maps to a
+    // builtin SCENARIO_CONFIG key. Custom workflows leave the field blank.
+    const legacyKey = wf.legacyScenarioKey;
+    if (legacyKey) {
+      const cfg = SCENARIO_CONFIG[legacyKey];
+      if (cfg?.templateInstruction) {
+        setInstruction(cfg.templateInstruction);
+      }
+    }
   }
 
   return (
@@ -332,41 +403,169 @@ export function MissionsClient({
             <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto p-0">
               <div className="px-8 pt-8 pb-6"><SheetHeader><SheetTitle className="text-xl">发起新任务</SheetTitle></SheetHeader></div>
               <div className="px-8 pb-8">
-                {!selectedScenario ? (
+                {!selectedWorkflow ? (
                   <div className="space-y-5">
                     <p className="text-sm text-gray-500 dark:text-gray-400">选择任务场景，系统将自动匹配最佳团队配置</p>
-                    <Tabs value={scenarioCategory} onValueChange={setScenarioCategory}>
-                      <TabsList className="w-full">
-                        {SCENARIO_CATEGORIES.map((cat) => { const I = cat.icon; return <TabsTrigger key={cat.key} value={cat.key} className="gap-1.5 flex-1"><I size={14} />{cat.label}</TabsTrigger>; })}
-                      </TabsList>
-                    </Tabs>
-                    <div className="grid grid-cols-2 gap-4">
-                      {Object.entries(SCENARIO_CONFIG).filter(([, c]) => c.category === scenarioCategory).map(([k, c]) => {
-                        const I = c.icon;
-                        return (
-                          <button key={k} onClick={() => pickScenario(k)} className="glass-card-interactive p-5 text-left rounded-2xl transition-all hover:scale-[1.02]">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: c.bgColor }}><I size={18} style={{ color: c.color }} /></div>
-                              <span className="font-medium text-gray-900 dark:text-gray-100">{c.label}</span>
+                    {activeCategoryTabs.length === 0 ? (
+                      <div className="text-center py-10 text-sm text-gray-400 dark:text-gray-500">
+                        暂无可用的工作流，请先到「工作流」页面创建或启用内置模板。
+                      </div>
+                    ) : (
+                      <Tabs
+                        value={scenarioCategory}
+                        onValueChange={(v) => setScenarioCategory(v as OrderedCategory)}
+                      >
+                        <TabsList variant="line" className="w-full">
+                          {activeCategoryTabs.map((c) => (
+                            <TabsTrigger key={c} value={c} className="flex-1">
+                              {CATEGORY_LABELS[c]}
+                              <span className="ml-1 text-[10px] text-gray-400">
+                                ({workflowsByCategory[c]?.length ?? 0})
+                              </span>
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                        {activeCategoryTabs.map((c) => (
+                          <TabsContent key={c} value={c} className="mt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              {(workflowsByCategory[c] ?? []).map((wf) => {
+                                const Icon = resolveLucideIcon(wf.icon);
+                                const team = (wf.defaultTeam ?? []) as EmployeeId[];
+                                return (
+                                  <button
+                                    key={wf.id}
+                                    type="button"
+                                    onClick={() => pickWorkflow(wf)}
+                                    className="glass-card-interactive p-5 text-left rounded-2xl transition-all hover:scale-[1.02] border-0"
+                                  >
+                                    <div className="flex items-center gap-3 mb-3">
+                                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/10">
+                                        <Icon size={18} className="text-indigo-500" />
+                                      </div>
+                                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                                        {wf.name}
+                                      </span>
+                                    </div>
+                                    {wf.description && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed line-clamp-2">
+                                        {wf.description}
+                                      </p>
+                                    )}
+                                    {team.length > 0 && (
+                                      <div className="flex items-center gap-1.5">
+                                        <Crown size={10} className="text-rose-400" />
+                                        {team.slice(0, 4).map((e) => (
+                                          <EmployeeAvatar key={e} employeeId={e} size="xs" />
+                                        ))}
+                                        {team.length > 4 && (
+                                          <span className="text-[10px] text-gray-400 ml-0.5">
+                                            +{team.length - 4}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">{c.description}</p>
-                            {c.defaultTeam.length > 0 && <div className="flex items-center gap-1.5"><Crown size={10} className="text-rose-400" />{c.defaultTeam.slice(0, 4).map((e) => <EmployeeAvatar key={e} employeeId={e} size="xs" />)}{c.defaultTeam.length > 4 && <span className="text-[10px] text-gray-400 ml-0.5">+{c.defaultTeam.length - 4}</span>}</div>}
-                          </button>
-                        );
-                      })}
-                    </div>
+                          </TabsContent>
+                        ))}
+                      </Tabs>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <button onClick={() => setSelectedScenario(null)} className="flex items-center gap-4 w-full text-left glass-card p-4 rounded-xl">
-                      {(() => { const c = SCENARIO_CONFIG[selectedScenario]; const I = c.icon; return (<><div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: c.bgColor }}><I size={22} style={{ color: c.color }} /></div><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-0.5"><CheckCircle size={14} className="text-emerald-400" /><span className="font-medium text-gray-900 dark:text-gray-100">{c.label}</span></div><p className="text-xs text-gray-500 dark:text-gray-400">{c.description}</p></div><span className="text-xs text-gray-400 shrink-0">点击更换</span></>); })()}
-                    </button>
-                    <div className="space-y-2"><label className="text-sm font-medium block text-gray-700 dark:text-gray-300">任务标题</label><Input placeholder="例：两会热点追踪与深度报道" value={title} onChange={(e) => setTitle(e.target.value)} className="glass-input h-11" /></div>
-                    <div className="space-y-2"><label className="text-sm font-medium block text-gray-700 dark:text-gray-300">任务说明</label><Textarea placeholder="详细描述你希望团队完成的任务..." rows={6} value={instruction} onChange={(e) => setInstruction(e.target.value)} className="glass-input" /></div>
-                    {SCENARIO_CONFIG[selectedScenario]?.defaultTeam.length > 0 && (
-                      <div className="space-y-3"><label className="text-sm font-medium block text-gray-700 dark:text-gray-300">参与团队</label><div className="flex items-center gap-2.5 flex-wrap"><div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-100 dark:bg-rose-900/20 text-xs"><EmployeeAvatar employeeId="leader" size="xs" /><span>小领</span><span className="text-gray-400">队长</span></div>{SCENARIO_CONFIG[selectedScenario].defaultTeam.map((e) => { const m = EMPLOYEE_META[e]; return <div key={e} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs"><EmployeeAvatar employeeId={e} size="xs" /><span>{m?.nickname}</span></div>; })}</div></div>
+                    {(() => {
+                      const Icon = resolveLucideIcon(selectedWorkflow.icon);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWorkflow(null)}
+                          className="flex items-center gap-4 w-full text-left glass-card p-4 rounded-xl border-0"
+                        >
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-indigo-500/10">
+                            <Icon size={22} className="text-indigo-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <CheckCircle size={14} className="text-emerald-400" />
+                              <span className="font-medium text-gray-900 dark:text-gray-100">
+                                {selectedWorkflow.name}
+                              </span>
+                            </div>
+                            {selectedWorkflow.description && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                                {selectedWorkflow.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-400 shrink-0">点击更换</span>
+                        </button>
+                      );
+                    })()}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium block text-gray-700 dark:text-gray-300">
+                        任务标题
+                      </label>
+                      <Input
+                        placeholder="例：两会热点追踪与深度报道"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="glass-input h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium block text-gray-700 dark:text-gray-300">
+                        任务说明
+                      </label>
+                      <Textarea
+                        placeholder="详细描述你希望团队完成的任务..."
+                        rows={6}
+                        value={instruction}
+                        onChange={(e) => setInstruction(e.target.value)}
+                        className="glass-input"
+                      />
+                    </div>
+                    {((selectedWorkflow.defaultTeam ?? []) as EmployeeId[]).length > 0 && (
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium block text-gray-700 dark:text-gray-300">
+                          参与团队
+                        </label>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-100 dark:bg-rose-900/20 text-xs">
+                            <EmployeeAvatar employeeId="leader" size="xs" />
+                            <span>小领</span>
+                            <span className="text-gray-400">队长</span>
+                          </div>
+                          {((selectedWorkflow.defaultTeam ?? []) as EmployeeId[]).map((e) => {
+                            const m = EMPLOYEE_META[e];
+                            return (
+                              <div
+                                key={e}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs"
+                              >
+                                <EmployeeAvatar employeeId={e} size="xs" />
+                                <span>{m?.nickname ?? e}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
-                    <div className="pt-2"><Button className="w-full gap-2 h-11" onClick={handleCreate} disabled={creating || !title.trim() || !instruction.trim()}>{creating ? <Loader2 size={16} className="animate-spin" /> : <Crown size={16} />}{creating ? "正在创建..." : "提交任务"}</Button></div>
+                    <div className="pt-2">
+                      <Button
+                        className="w-full gap-2 h-11"
+                        onClick={handleCreate}
+                        disabled={creating || !title.trim() || !instruction.trim()}
+                      >
+                        {creating ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Crown size={16} />
+                        )}
+                        {creating ? "正在创建..." : "提交任务"}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -580,7 +779,7 @@ function MissionRow({
     : m.totalTaskCount > 0 ? Math.round((m.completedTaskCount / m.totalTaskCount) * 100) : 0;
   const progressCls = PROGRESS_CLASS[m.status] ?? "bg-gray-400";
   const skippedCount = isDone ? m.totalTaskCount - m.completedTaskCount - m.inProgressTaskCount : 0;
-  const scCfg = SCENARIO_CONFIG[m.scenario] ?? ADVANCED_SCENARIO_CONFIG[m.scenario as keyof typeof ADVANCED_SCENARIO_CONFIG];
+  const scCfg = resolveScenarioConfig(m);
   const isActive = ["executing", "consolidating"].includes(m.status);
 
   // Extract error message from finalOutput for failed missions

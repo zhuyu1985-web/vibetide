@@ -27,7 +27,9 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetFooter,
 } from "@/components/ui/sheet";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import {
   Dialog,
   DialogContent,
@@ -74,8 +76,12 @@ import {
   MessageSquare,
   Radio,
   ExternalLink,
+  Play,
+  FileText,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { startTopicMission, refreshInspirationData } from "@/app/actions/hot-topics";
+import { startMission } from "@/app/actions/missions";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
 import { updateSubscriptionsAction } from "@/app/actions/topic-subscriptions";
 import {
@@ -83,6 +89,12 @@ import {
   confirmCalendarEventAction,
   rejectCalendarEventAction,
 } from "@/app/actions/calendar-events";
+import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
+import {
+  ORDERED_CATEGORIES,
+  CATEGORY_LABELS,
+  type OrderedCategory,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type {
   InspirationTopic,
@@ -91,6 +103,7 @@ import type {
   UserTopicSubscription,
   CalendarEvent,
 } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
 
 // ========================
 // Types & Constants
@@ -103,6 +116,7 @@ interface InspirationClientProps {
   subscriptions?: UserTopicSubscription | null;
   calendarEvents?: CalendarEvent[];
   lastViewedAt?: string;
+  workflows?: WorkflowTemplateRow[];
 }
 
 const PLATFORM_STYLE: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
@@ -234,6 +248,7 @@ export function InspirationClient({
   subscriptions,
   calendarEvents = [],
   lastViewedAt,
+  workflows = [],
 }: InspirationClientProps) {
   const router = useRouter();
 
@@ -255,6 +270,18 @@ export function InspirationClient({
   const [showSubscriptionSheet, setShowSubscriptionSheet] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(!subscriptions);
   const [showCalendarSheet, setShowCalendarSheet] = useState(false);
+
+  // Generate article sheet state
+  const [generateSheetOpen, setGenerateSheetOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<{
+    title: string;
+    summary?: string;
+  } | null>(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowTemplateRow | null>(
+    null
+  );
+  const [activeCategory, setActiveCategory] = useState<OrderedCategory>("daily_brief");
+  const [isGeneratePending, startGenerateTransition] = useTransition();
 
   // Mission state
   const [, startTrackingTransition] = useTransition();
@@ -338,6 +365,26 @@ export function InspirationClient({
     () => new Set(subscriptions?.subscribedCategories ?? []),
     [subscriptions]
   );
+
+  // Group workflows by category for the generate-article sheet
+  const workflowsByCategory = useMemo(() => {
+    return workflows.reduce((acc, w) => {
+      const c = (w.category ?? "custom") as OrderedCategory;
+      (acc[c] ??= []).push(w);
+      return acc;
+    }, {} as Partial<Record<OrderedCategory, WorkflowTemplateRow[]>>);
+  }, [workflows]);
+
+  // Pick a sensible initial active tab when the sheet opens
+  useEffect(() => {
+    if (!generateSheetOpen) return;
+    const firstNonEmpty = ORDERED_CATEGORIES.find(
+      (c) => (workflowsByCategory[c]?.length ?? 0) > 0
+    );
+    if (firstNonEmpty) {
+      setActiveCategory(firstNonEmpty);
+    }
+  }, [generateSheetOpen, workflowsByCategory]);
 
   const baseTopics = useMemo(() => {
     return localTopics;
@@ -432,6 +479,35 @@ export function InspirationClient({
     },
     [router, startTrackingTransition]
   );
+
+  const handleOpenGenerate = useCallback((topic: InspirationTopic) => {
+    setSelectedTopic({ title: topic.title, summary: topic.summary });
+    setSelectedWorkflow(null);
+    setGenerateSheetOpen(true);
+  }, []);
+
+  const handleGenerate = useCallback(() => {
+    if (!selectedWorkflow || !selectedTopic) return;
+    startGenerateTransition(async () => {
+      try {
+        const mission = await startMission({
+          title: selectedTopic.title,
+          scenario: templateToScenarioSlug({
+            legacyScenarioKey: selectedWorkflow.legacyScenarioKey,
+            name: selectedWorkflow.name,
+          }),
+          workflowTemplateId: selectedWorkflow.id,
+          userInstruction: selectedTopic.summary ?? selectedTopic.title,
+        });
+        if (mission?.id) {
+          setGenerateSheetOpen(false);
+          router.push(`/missions/${mission.id}`);
+        }
+      } catch (err) {
+        console.error("[inspiration] startMission failed:", err);
+      }
+    });
+  }, [selectedWorkflow, selectedTopic, router, startGenerateTransition]);
 
   const handleTrackAllP0 = useCallback(() => {
     startTrackingAllTransition(async () => {
@@ -754,6 +830,7 @@ export function InspirationClient({
                   onStartMission={handleStartMission}
                   onMarkRead={handleMarkRead}
                   subscribedCategories={subscribedCategories}
+                  onGenerate={handleOpenGenerate}
                 />
               </div>
             </ScrollArea>
@@ -845,6 +922,20 @@ export function InspirationClient({
           setShowCalendarSheet(false);
           router.refresh();
         }}
+      />
+
+      <GenerateArticleSheet
+        open={generateSheetOpen}
+        onOpenChange={setGenerateSheetOpen}
+        topic={selectedTopic}
+        workflows={workflows}
+        workflowsByCategory={workflowsByCategory}
+        activeCategory={activeCategory}
+        onActiveCategoryChange={setActiveCategory}
+        selectedWorkflow={selectedWorkflow}
+        onSelectWorkflow={setSelectedWorkflow}
+        onGenerate={handleGenerate}
+        isPending={isGeneratePending}
       />
     </div>
   );
@@ -956,6 +1047,7 @@ function TopicList({
   onStartMission,
   onMarkRead,
   subscribedCategories,
+  onGenerate,
 }: {
   topics: InspirationTopic[];
   readIds: Set<string>;
@@ -964,6 +1056,7 @@ function TopicList({
   onStartMission: (id: string) => void;
   onMarkRead: (id: string) => void;
   subscribedCategories: Set<string>;
+  onGenerate: (topic: InspirationTopic) => void;
 }) {
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -1143,6 +1236,16 @@ function TopicList({
                         {isMissionPending ? "创建中..." : "启动追踪"}
                       </button>
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onGenerate(topic);
+                      }}
+                      className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-0.5 ml-2 transition-colors"
+                    >
+                      <Play size={10} />
+                      生成稿件
+                    </button>
                     <button
                       className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-0.5 ml-2 transition-colors"
                     >
@@ -1977,6 +2080,161 @@ function CalendarEventSheet({
             创建事件
           </Button>
         </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ========================
+// Generate Article Sheet
+// ========================
+
+function GenerateArticleSheet({
+  open,
+  onOpenChange,
+  topic,
+  workflows,
+  workflowsByCategory,
+  activeCategory,
+  onActiveCategoryChange,
+  selectedWorkflow,
+  onSelectWorkflow,
+  onGenerate,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  topic: { title: string; summary?: string } | null;
+  workflows: WorkflowTemplateRow[];
+  workflowsByCategory: Partial<Record<OrderedCategory, WorkflowTemplateRow[]>>;
+  activeCategory: OrderedCategory;
+  onActiveCategoryChange: (c: OrderedCategory) => void;
+  selectedWorkflow: WorkflowTemplateRow | null;
+  onSelectWorkflow: (wf: WorkflowTemplateRow) => void;
+  onGenerate: () => void;
+  isPending: boolean;
+}) {
+  const nonEmptyCategories = ORDERED_CATEGORIES.filter(
+    (c) => (workflowsByCategory[c]?.length ?? 0) > 0
+  );
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+        <SheetHeader>
+          <SheetTitle>生成稿件</SheetTitle>
+          <SheetDescription>
+            选择一个工作流，AI 员工会自动执行
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto px-4 space-y-4">
+          {/* Topic summary */}
+          <div className="text-sm">
+            <div className="text-muted-foreground text-xs">选题</div>
+            <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+              {topic?.title ?? "—"}
+            </div>
+            {topic?.summary && (
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                {topic.summary}
+              </div>
+            )}
+          </div>
+
+          {/* Workflow picker */}
+          {workflows.length === 0 ? (
+            <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-6">
+              当前组织暂无可用工作流
+            </div>
+          ) : (
+            <Tabs
+              value={activeCategory}
+              onValueChange={(v) => onActiveCategoryChange(v as OrderedCategory)}
+            >
+              <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+                {nonEmptyCategories.map((c) => (
+                  <TabsTrigger key={c} value={c}>
+                    {CATEGORY_LABELS[c]} ({workflowsByCategory[c]?.length ?? 0})
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {nonEmptyCategories.map((c) => (
+                <TabsContent key={c} value={c} className="mt-3 space-y-2">
+                  {(workflowsByCategory[c] ?? []).map((wf) => {
+                    const IconComp =
+                      wf.icon && (LucideIcons as Record<string, unknown>)[wf.icon]
+                        ? ((LucideIcons as Record<string, unknown>)[
+                            wf.icon
+                          ] as React.ComponentType<{ size?: number | string }>)
+                        : FileText;
+                    const isSelected = selectedWorkflow?.id === wf.id;
+                    const team = Array.isArray(wf.defaultTeam)
+                      ? (wf.defaultTeam as string[])
+                      : [];
+                    return (
+                      <button
+                        key={wf.id}
+                        type="button"
+                        onClick={() => onSelectWorkflow(wf)}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg transition",
+                          isSelected
+                            ? "bg-sky-50 dark:bg-sky-950/30 ring-2 ring-sky-400"
+                            : "hover:bg-muted/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <IconComp size={18} />
+                          <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                            {wf.name}
+                          </div>
+                        </div>
+                        {wf.description && (
+                          <div className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                            {wf.description}
+                          </div>
+                        )}
+                        <div className="mt-2 flex gap-1 items-center text-xs">
+                          {team.length > 0 && (
+                            <>
+                              <span className="text-muted-foreground">团队：</span>
+                              <div className="flex -space-x-1">
+                                {team.slice(0, 4).map((emp) => (
+                                  <EmployeeAvatar
+                                    key={emp}
+                                    employeeId={emp}
+                                    size="xs"
+                                  />
+                                ))}
+                              </div>
+                            </>
+                          )}
+                          {wf.appChannelSlug && (
+                            <span className="ml-auto text-muted-foreground">
+                              → {wf.appChannelSlug}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </div>
+
+        <SheetFooter className="border-t p-4">
+          <Button
+            variant="ghost"
+            disabled={!selectedWorkflow || isPending || !topic}
+            onClick={onGenerate}
+            className="w-full"
+          >
+            {isPending ? "生成中..." : "立即生成"}
+          </Button>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

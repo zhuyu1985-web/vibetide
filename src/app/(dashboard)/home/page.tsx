@@ -7,7 +7,9 @@ import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
 import { getAllScenariosByOrg } from "@/lib/dal/scenarios";
 import { getEmployees } from "@/lib/dal/employees";
+import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import type { ScenarioCardData } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
 import { HomeClient } from "./home-client";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,7 @@ export default async function HomePage() {
   }> = [];
   let scenarioMap: Record<string, ScenarioCardData[]> = {};
   let employeeDbIdMap: Record<string, string> = {};
+  let workflows: WorkflowTemplateRow[] = [];
 
   try {
     const supabase = await createClient();
@@ -84,6 +87,19 @@ export default async function HomePage() {
         ...c,
         updatedAt: c.updatedAt.toISOString(),
       }));
+
+      // B.1 Unified Scenario Workflow — fetch enabled builtin workflow templates
+      // for this org so <HomeClient> can render them (Task 16 consumes the prop).
+      if (orgId) {
+        try {
+          workflows = await listWorkflowTemplatesByOrg(orgId, {
+            isBuiltin: true,
+            isEnabled: true,
+          });
+        } catch {
+          // Graceful degradation — fall through with workflows = []
+        }
+      }
     }
 
     // Fetch scenarios grouped by employee slug — pass full data so the
@@ -114,6 +130,7 @@ export default async function HomePage() {
         recentConversations={recentConversations}
         scenarioMap={scenarioMap}
         employeeDbIdMap={employeeDbIdMap}
+        workflows={workflows}
       />
     </Suspense>
   );
