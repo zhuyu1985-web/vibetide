@@ -81,7 +81,14 @@
 **选 A：保留字段做 label cache**（推荐）
 - DB 不改（无 migration）
 - 新 mission 创建时：`scenario = templateToScenarioSlug(template)` 继续写
-- 下游消费者 `label = workflowTemplate?.name ?? mission.scenario ?? "任务"` 三级 fallback
+- 下游消费者 label 降级公式（四级 fallback，对齐现有 `resolveScenarioConfig` 实现）：
+  ```ts
+  label = mission.workflowTemplate?.name     // 1. 首选：workflow 关联
+        ?? mission.title                       // 2. 次选：missions.title (notNull text)
+        ?? mission.scenario                    // 3. 再次：scenario slug text（若为 custom_xxx 可读性差但非空）
+        ?? "任务"                              // 4. 兜底
+  ```
+  **说明：** B.1 的 `src/lib/scenario-fallback.ts:65` `makeFallback` 已经是 `title ?? scenario ?? "任务"`；B.2 只在前面加一级 `workflowTemplate?.name`。**不要**回归成 `workflowTemplate?.name ?? scenario ?? "任务"`（会丢 title，回归风险）。
 - 优点：零回归，对已有 mission 行兼容
 - 缺点：两个字段长期并存
 
@@ -120,6 +127,12 @@
 - [ ] 测试通过：mission list 既能用新关联也能用旧 scenario text
 
 ### Phase 4.2 — 迁移 20+ 下游消费者
+
+**Phase 4.2 与 B.1 Task 14 的关系（采纳 reviewer I1）：**
+- B.1 Task 14 通过 `resolveScenarioConfig(mission)` 给 5 个 UI 消费点加了**兜底层**（SCENARIO_CONFIG → ADVANCED_SCENARIO_CONFIG → fallback 三级）— 这是热修，保证 custom_slug 不崩
+- B.2 Phase 4.2 的工作是**换底层实现**：从"SCENARIO_CONFIG 常量 lookup + fallback"改为"workflow_template 直读 + 降级到 title/slug"
+- 换底后删除 SCENARIO_CONFIG 常量（Phase 4.3）
+- `resolveScenarioConfig` **保留**但简化：接受 `{ scenario, title, workflowTemplate }` → 返回 label / icon / description 等；删掉 SCENARIO_CONFIG/ADVANCED_SCENARIO_CONFIG 分支
 
 **按类型分批：**
 
@@ -178,12 +191,26 @@
     redirect("/workflows");
   }
   ```
-- `/workflows` 页面**不在 B.2 范围**（P2 做真正的工作流编辑器）；B.2 只做 redirect 占位
+- **`/workflows` 是真实管理页面**（commit B.1 前已存在）：
+  - `src/app/(dashboard)/workflows/page.tsx` 43 行，读 `getMyWorkflows` + `getBuiltinTemplates`
+  - 已有 `[id]/` 详情 + `new/` 创建子路由
+  - redirect 会直接把用户带到能用的列表页，非"占位"
 
-**Localstorage 自定义场景迁移：**
-- 之前用户在 localStorage 存的自定义场景会丢失
-- 加一个 migration banner（简单版）：打开 `/workflows` 时如果检测到 localStorage 里的老数据，提示"请联系管理员迁移"
-- **推迟到 P2**：B.2 不处理 localStorage 迁移
+**Localstorage 自定义场景迁移 + 前置用户通知（采纳 reviewer I5）：**
+- 现有代码 `home-client.tsx:83` 和 `customize-scenario-client.tsx:62` 读取 `vibetide_custom_scenarios` localStorage key
+- B.2 merge 后该 key 不再有读取路径，用户之前定义的场景从 UI 消失（数据仍在 localStorage）
+- **前置通知策略（merge B.2 前必须先 ship）：**
+  1. **Phase 0（B.2 之前，独立 PR）：** 在 `/home` + `/scenarios/customize` 顶部埋 7 天告警 banner：
+     ```
+     ⚠️ 场景自定义即将迁移到新的工作流编辑器（/workflows）。
+         您目前在本页保存的 N 个自定义场景将在 2026-04-26 后无法通过此页面访问。
+         如需保留，请联系管理员协助导出。
+     ```
+     （N 从 localStorage 读）
+  2. **至少观察 1 周**（~7 天）后再 merge B.2
+  3. **B.2 merge 同时**在 `/workflows` 顶部加一次性提示："您如有历史自定义场景需迁移，请联系管理员" —— P2 做真正的 import 工具
+- localStorage 数据**不删除**（浏览器端，B.2 无法删），后续用户清缓存自行丢弃
+- **完整 import 工具推迟到 P2**（独立 spec）
 
 ### 5.2 `scenario-detail-sheet.tsx` 处置
 
@@ -215,12 +242,67 @@ export const missionsRelations = relations(missions, ({ one }) => ({
 
 ```sql
 -- supabase/migrations/20260419000003_drop_employee_scenarios.sql
+-- 前置备份（防意外）：
+-- pg_dump -t employee_scenarios $DATABASE_URL > backup_employee_scenarios_20260419.sql
+-- 已验证无 FK 指向本表（schema + migrations grep zero matches on 2026-04-19）
+-- B.1 停写 + 每 org seed delete，表已空
+
 DROP TABLE IF EXISTS employee_scenarios CASCADE;
 ```
 
-**CASCADE 考虑：**
-- 检查是否有 FK 指向 employee_scenarios（B.1 应该没 FK 进来；check via `\d+ employee_scenarios`）
-- B.1 已确保表空（停写 + 每 org seed 开头 delete），DROP 应该无数据损失
+**CASCADE 确认（采纳 reviewer I3，spec 阶段已跑）：**
+- `grep -rE "references.*employeeScenarios|REFERENCES.*employee_scenarios" src/db/schema supabase/migrations` = 0 matches
+- 无任何 FK 指向本表，CASCADE 等价于 DROP（不会级联删其他表）
+- B.1 已确保表空（停写 + 每 org seed 开头 delete）
+
+### 6.3 channels/gateway.ts `#场景名` 解析重写（采纳 reviewer I2）
+
+**当前：** `gateway.ts:36/42/54/133` 按常量查（`ADVANCED_SCENARIO_CONFIG[key]` + `[key].label`）。
+
+**B.2 查询规范：**
+
+```ts
+// lib/channels/gateway.ts
+async function resolveScenarioByNameOrKey(
+  scenarioText: string,       // 用户输入的 #场景名 (中文 name 或英文 key)
+  organizationId: string,     // DingTalk/WeCom tenant → orgId 映射（现有逻辑已有）
+): Promise<WorkflowTemplateRow | null> {
+  // 策略：精确匹配（legacyScenarioKey OR name） → 模糊匹配（name ILIKE）
+  // 1. 精确 legacyScenarioKey（英文 slug 输入优先）
+  const exactKey = await db.query.workflowTemplates.findFirst({
+    where: and(
+      eq(workflowTemplates.organizationId, organizationId),
+      eq(workflowTemplates.legacyScenarioKey, scenarioText),
+      eq(workflowTemplates.isEnabled, true),
+    ),
+  });
+  if (exactKey) return exactKey;
+
+  // 2. 精确 name（中文输入）
+  const exactName = await db.query.workflowTemplates.findFirst({
+    where: and(
+      eq(workflowTemplates.organizationId, organizationId),
+      eq(workflowTemplates.name, scenarioText),
+      eq(workflowTemplates.isEnabled, true),
+    ),
+  });
+  if (exactName) return exactName;
+
+  // 3. 模糊 name（最后兜底；限 1 条避免歧义）
+  const fuzzy = await db.query.workflowTemplates.findFirst({
+    where: and(
+      eq(workflowTemplates.organizationId, organizationId),
+      sql`${workflowTemplates.name} ILIKE ${`%${scenarioText}%`}`,
+      eq(workflowTemplates.isEnabled, true),
+    ),
+    limit: 1,
+  });
+  return fuzzy ?? null;
+}
+```
+
+**未命中时：** 回复用户："未识别到场景『${scenarioText}』，请在 `/workflows` 查看可用场景列表。"
+**org 上下文：** 从 DingTalk/WeCom webhook 的 tenantId 查 `organizations` 表获得 orgId（`gateway.ts` 现有逻辑已做此映射，复用即可）。
 
 ---
 
@@ -238,7 +320,28 @@ DROP TABLE IF EXISTS employee_scenarios CASCADE;
 - 旧 mission（workflowTemplateId=null）仍能正确显示 label（兜底 `mission.scenario` text）
 - DingTalk `#场景名` 入口触发 → mission 创建成功
 
-### 7.3 Acceptance
+### 7.3 Staging E2E 验证（采纳 reviewer I6）
+
+**Merge 前必须通过的 staging 冒烟：**
+
+1. **部署 preview build** 到 staging（Supabase + Vercel preview env）
+2. **触发真实 Mission 流（3 类）：**
+   - 用户 UI 启动：`/home` → 点 workflow card → 创建 mission → mission 详情 label 显示正确
+   - 任务中心启动：`/missions` → "发起新任务" → tab → 启动 → mission console label 正确
+   - DingTalk 入口：企微 IM 发 `#快讯工作流 测试内容` → 看 bot 回复 mission 创建成功
+3. **观察 Inngest 24-48h：**
+   - leader-plan / leader-consolidate / execute-mission-task 三个 function run 无异常
+   - `mission.workflowTemplate?.name` 在 prompt 中正确出现（检查 Inngest run log）
+4. **验证 channels gateway：**
+   - 测一个精确 key（`#flash_report`）→ 命中
+   - 测一个精确 name（`#快讯工作流`）→ 命中
+   - 测一个 fuzzy name（`#快讯`）→ 命中
+   - 测一个不存在的（`#不存在场景`）→ 回复"未识别，请查 /workflows"
+5. **回归 critical path：** mission 列表、mission 详情、`/scenarios/customize` 跳转到 `/workflows`
+
+**必须 100% 通过**；任意步骤失败 → 阻止 merge。
+
+### 7.4 Acceptance
 
 - `grep -rn "SCENARIO_CONFIG\|ADVANCED_SCENARIO_CONFIG" src/` = 0 匹配（完全删除）
 - `grep -rn "employee_scenarios\|employeeScenarios" src/` = 0 匹配
@@ -251,11 +354,16 @@ DROP TABLE IF EXISTS employee_scenarios CASCADE;
 
 ## 8. Out of scope（B.2 不做）
 
-- 新 `/workflows` 管理页（P2 做）
-- Localstorage 自定义场景迁移（P2）
+- ~~新 `/workflows` 管理页~~ — **已存在，见 §5.1**；B.2 只做 redirect 把旧 URL 带过去
+- Localstorage 自定义场景真正的 import 工具（推迟到 P2，单独 spec；B.2 通过 §5.1 banner 前置通知用户）
 - `mission.scenario` 字段删除（保留 text 做 cache）
-- workflow_templates 编辑 UI（P2 独立 spec）
+- workflow_templates 编辑 UI 增强（`/workflows` 现有版本够用，富编辑推迟到 P2）
 - Inngest consumers 的进一步优化（只做 label 替换，不改业务逻辑）
+
+**Follow-up tracker 占位（合入 B.2 PR 时同时开 GH issue）：**
+- `follow-up-A`: localStorage 场景 import 工具 → `/workflows/import`
+- `follow-up-B`: workflow_templates 编辑器增强 (drag-reorder steps, team picker UI)
+- `follow-up-C`: mission.scenario 字段真正下掉（数据彻底迁到 workflowTemplateId JOIN 后）
 
 ---
 
@@ -270,7 +378,17 @@ DROP TABLE IF EXISTS employee_scenarios CASCADE;
 | resolveScenarioConfig 改动后老 mission 显示异常 | E2E smoke 覆盖新老 mission |
 | /scenarios/customize 已有用户 bookmark | redirect 保证旧 URL 不 404 |
 
-**回滚：** B.2 每 Phase 独立 commit；若 Phase 4.4 DROP 出问题，可以 `git revert` + 重新 seed 空 employee_scenarios 表。但 Phase 4.1-4.3 的代码变动如果 revert 工作量大，建议 merge 前充分 review。
+**回滚（采纳 reviewer I4 加 pg_dump 保险）：**
+
+- Phase 4.1-4.3 回滚：每 Phase 独立 commit，用 `git revert`（代码变动可恢复）
+- Phase 4.4 DROP 前**必须**执行：
+  ```bash
+  pg_dump -t employee_scenarios "$DATABASE_URL" > backups/employee_scenarios_backup_20260419.sql
+  # backups/ 目录加 .gitignore，不入库
+  ```
+  保留 backup 至少 6 个月。即使 B.1 后表已空，也防止"意外数据"（某 org 没跑过 B.1 seed）
+- 回滚 Phase 4.4：`psql $DATABASE_URL < backups/employee_scenarios_backup_20260419.sql` + `git revert`
+- 代码变动多、test 覆盖有限，**merge 前要 staging 验证**（§7.4）
 
 ---
 
@@ -297,15 +415,19 @@ DROP TABLE IF EXISTS employee_scenarios CASCADE;
 
 ## 11. 预计工作量
 
+**代码工作：**
+- **Phase 0** (banner PR + 7 天观察窗口)：30 分钟编码 + 7 天等待
 - **Phase 4.1** (Infrastructure)：1-2 小时
 - **Phase 4.2** (20+ downstream migration)：4-6 小时
 - **Phase 4.3** (delete code / pages)：1-2 小时
 - **Phase 4.4** (DROP table + migration)：30 分钟
-- **测试 + review**：1-2 小时
+- **本地测试**：1-2 小时
 
-**总计：** 7-12 小时（1-2 天工作量）
+**Staging 验证窗口：** 24-48 小时（§7.3）
 
-subagent-driven 并行化空间：Phase 4.2 的 UI 批和 Inngest 批可并行（~3 小时压到 ~1.5 小时）
+**总计：** 代码 8-13 小时 + 7 天 banner 观察 + 24-48 小时 staging = **~10 天 wall-clock**（其中实际动手 ~1.5 天，其余是观察/等待）
+
+**subagent-driven 并行化空间：** Phase 4.2 的 UI 批（A）和 Inngest 批（B）可并行（~3 小时压到 ~1.5 小时）；Phase 4.3 的文件删除也可并行
 
 ---
 
