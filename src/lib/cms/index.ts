@@ -56,8 +56,13 @@ export {
 // —— 栏目同步主流程 ——
 export { syncCmsCatalogs, type SyncCmsCatalogsOptions, type SyncResult } from "./catalog-sync";
 
-// —— 后续 Task 会追加 ——
-// export { classifyState, isRetriableError } from "./status-machine";
+// —— 状态机 ——
+export {
+  mapCmsStatusToPublicationState,
+  canTransition,
+  isTerminalState,
+  type CmsPublicationState,
+} from "./status-machine";
 
 // —— 错误类型 ——
 export {
