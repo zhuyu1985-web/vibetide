@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { workflowTemplates } from "@/db/schema";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, sql, type SQL } from "drizzle-orm";
 import { getCurrentUserOrg } from "./auth";
 import { BUILTIN_TEMPLATES } from "@/lib/workflow-templates";
 import type { WorkflowTemplateRow } from "@/db/types";
@@ -134,4 +134,80 @@ export async function getWorkflowTemplate(id: string) {
   });
 
   return row ?? null;
+}
+
+// ─── B.1 Unified Scenario Workflow — listWorkflowTemplatesByOrg ───
+
+export type WorkflowTemplateCategory =
+  | "news"
+  | "video"
+  | "analytics"
+  | "distribution"
+  | "deep"
+  | "social"
+  | "advanced"
+  | "livelihood"
+  | "podcast"
+  | "drama"
+  | "daily_brief"
+  | "custom";
+
+export interface ListFilter {
+  category?: WorkflowTemplateCategory;
+  isBuiltin?: boolean;
+  isEnabled?: boolean; // default true
+  appChannelSlug?: string;
+  employeeSlug?: string; // defaultTeam @> [employeeSlug]
+}
+
+export interface ListOptions {
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * List workflow templates for a given organization with rich filtering.
+ *
+ * Filter semantics:
+ * - `isEnabled` defaults to `true` (scenarios hidden until explicitly enabled).
+ * - `employeeSlug` uses jsonb containment (`default_team @> '["slug"]'`).
+ * - All other filters are equality.
+ *
+ * Ordered by `createdAt` ascending for stable UI rendering.
+ */
+export async function listWorkflowTemplatesByOrg(
+  organizationId: string,
+  filter: ListFilter = {},
+  options: ListOptions = {},
+) {
+  const conds: SQL[] = [eq(workflowTemplates.organizationId, organizationId)];
+
+  conds.push(eq(workflowTemplates.isEnabled, filter.isEnabled ?? true));
+
+  if (filter.category !== undefined) {
+    conds.push(eq(workflowTemplates.category, filter.category));
+  }
+  if (filter.isBuiltin !== undefined) {
+    conds.push(eq(workflowTemplates.isBuiltin, filter.isBuiltin));
+  }
+  if (filter.appChannelSlug !== undefined) {
+    conds.push(eq(workflowTemplates.appChannelSlug, filter.appChannelSlug));
+  }
+  if (filter.employeeSlug !== undefined) {
+    // jsonb contains check: default_team @> '["<slug>"]'
+    conds.push(
+      sql`${workflowTemplates.defaultTeam} @> ${JSON.stringify([filter.employeeSlug])}::jsonb`,
+    );
+  }
+
+  let query = db
+    .select()
+    .from(workflowTemplates)
+    .where(and(...conds))
+    .orderBy(asc(workflowTemplates.createdAt));
+
+  if (options.limit !== undefined) query = query.limit(options.limit) as typeof query;
+  if (options.offset !== undefined) query = query.offset(options.offset) as typeof query;
+
+  return await query;
 }
