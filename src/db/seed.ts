@@ -277,6 +277,36 @@ async function seed() {
   }
   console.log(`   ${empsCreated} new / ${employeesData.length - empsCreated} existing employees\n`);
 
+  // =====================================================================
+  // Phase 1 — Seed 9 个 APP 栏目（§2.0.1 规范化清单）
+  // =====================================================================
+  console.log("P1: Inserting app_channels...");
+
+  const APP_CHANNELS_SEED = [
+    { slug: "app_home",                     displayName: "首页",         reviewTier: "relaxed" as const, icon: "🏠", sortOrder: 0 },
+    { slug: "app_news",                     displayName: "新闻",         reviewTier: "strict" as const,  icon: "📰", sortOrder: 1 },
+    { slug: "app_politics",                 displayName: "时政",         reviewTier: "strict" as const,  icon: "🏛️", sortOrder: 2 },
+    { slug: "app_sports",                   displayName: "体育",         reviewTier: "relaxed" as const, icon: "⚽", sortOrder: 3 },
+    { slug: "app_variety",                  displayName: "综艺",         reviewTier: "relaxed" as const, icon: "🎭", sortOrder: 4 },
+    { slug: "app_livelihood_zhongcao",      displayName: "民生-种草",   reviewTier: "relaxed" as const, icon: "🌱", sortOrder: 5 },
+    { slug: "app_livelihood_tandian",       displayName: "民生-探店",   reviewTier: "relaxed" as const, icon: "🍜", sortOrder: 6 },
+    { slug: "app_livelihood_podcast",       displayName: "民生-播客",   reviewTier: "strict" as const,  icon: "🎧", sortOrder: 7 },
+    { slug: "app_drama",                    displayName: "短剧",         reviewTier: "strict" as const,  icon: "🎬", sortOrder: 8 },
+  ];
+
+  for (const ch of APP_CHANNELS_SEED) {
+    await db.insert(schema.appChannels).values({
+      organizationId: org.id,
+      slug: ch.slug,
+      displayName: ch.displayName,
+      reviewTier: ch.reviewTier,
+      sortOrder: ch.sortOrder,
+      icon: ch.icon,
+    }).onConflictDoNothing({ target: [schema.appChannels.organizationId, schema.appChannels.slug] });
+    console.log(`   app_channel: ${ch.slug} (${ch.displayName})`);
+  }
+  console.log();
+
   // 4. Seed missions
   console.log("4. Inserting missions...");
 

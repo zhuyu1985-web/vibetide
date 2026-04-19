@@ -81,3 +81,5 @@ export * from "./collection";
 export * from "./cms-mapping";
 // CMS Adapter Phase 1 — Task 11：article → CMS 入稿流水
 export * from "./cms-publications";
+// CMS Adapter Phase 1 — Task 12：APP 栏目 ↔ CMS 栏目绑定（运营配置）
+export * from "./app-channels";
