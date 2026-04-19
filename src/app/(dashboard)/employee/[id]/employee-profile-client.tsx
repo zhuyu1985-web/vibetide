@@ -75,7 +75,6 @@ import { VersionHistory } from "./version-history";
 import { SkillTestDialog } from "./skill-test-dialog";
 import { SkillComboManager } from "./skill-combo-manager";
 import { ScenarioWorkbench } from "./scenario-workbench";
-import { ScenariosTab } from "./scenarios-tab";
 import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo, ScenarioCardData } from "@/lib/types";
 import type { ScenarioAdminRow } from "@/lib/dal/scenarios";
 import type { SkillRecommendation } from "@/lib/dal/skills";
@@ -399,10 +398,6 @@ export function EmployeeProfileClient({
           <TabsTrigger value="versions" className="text-xs gap-1">
             <History size={14} />
             版本历史
-          </TabsTrigger>
-          <TabsTrigger value="scenarios" className="text-xs gap-1">
-            <Zap size={14} />
-            预设场景
           </TabsTrigger>
         </TabsList>
 
@@ -1168,14 +1163,8 @@ export function EmployeeProfileClient({
           <VersionHistory employeeId={employee.dbId} versions={configVersions} />
         </TabsContent>
 
-        {/* Scenarios Tab — per-employee preset scenario management */}
-        <TabsContent value="scenarios">
-          <ScenariosTab
-            employeeSlug={employee.id}
-            scenarios={adminScenarios}
-            canManage={canManageScenarios}
-          />
-        </TabsContent>
+        {/* Scenarios Tab removed 2026-04-20 — employee_scenarios 已由
+             workflow_templates 统一管理，请访问 /workflows 或 /missions 新建任务 */}
       </Tabs>
 
       <SkillBrowserDialog

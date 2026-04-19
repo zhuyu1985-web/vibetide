@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Search,
   FileText,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -180,6 +181,11 @@ export function MissionsClient({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(20);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // ── Batch delete state (preserved from main 72b6788) ──
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // ── Workflow grouping (B.1 Task 18) ──
   const workflowsByCategory = useMemo(() => {
