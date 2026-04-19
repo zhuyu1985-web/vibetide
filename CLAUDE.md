@@ -148,6 +148,34 @@ INNGEST_SIGNING_KEY
 
 **Important:** Supabase may have connectivity issues. Pages that query the database at render time must add `export const dynamic = 'force-dynamic'` to avoid build-time DB connection timeouts.
 
+### CMS Integration Layer (Phase 1)
+
+Phase 1 交付的 `src/lib/cms/` 模块是 VibeTide → 华栖云 CMS 的唯一出口。
+
+**导出（只从 `@/lib/cms` import，不直接访问内部文件）：**
+- `CmsClient` + 5 接口（getChannels / getAppList / getCatalogTree / saveArticle / getArticleDetail）
+- `publishArticleToCms({ articleId, appChannelSlug, operatorId, triggerSource })` — 核心入库
+- `syncCmsCatalogs(orgId, options)` — 三步栏目同步
+- `mapArticleToCms(article, ctx)` + `loadMapperContext(orgId, slug, org)`
+- 错误类型：`CmsAuthError` / `CmsBusinessError` / `CmsNetworkError` / `CmsSchemaError` / `CmsConfigError`
+- Feature flag：`isCmsPublishEnabled()` / `isCatalogSyncEnabled()`
+
+**9 个 APP 栏目 slug（`ALL_APP_CHANNEL_SLUGS` 严格锁定）：**
+`app_home / app_news / app_politics / app_sports / app_variety / app_livelihood_zhongcao / app_livelihood_tandian / app_livelihood_podcast / app_drama`
+
+**关键 env（`.env.local`）：**
+- `CMS_HOST` / `CMS_LOGIN_CMC_ID` / `CMS_LOGIN_CMC_TID` / `CMS_TENANT_ID` / `CMS_USERNAME`
+- `VIBETIDE_CMS_PUBLISH_ENABLED`（默认 false，按 org 灰度）
+- `VIBETIDE_CATALOG_SYNC_ENABLED`（默认 true）
+
+**Inngest 函数：**
+- `cmsCatalogSyncDaily`（每天 02:00 Asia/Shanghai 跑 org 级同步）
+- `cmsCatalogSyncOnDemand`（event `cms/catalog-sync.trigger`）
+- `cmsStatusPoll`（入库后 5 次指数退避轮询，event `cms/publication.submitted`）
+- `cmsPublishRetry`（失败重试 3 次，event `cms/publication.retry`）
+
+**配置 UI：** `/settings/cms-mapping`（绑定 app_channels → cms_catalogs + 同步日志）
+
 ### API Routes
 
 `src/app/api/` has 10 route groups:

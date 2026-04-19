@@ -3,9 +3,8 @@ name: cms_catalog_sync
 displayName: CMS 栏目同步
 description: 通过华栖云 CMS 三步接口（渠道列表 → 应用列表 → 栏目树）同步 APP 侧所有可用栏目到 VibeTide 本地映射表（cms_channels / cms_apps / cms_catalogs）。支持手动触发与每日 cron，采用差量对比（insert/update/soft-delete）+ audit log。当用户提及"同步栏目""更新栏目表""刷新 CMS 栏目"或首次配置 CMS 映射时调用。
 version: 1.0.0
-category: management
+category: action
 metadata:
-  skill_kind: action  # DB enum 只有 6 个 category，action 作为 management 下的细分 kind
   scenario_tags: [configuration, setup]
   compatibleEmployees: [xiaofa, leader]
   runtime:
