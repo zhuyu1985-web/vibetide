@@ -57,6 +57,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -671,28 +680,29 @@ export function EmbeddedChatPanel({
                           )}
                         </label>
                         {field.type === "select" ? (
-                          <select
-                            className="w-full h-9 px-3 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400/50 border border-gray-200 dark:border-gray-600 transition-all"
+                          <Select
                             value={scenarioInputs[field.name] ?? ""}
-                            onChange={(e) =>
+                            onValueChange={(val) =>
                               setScenarioInputs((prev) => ({
                                 ...prev,
-                                [field.name]: e.target.value,
+                                [field.name]: val,
                               }))
                             }
                           >
-                            <option value="">
-                              {field.placeholder || "请选择"}
-                            </option>
-                            {field.options?.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={field.placeholder || "请选择"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {field.options?.map((opt) => (
+                                <SelectItem key={opt} value={opt}>
+                                  {opt}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : field.type === "textarea" ? (
-                          <textarea
-                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400/50 border border-gray-200 dark:border-gray-600 resize-none transition-all"
+                          <Textarea
+                            className="resize-none"
                             rows={3}
                             placeholder={field.placeholder}
                             value={scenarioInputs[field.name] ?? ""}
@@ -704,9 +714,8 @@ export function EmbeddedChatPanel({
                             }
                           />
                         ) : (
-                          <input
+                          <Input
                             type="text"
-                            className="w-full h-9 px-3 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-400/50 border border-gray-200 dark:border-gray-600 transition-all"
                             placeholder={field.placeholder}
                             value={scenarioInputs[field.name] ?? ""}
                             onChange={(e) =>

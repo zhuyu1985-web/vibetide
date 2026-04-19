@@ -7,6 +7,7 @@ import { getLanguageModel } from "@/lib/agent/model-router";
 import { resolveTools, toVercelTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
+import { notifyChatMessage } from "@/lib/channels/chat-notifier";
 
 function resolveTemplate(
   template: string,
@@ -98,6 +99,8 @@ export async function POST(req: Request) {
     if (!profile?.organizationId) {
       return new Response("Organization not found", { status: 403 });
     }
+    // Narrowed above, but TS loses narrowing across the streaming closure.
+    const organizationId: string = profile.organizationId;
 
     // Verify employee belongs to this organization
     const employeeRecord = await db.query.aiEmployees.findFirst({
@@ -176,6 +179,9 @@ export async function POST(req: Request) {
     const usedSkills: { tool: string; skillName: string }[] = [];
     const usedToolSet = new Set<string>();
 
+    // Accumulate full answer for post-stream channel sync
+    let assistantText = "";
+
     const stream = new ReadableStream({
       async start(controller) {
         const send = (event: string, data: Record<string, unknown>) => {
@@ -223,6 +229,7 @@ export async function POST(req: Request) {
                 break;
               }
               case "text-delta": {
+                assistantText += part.text;
                 send("text-delta", { text: part.text });
                 break;
               }
@@ -246,6 +253,23 @@ export async function POST(req: Request) {
             controller.close();
           } catch {
             // Already closed
+          }
+
+          // Fire-and-forget channel sync
+          if (assistantText.trim()) {
+            void notifyChatMessage({
+              organizationId,
+              userId: user.id,
+              employeeSlug: employeeRecord.slug,
+              employeeName:
+                employeeRecord.nickname ||
+                employeeRecord.name ||
+                employeeRecord.slug,
+              userMessage: resolvedInstruction,
+              assistantMessage: assistantText,
+              scenarioName: scenario.name,
+              skillsUsed: usedSkills.map((s) => s.skillName),
+            });
           }
         }
       },

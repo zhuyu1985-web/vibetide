@@ -11,6 +11,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -26,14 +27,6 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ItemDetailDrawer } from "./item-detail-drawer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -229,15 +222,12 @@ export function ContentClient({
       {/* Top bar */}
       <div className="flex items-center gap-2">
         {/* Search */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            className="pl-9"
-            placeholder="搜索标题或内容…"
-            value={searchValue}
-            onChange={(e) => handleSearchChange(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="flex-1 max-w-sm"
+          placeholder="搜索标题或内容…"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
 
         <div className="ml-auto flex items-center gap-2">
           {/* Filter sheet trigger */}
@@ -370,22 +360,22 @@ export function ContentClient({
         <GlassCard variant="panel" padding="none">
           {/* Header row */}
           <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/60 dark:bg-gray-800/30 border-b border-gray-300 dark:border-gray-600/70">
-            <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
+            <div className="flex-1 min-w-0 text-sm font-semibold text-gray-600 dark:text-gray-400">
               标题
             </div>
-            <div className="w-32 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
+            <div className="w-32 text-sm font-semibold text-gray-600 dark:text-gray-400">
               首抓源
             </div>
-            <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
+            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">
               时间
             </div>
-            <div className="w-14 text-xs text-gray-600 dark:text-gray-300 tracking-wide text-center">
+            <div className="w-14 text-sm font-semibold text-gray-600 dark:text-gray-400 text-center">
               渠道
             </div>
-            <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
+            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">
               分类
             </div>
-            <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">
+            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">
               富化
             </div>
           </div>
@@ -437,13 +427,13 @@ export function ContentClient({
 
       {/* Empty state */}
       {items.length === 0 && (
-        <div className="rounded-xl border bg-card">
+        <GlassCard variant="panel" padding="none">
           <EmptyState
             icon={FileText}
             title="暂无匹配的采集内容"
             description="当前筛选条件下没有找到内容。可以清空筛选,或到源管理页触发一次采集。"
           />
-        </div>
+        </GlassCard>
       )}
 
       {/* Detail drawer */}

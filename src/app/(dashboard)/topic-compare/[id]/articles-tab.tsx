@@ -9,7 +9,8 @@ import {
   AlertCircle,
   ChevronDown,
 } from "lucide-react";
-import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { SearchInput } from "@/components/shared/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { NetworkReport } from "@/lib/types";
@@ -172,145 +173,156 @@ export function ArticlesTab({ reports }: Props) {
             </Button>
           ))}
         </div>
-        <div className="relative ml-auto">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="搜索标题或媒体..."
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="h-9 w-[240px] rounded-md bg-white/60 dark:bg-gray-800/60 pl-8 pr-3 text-sm outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 transition"
-          />
-        </div>
+        <SearchInput
+          className="ml-auto w-[240px]"
+          placeholder="搜索标题或媒体..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
       </div>
 
       {/* ── Table ── */}
-      <GlassCard padding="none">
-        {/* Header */}
-        <div className="grid grid-cols-[1fr_160px_110px_100px_140px] gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
-          <span>报道标题</span>
-          <span>来源媒体</span>
-          <span>发布时间</span>
-          <span>作者</span>
-          <span>操作</span>
-        </div>
-
-        {/* Body */}
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
-            <Search className="h-10 w-10 mb-3 opacity-40" />
-            <p className="text-sm">没有找到匹配的报道</p>
+      <DataTable
+        rows={filtered}
+        rowKey={(report) => report.id}
+        emptyMessage={
+          <div className="flex flex-col items-center gap-2">
+            <Search className="h-10 w-10 opacity-40" />
+            <p>没有找到匹配的报道</p>
           </div>
-        ) : (
-          filtered.map((report) => {
-            const lc = levelConfig[report.mediaLevel];
-            const interp = interpretations[report.id];
-            const isExpanded = interp?.expanded ?? false;
-            return (
-              <div
-                key={report.id}
-                className="border-b border-gray-50 dark:border-gray-800/50 last:border-b-0"
-              >
-                <div className="grid grid-cols-[1fr_160px_110px_100px_140px] gap-2 px-5 py-4 items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition">
-                  <div className="min-w-0">
-                    <p className="text-sm text-gray-900 dark:text-gray-100 truncate font-normal">
-                      {report.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                      {report.summary}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">
-                      {report.sourceOutlet}
-                    </span>
-                    <Badge className={`${lc.color} text-[10px] border-0`}>
-                      {lc.label}
-                    </Badge>
-                  </div>
-
-                  <span className="text-sm text-gray-600 dark:text-gray-400 font-normal">
-                    {formatDate(report.publishedAt)}
+        }
+        expandedKeys={
+          new Set(
+            Object.entries(interpretations)
+              .filter(([, v]) => v?.expanded)
+              .map(([k]) => k),
+          )
+        }
+        renderExpanded={(report) => {
+          const interp = interpretations[report.id];
+          if (!interp) return null;
+          return (
+            <div className="pt-1">
+              <div className="rounded-md bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                    AI 解读
                   </span>
-
-                  <span className="text-sm text-gray-600 dark:text-gray-400 font-normal truncate">
-                    {report.author}
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="border-0 text-xs"
-                      onClick={() => handleInterpret(report.id)}
-                      disabled={interp?.loading}
-                    >
-                      {interp?.loading ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5 mr-1" />
-                      )}
-                      {interp?.text && isExpanded
-                        ? "收起解读"
-                        : interp?.loading
-                        ? "解读中..."
-                        : "AI 解读"}
-                      {interp?.text && (
-                        <ChevronDown
-                          className={`h-3 w-3 ml-0.5 transition-transform ${
-                            isExpanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      )}
-                    </Button>
-                    <a
-                      href={report.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition px-2 py-1"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      查看原文
-                    </a>
-                  </div>
                 </div>
-
-                {/* Expandable interpretation panel */}
-                {isExpanded && interp && (
-                  <div className="px-5 pb-4 pt-1">
-                    <div className="rounded-md bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 px-4 py-3">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                          AI 解读
-                        </span>
-                      </div>
-                      {interp.loading && (
-                        <div className="text-xs text-gray-500 flex items-center gap-1.5">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          正在生成解读，请稍候...
-                        </div>
-                      )}
-                      {interp.error && (
-                        <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
-                          <AlertCircle className="h-3.5 w-3.5" />
-                          {interp.error}
-                        </div>
-                      )}
-                      {interp.text && (
-                        <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                          {interp.text}
-                        </div>
-                      )}
-                    </div>
+                {interp.loading && (
+                  <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    正在生成解读，请稍候...
+                  </div>
+                )}
+                {interp.error && (
+                  <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    {interp.error}
+                  </div>
+                )}
+                {interp.text && (
+                  <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
+                    {interp.text}
                   </div>
                 )}
               </div>
-            );
-          })
-        )}
-      </GlassCard>
+            </div>
+          );
+        }}
+        columns={[
+          {
+            key: "title",
+            header: "报道标题",
+            render: (report) => (
+              <div className="min-w-0">
+                <p className="truncate">{report.title}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                  {report.summary}
+                </p>
+              </div>
+            ),
+          },
+          {
+            key: "source",
+            header: "来源媒体",
+            width: "160px",
+            render: (report) => {
+              const lc = levelConfig[report.mediaLevel];
+              return (
+                <div className="flex items-center gap-2">
+                  <span className="truncate">{report.sourceOutlet}</span>
+                  <Badge className={`${lc.color} text-[10px]`}>{lc.label}</Badge>
+                </div>
+              );
+            },
+          },
+          {
+            key: "publishedAt",
+            header: "发布时间",
+            width: "110px",
+            render: (report) => (
+              <span className="text-gray-600 dark:text-gray-400">{formatDate(report.publishedAt)}</span>
+            ),
+          },
+          {
+            key: "author",
+            header: "作者",
+            width: "100px",
+            render: (report) => (
+              <span className="text-gray-600 dark:text-gray-400 truncate block">{report.author}</span>
+            ),
+          },
+          {
+            key: "actions",
+            header: "操作",
+            width: "140px",
+            render: (report) => {
+              const interp = interpretations[report.id];
+              const isExpanded = interp?.expanded ?? false;
+              return (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => handleInterpret(report.id)}
+                    disabled={interp?.loading}
+                  >
+                    {interp?.loading ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {interp?.text && isExpanded
+                      ? "收起解读"
+                      : interp?.loading
+                      ? "解读中..."
+                      : "AI 解读"}
+                    {interp?.text && (
+                      <ChevronDown
+                        className={`h-3 w-3 ml-0.5 transition-transform ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                      />
+                    )}
+                  </Button>
+                  <a
+                    href={report.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 transition px-2 py-1"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    查看原文
+                  </a>
+                </div>
+              );
+            },
+          },
+        ] satisfies DataTableColumn<NetworkReport>[]}
+      />
     </div>
   );
 }

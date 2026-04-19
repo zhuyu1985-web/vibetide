@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GlassCard } from "@/components/shared/glass-card";
+import { SearchInput } from "@/components/shared/search-input";
 import { toast } from "sonner";
 import {
   toggleCollectionSourceEnabled,
@@ -194,18 +195,14 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="按名称搜索"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-72 rounded-md bg-white/60 dark:bg-gray-800/60 pl-8 pr-3 text-sm outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 transition"
-            />
-          </div>
+          <SearchInput
+            className="w-72"
+            placeholder="按名称搜索"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-9 w-40 bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700">
+            <SelectTrigger className="w-40">
               <SelectValue placeholder="源类型" />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +215,7 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-32 bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700">
+            <SelectTrigger className="w-32">
               <SelectValue placeholder="状态" />
             </SelectTrigger>
             <SelectContent>
@@ -243,14 +240,14 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
       <GlassCard variant="panel" padding="none">
         {/* Header row (missions style) */}
         <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/60 dark:bg-gray-800/30 border-b border-gray-300 dark:border-gray-600/70">
-          <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-300 tracking-wide">名称</div>
-          <div className="w-24 text-xs text-gray-600 dark:text-gray-300 tracking-wide">类型</div>
-          <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">调度</div>
-          <div className="w-36 text-xs text-gray-600 dark:text-gray-300 tracking-wide">归属模块</div>
-          <div className="w-24 text-xs text-gray-600 dark:text-gray-300 tracking-wide">最近运行</div>
-          <div className="w-16 text-xs text-gray-600 dark:text-gray-300 tracking-wide text-right">已采集</div>
-          <div className="w-20 text-xs text-gray-600 dark:text-gray-300 tracking-wide">状态</div>
-          <div className="w-24 text-xs text-gray-600 dark:text-gray-300 tracking-wide text-right">操作</div>
+          <div className="flex-1 min-w-0 text-sm font-semibold text-gray-600 dark:text-gray-400">名称</div>
+          <div className="w-24 text-sm font-semibold text-gray-600 dark:text-gray-400">类型</div>
+          <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">调度</div>
+          <div className="w-36 text-sm font-semibold text-gray-600 dark:text-gray-400">归属模块</div>
+          <div className="w-24 text-sm font-semibold text-gray-600 dark:text-gray-400">最近运行</div>
+          <div className="w-16 text-sm font-semibold text-gray-600 dark:text-gray-400 text-right">已采集</div>
+          <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">状态</div>
+          <div className="w-24 text-sm font-semibold text-gray-600 dark:text-gray-400 text-right">操作</div>
         </div>
 
         {/* Body */}

@@ -89,10 +89,7 @@ export default function OrganizationsClient({
             管理平台中的所有组织，每个组织的数据相互隔离
           </p>
         </div>
-        <Button
-          onClick={openCreate}
-          className="bg-primary text-primary-foreground hover:brightness-110"
-        >
+        <Button onClick={openCreate}>
           <Plus size={16} className="mr-1.5" />
           新建组织
         </Button>
@@ -187,11 +184,7 @@ export default function OrganizationsClient({
                 {error}
               </p>
             )}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary text-primary-foreground hover:brightness-110"
-            >
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? "保存中..." : editOrg ? "保存修改" : "创建组织"}
             </Button>
           </form>

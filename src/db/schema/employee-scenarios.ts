@@ -6,6 +6,7 @@ import {
   jsonb,
   integer,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
@@ -42,7 +43,14 @@ export const employeeScenarios = pgTable("employee_scenarios", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  // Natural key — prevents duplicate scenario rows per employee per org.
+  // Without this, re-running `npm run db:seed` appended fresh copies every
+  // time (seed uses plain INSERT without onConflictDoNothing). We saw 7x
+  // duplicates in the wild.
+  orgEmployeeNameUidx: uniqueIndex("employee_scenarios_org_slug_name_uidx")
+    .on(table.organizationId, table.employeeSlug, table.name),
+}));
 
 export const employeeScenariosRelations = relations(
   employeeScenarios,

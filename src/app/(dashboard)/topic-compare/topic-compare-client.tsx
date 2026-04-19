@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Search,
-  ArrowUpDown,
   FileText,
   Video,
   Radio,
@@ -17,6 +16,8 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { StatCard } from "@/components/shared/stat-card";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
 import type { TopicCompareArticle } from "@/lib/types";
 
@@ -109,15 +110,6 @@ export function TopicCompareClient({ articles, usingMock }: Props) {
   const [keyword, setKeyword] = useState("");
   const [sortField, setSortField] = useState<SortField>("publishedAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
-  };
 
   /* ─── KPI 计算 ─── */
   const kpis = useMemo(() => {
@@ -235,107 +227,116 @@ export function TopicCompareClient({ articles, usingMock }: Props) {
           ))}
         </div>
 
-        <div className="relative ml-auto">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="搜索作品标题..."
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="h-9 w-[260px] rounded-md bg-white/60 dark:bg-gray-800/60 pl-8 pr-3 text-sm outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 transition"
-          />
-        </div>
+        <SearchInput
+          className="ml-auto w-[260px]"
+          placeholder="搜索作品标题..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
       </div>
 
       {/* ── Table ── */}
-      <GlassCard padding="none">
-        {/* Table header */}
-        <div className="grid grid-cols-[1fr_100px_120px_70px_80px_70px_90px_110px] gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
-          <span>作品标题</span>
-          <button
-            className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300 transition border-0 bg-transparent cursor-pointer text-xs text-gray-500 dark:text-gray-400 font-medium"
-            onClick={() => toggleSort("publishedAt")}
-          >
-            发布时间
-            <ArrowUpDown className="h-3 w-3" />
-          </button>
-          <span>发布渠道</span>
-          <span>类型</span>
-          <button
-            className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300 transition border-0 bg-transparent cursor-pointer text-xs text-gray-500 dark:text-gray-400 font-medium"
-            onClick={() => toggleSort("readCount")}
-          >
-            阅读量
-            <ArrowUpDown className="h-3 w-3" />
-          </button>
-          <span>热度</span>
-          <span>同题报道</span>
-          <span>操作</span>
-        </div>
-
-        {/* Table body */}
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
-            <Search className="h-10 w-10 mb-3 opacity-40" />
-            <p className="text-sm">
-              {articles.length === 0 ? "暂无已发布作品" : "没有找到匹配的作品，请调整筛选条件"}
-            </p>
-            {articles.length === 0 && (
-              <p className="text-xs text-gray-400 mt-1">作品数据将从发布系统自动同步</p>
-            )}
+      <DataTable
+        rows={filtered}
+        rowKey={(a) => a.id}
+        sortKey={sortField}
+        sortDirection={sortDir}
+        onSortChange={(key, dir) => {
+          setSortField(key as SortField);
+          setSortDir(dir);
+        }}
+        emptyMessage={
+          <div className="flex flex-col items-center gap-2">
+            <Search className="h-10 w-10 opacity-40" />
+            <p>{articles.length === 0 ? "暂无已发布作品" : "没有找到匹配的作品，请调整筛选条件"}</p>
+            {articles.length === 0 && <p className="text-xs">作品数据将从发布系统自动同步</p>}
           </div>
-        ) : (
-          filtered.map((article) => {
-            // 模拟热度值：基于同题报道数和阅读量综合计算
-            const heat = Math.min(99, Math.round(
-              (article.benchmarkCount / 50) * 60 + (article.readCount / 150000) * 40
-            ));
-            return (
-              <div
-                key={article.id}
-                className="grid grid-cols-[1fr_100px_120px_70px_80px_70px_90px_110px] gap-2 px-5 py-4 border-b border-gray-50 dark:border-gray-800/50 last:border-b-0 items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition"
-              >
-                {/* Title */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
-                    {article.title}
+        }
+        footer={
+          filtered.length > 0 ? (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">共 {filtered.length} 篇作品</span>
+              <span className="text-xs text-gray-400">
+                累计阅读 {formatNumber(filtered.reduce((s, a) => s + a.readCount, 0))}
+              </span>
+            </div>
+          ) : undefined
+        }
+        columns={[
+          {
+            key: "title",
+            header: "作品标题",
+            render: (article) => (
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="truncate">{article.title}</span>
+                {isWithin24h(article.publishedAt) && (
+                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0 leading-4 rounded shrink-0">
+                    新
                   </span>
-                  {isWithin24h(article.publishedAt) && (
-                    <span className="bg-red-500 text-white text-[10px] px-1.5 py-0 leading-4 rounded shrink-0">
-                      新
-                    </span>
-                  )}
-                </div>
-
-                {/* Publish time */}
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatDate(article.publishedAt)}
-                </span>
-
-                {/* Channels */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  {article.channels.map((ch) => (
-                    <span
-                      key={ch}
-                      className={`text-[10px] px-1.5 py-0.5 rounded ${channelColor[ch] ?? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}
-                    >
-                      {ch}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Content type */}
-                <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                  {contentTypeIcon[article.contentType]}
-                  <span className="text-xs">{contentTypeLabel[article.contentType]}</span>
-                </div>
-
-                {/* Read count */}
-                <span className="text-xs text-gray-700 dark:text-gray-300">
-                  {formatNumber(article.readCount)}
-                </span>
-
-                {/* 热度 */}
+                )}
+              </div>
+            ),
+          },
+          {
+            key: "publishedAt",
+            header: "发布时间",
+            width: "100px",
+            sortable: true,
+            render: (article) => (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {formatDate(article.publishedAt)}
+              </span>
+            ),
+          },
+          {
+            key: "channels",
+            header: "发布渠道",
+            width: "120px",
+            render: (article) => (
+              <div className="flex items-center gap-1 flex-wrap">
+                {article.channels.map((ch) => (
+                  <span
+                    key={ch}
+                    className={`text-[10px] px-1.5 py-0.5 rounded ${channelColor[ch] ?? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}
+                  >
+                    {ch}
+                  </span>
+                ))}
+              </div>
+            ),
+          },
+          {
+            key: "contentType",
+            header: "类型",
+            width: "70px",
+            render: (article) => (
+              <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                {contentTypeIcon[article.contentType]}
+                <span className="text-xs">{contentTypeLabel[article.contentType]}</span>
+              </div>
+            ),
+          },
+          {
+            key: "readCount",
+            header: "阅读量",
+            width: "80px",
+            sortable: true,
+            render: (article) => (
+              <span className="text-xs text-gray-700 dark:text-gray-300">
+                {formatNumber(article.readCount)}
+              </span>
+            ),
+          },
+          {
+            key: "heat",
+            header: "热度",
+            width: "70px",
+            render: (article) => {
+              const heat = Math.min(
+                99,
+                Math.round((article.benchmarkCount / 50) * 60 + (article.readCount / 150000) * 40),
+              );
+              return (
                 <div className="flex items-center gap-1.5">
                   <div className="w-8 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                     <div
@@ -345,46 +346,39 @@ export function TopicCompareClient({ articles, usingMock }: Props) {
                   </div>
                   <span className={`text-[11px] font-medium ${heatTextColor(heat)}`}>{heat}</span>
                 </div>
-
-                {/* Benchmark count badge */}
-                <div>
-                  <span
-                    className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${benchmarkBadgeColor(article.benchmarkCount)}`}
-                  >
-                    {article.benchmarkCount} 篇
-                  </span>
-                </div>
-
-                {/* Action */}
-                <div>
-                  {article.hasAnalysis ? (
-                    <Link
-                      href={`/topic-compare/${article.id}`}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition"
-                    >
-                      查看同题对比 →
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      未生成分析
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-
-        {/* Footer */}
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-800">
-            <span className="text-xs text-gray-400">共 {filtered.length} 篇作品</span>
-            <span className="text-xs text-gray-400">
-              累计阅读 {formatNumber(filtered.reduce((s, a) => s + a.readCount, 0))}
-            </span>
-          </div>
-        )}
-      </GlassCard>
+              );
+            },
+          },
+          {
+            key: "benchmark",
+            header: "同题报道",
+            width: "90px",
+            render: (article) => (
+              <span
+                className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${benchmarkBadgeColor(article.benchmarkCount)}`}
+              >
+                {article.benchmarkCount} 篇
+              </span>
+            ),
+          },
+          {
+            key: "action",
+            header: "操作",
+            width: "110px",
+            render: (article) =>
+              article.hasAnalysis ? (
+                <Link
+                  href={`/topic-compare/${article.id}`}
+                  className="text-xs text-sky-600 hover:text-sky-700 transition"
+                >
+                  查看同题对比 →
+                </Link>
+              ) : (
+                <span className="text-xs text-gray-400 dark:text-gray-500">未生成分析</span>
+              ),
+          },
+        ] satisfies DataTableColumn<TopicCompareArticle>[]}
+      />
     </div>
   );
 }

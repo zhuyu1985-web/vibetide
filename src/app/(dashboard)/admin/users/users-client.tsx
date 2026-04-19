@@ -231,10 +231,7 @@ export default function UsersClient({
             管理用户账号、分配组织和角色
           </p>
         </div>
-        <Button
-          onClick={openCreate}
-          className="bg-primary text-primary-foreground hover:brightness-110"
-        >
+        <Button onClick={openCreate}>
           <Plus size={16} className="mr-1.5" />
           添加用户
         </Button>
@@ -447,11 +444,7 @@ export default function UsersClient({
                 {error}
               </p>
             )}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary text-primary-foreground hover:brightness-110"
-            >
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? "创建中..." : "创建用户"}
             </Button>
           </form>
@@ -503,11 +496,7 @@ export default function UsersClient({
                 {error}
               </p>
             )}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary text-primary-foreground hover:brightness-110"
-            >
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? "保存中..." : "保存修改"}
             </Button>
           </form>
@@ -553,7 +542,7 @@ export default function UsersClient({
             <Button
               type="submit"
               disabled={loading || !selectedRoleId}
-              className="w-full bg-primary text-primary-foreground hover:brightness-110"
+              className="w-full"
             >
               {loading ? "分配中..." : "确认分配"}
             </Button>

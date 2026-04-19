@@ -105,7 +105,18 @@ function getScopedSkillKey(skill: ScopedSkillRow) {
 }
 
 function preferScopedSkillRows<T extends ScopedSkillRow>(rows: T[], orgId: string | null): T[] {
-  if (!orgId) return rows;
+  if (!orgId) {
+    // Still dedup by key to guard against duplicate rows accumulating from
+    // un-guarded seeds (fixed in migration 0028 with a unique index, but
+    // existing databases may still have leftover duplicates).
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+      const key = getScopedSkillKey(row);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
 
   const keysWithOrgSpecific = new Set(
     rows
@@ -113,9 +124,18 @@ function preferScopedSkillRows<T extends ScopedSkillRow>(rows: T[], orgId: strin
       .map((row) => getScopedSkillKey(row))
   );
 
-  return rows.filter(
-    (row) => !(row.organizationId === null && keysWithOrgSpecific.has(getScopedSkillKey(row)))
-  );
+  // 1. Drop global rows that are shadowed by an org-scoped row.
+  // 2. Defensive dedup: keep only the first occurrence of each key.
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (row.organizationId === null && keysWithOrgSpecific.has(getScopedSkillKey(row))) {
+      return false;
+    }
+    const key = getScopedSkillKey(row);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function findSkillRecord(

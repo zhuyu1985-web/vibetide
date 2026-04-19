@@ -112,10 +112,81 @@ Each employee has skills (many-to-many via `employee_skills`), performance stats
 ### Component Organization
 
 - `src/components/ui/` — shadcn/ui base components (25+). Add new ones via `npx shadcn add <component>`.
-- `src/components/shared/` — Domain-specific reusable components (GlassCard, EmployeeAvatar, ActivityFeed, WorkflowPipeline, etc.)
+- `src/components/shared/` — Domain-specific reusable components (GlassCard, DataTable, PageHeader, EmployeeAvatar, ActivityFeed, WorkflowPipeline, etc.)
 - `src/components/charts/` — Recharts wrappers (area, bar, donut, gauge, radar, heat curve)
 - `src/components/layout/` — AppSidebar, Topbar
 - `cn()` utility in `src/lib/utils.ts` for merging Tailwind classes
+
+### Design System Rules (don't break these)
+
+Every past round of style drift came from bypassing shared primitives. These rules keep the UI consistent:
+
+**Always use the shared primitives. Never hand-roll:**
+- Buttons → `<Button>` from `@/components/ui/button` (never `<button>`)
+- Inputs → `<Input>` from `@/components/ui/input` (never `<input type='text'>`)
+- Search boxes → `<SearchInput>` from `@/components/shared/search-input` (never `<div className="relative"><Search absolute .../><Input pl-8 .../></div>`)
+- Dropdowns → `<Select>` from `@/components/ui/select` (never `<select>`)
+- Multi-line inputs → `<Textarea>` from `@/components/ui/textarea` (never `<textarea>`)
+- Date pickers → `<DatePicker>` / `<DateRangePicker>` from `@/components/shared/date-picker` (never Popover+Calendar built from scratch)
+- Tabs → `<Tabs>` / `<TabsList>` / `<TabsTrigger>` from `@/components/ui/tabs`. Use `variant="default"` (filled pill) or `variant="line"` (underlined). Don't manually emulate via `className="bg-transparent border-0 p-0 h-auto"` — use the variant.
+- Data tables → `<DataTable>` from `@/components/shared/data-table` (never hand-rolled flex/grid rows)
+- Page titles → `<PageHeader>` from `@/components/shared/page-header`
+- Cards → `<GlassCard>` from `@/components/shared/glass-card` (never `rounded-xl bg-white p-4 shadow`)
+
+**Never override color classes via `className` on shared components.** The shared `Button` uses a liquid-glass translucent sky style. `<Button className="bg-primary text-white">...</Button>` defeats the shared style — use `variant` (`default` / `ghost` / `destructive` / `outline` / `secondary` / `link`) instead. Same for `<Input>`, `<SelectTrigger>`, `<Textarea>`, etc.
+
+Known drift patterns to avoid (these have all appeared and been cleaned up — don't reintroduce):
+- `<Input className="bg-white/60 border border-gray-200 focus:ring-blue-500/30">` — strip the overrides
+- `<SelectTrigger className="bg-[var(--glass-input-bg)] border-[var(--glass-input-border)]">` — strip
+- `<SelectTrigger className="border-0 bg-gray-100 dark:bg-gray-800">` — strip
+- `<Textarea className="border-0 bg-gray-100 dark:bg-gray-800">` — strip
+- `<TabsList className="bg-transparent border-0 p-0 h-auto">` — use `variant="line"` instead
+
+**DataTable API (key patterns):**
+```tsx
+<DataTable
+  rows={items}
+  rowKey={(item) => item.id}
+  columns={[
+    { key: "name", header: "名称", render: (r) => r.name },              // flex column (default)
+    { key: "status", header: "状态", width: "w-24", render: (r) => ... }, // Tailwind width class
+    { key: "date", header: "时间", width: "120px", render: (r) => ... }, // CSS length
+    { key: "count", header: "数量", align: "right", sortable: true, render: (r) => r.count },
+  ]}
+  // Optional: selection
+  selectable
+  selectedKeys={selected}
+  onSelectionChange={setSelected}
+  // Optional: sorting (controlled)
+  sortKey={sortField}
+  sortDirection={sortDir}
+  onSortChange={(key, dir) => { ... }}
+  // Optional: expandable rows. If `onExpandChange` is provided, row-click toggles
+  // expansion and a chevron column appears. Omit it to drive expansion from an
+  // action button inside a cell.
+  expandedKeys={expanded}
+  renderExpanded={(row) => <div>...</div>}
+  // Optional: empty state + footer
+  emptyMessage={<EmptyStateContent />}
+  footer={<FooterStats />}
+/>
+```
+
+**SearchInput API:**
+```tsx
+<SearchInput placeholder="搜索..." value={q} onChange={e => setQ(e.target.value)} />
+<SearchInput className="w-60" inputClassName="h-8 text-xs" ... />  // compact variant
+```
+`className` goes on the wrapper (use for width / positioning). `inputClassName` forwards to the inner `<Input>` (use for size variants like `h-8 text-xs`).
+
+**DatePicker / DateRangePicker API:**
+```tsx
+<DatePicker value={date} onChange={setDate} placeholder="选择日期" />
+<DateRangePicker value={range} onChange={setRange} placeholder="选择日期范围" />
+```
+The trigger visually matches `<Input>` (bordered, muted) since date pickers are form inputs, not primary-action buttons.
+
+**Enforcement:** `eslint.config.mjs` defines `no-restricted-syntax` rules (currently `warn`) that flag raw `<button>/<input>/<select>/<textarea>` in `src/app/**` and `src/components/**` (except under `src/components/ui/**`, `src/app/landing/**`, `src/components/media-assets/**`). Editor ESLint integrations show red squigglies on violations; CI output lists them too.
 
 ### Environment Variables
 

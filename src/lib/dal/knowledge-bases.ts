@@ -6,7 +6,7 @@ import {
   employeeKnowledgeBases,
   aiEmployees,
 } from "@/db/schema";
-import { eq, and, desc, sql, ilike, notInArray, inArray, or, isNotNull } from "drizzle-orm";
+import { eq, and, asc, desc, sql, ilike, notInArray, inArray, or, isNotNull } from "drizzle-orm";
 import type {
   KnowledgeBaseInfo,
   KBSummary,
@@ -121,21 +121,32 @@ export async function listKnowledgeBaseSummariesByOrg(
     })
     .from(knowledgeBases)
     .where(eq(knowledgeBases.organizationId, organizationId))
-    .orderBy(desc(knowledgeBases.updatedAt));
+    .orderBy(asc(knowledgeBases.createdAt));
 
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    description: r.description || "",
-    type: r.type,
-    documentCount: r.documentCount || 0,
-    chunkCount: r.chunkCount || 0,
-    vectorizationStatus: r.vectorizationStatus as KBVectorizationStatus,
-    boundEmployeeCount: Number(r.boundCount || 0),
-    lastSyncAt: toIsoStringNullable(r.lastSyncAt),
-    updatedAt: toIsoString(r.updatedAt),
-    createdAt: toIsoString(r.createdAt),
-  }));
+  // Defensive dedup by name — migration 0028 adds a unique index on
+  // (organizationId, name), but existing DBs may still carry duplicates.
+  const seen = new Set<string>();
+  const unique = rows.filter((r) => {
+    if (seen.has(r.name)) return false;
+    seen.add(r.name);
+    return true;
+  });
+
+  return unique
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description || "",
+      type: r.type,
+      documentCount: r.documentCount || 0,
+      chunkCount: r.chunkCount || 0,
+      vectorizationStatus: r.vectorizationStatus as KBVectorizationStatus,
+      boundEmployeeCount: Number(r.boundCount || 0),
+      lastSyncAt: toIsoStringNullable(r.lastSyncAt),
+      updatedAt: toIsoString(r.updatedAt),
+      createdAt: toIsoString(r.createdAt),
+    }));
 }
 
 /**

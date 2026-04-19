@@ -136,8 +136,10 @@ async function handleQuickCommand(
   }
 
   try {
-    // Import startMission lazily to avoid pulling server-action context at module load
-    const { startMission } = await import("@/app/actions/missions");
+    // Use startMissionFromModule so we can pass an idempotency key from the
+    // IM platform. IM webhooks are at-least-once delivery (DingTalk retries
+    // 3x, WeCom 5x) — without this every retry created a duplicate mission.
+    const { startMissionFromModule } = await import("@/app/actions/missions");
 
     // Build a human-readable instruction from params
     const paramLines = Object.entries(command.params)
@@ -147,10 +149,19 @@ async function handleQuickCommand(
       ? `来自渠道消息的任务请求。\n${paramLines}`
       : "来自渠道消息的任务请求。";
 
-    const mission = await startMission({
+    const mission = await startMissionFromModule({
+      organizationId: msg.organizationId,
       title: cfg.label,
       scenario: command.scenarioKey,
       userInstruction,
+      sourceModule: `channel:${msg.platform}`,
+      sourceEntityId: msg.externalMessageId,
+      sourceEntityType: "channel_message",
+      sourceContext: {
+        configId: msg.configId,
+        externalUserId: msg.externalUserId,
+        chatId: msg.chatId,
+      },
     });
 
     // Persist outbound acknowledgement (fire-and-forget)

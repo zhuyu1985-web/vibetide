@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "employee_scenarios_org_slug_name_uidx" ON "employee_scenarios" USING btree ("organization_id","employee_slug","name");

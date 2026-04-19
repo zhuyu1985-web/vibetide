@@ -7,15 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/shared/date-picker";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import {
   Select,
   SelectContent,
@@ -440,7 +432,7 @@ export function SearchWorkbenchClient({
                 onChange={(e) => setKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="输入关键词搜索新闻标题和正文..."
-                className="flex-1 bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] rounded-lg focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                className="flex-1"
               />
               <Button variant="ghost" onClick={handleSearch} disabled={pending}>
                 <Search className="h-4 w-4 mr-1" />
@@ -450,7 +442,7 @@ export function SearchWorkbenchClient({
 
             <div className="flex flex-wrap items-center gap-2">
               <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="w-36 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+                <SelectTrigger className="w-36">
                   <SelectValue placeholder="媒体层级" />
                 </SelectTrigger>
                 <SelectContent>
@@ -464,7 +456,7 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger className="w-32 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+                <SelectTrigger className="w-32">
                   <SelectValue placeholder="区县" />
                 </SelectTrigger>
                 <SelectContent>
@@ -478,7 +470,7 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={outletFilter} onValueChange={setOutletFilter}>
-                <SelectTrigger className="w-36 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+                <SelectTrigger className="w-36">
                   <SelectValue placeholder="具体媒体" />
                 </SelectTrigger>
                 <SelectContent>
@@ -492,7 +484,7 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={channelFilter} onValueChange={setChannelFilter}>
-                <SelectTrigger className="w-32 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+                <SelectTrigger className="w-32">
                   <SelectValue placeholder="采集来源" />
                 </SelectTrigger>
                 <SelectContent>
@@ -556,7 +548,7 @@ export function SearchWorkbenchClient({
                     value={row.field}
                     onValueChange={(v) => handleFieldChange(row.id, v as AdvancedSearchField)}
                   >
-                    <SelectTrigger className="w-44 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+                    <SelectTrigger className="w-44">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -573,7 +565,7 @@ export function SearchWorkbenchClient({
                       updateCondition(row.id, { operator: v as AdvancedSearchOperator })
                     }
                   >
-                    <SelectTrigger className="w-28 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+                    <SelectTrigger className="w-28">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -672,77 +664,92 @@ export function SearchWorkbenchClient({
             </div>
 
             {/* Table */}
-            <GlassCard variant="default" padding="none">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10" />
-                    <TableHead>标题</TableHead>
-                    <TableHead className="w-28">媒体名</TableHead>
-                    <TableHead className="w-24">层级</TableHead>
-                    <TableHead className="w-20">区县</TableHead>
-                    <TableHead className="w-28">发布时间</TableHead>
-                    <TableHead className="w-20">来源</TableHead>
-                    <TableHead className="w-14">原链</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {result.articles.map((a: ArticleSearchResult) => (
-                    <TableRow key={a.id} className="[&>td]:py-4">
-                      <TableCell>
-                        <Checkbox
-                          checked={selected.has(a.id)}
-                          onCheckedChange={() => toggleSelect(a.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="truncate" title={a.title}>
-                          {a.title}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {a.outletName ?? "-"}
-                      </TableCell>
-                      <TableCell>
-                        {a.outletTier ? (
-                          <Badge
-                            className={
-                              TIER_BADGE_CLASS[a.outletTier] ??
-                              "bg-gray-100 text-gray-700"
-                            }
-                          >
-                            {TIER_LABELS[a.outletTier] ?? a.outletTier}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {a.districtName ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {a.publishedAt
-                          ? new Date(a.publishedAt).toLocaleDateString("zh-CN")
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {CHANNEL_LABELS[a.sourceChannel] ?? a.sourceChannel}
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={a.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-primary hover:underline"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </GlassCard>
+            <DataTable
+              rows={result.articles as ArticleSearchResult[]}
+              rowKey={(a) => a.id}
+              selectable
+              selectedKeys={selected}
+              onSelectionChange={setSelected}
+              columns={[
+                {
+                  key: "title",
+                  header: "标题",
+                  render: (a) => (
+                    <span className="truncate block" title={a.title}>{a.title}</span>
+                  ),
+                },
+                {
+                  key: "outlet",
+                  header: "媒体名",
+                  width: "w-28",
+                  render: (a) => (
+                    <span className="text-muted-foreground truncate block">{a.outletName ?? "-"}</span>
+                  ),
+                },
+                {
+                  key: "tier",
+                  header: "层级",
+                  width: "w-24",
+                  render: (a) =>
+                    a.outletTier ? (
+                      <Badge
+                        className={
+                          TIER_BADGE_CLASS[a.outletTier] ??
+                          "bg-gray-100 text-gray-700"
+                        }
+                      >
+                        {TIER_LABELS[a.outletTier] ?? a.outletTier}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    ),
+                },
+                {
+                  key: "district",
+                  header: "区县",
+                  width: "w-20",
+                  render: (a) => (
+                    <span className="text-muted-foreground truncate block">{a.districtName ?? "-"}</span>
+                  ),
+                },
+                {
+                  key: "publishedAt",
+                  header: "发布时间",
+                  width: "w-28",
+                  render: (a) => (
+                    <span className="text-xs text-muted-foreground">
+                      {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString("zh-CN") : "-"}
+                    </span>
+                  ),
+                },
+                {
+                  key: "channel",
+                  header: "来源",
+                  width: "w-20",
+                  render: (a) => (
+                    <span className="text-xs text-muted-foreground truncate block">
+                      {CHANNEL_LABELS[a.sourceChannel] ?? a.sourceChannel}
+                    </span>
+                  ),
+                },
+                {
+                  key: "url",
+                  header: "原链",
+                  width: "w-14",
+                  align: "right",
+                  render: (a) => (
+                    <a
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-end text-sky-600 hover:text-sky-700"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  ),
+                },
+              ] satisfies DataTableColumn<ArticleSearchResult>[]}
+            />
           </div>
         )}
       </div>

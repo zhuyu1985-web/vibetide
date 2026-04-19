@@ -263,7 +263,7 @@ function CatalogTab({ asset }: { asset: AssetDetailFull }) {
         <button
           onClick={save}
           disabled={saving}
-          className="h-8 px-4 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+          className="h-8 px-4 rounded-lg bg-sky-300/10 text-blue-900 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_1px_2px_rgba(14,165,233,0.08)] ring-1 ring-inset ring-sky-300/25 text-[13px] font-medium hover:bg-sky-300/18 hover:ring-sky-300/40 disabled:opacity-50 flex items-center gap-1.5 transition-all"
         >
           <Save size={14} />
           {saving ? "保存中..." : "保存"}

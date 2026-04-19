@@ -19,14 +19,6 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { MonitoringSummary, CollectionTrendPoint } from "@/lib/dal/collected-items";
 
@@ -242,40 +234,41 @@ export function MonitoringClient({
             {errorSources.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">暂无错误数据</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>源名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead className="text-right">失败</TableHead>
-                    <TableHead className="text-right">部分</TableHead>
-                    <TableHead>最近失败</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {errorSources.map((src) => (
-                    <TableRow key={src.sourceId}>
-                      <TableCell className="max-w-[140px] truncate font-medium">
-                        {src.sourceName}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {src.sourceType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-red-500 font-semibold">
-                        {src.failedCount}
-                      </TableCell>
-                      <TableCell className="text-right text-yellow-500">
-                        {src.partialCount}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {src.lastFailedAt ? formatDateTime(src.lastFailedAt) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="-mx-6 -mb-6">
+                {/* Header */}
+                <div className="flex items-center gap-3 px-6 py-2.5 border-b border-gray-200/60 dark:border-gray-700/40">
+                  <div className="flex-1 min-w-0 text-sm font-semibold text-gray-600 dark:text-gray-400">源名称</div>
+                  <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">类型</div>
+                  <div className="w-14 text-sm font-semibold text-gray-600 dark:text-gray-400 text-right">失败</div>
+                  <div className="w-14 text-sm font-semibold text-gray-600 dark:text-gray-400 text-right">部分</div>
+                  <div className="w-32 text-sm font-semibold text-gray-600 dark:text-gray-400">最近失败</div>
+                </div>
+                {/* Body */}
+                {errorSources.map((src) => (
+                  <div
+                    key={src.sourceId}
+                    className="flex items-center gap-3 px-6 py-3.5 border-b border-gray-100/60 dark:border-gray-800/40 last:border-b-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 text-sm text-gray-800 dark:text-gray-100 truncate">
+                      {src.sourceName}
+                    </div>
+                    <div className="w-20">
+                      <Badge variant="outline" className="text-xs">
+                        {src.sourceType}
+                      </Badge>
+                    </div>
+                    <div className="w-14 text-right text-sm text-red-500">
+                      {src.failedCount}
+                    </div>
+                    <div className="w-14 text-right text-sm text-yellow-500">
+                      {src.partialCount}
+                    </div>
+                    <div className="w-32 text-xs text-muted-foreground truncate">
+                      {src.lastFailedAt ? formatDateTime(src.lastFailedAt) : "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

@@ -13,14 +13,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -28,8 +20,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, X, Pencil, Archive, RotateCcw } from "lucide-react";
-import { GlassCard } from "@/components/shared/glass-card";
+import { Plus, X } from "lucide-react";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { PageHeader } from "@/components/shared/page-header";
 import type {
   MediaOutletSummary,
   MediaTier,
@@ -218,25 +211,23 @@ export function MediaOutletsClient({
 
   return (
     <div className="max-w-[1400px] mx-auto w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">媒体源管理</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          管理央、市、行业、区县四级媒体登记
-        </p>
-      </div>
+      <PageHeader
+        title="媒体源管理"
+        description="管理央、市、行业、区县四级媒体登记"
+      />
 
       <div className="flex flex-wrap gap-3 items-center">
         <Input
           placeholder="按名称搜索..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] rounded-lg focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+          className="max-w-xs"
         />
         <Select
           value={tierFilter}
           onValueChange={(v) => setTierFilter(v as "all" | MediaTier)}
         >
-          <SelectTrigger className="w-44 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+          <SelectTrigger className="w-44">
             <SelectValue placeholder="层级" />
           </SelectTrigger>
           <SelectContent>
@@ -253,7 +244,7 @@ export function MediaOutletsClient({
             setStatusFilter(v as "all" | "active" | "archived")
           }
         >
-          <SelectTrigger className="w-32 bg-[var(--glass-input-bg)] border-[var(--glass-input-border)] rounded-lg">
+          <SelectTrigger className="w-32">
             <SelectValue placeholder="状态" />
           </SelectTrigger>
           <SelectContent>
@@ -263,105 +254,106 @@ export function MediaOutletsClient({
           </SelectContent>
         </Select>
         <div className="flex-1" />
-        <Button variant="ghost" onClick={openCreate}>
+        <Button onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" />
           新增媒体
         </Button>
       </div>
 
-      <GlassCard variant="default" padding="none">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>名称</TableHead>
-              <TableHead>层级</TableHead>
-              <TableHead>省市</TableHead>
-              <TableHead>区县</TableHead>
-              <TableHead>行业标签</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>别名数</TableHead>
-              <TableHead>操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center text-muted-foreground py-10"
+      <DataTable
+        rows={filtered}
+        rowKey={(o) => o.id}
+        emptyMessage="未找到匹配的媒体源"
+        columns={[
+          {
+            key: "name",
+            header: "名称",
+            render: (o) =>
+              o.officialUrl ? (
+                <a
+                  href={o.officialUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline truncate block"
                 >
-                  未找到匹配的媒体源
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-medium">
-                    {o.officialUrl ? (
-                      <a
-                        href={o.officialUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {o.name}
-                      </a>
-                    ) : (
-                      o.name
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={TIER_BADGE_CLASS[o.tier]}>
-                      {TIER_LABELS[o.tier]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{o.province ?? "-"}</TableCell>
-                  <TableCell>{o.districtName ?? "-"}</TableCell>
-                  <TableCell>{o.industryTag ?? "-"}</TableCell>
-                  <TableCell>
-                    {o.status === "active" ? (
-                      <span className="text-emerald-600">有效</span>
-                    ) : (
-                      <span className="text-muted-foreground">已归档</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{o.aliasCount}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEdit(o)}
-                      >
-                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                        编辑
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleArchive(o)}
-                        disabled={pending}
-                      >
-                        {o.status === "archived" ? (
-                          <>
-                            <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                            恢复
-                          </>
-                        ) : (
-                          <>
-                            <Archive className="mr-1 h-3.5 w-3.5" />
-                            归档
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </GlassCard>
+                  {o.name}
+                </a>
+              ) : (
+                <span className="truncate block">{o.name}</span>
+              ),
+          },
+          {
+            key: "tier",
+            header: "层级",
+            width: "w-24",
+            render: (o) => (
+              <Badge className={TIER_BADGE_CLASS[o.tier]}>{TIER_LABELS[o.tier]}</Badge>
+            ),
+          },
+          {
+            key: "province",
+            header: "省市",
+            width: "w-24",
+            render: (o) => <span className="truncate block">{o.province ?? "-"}</span>,
+          },
+          {
+            key: "district",
+            header: "区县",
+            width: "w-24",
+            render: (o) => <span className="truncate block">{o.districtName ?? "-"}</span>,
+          },
+          {
+            key: "industry",
+            header: "行业标签",
+            width: "w-28",
+            render: (o) => <span className="truncate block">{o.industryTag ?? "-"}</span>,
+          },
+          {
+            key: "status",
+            header: "状态",
+            width: "w-20",
+            render: (o) =>
+              o.status === "active" ? (
+                <span className="inline-flex items-center gap-1.5 text-emerald-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  有效
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                  已归档
+                </span>
+              ),
+          },
+          {
+            key: "aliasCount",
+            header: "别名数",
+            width: "w-16",
+            render: (o) => o.aliasCount,
+          },
+          {
+            key: "actions",
+            header: "操作",
+            width: "w-32",
+            align: "right",
+            render: (o) => (
+              <div className="flex justify-end gap-1">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(o)}>
+                  编辑
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleArchive(o)}
+                  disabled={pending}
+                >
+                  {o.status === "archived" ? "恢复" : "归档"}
+                </Button>
+              </div>
+            ),
+          },
+        ] satisfies DataTableColumn<MediaOutletSummary>[]}
+      />
 
       <Dialog
         open={dialog.kind !== "closed"}

@@ -6,6 +6,7 @@ import {
   jsonb,
   integer,
   real,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
@@ -56,7 +57,12 @@ export const skills = pgTable("skills", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  // Natural key — skill name must be unique per org. Prevents duplicate rows
+  // from un-guarded seeds or double-submits on the skill-create form.
+  orgNameUidx: uniqueIndex("skills_org_name_uidx")
+    .on(table.organizationId, table.name),
+}));
 
 export const employeeSkills = pgTable("employee_skills", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -76,7 +82,11 @@ export const employeeSkills = pgTable("employee_skills", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  // Join-table uniqueness — an employee either has a skill or doesn't.
+  employeeSkillUidx: uniqueIndex("employee_skills_employee_skill_uidx")
+    .on(table.employeeId, table.skillId),
+}));
 
 // Relations
 export const skillsRelations = relations(skills, ({ one, many }) => ({

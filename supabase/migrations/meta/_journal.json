@@ -183,6 +183,27 @@
       "when": 1776504312704,
       "tag": "0025_rainy_thunderbolt_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776570296931,
+      "tag": "0026_low_prism",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1776571632185,
+      "tag": "0027_aspiring_photon",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1776572115615,
+      "tag": "0028_warm_quicksilver",
+      "breakpoints": true
     }
   ]
 }

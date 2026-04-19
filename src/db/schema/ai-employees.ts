@@ -6,6 +6,7 @@ import {
   jsonb,
   integer,
   real,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
@@ -76,9 +77,14 @@ export const aiEmployees = pgTable("ai_employees", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
-// Unique constraint on (organization_id, slug) should be added via migration:
-// CREATE UNIQUE INDEX ai_employees_org_slug_unique ON ai_employees (organization_id, slug);
+}, (table) => ({
+  // Natural key — each slug (xiaolei, xiaoce, leader, …) is unique per org.
+  // Without this, the auto-provision in startMission (missions.ts) had a race
+  // window where two concurrent inserts could both slip past the "if (!leader)"
+  // check and create duplicate leader rows.
+  orgSlugUidx: uniqueIndex("ai_employees_org_slug_uidx")
+    .on(table.organizationId, table.slug),
+}));
 
 // Note: Cross-module relations (employeeSkills, teamMembers, etc.)
 // are defined in their respective schema files pointing back to aiEmployees.

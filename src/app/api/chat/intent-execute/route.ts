@@ -9,6 +9,7 @@ import { toVercelTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import type { IntentResult } from "@/lib/agent/intent-recognition";
+import { notifyChatMessage } from "@/lib/channels/chat-notifier";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -138,6 +139,12 @@ export async function POST(req: Request) {
     const usedSkills: { tool: string; skillName: string }[] = [];
     const usedToolSet = new Set<string>();
 
+    // Accumulate the combined assistant output across all steps so we can
+    // forward the Q&A to external channels after streaming completes.
+    let fullAssistantOutput = "";
+    const primarySlug = intent.steps[0].employeeSlug;
+    const primaryEmployee = employeeMap.get(primarySlug);
+
     const stream = new ReadableStream({
       async start(controller) {
         const send = (event: string, data: Record<string, unknown>) => {
@@ -256,6 +263,15 @@ export async function POST(req: Request) {
             // Save step output as context for next step
             priorStepOutput = stepText;
 
+            // Accumulate for post-stream channel notification
+            if (intent.steps.length > 1) {
+              fullAssistantOutput +=
+                (fullAssistantOutput ? "\n\n" : "") +
+                `【${step.employeeName}】\n${stepText}`;
+            } else {
+              fullAssistantOutput = stepText;
+            }
+
             // --- Cognitive Engine: verify step output (non-blocking) ---
             if (stepText.length > 50) {
               verify({
@@ -307,6 +323,23 @@ export async function POST(req: Request) {
             controller.close();
           } catch {
             // Already closed
+          }
+
+          // Fire-and-forget channel sync
+          if (fullAssistantOutput.trim() && message) {
+            void notifyChatMessage({
+              organizationId: orgId,
+              userId: user.id,
+              employeeSlug: primarySlug,
+              employeeName:
+                primaryEmployee?.nickname ||
+                primaryEmployee?.name ||
+                intent.steps[0].employeeName ||
+                primarySlug,
+              userMessage: message,
+              assistantMessage: fullAssistantOutput,
+              skillsUsed: usedSkills.map((s) => s.skillName),
+            });
           }
         }
       },

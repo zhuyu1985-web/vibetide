@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SearchInput } from "@/components/shared/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -235,15 +236,13 @@ export function EmployeeMarketplaceClient({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-            <Input
-              placeholder="搜索员工名称、昵称或职位..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="pl-8 h-8 text-xs border-none bg-white/60 dark:bg-white/5"
-            />
-          </div>
+          <SearchInput
+            className="flex-1 max-w-xs"
+            inputClassName="h-8 text-xs"
+            placeholder="搜索员工名称、昵称或职位..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
           <div className="flex items-center gap-1.5">
             <ArrowUpDown size={14} className="text-gray-400 dark:text-gray-500" />
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>

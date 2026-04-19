@@ -121,8 +121,7 @@ export function ScenarioGrid({
                   <EmployeeAvatar
                     key={memberId}
                     employeeId={memberId}
-                    size="xs"
-                    className=""
+                    size="sm"
                   />
                 ))}
               </div>
@@ -189,8 +188,8 @@ export function ScenarioGrid({
                       <EmployeeAvatar
                         key={memberId}
                         employeeId={memberId}
-                        size="xs"
-                        className=""
+                        size="sm"
+                        className="ring-2 ring-background"
                       />
                     ))}
                     {scenario.teamMembers.length > 5 && (

@@ -7,10 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, ExternalLink, RefreshCw, XCircle } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { cancelResearchTask } from "@/app/actions/research/research-tasks";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -199,13 +204,19 @@ export function TaskDetailClient({
       <div>
         <div className="flex items-center gap-3 mb-3">
           <h2 className="text-sm font-medium">采集文章列表</h2>
-          <Input placeholder="按标题搜索..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] rounded-lg focus:border-primary/50 focus:ring-1 focus:ring-primary/20" />
-          <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}
-            className="rounded-lg bg-[var(--glass-input-bg)] border border-[var(--glass-input-border)] text-sm px-3 py-1.5 outline-none">
-            <option value="all">全部层级</option>
-            {Object.entries(TIER_LABELS).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
-            <option value="unclassified">未分类</option>
-          </select>
+          <Input placeholder="按标题搜索..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+          <Select value={tierFilter} onValueChange={setTierFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="层级" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部层级</SelectItem>
+              {Object.entries(TIER_LABELS).map(([v, l]) => (
+                <SelectItem key={v} value={v}>{l}</SelectItem>
+              ))}
+              <SelectItem value="unclassified">未分类</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="text-xs text-gray-500 dark:text-gray-400 ml-auto">显示 {filtered.length} / {articles.length} 条</div>
         </div>
 
@@ -218,49 +229,64 @@ export function TaskDetailClient({
             </div>
           </GlassCard>
         ) : (
-          <GlassCard variant="default" padding="none">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>标题</TableHead>
-                  <TableHead className="w-32">媒体层级</TableHead>
-                  <TableHead className="w-32">采集来源</TableHead>
-                  <TableHead className="w-40">发布时间</TableHead>
-                  <TableHead className="w-16">原链</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium max-w-md">
-                      <div className="truncate" title={a.title}>{a.title}</div>
-                    </TableCell>
-                    <TableCell>
-                      {a.outletTierSnapshot ? (
-                        <Badge className={TIER_BADGE_CLASS[a.outletTierSnapshot] ?? ""}>
-                          {TIER_LABELS[a.outletTierSnapshot]}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">未分类</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {CHANNEL_LABELS[a.sourceChannel] ?? a.sourceChannel}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {a.publishedAt ? a.publishedAt.toLocaleDateString("zh-CN") : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <a href={a.url} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center text-primary hover:underline">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </GlassCard>
+          <DataTable
+            rows={filtered}
+            rowKey={(a) => a.id}
+            columns={[
+              {
+                key: "title",
+                header: "标题",
+                render: (a) => (
+                  <span className="truncate block" title={a.title}>{a.title}</span>
+                ),
+              },
+              {
+                key: "tier",
+                header: "媒体层级",
+                width: "w-32",
+                render: (a) =>
+                  a.outletTierSnapshot ? (
+                    <Badge className={TIER_BADGE_CLASS[a.outletTierSnapshot] ?? ""}>
+                      {TIER_LABELS[a.outletTierSnapshot]}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">未分类</span>
+                  ),
+              },
+              {
+                key: "channel",
+                header: "采集来源",
+                width: "w-32",
+                render: (a) => (
+                  <span className="text-muted-foreground truncate block">
+                    {CHANNEL_LABELS[a.sourceChannel] ?? a.sourceChannel}
+                  </span>
+                ),
+              },
+              {
+                key: "publishedAt",
+                header: "发布时间",
+                width: "w-40",
+                render: (a) => (
+                  <span className="text-xs text-muted-foreground">
+                    {a.publishedAt ? a.publishedAt.toLocaleDateString("zh-CN") : "-"}
+                  </span>
+                ),
+              },
+              {
+                key: "url",
+                header: "原链",
+                width: "w-16",
+                align: "right",
+                render: (a) => (
+                  <a href={a.url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center justify-end text-sky-600 hover:text-sky-700">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                ),
+              },
+            ] satisfies DataTableColumn<Article>[]}
+          />
         )}
       </div>
     </div>

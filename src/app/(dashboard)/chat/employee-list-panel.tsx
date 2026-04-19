@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { EMPLOYEE_META, EMPLOYEE_SHORT_DESC, type EmployeeId } from "@/lib/constants";
 import { Search, Trash2, MessageSquare, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AIEmployee } from "@/lib/types";
@@ -154,6 +154,8 @@ export function EmployeeListPanel({
             {filteredEmployees.map((emp) => {
               const meta = EMPLOYEE_META[emp.id as EmployeeId];
               const isSelected = emp.id === selectedSlug;
+              const displayTitle = meta?.name ?? emp.title;
+              const displaySubtitle = EMPLOYEE_SHORT_DESC[emp.id as EmployeeId] ?? "";
               return (
                 <button
                   key={emp.id}
@@ -181,7 +183,7 @@ export function EmployeeListPanel({
                             : "text-gray-800 dark:text-gray-200"
                         )}
                       >
-                        {emp.title}
+                        {displayTitle}
                       </span>
                       <span
                         className={cn(
@@ -193,7 +195,7 @@ export function EmployeeListPanel({
                       />
                     </div>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                      {emp.title}
+                      {displaySubtitle}
                     </p>
                   </div>
                   {unreadCounts[emp.id] > 0 && !isSelected && (

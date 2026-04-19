@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "missions_source_dedup_uidx" ON "missions" USING btree ("organization_id","source_module","source_entity_id") WHERE "missions"."source_entity_id" IS NOT NULL;

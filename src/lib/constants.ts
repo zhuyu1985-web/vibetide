@@ -163,6 +163,20 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
   },
 };
 
+export const EMPLOYEE_SHORT_DESC: Record<EmployeeId, string> = {
+  xiaolei: "全网热点实时捕捉，深度趋势分析",
+  xiaoce: "洞察用户需求，策划高价值选题",
+  xiaozi: "多源素材整合，构建可检索素材库",
+  xiaowen: "多风格生成，标题摘要脚本一体化",
+  xiaojian: "视频剪辑与封面、音频一体化制作",
+  xiaoshen: "多维事实核查，质量合规全面把关",
+  xiaofa: "多平台策略制定，精准分发与投放",
+  xiaoshu: "实时数据洞察，追踪效果深度复盘",
+  xiaotan: "深度调查专题追踪，挖掘事件真相",
+  advisor: "频道运营策略咨询，内容方向建议",
+  leader: "智能项目管理，多员工协同调度",
+};
+
 export const WORKFLOW_STEPS = [
   { key: "monitor", label: "热点监控", employeeId: "xiaolei" as EmployeeId },
   { key: "plan", label: "选题策划", employeeId: "xiaoce" as EmployeeId },

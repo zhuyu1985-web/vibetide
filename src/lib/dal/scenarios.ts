@@ -20,9 +20,21 @@ export async function getScenariosByEmployeeSlug(
         eq(employeeScenarios.enabled, true)
       )
     )
-    .orderBy(asc(employeeScenarios.sortOrder));
+    .orderBy(asc(employeeScenarios.sortOrder), asc(employeeScenarios.createdAt));
 
-  return rows.map((r) => ({
+  // Defensive dedup: the (org, slug, name) unique index is added in migration
+  // 0027, but existing databases may still have duplicate rows from prior
+  // un-guarded seeds. Keep the earliest row per scenario name so the UI never
+  // shows duplicates even before the one-time cleanup script runs.
+  const seen = new Set<string>();
+  const unique: typeof rows = [];
+  for (const r of rows) {
+    if (seen.has(r.name)) continue;
+    seen.add(r.name);
+    unique.push(r);
+  }
+
+  return unique.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
@@ -46,10 +58,22 @@ export async function getAllScenariosByOrg(): Promise<Record<string, ScenarioCar
         eq(employeeScenarios.enabled, true)
       )
     )
-    .orderBy(asc(employeeScenarios.sortOrder));
+    .orderBy(asc(employeeScenarios.sortOrder), asc(employeeScenarios.createdAt));
 
+  // Defensive dedup per employee by scenario name — see comment in
+  // getScenariosByEmployeeSlug. Removes pre-existing duplicates in the DB
+  // before the cleanup script has run.
   const map: Record<string, ScenarioCardData[]> = {};
+  const seenPerSlug = new Map<string, Set<string>>();
   for (const r of rows) {
+    let seen = seenPerSlug.get(r.employeeSlug);
+    if (!seen) {
+      seen = new Set<string>();
+      seenPerSlug.set(r.employeeSlug, seen);
+    }
+    if (seen.has(r.name)) continue;
+    seen.add(r.name);
+
     const item: ScenarioCardData = {
       id: r.id,
       name: r.name,

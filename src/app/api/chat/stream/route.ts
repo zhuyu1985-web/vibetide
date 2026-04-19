@@ -7,6 +7,7 @@ import { getLanguageModel } from "@/lib/agent/model-router";
 import { resolveTools, toVercelTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
+import { notifyChatMessage } from "@/lib/channels/chat-notifier";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
     if (!profile?.organizationId) {
       return new Response("Organization not found", { status: 403 });
     }
+    const organizationId = profile.organizationId;
 
     // Find employee by slug + org
     const employeeRecord = await db.query.aiEmployees.findFirst({
@@ -145,6 +147,12 @@ export async function POST(req: Request) {
     const usedSkills: { tool: string; skillName: string }[] = [];
     const usedToolSet = new Set<string>();
 
+    // Accumulate the full assistant answer so we can forward the Q&A to any
+    // configured external channels (DingTalk / WeChat Work) after streaming.
+    let assistantText = "";
+    const lastUserMessage =
+      [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+
     const stream = new ReadableStream({
       async start(controller) {
         const send = (event: string, data: Record<string, unknown>) => {
@@ -191,6 +199,7 @@ export async function POST(req: Request) {
                 break;
               }
               case "text-delta": {
+                assistantText += part.text;
                 send("text-delta", { text: part.text });
                 break;
               }
@@ -214,6 +223,24 @@ export async function POST(req: Request) {
             controller.close();
           } catch {
             // Already closed
+          }
+
+          // Fire-and-forget channel sync. Don't await — response stream has
+          // already closed to the client; external webhook latency shouldn't
+          // delay the function response or fail the chat.
+          if (assistantText.trim() && lastUserMessage) {
+            void notifyChatMessage({
+              organizationId,
+              userId: user.id,
+              employeeSlug,
+              employeeName:
+                employeeRecord.nickname ||
+                employeeRecord.name ||
+                employeeSlug,
+              userMessage: lastUserMessage,
+              assistantMessage: assistantText,
+              skillsUsed: usedSkills.map((s) => s.skillName),
+            });
           }
         }
       },

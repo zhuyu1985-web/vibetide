@@ -15,6 +15,7 @@ import { KPIComparisonBar } from "@/components/shared/kpi-comparison-bar";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { AgentWorkCard } from "@/components/shared/agent-work-card";
 import { AIScoreBadge } from "@/components/shared/ai-score-badge";
+import { SearchInput } from "@/components/shared/search-input";
 import { TimelineStep } from "@/components/shared/timeline-step";
 import { RealTimeIndicator } from "@/components/shared/realtime-indicator";
 import { DonutChartCard } from "@/components/charts/donut-chart-card";
@@ -362,16 +363,12 @@ export default function ChannelKnowledgeClient({ sources, items, dna, syncLogs, 
         <TabsContent value="browse">
           {/* Search + Filter */}
           <div className="flex items-center gap-3 mb-5">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-              <input
-                type="text"
-                value={knowledgeSearchQuery}
-                onChange={(e) => setKnowledgeSearchQuery(e.target.value)}
-                placeholder="搜索知识库..."
-                className="w-full h-9 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 transition-colors"
-              />
-            </div>
+            <SearchInput
+              className="flex-1"
+              value={knowledgeSearchQuery}
+              onChange={(e) => setKnowledgeSearchQuery(e.target.value)}
+              placeholder="搜索知识库..."
+            />
             <div className="flex items-center gap-1.5">
               {[
                 { key: null, label: "全部" },

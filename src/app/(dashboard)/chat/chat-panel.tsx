@@ -38,7 +38,7 @@ import {
   Type,
   Film,
   RefreshCw,
-  Image,
+  Image as ImageIcon,
   Music,
   CheckCircle,
   Shield,
@@ -47,9 +47,12 @@ import {
   Radio,
   Zap,
   Home,
+  Paperclip,
+  Mic,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { EMPLOYEE_META, EMPLOYEE_SHORT_DESC, type EmployeeId } from "@/lib/constants";
 import type { AIEmployee, ScenarioCardData } from "@/lib/types";
 import type { ChatMessage, ThinkingStep, SkillUsed } from "@/lib/chat-utils";
 import type { SavedConversationRow } from "@/db/types";
@@ -77,7 +80,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Type,
   Film,
   RefreshCw,
-  Image,
+  Image: ImageIcon,
   Music,
   CheckCircle,
   Shield,
@@ -266,6 +269,9 @@ export function ChatPanel({
   const [borderDone, setBorderDone] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [borderSize, setBorderSize] = useState({ w: 0, h: 0 });
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(true);
 
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -273,10 +279,18 @@ export function ChatPanel({
   const glowRef = useRef<SVGPathElement>(null);
   const borderBoxRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const voiceBaseTextRef = useRef<string>("");
 
   const meta = employee
     ? EMPLOYEE_META[employee.id as EmployeeId]
     : null;
+  const displayTitle = meta?.name ?? employee?.title ?? "";
+  const displaySubtitle = employee
+    ? EMPLOYEE_SHORT_DESC[employee.id as EmployeeId] ?? ""
+    : "";
 
   /* ── Border animation logic ── */
   const borderActive = inputHovered || inputFocused;
@@ -355,13 +369,33 @@ export function ChatPanel({
     return () => el.removeEventListener("scroll", handleScroll);
   }, [employee?.id]);
 
-  /* ── Auto-scroll (use scrollTop to avoid scrollIntoView bubbling to outer containers) ── */
+  /* ── Auto-scroll (use scrollTop to avoid scrollIntoView bubbling to outer containers).
+     Double rAF waits for async layout (markdown/code blocks) before measuring scrollHeight. ── */
   useEffect(() => {
-    const el = chatBodyRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [messages, loading, currentThinking, intentLoading, intentProgress, pendingIntent]);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = chatBodyRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [
+    employee?.id,
+    activeScenario?.id,
+    inlineScenario?.id,
+    viewingSaved,
+    messages,
+    messages.length,
+    loading,
+    currentThinking,
+    intentLoading,
+    intentProgress,
+    pendingIntent,
+  ]);
 
   const scrollToBottom = () => {
     const el = chatBodyRef.current;
@@ -378,11 +412,88 @@ export function ChatPanel({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [inputText]);
 
+  /* ── File attachment handlers ── */
+  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const picked = Array.from(files);
+    setAttachedFiles((prev) => [...prev, ...picked].slice(0, 9));
+    e.target.value = "";
+  };
+  const removeAttachment = (idx: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  /* ── Voice input (Web Speech API) ── */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Ctor) {
+      setVoiceSupported(false);
+    }
+    return () => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (typeof window === "undefined") return;
+    const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Ctor) {
+      setVoiceSupported(false);
+      return;
+    }
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const rec = new Ctor();
+    rec.lang = "zh-CN";
+    rec.continuous = true;
+    rec.interimResults = true;
+    voiceBaseTextRef.current = inputText ? inputText + (inputText.endsWith(" ") ? "" : " ") : "";
+    rec.onstart = () => setIsRecording(true);
+    rec.onend = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+    rec.onerror = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+    rec.onresult = (ev: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = 0; i < ev.results.length; i++) {
+        transcript += ev.results[i][0].transcript;
+      }
+      setInputText(voiceBaseTextRef.current + transcript);
+    };
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+    } catch {
+      setIsRecording(false);
+    }
+  };
+
   const handleSend = () => {
-    if (!inputText.trim() || loading || !!viewingSaved) return;
-    onSendMessage(inputText.trim());
+    if (loading || !!viewingSaved) return;
+    const trimmed = inputText.trim();
+    if (!trimmed && attachedFiles.length === 0) return;
+    const parts: string[] = [];
+    if (attachedFiles.length > 0) {
+      parts.push(
+        `[附件] ${attachedFiles.map((f) => f.name).join("、")}`
+      );
+    }
+    if (trimmed) parts.push(trimmed);
+    onSendMessage(parts.join("\n"));
     setInputText("");
-    // Reset textarea height
+    setAttachedFiles([]);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -427,10 +538,10 @@ export function ChatPanel({
         />
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-            {employee.title}
+            {displayTitle}
           </h2>
           <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate">
-            {employee.title}
+            {displaySubtitle}
             {activeScenario && (
               <span className="text-blue-500 dark:text-blue-400 ml-2">
                 · {activeScenario.name}
@@ -447,8 +558,12 @@ export function ChatPanel({
 
         {!viewingSaved && messages.length > 0 && (
           <button
+            type="button"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-200 border-0"
-            onClick={onSave}
+            onClick={(e) => {
+              e.preventDefault();
+              onSave();
+            }}
           >
             {isSaved ? (
               <BookmarkCheck size={15} className="text-blue-500" />
@@ -467,8 +582,12 @@ export function ChatPanel({
           首页
         </Link>
         <button
+          type="button"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-200 border-0"
-          onClick={onNewChat}
+          onClick={(e) => {
+            e.preventDefault();
+            onNewChat();
+          }}
         >
           <Plus size={15} />
           新对话
@@ -489,10 +608,10 @@ export function ChatPanel({
                 className="mb-4"
               />
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                你好，我是{employee.title}
+                你好，我是{displayTitle}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center max-w-md">
-                {employee.motto || `${employee.title}，随时为你服务`}
+                {employee.motto || `${displayTitle}，随时为你服务`}
               </p>
 
               {/* Scenario suggestions */}
@@ -604,8 +723,8 @@ export function ChatPanel({
                         )}
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                           {msg.durationMs
-                            ? `${employee.title}思考完成`
-                            : `${employee.title}正在输出...`}
+                            ? `${displayTitle}思考完成`
+                            : `${displayTitle}正在输出...`}
                         </span>
                         {msg.durationMs &&
                           msg.referenceCount != null &&
@@ -764,7 +883,7 @@ export function ChatPanel({
                           className="animate-spin text-blue-500"
                         />
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                          {employee.title}正在思考...
+                          {displayTitle}正在思考...
                         </span>
                         {currentRefCount > 0 && (
                           <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -906,6 +1025,18 @@ export function ChatPanel({
                             onChange={(e) =>
                               setScenarioInputs((prev) => ({ ...prev, [field.name]: e.target.value }))
                             }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                e.preventDefault();
+                                const allFilled = inlineScenario.inputFields.every(
+                                  (f) => !f.required || scenarioInputs[f.name]?.trim()
+                                );
+                                if (allFilled) {
+                                  onScenarioFormSubmit(inlineScenario, scenarioInputs);
+                                  setScenarioInputs({});
+                                }
+                              }
+                            }}
                           />
                         )}
                       </div>
@@ -913,6 +1044,7 @@ export function ChatPanel({
                   </div>
                   <div className="flex items-center gap-2 mt-4">
                     <button
+                      type="button"
                       className={cn(
                         "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 border-0",
                         inlineScenario.inputFields.every(
@@ -926,7 +1058,8 @@ export function ChatPanel({
                           (f) => !f.required || scenarioInputs[f.name]?.trim()
                         )
                       }
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         onScenarioFormSubmit(inlineScenario, scenarioInputs);
                         setScenarioInputs({});
                       }}
@@ -935,8 +1068,10 @@ export function ChatPanel({
                       开始执行
                     </button>
                     <button
+                      type="button"
                       className="px-3 py-2 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 border-0"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         onCancelScenario();
                         setScenarioInputs({});
                       }}
@@ -977,8 +1112,12 @@ export function ChatPanel({
                 return (
                   <button
                     key={s.id}
+                    type="button"
                     className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 dark:bg-gray-800/60 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 border-0"
-                    onClick={() => onSelectScenario(s)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSelectScenario(s);
+                    }}
                   >
                     <Icon size={12} />
                     {s.name}
@@ -1045,11 +1184,47 @@ export function ChatPanel({
 
               {/* Inner content */}
               <div className="relative rounded-[15px] bg-white dark:bg-gray-800">
+                {/* Attachment chips */}
+                {attachedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+                    {attachedFiles.map((f, i) => {
+                      const isImage = f.type.startsWith("image/");
+                      return (
+                        <span
+                          key={`${f.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 max-w-[200px] pl-2 pr-1 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-[11px] text-blue-700 dark:text-blue-300"
+                        >
+                          {isImage ? (
+                            <ImageIcon size={12} className="flex-shrink-0" />
+                          ) : (
+                            <Paperclip size={12} className="flex-shrink-0" />
+                          )}
+                          <span className="truncate">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              removeAttachment(i);
+                            }}
+                            className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-blue-500/70 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-all border-0"
+                            aria-label="移除附件"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
                 <textarea
                   ref={textareaRef}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 resize-none px-4 pt-3 pb-1 border-0 min-h-[72px]"
                   rows={3}
-                  placeholder={`和${employee.title}自由对话...`}
+                  placeholder={
+                    isRecording
+                      ? "正在聆听，请说话..."
+                      : `和${displayTitle}自由对话...`
+                  }
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onFocus={() => setInputFocused(true)}
@@ -1065,22 +1240,136 @@ export function ChatPanel({
                     }
                   }}
                 />
-                <div className="flex items-center justify-between px-4 pb-2.5">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <Globe size={14} className="text-blue-500" />
-                    <span>联网搜索</span>
+                {/* Hidden file inputs */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFilesPicked}
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFilesPicked}
+                />
+                <div className="flex items-center justify-between px-3 pb-2.5">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 border-0"
+                      aria-label="上传文件"
+                      title="上传文件"
+                    >
+                      <Paperclip size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        imageInputRef.current?.click();
+                      }}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 border-0"
+                      aria-label="上传图片"
+                      title="上传图片"
+                    >
+                      <ImageIcon size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        toggleVoiceInput();
+                      }}
+                      disabled={!voiceSupported}
+                      className={cn(
+                        "relative w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 border-0",
+                        isRecording
+                          ? "text-red-500 bg-red-50 dark:bg-red-900/30"
+                          : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30",
+                        !voiceSupported && "opacity-40 cursor-not-allowed hover:bg-transparent"
+                      )}
+                      aria-label={isRecording ? "停止语音输入" : "语音输入"}
+                      title={
+                        !voiceSupported
+                          ? "当前浏览器不支持语音识别"
+                          : isRecording
+                            ? "点击停止录音"
+                            : "点击开始语音输入"
+                      }
+                    >
+                      <Mic size={15} />
+                      {isRecording && (
+                        <span className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-red-400/60 animate-[send-pulse_1.4s_ease-in-out_infinite]" />
+                      )}
+                    </button>
+                    <span className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
+                    <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                      <Globe size={12} className="text-blue-500" />
+                      <span>联网搜索</span>
+                    </div>
                   </div>
                   <button
+                    type="button"
                     className={cn(
-                      "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 border-0",
-                      inputText.trim() && !loading
-                        ? "bg-blue-500 text-white cursor-pointer shadow-sm"
+                      "send-btn group relative flex-shrink-0 w-[35px] h-[35px] rounded-[10px] flex items-center justify-center transition-all duration-300 border-0",
+                      (inputText.trim() || attachedFiles.length > 0) && !loading
+                        ? "send-btn--active cursor-pointer text-white shadow-[0_6px_18px_-6px_rgba(79,70,229,0.55)] hover:shadow-[0_10px_26px_-8px_rgba(139,92,246,0.7)] hover:scale-[1.08] active:scale-95"
                         : "bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
                     )}
-                    onClick={handleSend}
-                    disabled={loading || !inputText.trim()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSend();
+                    }}
+                    disabled={loading || (!inputText.trim() && attachedFiles.length === 0)}
+                    aria-label="发送"
                   >
-                    <Send size={14} />
+                    {(inputText.trim() || attachedFiles.length > 0) && !loading && (
+                      <>
+                        {/* Rotating 7-color rainbow halo — flush with button edge (0px) */}
+                        <span
+                          className="pointer-events-none absolute inset-0 rounded-[10px] opacity-85 group-hover:opacity-100 transition-opacity duration-300"
+                          style={{
+                            background:
+                              "conic-gradient(from 0deg, #38bdf8, #6366f1, #a855f7, #ec4899, #f59e0b, #10b981, #06b6d4, #38bdf8)",
+                            animation: "send-halo-spin 4s linear infinite",
+                          }}
+                        />
+                        {/* Inner filled gradient — masks halo to a thin rotating rim */}
+                        <span className="absolute inset-0 rounded-[10px] bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
+                        {/* Breathing inner highlight */}
+                        <span className="pointer-events-none absolute inset-[2px] rounded-[8px] bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,255,255,0.5),transparent_65%)] animate-[send-breathe_2.6s_ease-in-out_infinite]" />
+                        {/* Ambient pulse ring */}
+                        <span className="pointer-events-none absolute inset-0 rounded-[10px] animate-[send-pulse_1.8s_ease-in-out_infinite]" />
+                        {/* Shine sweep on hover */}
+                        <span className="pointer-events-none absolute inset-0 rounded-[10px] overflow-hidden">
+                          <span className="absolute -inset-y-2 -left-1/2 w-1/2 rotate-12 bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 group-hover:opacity-100 group-hover:left-[120%] transition-all duration-700 ease-out" />
+                        </span>
+                      </>
+                    )}
+                    {/* Icon */}
+                    <span className="relative z-10 flex items-center justify-center">
+                      {loading ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Send
+                          size={15}
+                          className={cn(
+                            "transition-all duration-300 -translate-x-[1px]",
+                            inputText.trim() || attachedFiles.length > 0
+                              ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)] group-hover:translate-x-[3px] group-hover:-translate-y-[3px] group-hover:rotate-[12deg] group-active:translate-x-[8px] group-active:-translate-y-[8px] group-active:rotate-[20deg] group-active:opacity-0 group-active:duration-200"
+                              : ""
+                          )}
+                        />
+                      )}
+                    </span>
                   </button>
                 </div>
               </div>

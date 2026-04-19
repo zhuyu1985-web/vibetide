@@ -7,14 +7,7 @@ import { ChevronLeft, Play, Pause, RefreshCw, Trash2, Loader2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import {
   triggerCollectionSource,
@@ -257,110 +250,125 @@ export function SourceDetailClient({ source, runs, items }: SourceDetailClientPr
         </TabsContent>
 
         <TabsContent value="runs" className="mt-4">
-          <div className="rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>开始</TableHead>
-                  <TableHead>触发</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="text-right">新增</TableHead>
-                  <TableHead className="text-right">合并</TableHead>
-                  <TableHead className="text-right">失败</TableHead>
-                  <TableHead>错误</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {runs.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      暂无运行记录
-                    </TableCell>
-                  </TableRow>
-                )}
-                {runs.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="text-sm">
-                      {new Date(r.startedAt).toLocaleString("zh-CN")}
-                    </TableCell>
-                    <TableCell>{r.trigger}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          r.status === "success"
-                            ? "default"
-                            : r.status === "failed"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
-                        {r.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{r.itemsInserted}</TableCell>
-                    <TableCell className="text-right">{r.itemsMerged}</TableCell>
-                    <TableCell className="text-right">{r.itemsFailed}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                      {r.errorSummary ?? "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            rows={runs}
+            rowKey={(r) => String(r.id)}
+            emptyMessage="暂无运行记录"
+            columns={[
+              {
+                key: "startedAt",
+                header: "开始",
+                width: "w-40",
+                render: (r) => new Date(r.startedAt).toLocaleString("zh-CN"),
+              },
+              {
+                key: "trigger",
+                header: "触发",
+                width: "w-20",
+                render: (r) => <span className="text-gray-600 dark:text-gray-300">{r.trigger}</span>,
+              },
+              {
+                key: "status",
+                header: "状态",
+                width: "w-20",
+                render: (r) => (
+                  <Badge
+                    variant={
+                      r.status === "success"
+                        ? "default"
+                        : r.status === "failed"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                  >
+                    {r.status}
+                  </Badge>
+                ),
+              },
+              {
+                key: "inserted",
+                header: "新增",
+                width: "w-16",
+                align: "right",
+                render: (r) => r.itemsInserted,
+              },
+              {
+                key: "merged",
+                header: "合并",
+                width: "w-16",
+                align: "right",
+                render: (r) => r.itemsMerged,
+              },
+              {
+                key: "failed",
+                header: "失败",
+                width: "w-16",
+                align: "right",
+                render: (r) => r.itemsFailed,
+              },
+              {
+                key: "error",
+                header: "错误",
+                render: (r) => (
+                  <span className="text-xs text-muted-foreground truncate block">
+                    {r.errorSummary ?? "—"}
+                  </span>
+                ),
+              },
+            ] satisfies DataTableColumn<RunSummary>[]}
+          />
         </TabsContent>
 
         <TabsContent value="items" className="mt-4">
-          <div className="rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>标题</TableHead>
-                  <TableHead>渠道</TableHead>
-                  <TableHead>分类</TableHead>
-                  <TableHead>采集时间</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      暂无内容
-                    </TableCell>
-                  </TableRow>
-                )}
-                {items.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell>
-                      {i.canonicalUrl ? (
-                        <a
-                          href={i.canonicalUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {i.title}
-                        </a>
-                      ) : (
-                        i.title
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">{i.firstSeenChannel}</TableCell>
-                    <TableCell>{i.category ?? "—"}</TableCell>
-                    <TableCell className="text-sm">
-                      {new Date(i.firstSeenAt).toLocaleString("zh-CN")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            rows={items}
+            rowKey={(i) => i.id}
+            emptyMessage="暂无内容"
+            columns={[
+              {
+                key: "title",
+                header: "标题",
+                render: (i) => (
+                  <span className="truncate block">
+                    {i.canonicalUrl ? (
+                      <a
+                        href={i.canonicalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-600 hover:underline"
+                      >
+                        {i.title}
+                      </a>
+                    ) : (
+                      i.title
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: "channel",
+                header: "渠道",
+                width: "w-32",
+                render: (i) => <span className="text-gray-600 dark:text-gray-300 truncate block">{i.firstSeenChannel}</span>,
+              },
+              {
+                key: "category",
+                header: "分类",
+                width: "w-32",
+                render: (i) => <span className="text-gray-600 dark:text-gray-300 truncate block">{i.category ?? "—"}</span>,
+              },
+              {
+                key: "firstSeenAt",
+                header: "采集时间",
+                width: "w-44",
+                render: (i) => (
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {new Date(i.firstSeenAt).toLocaleString("zh-CN")}
+                  </span>
+                ),
+              },
+            ] satisfies DataTableColumn<ItemSummary>[]}
+          />
         </TabsContent>
       </Tabs>
     </div>

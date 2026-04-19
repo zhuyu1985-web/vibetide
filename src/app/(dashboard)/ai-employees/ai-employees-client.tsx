@@ -3,9 +3,10 @@
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { EmployeeAgentCard } from "@/components/ai-employees/employee-agent-card";
+import { SearchInput } from "@/components/shared/search-input";
 import { EMPLOYEE_HOT_TASKS } from "@/lib/employee-tasks";
 import type { AIEmployee } from "@/lib/types";
-import { Search, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -117,16 +118,12 @@ export function AiEmployeesClient({
       {/* ── Search + Status Filter ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
         {/* Search */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-white/25" />
-          <input
-            type="text"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="搜索员工名称、昵称或职位..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-black/[0.12] dark:focus:border-white/[0.15] transition-colors"
-          />
-        </div>
+        <SearchInput
+          className="w-full sm:w-72"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          placeholder="搜索员工名称、昵称或职位..."
+        />
 
         {/* Status filter pills */}
         <div className="flex gap-1.5">
@@ -148,7 +145,7 @@ export function AiEmployeesClient({
 
       {/* ── Employee count ── */}
       <div className="mb-4">
-        <span className="text-xs text-gray-300 dark:text-white/30">
+        <span className="text-xs text-gray-600 dark:text-gray-300">
           共 {filteredEmployees.length} 名员工
           {statusFilter !== "all" && ` (已筛选)`}
         </span>

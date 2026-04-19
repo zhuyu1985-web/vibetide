@@ -300,7 +300,7 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
       <div className="flex gap-5 items-start">
 
         {/* ── Left: Team ── */}
-        <div className="w-[220px] shrink-0">
+        <div className="w-[280px] shrink-0">
           <GlassCard padding="none" className="overflow-hidden">
             {/* Section header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-white/5">
@@ -460,7 +460,7 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
         </div>
 
         {/* ── Right: Activity + Stats ── */}
-        <div className="w-[260px] shrink-0 space-y-4">
+        <div className="w-[280px] shrink-0 space-y-4">
           {/* Activity Feed */}
           <GlassCard padding="none" className="overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-white/5">

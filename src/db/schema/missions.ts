@@ -5,8 +5,9 @@ import {
   timestamp,
   jsonb,
   integer,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
 import {
@@ -63,7 +64,15 @@ export const missions = pgTable("missions", {
     .notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
-});
+}, (table) => ({
+  // Deduplicate missions that were triggered by an external source (IM
+  // message, review decision, anomaly alert, …). Without this, at-least-once
+  // webhook delivery + IM-platform retries silently create duplicate rows.
+  // Partial index: only rows with a source_entity_id participate.
+  sourceDedupUidx: uniqueIndex("missions_source_dedup_uidx")
+    .on(table.organizationId, table.sourceModule, table.sourceEntityId)
+    .where(sql`${table.sourceEntityId} IS NOT NULL`),
+}));
 
 // ─── Mission Tasks (shared task board — DAG-based, replaces workflow_steps) ───
 

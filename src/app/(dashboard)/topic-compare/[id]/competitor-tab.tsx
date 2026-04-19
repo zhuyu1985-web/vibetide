@@ -9,10 +9,22 @@ import {
   AlertCircle,
   ChevronDown,
 } from "lucide-react";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CompetitorGroup } from "@/lib/types";
+
+type CompetitorRow = {
+  rowKey: string;
+  outletName: string;
+  title: string;
+  subject: string;
+  publishedAt: string;
+  channel: string;
+  contentId?: string;
+  sourceUrl: string;
+};
 
 /* ─── Helpers ─── */
 
@@ -136,123 +148,149 @@ export function CompetitorTab({ competitorGroups }: Props) {
             </div>
 
             {/* Table */}
-            <GlassCard padding="none" className="rounded-t-none">
-              <div className="grid grid-cols-[120px_1fr_100px_100px_100px_140px] gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                <span>媒体名称</span>
-                <span>报道标题</span>
-                <span>报道主体</span>
-                <span>发布时间</span>
-                <span>发布渠道</span>
-                <span>操作</span>
-              </div>
-
-              {group.outlets.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-gray-500">
-                  <p className="text-sm">该级别暂无数据</p>
-                </div>
-              ) : (
-                group.outlets.flatMap((outlet) =>
-                  outlet.articles.map((art, idx) => {
-                    const rowKey = `${outlet.outletName}-${idx}-${art.title}`;
-                    const interp = interpretations[rowKey];
+            <DataTable
+              className="rounded-t-none"
+              rows={group.outlets.flatMap((outlet) =>
+                outlet.articles.map<CompetitorRow>((art, idx) => ({
+                  rowKey: `${outlet.outletName}-${idx}-${art.title}`,
+                  outletName: outlet.outletName,
+                  title: art.title,
+                  subject: art.subject,
+                  publishedAt: art.publishedAt,
+                  channel: art.channel,
+                  contentId: art.contentId,
+                  sourceUrl: art.sourceUrl,
+                })),
+              )}
+              rowKey={(r) => r.rowKey}
+              emptyMessage="该级别暂无数据"
+              expandedKeys={
+                new Set(
+                  Object.entries(interpretations)
+                    .filter(([, v]) => v?.expanded)
+                    .map(([k]) => k),
+                )
+              }
+              renderExpanded={(r) => {
+                const interp = interpretations[r.rowKey];
+                if (!interp) return null;
+                return (
+                  <div className="pt-0.5">
+                    <div className="rounded-md bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 px-4 py-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                          AI 解读
+                        </span>
+                      </div>
+                      {interp.loading && (
+                        <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          正在生成解读，请稍候...
+                        </div>
+                      )}
+                      {interp.error && (
+                        <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {interp.error}
+                        </div>
+                      )}
+                      {interp.text && (
+                        <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
+                          {interp.text}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }}
+              columns={[
+                {
+                  key: "outletName",
+                  header: "媒体名称",
+                  width: "120px",
+                  render: (r) => (
+                    <span className="font-medium truncate block">{r.outletName}</span>
+                  ),
+                },
+                {
+                  key: "title",
+                  header: "报道标题",
+                  render: (r) => <span className="truncate block">{r.title}</span>,
+                },
+                {
+                  key: "subject",
+                  header: "报道主体",
+                  width: "100px",
+                  render: (r) => (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
+                      {r.subject}
+                    </span>
+                  ),
+                },
+                {
+                  key: "publishedAt",
+                  header: "发布时间",
+                  width: "100px",
+                  render: (r) => <span className="text-gray-600 dark:text-gray-400">{r.publishedAt}</span>,
+                },
+                {
+                  key: "channel",
+                  header: "发布渠道",
+                  width: "100px",
+                  render: (r) => (
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{r.channel}</span>
+                  ),
+                },
+                {
+                  key: "actions",
+                  header: "操作",
+                  width: "140px",
+                  render: (r) => {
+                    const interp = interpretations[r.rowKey];
                     const isExpanded = interp?.expanded ?? false;
                     return (
-                      <div
-                        key={rowKey}
-                        className="border-b border-gray-50 dark:border-gray-800/50 last:border-b-0"
-                      >
-                        <div className="grid grid-cols-[120px_1fr_100px_100px_100px_140px] gap-2 px-5 py-3.5 items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition">
-                          <span className="text-sm text-gray-900 dark:text-gray-100 font-medium truncate">
-                            {outlet.outletName}
-                          </span>
-                          <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-normal">
-                            {art.title}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {art.subject}
-                          </span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400 font-normal">
-                            {art.publishedAt}
-                          </span>
-                          <span className="text-xs text-gray-600 dark:text-gray-400">
-                            {art.channel}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="border-0 text-xs"
-                              onClick={() =>
-                                handleInterpret(art.contentId, rowKey)
-                              }
-                              disabled={interp?.loading}
-                            >
-                              {interp?.loading ? (
-                                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                              ) : (
-                                <Sparkles className="h-3.5 w-3.5 mr-1" />
-                              )}
-                              {interp?.text && isExpanded
-                                ? "收起"
-                                : interp?.loading
-                                ? "解读中"
-                                : "AI 解读"}
-                              {interp?.text && (
-                                <ChevronDown
-                                  className={`h-3 w-3 ml-0.5 transition-transform ${
-                                    isExpanded ? "rotate-180" : ""
-                                  }`}
-                                />
-                              )}
-                            </Button>
-                            <a
-                              href={art.sourceUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition px-2 py-1"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              原文
-                            </a>
-                          </div>
-                        </div>
-
-                        {/* Expandable interpretation */}
-                        {isExpanded && interp && (
-                          <div className="px-5 pb-3 pt-0.5">
-                            <div className="rounded-md bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 px-4 py-3">
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                                  AI 解读
-                                </span>
-                              </div>
-                              {interp.loading && (
-                                <div className="text-xs text-gray-500 flex items-center gap-1.5">
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  正在生成解读，请稍候...
-                                </div>
-                              )}
-                              {interp.error && (
-                                <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
-                                  <AlertCircle className="h-3.5 w-3.5" />
-                                  {interp.error}
-                                </div>
-                              )}
-                              {interp.text && (
-                                <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                                  {interp.text}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => handleInterpret(r.contentId, r.rowKey)}
+                          disabled={interp?.loading}
+                        >
+                          {interp?.loading ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5 mr-1" />
+                          )}
+                          {interp?.text && isExpanded
+                            ? "收起"
+                            : interp?.loading
+                            ? "解读中"
+                            : "AI 解读"}
+                          {interp?.text && (
+                            <ChevronDown
+                              className={`h-3 w-3 ml-0.5 transition-transform ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                            />
+                          )}
+                        </Button>
+                        <a
+                          href={r.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 transition px-2 py-1"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          原文
+                        </a>
                       </div>
                     );
-                  })
-                )
-              )}
-            </GlassCard>
+                  },
+                },
+              ] satisfies DataTableColumn<CompetitorRow>[]}
+            />
           </div>
         );
       })}

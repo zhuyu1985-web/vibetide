@@ -204,8 +204,15 @@ export function HomeClient({
     setSheetOpen(true);
   }, []);
 
+  // Ignore re-entrant launch clicks while a mission is being created. Without
+  // this, a double-click on the scenario launch button could fire two
+  // startMission() calls in parallel before the server action's soft dedup
+  // window catches them.
+  const launchInFlight = useRef(false);
   const handleScenarioLaunch = useCallback(
     async (key: AdvancedScenarioKey, inputs: Record<string, string>) => {
+      if (launchInFlight.current) return;
+      launchInFlight.current = true;
       const sc = ADVANCED_SCENARIO_CONFIG[key];
       try {
         const result = await startMission({
@@ -221,6 +228,8 @@ export function HomeClient({
         if (result?.id) router.push(`/missions/${result.id}`);
       } catch {
         toast.error("启动失败，请重试");
+      } finally {
+        launchInFlight.current = false;
       }
     },
     [router]

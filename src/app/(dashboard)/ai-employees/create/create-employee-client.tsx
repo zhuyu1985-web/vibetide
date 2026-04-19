@@ -345,7 +345,7 @@ export function CreateEmployeeClient({
           <button
             disabled={isPending}
             onClick={handlePublish}
-            className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-all cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-sky-300/10 text-blue-900 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_1px_2px_rgba(14,165,233,0.08)] ring-1 ring-inset ring-sky-300/25 text-sm font-medium hover:bg-sky-300/18 hover:ring-sky-300/40 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending ? (
               <>

@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { HeatScoreBadge } from "@/components/shared/heat-score-badge";
 import { TrendIndicator } from "@/components/shared/trend-indicator";
+import { SearchInput } from "@/components/shared/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -684,16 +685,13 @@ export function InspirationClient({
                 </button>
               ))}
             </div>
-            <div className="ml-auto relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索热点..."
-                className="h-8 w-48 rounded-lg bg-gray-100 dark:bg-white/5 pl-8 pr-3 text-xs text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all"
-              />
-            </div>
+            <SearchInput
+              className="ml-auto w-48"
+              inputClassName="h-8 text-xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索热点..."
+            />
           </div>
 
           {/* Priority filter row */}
@@ -1895,7 +1893,7 @@ function CalendarEventSheet({
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">分类</label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1910,7 +1908,7 @@ function CalendarEventSheet({
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">事件类型</label>
             <Select value={eventType} onValueChange={(v) => setEventType(v as typeof eventType)}>
-              <SelectTrigger className="w-full bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1947,7 +1945,7 @@ function CalendarEventSheet({
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-500 mb-1 block">重复</label>
             <Select value={recurrence} onValueChange={(v) => setRecurrence(v as typeof recurrence)}>
-              <SelectTrigger className="w-full bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

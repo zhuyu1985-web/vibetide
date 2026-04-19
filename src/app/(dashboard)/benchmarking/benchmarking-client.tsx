@@ -10,6 +10,7 @@ import { CompareTable } from "@/components/shared/compare-table";
 import type { CompareRow } from "@/components/shared/compare-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
+import { SearchInput } from "@/components/shared/search-input";
 import { StatCard } from "@/components/shared/stat-card";
 import { RadarChartCard } from "@/components/charts/radar-chart-card";
 import { GaugeChart } from "@/components/charts/gauge-chart";
@@ -508,9 +509,7 @@ export function BenchmarkingClient({
           {/* Topic picker — search-based flow */}
           <div className="mb-4 flex items-center gap-3">
             <div ref={topicPickerRef} className="relative flex-1 max-w-lg">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-              <input
-                type="text"
+              <SearchInput
                 value={topicSearch}
                 onChange={(e) => {
                   setTopicSearch(e.target.value);
@@ -518,7 +517,6 @@ export function BenchmarkingClient({
                 }}
                 onFocus={() => setShowTopicDropdown(true)}
                 placeholder="输入选题关键词，或从已有文章/热点中选取..."
-                className="w-full text-sm pl-9 pr-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 placeholder:text-gray-400"
               />
               {showTopicDropdown && (topicSearch.trim() || topicCandidates.length > 0) && (
                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-72 overflow-y-auto">

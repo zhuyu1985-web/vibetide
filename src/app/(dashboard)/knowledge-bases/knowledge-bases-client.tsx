@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -180,16 +181,12 @@ export function KnowledgeBasesClient({ initialSummaries, channelData }: Props) {
 
       {/* ── Search + Filter ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-white/25" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索知识库名称或描述..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-black/[0.12] dark:focus:border-white/[0.15] transition-colors"
-          />
-        </div>
+        <SearchInput
+          className="w-full sm:w-72"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜索知识库名称或描述..."
+        />
 
         <div className="flex gap-1.5 flex-wrap">
           {STATUS_TABS.map((tab) => (

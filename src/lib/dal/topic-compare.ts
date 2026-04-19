@@ -334,6 +334,7 @@ export async function getTopicCompareDetail(
     const outlets = levelMap.get(level)!;
     if (!outlets.has(outletName)) outlets.set(outletName, []);
     outlets.get(outletName)!.push({
+      contentId: row.content.id,
       title: row.content.title,
       subject: row.content.category ?? "综合",
       publishedAt: row.content.publishedAt

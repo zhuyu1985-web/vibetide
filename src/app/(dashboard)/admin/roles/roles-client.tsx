@@ -125,10 +125,7 @@ export default function RolesClient({
             管理系统角色和权限配置
           </p>
         </div>
-        <Button
-          onClick={openCreate}
-          className="bg-primary text-primary-foreground hover:brightness-110"
-        >
+        <Button onClick={openCreate}>
           <Plus size={16} className="mr-1.5" />
           新建角色
         </Button>
@@ -292,11 +289,7 @@ export default function RolesClient({
                 {error}
               </p>
             )}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary text-primary-foreground hover:brightness-110"
-            >
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? "保存中..." : "保存"}
             </Button>
           </form>

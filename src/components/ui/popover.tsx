@@ -29,8 +29,15 @@ function PopoverContent({
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
+        // Liquid-glass surface matching Dialog/Sheet. `.glass-float` gives
+        // translucent white + backdrop-blur + sky shadow; override its default
+        // 20px radius with `!rounded-md` for compact popovers. `!fixed` here
+        // is NOT needed — Radix places the popover via portal + its own
+        // inline transform — but `.glass-float`'s `position: relative` would
+        // disrupt that. Keep `position: relative`, acceptable because the
+        // parent `[data-radix-popper-content-wrapper]` is already positioned.
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
+          "glass-float text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 origin-(--radix-popover-content-transform-origin) !rounded-md p-4 outline-hidden",
           className
         )}
         {...props}

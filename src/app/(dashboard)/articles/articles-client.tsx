@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { SearchInput } from "@/components/shared/search-input";
 import {
   Search,
   Plus,
@@ -230,16 +231,13 @@ export default function ArticlesClient({ articles, stats, categories }: Props) {
         {/* ── Toolbar ── */}
         <div className="flex items-center gap-3 px-5 h-12 border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl shrink-0 relative z-[100]">
           {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="搜索 (⌘B)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-8 pl-9 pr-3 rounded-lg bg-gray-100/60 dark:bg-white/5 text-[13px] text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 transition-shadow"
-            />
-          </div>
+          <SearchInput
+            className="flex-1 max-w-md"
+            inputClassName="h-8 text-[13px]"
+            placeholder="搜索 (⌘B)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
           {/* Action Buttons */}
           <div className="flex items-center gap-0.5 ml-auto">

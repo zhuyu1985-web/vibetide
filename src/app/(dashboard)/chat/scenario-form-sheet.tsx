@@ -84,7 +84,7 @@ export function ScenarioFormSheet({
                     setInputs((prev) => ({ ...prev, [field.name]: val }))
                   }
                 >
-                  <SelectTrigger className="border-0 bg-gray-100 dark:bg-gray-800">
+                  <SelectTrigger className="w-full">
                     <SelectValue
                       placeholder={field.placeholder || "请选择"}
                     />
@@ -99,7 +99,7 @@ export function ScenarioFormSheet({
                 </Select>
               ) : field.type === "textarea" ? (
                 <Textarea
-                  className="border-0 bg-gray-100 dark:bg-gray-800 resize-none text-sm"
+                  className="resize-none"
                   rows={3}
                   placeholder={field.placeholder}
                   value={inputs[field.name] || ""}
@@ -112,7 +112,6 @@ export function ScenarioFormSheet({
                 />
               ) : (
                 <Input
-                  className="border-0 bg-gray-100 dark:bg-gray-800 text-sm"
                   placeholder={field.placeholder}
                   value={inputs[field.name] || ""}
                   onChange={(e) =>

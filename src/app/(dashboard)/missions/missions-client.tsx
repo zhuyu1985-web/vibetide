@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,7 +20,20 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
+  Trash2,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -33,6 +47,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -42,7 +57,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { startMission } from "@/app/actions/missions";
+import { startMission, deleteMissions } from "@/app/actions/missions";
 import {
   SCENARIO_CONFIG,
   ADVANCED_SCENARIO_CONFIG,
@@ -147,6 +162,11 @@ export function MissionsClient({
   const [title, setTitle] = useState("");
   const [instruction, setInstruction] = useState("");
 
+  // Batch selection / delete
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Auto-refresh
   const hasActive = missions.some((m) =>
     ["queued", "planning", "executing", "consolidating"].includes(m.status)
@@ -181,6 +201,80 @@ export function MissionsClient({
 
   // Reset visible count when filter changes
   useEffect(() => { setVisibleCount(20); }, [filter, searchText, scenarioFilter]);
+
+  // Only terminal-state missions can be deleted — matches the server-side
+  // `deleteMissions` enforcement.
+  const deletableStatuses = ["completed", "failed", "cancelled"];
+  const deletableVisibleIds = useMemo(
+    () => visibleMissions.filter((m) => deletableStatuses.includes(m.status)).map((m) => m.id),
+    [visibleMissions],
+  );
+  const allVisibleSelected =
+    deletableVisibleIds.length > 0 &&
+    deletableVisibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected =
+    deletableVisibleIds.some((id) => selectedIds.has(id)) && !allVisibleSelected;
+
+  // Drop selections that no longer exist (e.g. after a delete or filter change).
+  useEffect(() => {
+    const existing = new Set(filtered.map((m) => m.id));
+    setSelectedIds((prev) => {
+      const next = new Set<string>();
+      for (const id of prev) if (existing.has(id)) next.add(id);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filtered]);
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of deletableVisibleIds) next.delete(id);
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of deletableVisibleIds) next.add(id);
+        return next;
+      });
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const result = await deleteMissions(ids);
+      if (result.deletedCount > 0) {
+        toast.success(`已删除 ${result.deletedCount} 个任务`);
+      }
+      if (result.skipped.length > 0) {
+        toast.warning(`${result.skipped.length} 个任务已跳过（运行中或无权限）`);
+      }
+      clearSelection();
+      setDeleteConfirmOpen(false);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "删除失败");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Infinite scroll observer
   useEffect(() => {
@@ -312,15 +406,12 @@ export function MissionsClient({
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-            <Input
-              placeholder="搜索任务..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="glass-input h-7 pl-8 w-40 text-xs"
-            />
-          </div>
+          <SearchInput
+            className="w-40"
+            placeholder="搜索任务..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
           <Select value={scenarioFilter} onValueChange={setScenarioFilter}>
             <SelectTrigger className="h-7 w-28 text-xs">
               <SelectValue placeholder="全部场景" />
@@ -348,16 +439,24 @@ export function MissionsClient({
         <GlassCard variant="panel" padding="none">
           {/* Table header */}
           <div className="flex items-center gap-2 px-5 py-2.5 border-b border-gray-200/60 dark:border-gray-700/40">
+            <div className="w-6 shrink-0 flex items-center">
+              <Checkbox
+                checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                onCheckedChange={toggleSelectAllVisible}
+                disabled={deletableVisibleIds.length === 0}
+                aria-label="全选当前页可删除任务"
+              />
+            </div>
             <div className="w-4 shrink-0" />
-            <div className="w-16 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">状态</div>
-            <div className="flex-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">任务名称</div>
-            <div className="w-20 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">场景</div>
-            <div className="w-28 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">进度</div>
-            <div className="w-20 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">阶段</div>
-            <div className="w-28 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">团队</div>
-            <div className="w-16 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">子任务</div>
-            <div className="w-12 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">消息</div>
-            <div className="w-52 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">最新动态</div>
+            <div className="w-16 text-sm font-semibold text-gray-600 dark:text-gray-400">状态</div>
+            <div className="flex-1 text-sm font-semibold text-gray-600 dark:text-gray-400">任务名称</div>
+            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">场景</div>
+            <div className="w-28 text-sm font-semibold text-gray-600 dark:text-gray-400">进度</div>
+            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">阶段</div>
+            <div className="w-28 text-sm font-semibold text-gray-600 dark:text-gray-400">团队</div>
+            <div className="w-16 text-sm font-semibold text-gray-600 dark:text-gray-400">子任务</div>
+            <div className="w-12 text-sm font-semibold text-gray-600 dark:text-gray-400">消息</div>
+            <div className="w-52 text-sm font-semibold text-gray-600 dark:text-gray-400">最新动态</div>
           </div>
 
           {/* Table body */}
@@ -367,6 +466,9 @@ export function MissionsClient({
               mission={m}
               isExpanded={expandedId === m.id}
               onToggle={() => setExpandedId(expandedId === m.id ? null : m.id)}
+              selected={selectedIds.has(m.id)}
+              selectable={deletableStatuses.includes(m.status)}
+              onToggleSelect={() => toggleSelectOne(m.id)}
             />
           ))}
 
@@ -379,6 +481,69 @@ export function MissionsClient({
           )}
         </GlassCard>
       )}
+
+      {/* Floating batch-action bar — rendered via portal to `document.body`
+          because the dashboard layout has ancestors with `backdrop-filter`
+          (creates a containing block and traps `position: fixed` inside the
+          scrolling page, making the bar scroll away). A portal moves it out
+          of that containing block entirely so it truly sticks to the
+          viewport bottom. */}
+      {selectedIds.size > 0 && typeof window !== "undefined" &&
+        createPortal(
+          <div
+            className="!fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-xl glass-float shadow-lg"
+          >
+            <span className="text-sm text-gray-700 dark:text-gray-200">
+              已选 <span className="font-semibold">{selectedIds.size}</span> 个任务
+            </span>
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={deleting}
+            >
+              <Trash2 size={14} className="mr-1" />
+              批量删除
+            </Button>
+          </div>,
+          document.body,
+        )}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>永久删除所选任务？</AlertDialogTitle>
+            <AlertDialogDescription>
+              即将删除 {selectedIds.size} 个任务及其下的子任务、消息、产出物。
+              此操作不可恢复。运行中的任务会被自动跳过。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(e) => {
+                e.preventDefault();
+                handleBatchDelete();
+              }}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                  删除中...
+                </>
+              ) : (
+                "确认删除"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -389,10 +554,16 @@ function MissionRow({
   mission: m,
   isExpanded,
   onToggle,
+  selected,
+  selectable,
+  onToggleSelect,
 }: {
   mission: MissionSummary;
   isExpanded: boolean;
   onToggle: () => void;
+  selected: boolean;
+  selectable: boolean;
+  onToggleSelect: () => void;
 }) {
   const sc = STATUS_CFG[m.status] ?? STATUS_CFG.planning;
   const isDone = ["completed", "failed", "cancelled"].includes(m.status);
@@ -419,15 +590,37 @@ function MissionRow({
   return (
     <div className={cn(
       "border-b border-gray-100/60 dark:border-gray-800/40 last:border-b-0 transition-colors duration-200",
-      isExpanded && "bg-gray-50/50 dark:bg-gray-800/20"
+      isExpanded && "bg-gray-50/50 dark:bg-gray-800/20",
+      selected && "bg-sky-50/40 dark:bg-sky-900/10",
     )}>
-      {/* Row */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 px-5 py-3.5 text-left hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors"
-      >
-        {/* Chevron */}
-        <div className="w-4 shrink-0 flex items-center justify-center">
+      {/* Row — split into two sibling elements so the checkbox lives outside
+          the expand-toggle <button>. Nested interactive elements are invalid
+          HTML and break clicks. */}
+      <div className="flex items-stretch">
+        {/* Checkbox cell — <label> wraps Checkbox so the whole cell is a
+            large click target that Radix auto-forwards to the Checkbox
+            primitive. */}
+        <label
+          className={cn(
+            "w-10 shrink-0 pl-5 flex items-center",
+            selectable ? "cursor-pointer" : "cursor-not-allowed pointer-events-none",
+          )}
+        >
+          <Checkbox
+            checked={selected}
+            onCheckedChange={onToggleSelect}
+            disabled={!selectable}
+            aria-label={selectable ? "选中任务" : "运行中的任务不能删除"}
+          />
+        </label>
+
+        {/* Clickable row body */}
+        <button
+          onClick={onToggle}
+          className="flex-1 flex items-center gap-2 pl-2 pr-5 py-3.5 text-left hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors"
+        >
+          {/* Chevron */}
+          <div className="w-4 shrink-0 flex items-center justify-center">
           <ChevronRight
             size={14}
             className={cn(
@@ -528,7 +721,8 @@ function MissionRow({
             </>
           ) : <span className="text-gray-300 dark:text-gray-600 text-[11px]">—</span>}
         </div>
-      </button>
+        </button>
+      </div>
 
       {/* Expanded panel — CSS grid height transition (no layout jitter) */}
       <div
@@ -546,7 +740,7 @@ function MissionRow({
                 <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-blue-400/60 dark:bg-blue-500/40" />
                 {/* Phase pipeline */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">任务阶段</p>
+                  <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3">任务阶段</p>
                   <div className="flex items-center">
                     {PHASES.map((p, i) => {
                       const idx = i + 1;
@@ -578,7 +772,7 @@ function MissionRow({
 
                 {/* Subtask distribution */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">子任务分布</p>
+                  <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3">子任务分布</p>
                   {m.totalTaskCount > 0 ? (
                     <>
                       <div className="flex h-2 rounded-full overflow-hidden gap-0.5 bg-gray-200/60 dark:bg-gray-700/30">
@@ -602,7 +796,7 @@ function MissionRow({
 
                 {/* Team members */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">团队成员</p>
+                  <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3">团队成员</p>
                   <div className="flex flex-wrap gap-2">
                     {m.teamSlugs.map((slug, i) => {
                       const meta = EMPLOYEE_META[slug as EmployeeId];

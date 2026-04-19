@@ -6,6 +6,7 @@ import {
   integer,
   real,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
@@ -42,7 +43,11 @@ export const knowledgeBases = pgTable("knowledge_bases", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  // Knowledge base name is unique per org.
+  orgNameUidx: uniqueIndex("knowledge_bases_org_name_uidx")
+    .on(table.organizationId, table.name),
+}));
 
 export const employeeKnowledgeBases = pgTable("employee_knowledge_bases", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -55,7 +60,11 @@ export const employeeKnowledgeBases = pgTable("employee_knowledge_bases", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  // Join-table uniqueness — an employee either is bound to a KB or isn't.
+  employeeKbUidx: uniqueIndex("employee_knowledge_bases_employee_kb_uidx")
+    .on(table.employeeId, table.knowledgeBaseId),
+}));
 
 export const knowledgeItems = pgTable("knowledge_items", {
   id: uuid("id").defaultRandom().primaryKey(),

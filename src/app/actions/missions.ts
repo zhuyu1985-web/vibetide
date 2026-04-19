@@ -1,12 +1,28 @@
 "use server";
 
 import { db } from "@/db";
-import { missions, aiEmployees, missionTasks } from "@/db/schema";
-import { eq, and, lt, inArray, sql } from "drizzle-orm";
+import {
+  missions,
+  aiEmployees,
+  missionTasks,
+  executionLogs,
+  articles,
+  verificationRecords,
+  auditRecords,
+  channelMessages,
+  skillUsageRecords,
+} from "@/db/schema";
+import { eq, and, lt, inArray, sql, gte } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { executeMissionDirect } from "@/lib/mission-executor";
+
+// Soft dedup window for direct user-submitted missions. Two inserts with the
+// same org + title + instruction within this window return the existing row
+// instead of creating a second one. Guards against double-click / keyboard-
+// Enter races that slip past the UI `disabled` guard.
+const USER_DEDUP_WINDOW_MS = 30_000;
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -43,7 +59,9 @@ export async function startMission(data: {
     ),
   });
 
-  // Auto-provision leader if missing in this organization
+  // Auto-provision leader if missing in this organization. Use onConflict to
+  // win any race against concurrent provisioning requests — the unique index
+  // `ai_employees_org_slug_uidx` guarantees we never create two leaders.
   if (!leader) {
     const [created] = await db
       .insert(aiEmployees)
@@ -59,8 +77,39 @@ export async function startMission(data: {
         status: "idle",
         isPreset: 1,
       })
+      .onConflictDoNothing({
+        target: [aiEmployees.organizationId, aiEmployees.slug],
+      })
       .returning();
-    leader = created;
+    if (created) {
+      leader = created;
+    } else {
+      // Lost the race — another request just created the leader. Re-read.
+      leader = await db.query.aiEmployees.findFirst({
+        where: and(
+          eq(aiEmployees.slug, "leader"),
+          eq(aiEmployees.organizationId, organizationId),
+        ),
+      });
+      if (!leader) {
+        throw new Error("Failed to provision leader employee");
+      }
+    }
+  }
+
+  // Soft dedup: if the same user submitted an identical mission in the last
+  // USER_DEDUP_WINDOW_MS ms, return that one instead of creating a second.
+  const windowStart = new Date(Date.now() - USER_DEDUP_WINDOW_MS);
+  const recentDuplicate = await db.query.missions.findFirst({
+    where: and(
+      eq(missions.organizationId, organizationId),
+      eq(missions.title, data.title),
+      eq(missions.userInstruction, data.userInstruction),
+      gte(missions.createdAt, windowStart),
+    ),
+  });
+  if (recentDuplicate) {
+    return recentDuplicate;
   }
 
   // Create mission record (queued → planning → executing lifecycle)
@@ -133,13 +182,45 @@ export async function startMissionFromModule(data: {
         status: "idle",
         isPreset: 1,
       })
+      .onConflictDoNothing({
+        target: [aiEmployees.organizationId, aiEmployees.slug],
+      })
       .returning();
-    leader = created;
+    if (created) {
+      leader = created;
+    } else {
+      leader = await db.query.aiEmployees.findFirst({
+        where: and(
+          eq(aiEmployees.slug, "leader"),
+          eq(aiEmployees.organizationId, data.organizationId),
+        ),
+      });
+      if (!leader) {
+        throw new Error("Failed to provision leader employee");
+      }
+    }
   }
 
   const instruction = data.sourceContext
     ? `${data.userInstruction}\n\n来源上下文：\n${JSON.stringify(data.sourceContext, null, 2)}`
     : data.userInstruction;
+
+  // Idempotency check: if a mission for the same (org, module, entity) already
+  // exists, return it instead of creating a duplicate. This handles at-least-
+  // once delivery from IM webhooks, Inngest event retries, etc. The partial
+  // unique index `missions_source_dedup_uidx` provides belt-and-suspenders.
+  if (data.sourceEntityId) {
+    const existing = await db.query.missions.findFirst({
+      where: and(
+        eq(missions.organizationId, data.organizationId),
+        eq(missions.sourceModule, data.sourceModule),
+        eq(missions.sourceEntityId, data.sourceEntityId),
+      ),
+    });
+    if (existing) {
+      return existing;
+    }
+  }
 
   const [mission] = await db
     .insert(missions)
@@ -216,8 +297,95 @@ export async function deleteMission(missionId: string) {
     throw new Error("不能删除运行中的任务，请先取消");
   }
 
+  // Null out FK references from non-cascading tables first (see
+  // deleteMissions for full rationale).
+  await db.update(executionLogs).set({ missionId: null }).where(eq(executionLogs.missionId, missionId));
+  await db.update(articles).set({ missionId: null }).where(eq(articles.missionId, missionId));
+  await db.update(verificationRecords).set({ missionId: null }).where(eq(verificationRecords.missionId, missionId));
+  await db.update(auditRecords).set({ missionId: null }).where(eq(auditRecords.missionId, missionId));
+
   await db.delete(missions).where(eq(missions.id, missionId));
   revalidatePath("/missions");
+}
+
+/**
+ * 批量永久删除任务。只有当前组织的、处于终态（非运行中）的任务会被删除；
+ * 运行中的任务会被跳过并在返回值里汇总。CASCADE 自动清理子表。
+ */
+const DELETABLE_STATUSES = [
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+export async function deleteMissions(missionIds: string[]): Promise<{
+  deletedCount: number;
+  skipped: { id: string; reason: string }[];
+}> {
+  await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) throw new Error("无法获取组织信息");
+  if (missionIds.length === 0) return { deletedCount: 0, skipped: [] };
+
+  // Scope to the current org and pull current status in one round-trip.
+  const rows = await db
+    .select({ id: missions.id, status: missions.status })
+    .from(missions)
+    .where(
+      and(
+        inArray(missions.id, missionIds),
+        eq(missions.organizationId, orgId),
+      ),
+    );
+
+  const foundIds = new Set(rows.map((r) => r.id));
+  const skipped: { id: string; reason: string }[] = [];
+  const deletableIds: string[] = [];
+
+  for (const id of missionIds) {
+    if (!foundIds.has(id)) {
+      skipped.push({ id, reason: "不存在或无权操作" });
+      continue;
+    }
+  }
+  for (const r of rows) {
+    if (DELETABLE_STATUSES.includes(r.status as (typeof DELETABLE_STATUSES)[number])) {
+      deletableIds.push(r.id);
+    } else {
+      skipped.push({ id: r.id, reason: "运行中任务不能删除" });
+    }
+  }
+
+  if (deletableIds.length > 0) {
+    // Null out every table that might FK to missions.id without ON DELETE
+    // CASCADE. Defensive: we include tables that have ON DELETE SET NULL or
+    // no FK at all (skill_usage_records) so orphaned references don't leak
+    // stale UUIDs. Wrapped in a transaction so a failure on any step rolls
+    // back everything.
+    try {
+      await db.transaction(async (tx) => {
+        await tx.update(executionLogs).set({ missionId: null }).where(inArray(executionLogs.missionId, deletableIds));
+        await tx.update(articles).set({ missionId: null }).where(inArray(articles.missionId, deletableIds));
+        await tx.update(verificationRecords).set({ missionId: null }).where(inArray(verificationRecords.missionId, deletableIds));
+        await tx.update(auditRecords).set({ missionId: null }).where(inArray(auditRecords.missionId, deletableIds));
+        await tx.update(channelMessages).set({ missionId: null }).where(inArray(channelMessages.missionId, deletableIds));
+        await tx.update(skillUsageRecords).set({ missionId: null }).where(inArray(skillUsageRecords.missionId, deletableIds));
+
+        await tx.delete(missions).where(inArray(missions.id, deletableIds));
+      });
+    } catch (err) {
+      // Surface the ACTUAL postgres error (not Drizzle's opaque wrapper) so
+      // we can see which FK constraint is blocking. Drizzle's DrizzleQueryError
+      // stores the underlying pg error on `.cause`.
+      const cause = (err as { cause?: { message?: string; detail?: string; constraint?: string } }).cause;
+      const detail = cause?.detail || cause?.message || (err instanceof Error ? err.message : String(err));
+      console.error("[deleteMissions] DB error:", detail, "constraint:", cause?.constraint);
+      throw new Error(`删除失败：${cause?.constraint ?? ""} ${detail}`.trim());
+    }
+    revalidatePath("/missions");
+  }
+
+  return { deletedCount: deletableIds.length, skipped };
 }
 
 /**

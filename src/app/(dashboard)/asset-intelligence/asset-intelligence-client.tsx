@@ -13,6 +13,7 @@ import type {
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { StatCard } from "@/components/shared/stat-card";
+import { SearchInput } from "@/components/shared/search-input";
 import { KPIComparisonBar } from "@/components/shared/kpi-comparison-bar";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { AgentWorkCard } from "@/components/shared/agent-work-card";
@@ -411,16 +412,13 @@ export default function AssetIntelligenceClient({
                   <Search size={14} className="text-blue-500" />
                   语义搜索
                 </h4>
-                <div className="relative mb-3">
-                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="搜索资产内容..."
-                    className="w-full h-8 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 pl-8 pr-3 text-xs outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 transition-colors"
-                  />
-                </div>
+                <SearchInput
+                  className="mb-3"
+                  inputClassName="h-8 text-xs"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="搜索资产内容..."
+                />
                 <div className="space-y-2">
                   {searchQuery ? (
                     <div className="flex items-center justify-center py-8 text-xs text-gray-400 dark:text-gray-500">

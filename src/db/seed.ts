@@ -261,17 +261,23 @@ async function seed() {
     empsCreated++;
     console.log(`   ${empData.nickname} (${empData.slug}) -> ${employee.id}`);
 
-    // Bind core skills from EMPLOYEE_CORE_SKILLS
+    // Bind core skills from EMPLOYEE_CORE_SKILLS. Idempotent via the unique
+    // index (employee_id, skill_id).
     const coreSkillSlugs = EMPLOYEE_CORE_SKILLS[empData.slug] || [];
     for (const skillSlug of coreSkillSlugs) {
       const skillId = skillMap.get(skillSlug);
       if (skillId) {
-        await db.insert(schema.employeeSkills).values({
-          employeeId: employee.id,
-          skillId,
-          level: 80 + Math.floor(Math.random() * 15), // 80-94
-          bindingType: "core",
-        });
+        await db
+          .insert(schema.employeeSkills)
+          .values({
+            employeeId: employee.id,
+            skillId,
+            level: 80 + Math.floor(Math.random() * 15), // 80-94
+            bindingType: "core",
+          })
+          .onConflictDoNothing({
+            target: [schema.employeeSkills.employeeId, schema.employeeSkills.skillId],
+          });
       }
     }
   }
@@ -507,11 +513,21 @@ async function seed() {
 
   const kbMap = new Map<string, string>();
   for (const kbData of knowledgeBasesData) {
+    // Idempotent: onConflict uses the unique index (org_id, name).
     const [kb] = await db
       .insert(schema.knowledgeBases)
       .values({
         organizationId: org.id,
         ...kbData,
+      })
+      .onConflictDoUpdate({
+        target: [schema.knowledgeBases.organizationId, schema.knowledgeBases.name],
+        set: {
+          description: kbData.description,
+          type: kbData.type,
+          documentCount: kbData.documentCount,
+          updatedAt: new Date(),
+        },
       })
       .returning();
     kbMap.set(kbData.name, kb.id);
@@ -533,10 +549,19 @@ async function seed() {
     for (const kbName of binding.kbs) {
       const kbId = kbMap.get(kbName);
       if (!kbId) continue;
-      await db.insert(schema.employeeKnowledgeBases).values({
-        employeeId: empId,
-        knowledgeBaseId: kbId,
-      });
+      // Idempotent: ignore duplicate binding inserts.
+      await db
+        .insert(schema.employeeKnowledgeBases)
+        .values({
+          employeeId: empId,
+          knowledgeBaseId: kbId,
+        })
+        .onConflictDoNothing({
+          target: [
+            schema.employeeKnowledgeBases.employeeId,
+            schema.employeeKnowledgeBases.knowledgeBaseId,
+          ],
+        });
     }
   }
   console.log(`   Bound knowledge bases to employees\n`);
@@ -1440,10 +1465,31 @@ async function seed() {
   ];
 
   for (const s of xiaoleiScenarios) {
-    await db.insert(schema.employeeScenarios).values({
-      organizationId: org.id,
-      ...s,
-    });
+    // Idempotent upsert so re-running the seed never appends duplicates.
+    // Natural key is (organization_id, employee_slug, name), matching the
+    // unique index `employee_scenarios_org_slug_name_uidx`.
+    await db
+      .insert(schema.employeeScenarios)
+      .values({
+        organizationId: org.id,
+        ...s,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.employeeScenarios.organizationId,
+          schema.employeeScenarios.employeeSlug,
+          schema.employeeScenarios.name,
+        ],
+        set: {
+          description: s.description,
+          icon: s.icon,
+          systemInstruction: s.systemInstruction,
+          inputFields: s.inputFields,
+          toolsHint: s.toolsHint,
+          sortOrder: s.sortOrder,
+          updatedAt: new Date(),
+        },
+      });
     console.log(`   Scenario: ${s.name}`);
   }
   console.log();
