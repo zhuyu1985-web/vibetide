@@ -1025,7 +1025,8 @@ export function buildBuiltinScenarioSeeds(): BuiltinSeedInput[] {
 
 ```bash
 npx tsx -e "import('./src/db/seed-builtin-workflows').then(m => console.log(JSON.stringify(m.buildBuiltinScenarioSeeds(), null, 2)))"
-# 预期看到 16 条（10 + 6），每条 legacyScenarioKey 非空
+# 此时仅 16 条（10 SCENARIO_CONFIG + 6 ADVANCED），Task 11 追加 xiaolei 5 条 → 21，Task 12 + 6 → 27+ 达到 spec §11 AC
+# 每条 legacyScenarioKey 应非空
 ```
 
 - [ ] **Step 10.3: 提交**
@@ -1045,6 +1046,8 @@ git commit -m "feat(workflow-unify/p1): builtin seed mapper for SCENARIO_CONFIG 
 - Modify: `src/db/seed.ts`（删除 employee_scenarios seed 块 + 清表）
 
 - [ ] **Step 11.1: 追加 xiaolei scenarios 函数**
+
+**🚨 强制动作（不可跳过）：** 先 `Read src/db/seed.ts` 第 1300-1478 行，找到 `xiaoleiScenarios = [...]` 数组，把 5 条记录的 `name / description / icon / systemInstruction / inputFields` **逐字完整复制**。**不要使用下方示例里的 "..." 占位符**——示例只示意结构，实际 systemInstruction 是中文详细指令（约 200-500 字），必须原样保留。
 
 在 `src/db/seed-builtin-workflows.ts` 追加：
 
@@ -1143,7 +1146,7 @@ export function buildBuiltinScenarioSeeds(): BuiltinSeedInput[] {
 }
 ```
 
-**重要：** `systemInstruction` 字段必须从原 `src/db/seed.ts` 里 xiaolei scenarios 完整 copy（包括中文详细指令），不能用占位符 "...". 实施时直接 Read → Copy。
+**重要重复：** 示例里的 `"..."` 是占位符。实施时 5 条 systemInstruction 必须是完整中文（从 seed.ts 复制）。提交前 grep `systemInstruction: "\\.\\.\\."` 预期 0 匹配。
 
 - [ ] **Step 11.2: 从 seed.ts 删除 employee_scenarios seed 块**
 
@@ -1270,17 +1273,17 @@ npm run test -- src/lib/dal/__tests__/workflow-templates.test.ts src/lib/workflo
 ## Task 13: startMission 接受 workflowTemplateId + 双写
 
 **Files:**
-- Modify: `src/app/actions/missions.ts`（或 `src/lib/mission-core.ts`，视项目实际位置）
+- Modify: `src/app/actions/missions.ts:26`（已 grep 确认：这是唯一 startMission export）
 - Modify: 对应单测文件（若已存在）
 
-- [ ] **Step 13.1: 定位 startMission 入口**
+- [ ] **Step 13.1: 读取 startMission 当前签名**
 
 ```bash
-grep -rn "export.*startMission\|async function startMission\|export const startMission" src/ | head
-# 预期看到 2-3 个匹配：action + core
+sed -n '20,60p' src/app/actions/missions.ts
+# 查看现有 startMission 签名和 insert values 结构
 ```
 
-读取主入口文件，确认当前签名。
+**注意：** `mission-core.ts` / `mission-executor.ts` 本 task **不改**。
 
 - [ ] **Step 13.2: 扩 API 签名**
 
@@ -1369,22 +1372,28 @@ grep -rn "SCENARIO_CONFIG\[" src/ | grep -v "??\|default" | head -20
 
 ```ts
 import { FileText } from "lucide-react";
+import type { ScenarioConfig } from "@/lib/constants";
 
-const FALLBACK_SC = {
-  label: (m?.title ?? m?.scenario ?? "任务"),
-  icon: FileText,
-  color: "#6b7280",
-  bgColor: "rgba(107,114,128,0.12)",
-  description: "",
-  defaultPriority: 2,
-  defaultTeam: [],
-  templateInstruction: "",
-};
+function makeFallback(m: { scenario: string; title?: string | null }): ScenarioConfig {
+  return {
+    label: m.title ?? m.scenario ?? "任务",
+    category: "custom",
+    icon: FileText,
+    color: "#6b7280",
+    bgColor: "rgba(107,114,128,0.12)",
+    description: "",
+    defaultPriority: 2,
+    defaultTeam: [],
+    templateInstruction: "",
+  };
+}
 
 const scCfg = SCENARIO_CONFIG[m.scenario]
   ?? ADVANCED_SCENARIO_CONFIG[m.scenario as keyof typeof ADVANCED_SCENARIO_CONFIG]
-  ?? FALLBACK_SC;
+  ?? makeFallback(m);
 ```
+
+若 `ScenarioConfig` 类型有其他必填字段（如 `name` / `workflowSteps`），按当前 type 定义补齐以确保 tsc 过。
 
 把 fallback 抽成一个 helper（`src/lib/scenario-fallback.ts`）避免重复：
 
