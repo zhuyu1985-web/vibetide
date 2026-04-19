@@ -53,8 +53,10 @@ export {
   type ArticleForMapping,
 } from "./article-mapper";
 
+// —— 栏目同步主流程 ——
+export { syncCmsCatalogs, type SyncCmsCatalogsOptions, type SyncResult } from "./catalog-sync";
+
 // —— 后续 Task 会追加 ——
-// export { syncCmsCatalogs } from "./catalog-sync";
 // export { classifyState, isRetriableError } from "./status-machine";
 
 // —— 错误类型 ——
