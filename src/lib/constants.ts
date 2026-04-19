@@ -434,6 +434,10 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
 // Mission Scenario Templates
 // ---------------------------------------------------------------------------
 
+/**
+ * @deprecated 使用 workflow_templates 表。此常量仅为 B.1 期间的 seed 源和 legacy 兜底，
+ *             B.2 将删除。请调用 listWorkflowTemplatesByOrg() 代替。
+ */
 export const SCENARIO_CATEGORIES = [
   { key: "news", label: "新闻快讯", icon: Newspaper },
   { key: "deep", label: "深度内容", icon: BookOpen },
@@ -453,6 +457,10 @@ export interface ScenarioConfig {
   templateInstruction: string;
 }
 
+/**
+ * @deprecated 使用 workflow_templates 表。此常量仅为 B.1 期间的 seed 源和 legacy 兜底，
+ *             B.2 将删除。请调用 listWorkflowTemplatesByOrg() 代替。
+ */
 export const SCENARIO_CONFIG: Record<string, ScenarioConfig> = {
   breaking_news: {
     label: "突发新闻",
@@ -607,6 +615,10 @@ export interface AdvancedScenarioConfig {
   }[];
 }
 
+/**
+ * @deprecated 使用 workflow_templates 表。此常量仅为 B.1 期间的 seed 源和 legacy 兜底,
+ *             B.2 将删除。请调用 listWorkflowTemplatesByOrg() 代替。
+ */
 export const ADVANCED_SCENARIO_CONFIG: Record<AdvancedScenarioKey, AdvancedScenarioConfig> = {
   lianghui_coverage: {
     key: "lianghui_coverage",
@@ -750,4 +762,45 @@ export const ADVANCED_SCENARIO_CONFIG: Record<AdvancedScenarioKey, AdvancedScena
   },
 };
 
+/**
+ * @deprecated 使用 workflow_templates 表。此常量仅为 B.1 期间的 seed 源和 legacy 兜底，
+ *             B.2 将删除。请调用 listWorkflowTemplatesByOrg() 代替。
+ */
 export const ADVANCED_SCENARIO_KEYS = Object.keys(ADVANCED_SCENARIO_CONFIG) as AdvancedScenarioKey[];
+
+/**
+ * 场景/工作流 category 在 UI tab 的展示顺序。
+ * 顺序=阅读优先级，与 workflowCategoryEnum (12 values) 一一对应。
+ * B.1 Unified Scenario Workflow spec §6.3.
+ */
+export const ORDERED_CATEGORIES = [
+  "news",
+  "deep",
+  "social",
+  "advanced",
+  "livelihood",
+  "podcast",
+  "drama",
+  "daily_brief",
+  "video",
+  "analytics",
+  "distribution",
+  "custom",
+] as const;
+
+export type OrderedCategory = (typeof ORDERED_CATEGORIES)[number];
+
+export const CATEGORY_LABELS: Record<OrderedCategory, string> = {
+  news: "新闻",
+  deep: "深度",
+  social: "社交",
+  advanced: "专项",
+  livelihood: "民生",
+  podcast: "播客",
+  drama: "短剧",
+  daily_brief: "日报",
+  video: "视频",
+  analytics: "分析",
+  distribution: "分发",
+  custom: "自定义",
+};
