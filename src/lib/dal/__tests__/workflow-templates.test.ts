@@ -10,6 +10,8 @@ import {
   updateWorkflowTemplate,
   softDisableWorkflowTemplate,
   getWorkflowTemplate,
+  seedBuiltinTemplatesForOrg,
+  type BuiltinSeedInput,
 } from "../workflow-templates";
 
 describe("listWorkflowTemplatesByOrg", () => {
@@ -237,5 +239,79 @@ describe("createWorkflowTemplate / updateWorkflowTemplate / softDisableWorkflowT
     expect(created.systemInstruction).toBe("测试指令");
     expect(created.legacyScenarioKey).toBe("test_legacy_key");
     expect(created.isBuiltin).toBe(true);
+  });
+});
+
+describe("seedBuiltinTemplatesForOrg", () => {
+  const orgId = randomUUID();
+
+  beforeAll(async () => {
+    const stamp = Date.now();
+    await db.insert(organizations)
+      .values({ id: orgId, name: "test-org-seed", slug: `test-seed-${stamp}` })
+      .onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db.delete(workflowTemplates).where(eq(workflowTemplates.organizationId, orgId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  const seedList: BuiltinSeedInput[] = [
+    {
+      name: "seed-news-with-key",
+      category: "news",
+      legacyScenarioKey: "seed_news_key_1",
+      defaultTeam: ["xiaolei"],
+      steps: [],
+    },
+    {
+      name: "seed-custom-no-key",
+      category: "custom",
+      legacyScenarioKey: null,     // 走 (org_id, name) WHERE is_builtin partial index
+      defaultTeam: [],
+      steps: [],
+    },
+  ];
+
+  it("inserts new rows on first run", async () => {
+    await seedBuiltinTemplatesForOrg(orgId, seedList);
+    const rows = await listWorkflowTemplatesByOrg(orgId, { isBuiltin: true });
+    const ours = rows.filter(r => r.name.startsWith("seed-"));
+    expect(ours.length).toBe(2);
+  });
+
+  it("is idempotent on second run (no duplicates)", async () => {
+    await seedBuiltinTemplatesForOrg(orgId, seedList);
+    const rows = await listWorkflowTemplatesByOrg(orgId, { isBuiltin: true });
+    const ours = rows.filter(r => r.name.startsWith("seed-"));
+    expect(ours.length).toBe(2);
+  });
+
+  it("updates fields on re-seed with same key (legacy key path)", async () => {
+    const updated: BuiltinSeedInput[] = [
+      {
+        ...seedList[0],
+        description: "updated-via-reseed",
+      },
+      seedList[1],
+    ];
+    await seedBuiltinTemplatesForOrg(orgId, updated);
+    const row = await getWorkflowTemplateByLegacyKey(orgId, "seed_news_key_1");
+    expect(row?.description).toBe("updated-via-reseed");
+  });
+
+  it("updates fields on re-seed with same name (no-legacy-key path)", async () => {
+    const updated: BuiltinSeedInput[] = [
+      seedList[0],
+      {
+        ...seedList[1],
+        description: "updated-via-name-key",
+      },
+    ];
+    await seedBuiltinTemplatesForOrg(orgId, updated);
+    const rows = await listWorkflowTemplatesByOrg(orgId, { isBuiltin: true });
+    const target = rows.find(r => r.name === "seed-custom-no-key");
+    expect(target?.description).toBe("updated-via-name-key");
   });
 });

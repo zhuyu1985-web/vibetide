@@ -309,3 +309,86 @@ export async function updateWorkflowTemplate(
 export async function softDisableWorkflowTemplate(id: string) {
   await updateWorkflowTemplate(id, { isEnabled: false });
 }
+
+// ─── B.1 Unified Scenario Workflow — idempotent seed ───
+
+export interface BuiltinSeedInput {
+  name: string;
+  description?: string | null;
+  category: WorkflowTemplateCategory;
+  icon?: string | null;
+  inputFields?: unknown[];
+  defaultTeam?: string[];
+  appChannelSlug?: string | null;
+  systemInstruction?: string | null;
+  legacyScenarioKey: string | null;
+  steps: unknown[];
+  triggerType?: "manual" | "scheduled";
+  triggerConfig?: Record<string, unknown>;
+}
+
+/**
+ * 幂等 upsert builtin workflow templates.
+ *
+ * 分两路 onConflictDoUpdate：
+ *  - 有 legacyScenarioKey：以 (org_id, legacy_scenario_key) partial unique index 为冲突目标
+ *  - 无 legacyScenarioKey：以 (org_id, name) WHERE is_builtin AND legacy_scenario_key IS NULL 为冲突目标
+ */
+export async function seedBuiltinTemplatesForOrg(
+  organizationId: string,
+  seeds: BuiltinSeedInput[],
+): Promise<void> {
+  for (const seed of seeds) {
+    const baseValues = {
+      organizationId,
+      name: seed.name,
+      description: seed.description ?? null,
+      category: seed.category,
+      isBuiltin: true,
+      isEnabled: true,
+      icon: seed.icon ?? null,
+      inputFields: (seed.inputFields ?? []) as never,
+      defaultTeam: (seed.defaultTeam ?? []) as never,
+      appChannelSlug: seed.appChannelSlug ?? null,
+      systemInstruction: seed.systemInstruction ?? null,
+      legacyScenarioKey: seed.legacyScenarioKey,
+      steps: seed.steps as never,
+      triggerType: seed.triggerType ?? "manual",
+      triggerConfig: (seed.triggerConfig ?? {}) as never,
+    };
+
+    const setOnConflict = {
+      description: baseValues.description,
+      category: baseValues.category,
+      icon: baseValues.icon,
+      inputFields: baseValues.inputFields,
+      defaultTeam: baseValues.defaultTeam,
+      appChannelSlug: baseValues.appChannelSlug,
+      systemInstruction: baseValues.systemInstruction,
+      steps: baseValues.steps,
+      triggerType: baseValues.triggerType,
+      triggerConfig: baseValues.triggerConfig,
+      updatedAt: new Date(),
+    };
+
+    if (seed.legacyScenarioKey) {
+      await db
+        .insert(workflowTemplates)
+        .values(baseValues)
+        .onConflictDoUpdate({
+          target: [workflowTemplates.organizationId, workflowTemplates.legacyScenarioKey],
+          targetWhere: sql`${workflowTemplates.legacyScenarioKey} IS NOT NULL`,
+          set: setOnConflict,
+        });
+    } else {
+      await db
+        .insert(workflowTemplates)
+        .values(baseValues)
+        .onConflictDoUpdate({
+          target: [workflowTemplates.organizationId, workflowTemplates.name],
+          targetWhere: sql`${workflowTemplates.isBuiltin} = true AND ${workflowTemplates.legacyScenarioKey} IS NULL`,
+          set: setOnConflict,
+        });
+    }
+  }
+}
