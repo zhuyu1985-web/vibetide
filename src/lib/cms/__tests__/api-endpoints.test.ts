@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mockCmsFetch, restoreCmsFetch, cmsSuccessResponse, cmsErrorResponse } from "./test-helpers";
 import { CmsClient } from "../client";
-import { getChannels, getAppList, getCatalogTree, saveArticle } from "../api-endpoints";
+import { getChannels, getAppList, getCatalogTree, saveArticle, getArticleDetail } from "../api-endpoints";
 import type { CmsArticleSaveDTO } from "../types";
 
 const cfg = {
@@ -211,5 +211,41 @@ describe("saveArticle", () => {
     mockCmsFetch([cmsErrorResponse(500, "入稿失败")]);
     const client = new CmsClient(cfg);
     await expect(saveArticle(client, buildMinimalDto())).rejects.toThrow(/入稿|CMS/);
+  });
+});
+
+describe("getArticleDetail", () => {
+  afterEach(() => restoreCmsFetch());
+
+  it("returns detail with status/type fields", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse({
+        Id: 925194, title: "稿件", status: "30", type: 1,
+        publishDate: "2026-04-18 10:00:00",
+      }),
+    ]);
+    const client = new CmsClient(cfg);
+    const res = await getArticleDetail(client, "925194");
+    expect(res.data?.Id).toBe(925194);
+    expect(res.data?.status).toBe("30");
+  });
+
+  it("sends articleId as query param (GET)", async () => {
+    let capturedUrl = "";
+    let capturedMethod = "";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      capturedUrl = url.toString();
+      capturedMethod = init?.method ?? "";
+      return cmsSuccessResponse({ Id: 1, title: "x", status: "0", type: 1 });
+    }) as typeof globalThis.fetch;
+    try {
+      const client = new CmsClient(cfg);
+      await getArticleDetail(client, "925194");
+      expect(capturedUrl).toContain("articleId=925194");
+      expect(capturedMethod).toBe("GET");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

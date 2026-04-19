@@ -14,9 +14,36 @@ export {
   type CmsConfig,
 } from "./feature-flags";
 
+// —— CmsClient ——
+export { CmsClient, type CmsClientConfig, type CmsRequestOptions } from "./client";
+
+// —— API endpoints ——
+export {
+  getChannels,
+  getAppList,
+  getCatalogTree,
+  saveArticle,
+  getArticleDetail,
+  type GetCatalogTreeOptions,
+} from "./api-endpoints";
+
+// —— DTO & schema types ——
+export {
+  type CmsResponseEnvelope,
+  type CmsChannelsData,
+  type CmsChannelInfo,
+  type CmsApp,
+  type CmsCatalogNode,
+  type CmsArticleSaveDTO,
+  type CmsArticleSaveResponseData,
+  type CmsArticleDetail,
+  type CmsImageSimpleDTO,
+  type CmsArticleContentDto,
+  type CmsAppCustomParams,
+  type CmsListStyleDto,
+} from "./types";
+
 // —— 后续 Task 会追加 ——
-// export { CmsClient } from "./client";
-// export { saveArticle, getArticleDetail, getChannels, getAppList, getCatalogTree } from "./api-endpoints";
 // export { mapArticleToCms, determineType } from "./article-mapper";
 // export { syncCmsCatalogs } from "./catalog-sync";
 // export { classifyState, isRetriableError } from "./status-machine";
