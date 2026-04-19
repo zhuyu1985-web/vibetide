@@ -52,6 +52,7 @@ import {
 } from "@/lib/constants";
 import { resolveScenarioConfig } from "@/lib/scenario-fallback";
 import type { MissionSummary } from "@/lib/dal/missions";
+import type { WorkflowTemplateRow } from "@/db/types";
 import { cn } from "@/lib/utils";
 
 // ── Source module labels ────────────────────────────────────
@@ -129,8 +130,12 @@ function getPhaseIndex(status: string, hasTasks: boolean): number {
 
 export function MissionsClient({
   missions,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  workflows,
 }: {
   missions: MissionSummary[];
+  // TODO(Task 18): consume `workflows` in the 发起新任务 Sheet.
+  workflows: WorkflowTemplateRow[];
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("all");
