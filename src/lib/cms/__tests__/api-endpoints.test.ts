@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mockCmsFetch, restoreCmsFetch, cmsSuccessResponse } from "./test-helpers";
+import { mockCmsFetch, restoreCmsFetch, cmsSuccessResponse, cmsErrorResponse } from "./test-helpers";
 import { CmsClient } from "../client";
-import { getChannels, getAppList, getCatalogTree } from "../api-endpoints";
+import { getChannels, getAppList, getCatalogTree, saveArticle } from "../api-endpoints";
+import type { CmsArticleSaveDTO } from "../types";
 
 const cfg = {
   host: "https://cms.example.com",
@@ -147,5 +148,68 @@ describe("getCatalogTree", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe("saveArticle", () => {
+  afterEach(() => restoreCmsFetch());
+
+  const buildMinimalDto = (): CmsArticleSaveDTO => ({
+    loginId: "id",
+    loginTid: "tid",
+    tenantId: "t",
+    username: "admin",
+    version: "cms2",
+    type: "1",
+    title: "稿件",
+    author: "智媒编辑部",
+    catalogId: 8634,
+    siteId: 81,
+    content: "<p>正文</p>",
+  });
+
+  it("returns article.id + url + preViewPath on success", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse({
+        article: { id: 925194, status: 0, title: "稿件" },
+        url: "1376/x/925194.shtml",
+        preViewPath: "https://api/preview",
+        method: "ADD",
+      }),
+    ]);
+    const client = new CmsClient(cfg);
+    const res = await saveArticle(client, buildMinimalDto());
+    expect(res.data?.article.id).toBe(925194);
+    expect(res.data?.url).toContain(".shtml");
+  });
+
+  it("forwards the full DTO as request body", async () => {
+    let captured: unknown;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse((init?.body as string) ?? "{}");
+      return cmsSuccessResponse({
+        article: { id: 1 }, url: "x", preViewPath: "", method: "ADD",
+      });
+    }) as typeof globalThis.fetch;
+    try {
+      const client = new CmsClient(cfg);
+      const dto = buildMinimalDto();
+      await saveArticle(client, dto);
+      expect(captured).toMatchObject({
+        title: "稿件",
+        type: "1",
+        catalogId: 8634,
+        version: "cms2",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("bubbles up CmsBusinessError on state != 200", async () => {
+    mockCmsFetch([cmsErrorResponse(500, "入稿失败")]);
+    const client = new CmsClient(cfg);
+    await expect(saveArticle(client, buildMinimalDto())).rejects.toThrow(/入稿|CMS/);
   });
 });

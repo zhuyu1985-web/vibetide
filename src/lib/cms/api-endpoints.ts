@@ -4,9 +4,12 @@ import {
   CmsChannelsDataSchema,
   CmsAppListSchema,
   CmsCatalogNodeSchema,
+  CmsArticleSaveResponseDataSchema,
   type CmsChannelsData,
   type CmsApp,
   type CmsCatalogNode,
+  type CmsArticleSaveDTO,
+  type CmsArticleSaveResponseData,
   type CmsResponseEnvelope,
 } from "./types";
 import { CmsSchemaError } from "./errors";
@@ -105,6 +108,34 @@ export async function getCatalogTree(
   if (!parsed.success) {
     throw new CmsSchemaError(
       `getCatalogTree 响应 data 结构不符：${parsed.error.message}`,
+    );
+  }
+
+  return {
+    state: res.state,
+    success: res.success,
+    message: res.message,
+    data: parsed.data,
+  };
+}
+
+/**
+ * 文稿入库（/web/article/save）
+ */
+export async function saveArticle(
+  client: CmsClient,
+  dto: CmsArticleSaveDTO,
+): Promise<CmsResponseEnvelope<CmsArticleSaveResponseData>> {
+  const res = await client.post<CmsArticleSaveDTO, unknown>(
+    "/web/article/save",
+    dto,
+    { timeoutMs: 20000 },
+  );
+
+  const parsed = CmsArticleSaveResponseDataSchema.safeParse(res.data);
+  if (!parsed.success) {
+    throw new CmsSchemaError(
+      `saveArticle 响应 data 结构不符：${parsed.error.message}`,
     );
   }
 
