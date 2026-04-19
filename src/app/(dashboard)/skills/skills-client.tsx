@@ -29,6 +29,9 @@ import { deleteSkill, getSkillsForExport } from "@/app/actions/skills";
 import { generateSkillMd } from "@/lib/skill-package";
 import type { SkillWithBindCount } from "@/lib/dal/skills";
 import type { SkillCategory } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { WorkflowsPanel } from "./workflows-panel";
 
 const categoryLabels: Record<SkillCategory, string> = {
   perception: "感知",
@@ -82,9 +85,18 @@ function formatDate(iso: string) {
 
 interface SkillsClientProps {
   skills: SkillWithBindCount[];
+  /**
+   * B.1 unified scenario workflow — the "场景工作流" tab shows workflow
+   * templates alongside atomic skills. Both are "能力" in the user mental
+   * model (场景 = 工作流 = 员工固化的能力)。
+   */
+  workflows?: WorkflowTemplateRow[];
 }
 
-export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
+export function SkillsClient({
+  skills: initialSkills,
+  workflows = [],
+}: SkillsClientProps) {
   const [localSkills, setLocalSkills] = useState(initialSkills);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -276,6 +288,17 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
         }
       />
 
+      <Tabs defaultValue="atomic" className="w-full">
+        <TabsList variant="line" className="mb-5">
+          <TabsTrigger value="atomic">
+            原子能力 ({initialSkills.length})
+          </TabsTrigger>
+          <TabsTrigger value="workflows">
+            场景工作流 ({workflows.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="atomic" className="mt-0">
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <Button
@@ -461,6 +484,12 @@ export function SkillsClient({ skills: initialSkills }: SkillsClientProps) {
           ))}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="workflows" className="mt-0">
+          <WorkflowsPanel workflows={workflows} />
+        </TabsContent>
+      </Tabs>
 
       {/* Import Dialog */}
       <SkillImportDialog open={importOpen} onOpenChange={setImportOpen} />

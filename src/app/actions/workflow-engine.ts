@@ -68,6 +68,11 @@ export async function createWorkflowTemplate(data: {
 
 /**
  * Update an existing workflow template.
+ *
+ * Supports `content` field (baoyu-standard SKILL.md body). When provided,
+ * in dev environments the content is also written back to
+ * `workflows/<legacy_scenario_key>/SKILL.md` to keep filesystem in sync.
+ * In production (Vercel), filesystem is read-only so this is a no-op.
  */
 export async function updateWorkflowTemplate(
   templateId: string,
@@ -75,6 +80,7 @@ export async function updateWorkflowTemplate(
     name?: string;
     description?: string;
     steps?: WorkflowStepDef[];
+    content?: string;
   }
 ) {
   await requireAuth();
@@ -84,7 +90,21 @@ export async function updateWorkflowTemplate(
     .set({ ...data, updatedAt: new Date() })
     .where(eq(workflowTemplates.id, templateId));
 
+  // Bidirectional sync: write DB content back to workflows/<slug>/SKILL.md
+  // so runtime + git stay in sync with UI edits (dev only).
+  if (data.content !== undefined) {
+    const existing = await db.query.workflowTemplates.findFirst({
+      where: eq(workflowTemplates.id, templateId),
+    });
+    if (existing?.legacyScenarioKey) {
+      const { writeWorkflowMdBody } = await import("@/lib/skill-md-sync");
+      writeWorkflowMdBody(existing.legacyScenarioKey, data.content.trim());
+    }
+  }
+
   revalidatePath("/missions");
+  revalidatePath(`/workflows/${templateId}`);
+  revalidatePath("/skills");
 }
 
 /**

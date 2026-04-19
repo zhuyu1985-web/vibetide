@@ -74,6 +74,13 @@ export const workflowTemplates = pgTable("workflow_templates", {
   systemInstruction: text("system_instruction"),
   legacyScenarioKey: text("legacy_scenario_key"),
 
+  // Scenario spec document (Markdown, baoyu-standard).
+  // Mirrors `skills.content` for the workflow side. Loaded from
+  // `workflows/<slug>/SKILL.md` by `sync-workflows-from-md.ts`; editable
+  // via `/workflows/[id]`. Runtime consumers (leader-plan / scenario
+  // dispatchers) read from here or the file, whichever is newer.
+  content: text("content").default(""),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

@@ -270,6 +270,14 @@ export async function updateSkill(
       .returning();
   });
 
+  // Bidirectional sync: in dev, write content back to skills/<slug>/SKILL.md
+  // so runtime skill-loader's filesystem reads stay consistent with UI edits.
+  // No-op in production (read-only filesystem on Vercel).
+  if (data.content !== undefined && existing.slug) {
+    const { writeSkillMdBody } = await import("@/lib/skill-md-sync");
+    writeSkillMdBody(existing.slug, data.content.trim());
+  }
+
   revalidatePath(`/skills/${id}`);
   return updated;
 }

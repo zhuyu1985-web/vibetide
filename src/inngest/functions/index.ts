@@ -37,6 +37,7 @@ import {
 } from "./cms-catalog-sync";
 import { cmsStatusPoll } from "./cms-status-poll";
 import { cmsPublishRetry } from "./cms-publish-retry";
+import { skillConsistencyCheck } from "./skill-consistency-check";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -80,4 +81,6 @@ export const functions = [
   cmsCatalogSyncOnDemand,
   cmsStatusPoll,
   cmsPublishRetry,
+  // Skill / Workflow MD ↔ DB consistency check (2026-04-20)
+  skillConsistencyCheck,
 ];
