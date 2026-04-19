@@ -35,6 +35,7 @@ import {
   cmsCatalogSyncDaily,
   cmsCatalogSyncOnDemand,
 } from "./cms-catalog-sync";
+import { cmsStatusPoll } from "./cms-status-poll";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -76,4 +77,5 @@ export const functions = [
   // CMS P1 (2026-04-18)
   cmsCatalogSyncDaily,
   cmsCatalogSyncOnDemand,
+  cmsStatusPoll,
 ];
