@@ -4,6 +4,7 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { EMPLOYEE_CORE_SKILLS } from "../lib/constants";
 import { getAllBuiltinSkills } from "../lib/skill-loader";
+import { DEFAULT_SCENARIOS } from "./seed-data/scenarios";
 
 // Load env manually for standalone script (.env.local takes priority)
 import { config } from "dotenv";
@@ -158,7 +159,10 @@ async function seed() {
   // 1. Find or create default organization (idempotent)
   // Use the oldest existing org so data aligns with ensureUserProfile (which
   // also picks the oldest org for new users). Only create a new org when none
-  // exists at all.
+  // exists at all. The fallback is named `华栖云传媒集团` to match the single
+  // tenant this project ships with; the previous `Vibe Media Demo` fallback
+  // caused a split-brain where real users landed in one org and seeded demo
+  // data landed in a parallel orphan org.
   console.log("1. Finding/creating organization...");
   const existingOrg = await db.query.organizations.findFirst({
     orderBy: (o, { asc }) => [asc(o.createdAt)],
@@ -168,8 +172,8 @@ async function seed() {
     : await db
         .insert(schema.organizations)
         .values({
-          name: "Vibe Media Demo",
-          slug: "vibe-media-demo",
+          name: "华栖云传媒集团",
+          slug: "huaqiyun",
         })
         .returning();
   console.log(`   ${existingOrg ? "Found" : "Created"} org: ${org.name} (${org.id})\n`);
@@ -511,7 +515,9 @@ async function seed() {
     { name: "AI科技领域专业库", description: "AI芯片、大模型、智能终端等科技领域专业知识", type: "domain", documentCount: 234 },
   ];
 
+  // Key includes org id so id lookup stays unambiguous if seed is extended to multi-org.
   const kbMap = new Map<string, string>();
+  const kbKey = (orgId: string, name: string) => `${orgId}:${name}`;
   for (const kbData of knowledgeBasesData) {
     // Idempotent: onConflict uses the unique index (org_id, name).
     const [kb] = await db
@@ -530,7 +536,7 @@ async function seed() {
         },
       })
       .returning();
-    kbMap.set(kbData.name, kb.id);
+    kbMap.set(kbKey(org.id, kbData.name), kb.id);
     console.log(`   KB: ${kbData.name}`);
   }
 
@@ -547,7 +553,7 @@ async function seed() {
     const empId = employeeMap.get(binding.slug);
     if (!empId) continue;
     for (const kbName of binding.kbs) {
-      const kbId = kbMap.get(kbName);
+      const kbId = kbMap.get(kbKey(org.id, kbName));
       if (!kbId) continue;
       // Idempotent: ignore duplicate binding inserts.
       await db
@@ -1328,150 +1334,18 @@ async function seed() {
   }
   console.log();
 
-  // 23. Insert employee scenarios for 小雷 (xiaolei)
-  console.log("23. Inserting employee scenarios for 小雷...");
-  const xiaoleiScenarios = [
-    {
-      employeeSlug: "xiaolei",
-      name: "全网热点扫描",
-      description: "扫描各平台热点话题，生成热点速报",
-      icon: "Radar",
-      systemInstruction:
-        "请对{{domain}}领域进行全网热点扫描，覆盖微博、百度、头条、抖音、知乎等主流平台。输出格式：按热度排序的 Top 10 热点列表，每个热点包含标题、热度值、来源平台、上升趋势、建议追踪角度。最后给出整体热点态势总结。",
-      inputFields: [
-        {
-          name: "domain",
-          label: "关注领域",
-          type: "select" as const,
-          required: true,
-          placeholder: "选择领域",
-          options: [
-            "全部",
-            "科技",
-            "财经",
-            "娱乐",
-            "体育",
-            "社会",
-            "教育",
-            "汽车",
-            "健康",
-          ],
-        },
-      ],
-      toolsHint: ["trending_topics", "web_search"],
-      sortOrder: 1,
-    },
-    {
-      employeeSlug: "xiaolei",
-      name: "话题深度追踪",
-      description: "深入分析特定话题的发展脉络",
-      icon: "Search",
-      systemInstruction:
-        "请对话题「{{topic}}」进行深度追踪分析。包含：1) 话题起源和发展时间线 2) 各平台传播路径 3) 关键节点和转折 4) 舆论情绪变化 5) 相关利益方观点汇总 6) 预测后续发展趋势 7) 建议的内容切入角度。",
-      inputFields: [
-        {
-          name: "topic",
-          label: "追踪话题",
-          type: "text" as const,
-          required: true,
-          placeholder: "输入要追踪的话题关键词",
-        },
-      ],
-      toolsHint: ["web_search", "web_deep_read", "trending_topics"],
-      sortOrder: 2,
-    },
-    {
-      employeeSlug: "xiaolei",
-      name: "平台热榜查看",
-      description: "查看指定平台的实时热榜",
-      icon: "BarChart3",
-      systemInstruction:
-        "请查看{{platform}}平台的实时热榜数据，列出当前 Top 20 热门话题，每个话题标注热度指数、上榜时长、趋势（上升/下降/平稳）。对排名前 5 的话题给出简要分析和内容制作建议。",
-      inputFields: [
-        {
-          name: "platform",
-          label: "目标平台",
-          type: "select" as const,
-          required: true,
-          placeholder: "选择平台",
-          options: [
-            "微博",
-            "百度",
-            "头条",
-            "抖音",
-            "知乎",
-            "B站",
-            "微信",
-          ],
-        },
-      ],
-      toolsHint: ["trending_topics"],
-      sortOrder: 3,
-    },
-    {
-      employeeSlug: "xiaolei",
-      name: "热点分析报告",
-      description: "生成深度热点分析报告",
-      icon: "FileText",
-      systemInstruction:
-        "请针对话题「{{topic}}」生成一份{{depth}}的热点分析报告。报告结构：1) 热点概述 2) 数据分析（热度趋势、平台分布、用户画像） 3) 舆情分析（正面/负面/中性占比、典型观点） 4) 竞品响应（主流媒体的报道角度） 5) 内容机会（建议的选题角度、体裁、发布时机） 6) 风险提示（敏感点、合规注意事项）",
-      inputFields: [
-        {
-          name: "topic",
-          label: "分析话题",
-          type: "text" as const,
-          required: true,
-          placeholder: "输入要分析的话题",
-        },
-        {
-          name: "depth",
-          label: "报告深度",
-          type: "select" as const,
-          required: true,
-          placeholder: "选择深度",
-          options: ["快速摘要", "标准报告", "深度研报"],
-        },
-      ],
-      toolsHint: ["trending_topics", "web_search", "web_deep_read"],
-      sortOrder: 4,
-    },
-    {
-      employeeSlug: "xiaolei",
-      name: "关键词热度监测",
-      description: "监测关键词在各平台的热度变化",
-      icon: "Activity",
-      systemInstruction:
-        "请监测关键词「{{keyword}}」在{{timeRange}}内的热度变化情况。输出：1) 各平台当前热度指数 2) 热度趋势变化曲线描述 3) 关联热词和话题 4) 主要讨论内容摘要 5) 情感倾向分析 6) 是否建议跟进及原因。",
-      inputFields: [
-        {
-          name: "keyword",
-          label: "监测关键词",
-          type: "text" as const,
-          required: true,
-          placeholder: "输入关键词",
-        },
-        {
-          name: "timeRange",
-          label: "时间范围",
-          type: "select" as const,
-          required: true,
-          placeholder: "选择时间范围",
-          options: ["最近1小时", "最近24小时", "最近7天", "最近30天"],
-        },
-      ],
-      toolsHint: ["web_search", "trending_topics"],
-      sortOrder: 5,
-    },
-  ];
-
-  for (const s of xiaoleiScenarios) {
-    // Idempotent upsert so re-running the seed never appends duplicates.
-    // Natural key is (organization_id, employee_slug, name), matching the
-    // unique index `employee_scenarios_org_slug_name_uidx`.
+  // 23. Insert employee scenarios — 27 scenarios across all 8 employees.
+  // Data lives in src/db/seed-data/scenarios.ts so a single `npm run db:seed`
+  // populates everything. Previously only xiaolei was seeded here while the
+  // other 7 employees lived in scripts/seed-scenarios.ts, which led to
+  // missing-data bugs whenever the DB was reset.
+  console.log(`23. Inserting ${DEFAULT_SCENARIOS.length} employee scenarios across 8 employees...`);
+  for (const s of DEFAULT_SCENARIOS) {
     await db
       .insert(schema.employeeScenarios)
       .values({
         organizationId: org.id,
+        welcomeMessage: s.welcomeMessage ?? null,
         ...s,
       })
       .onConflictDoUpdate({
@@ -1483,6 +1357,7 @@ async function seed() {
         set: {
           description: s.description,
           icon: s.icon,
+          welcomeMessage: s.welcomeMessage ?? null,
           systemInstruction: s.systemInstruction,
           inputFields: s.inputFields,
           toolsHint: s.toolsHint,
@@ -1490,7 +1365,7 @@ async function seed() {
           updatedAt: new Date(),
         },
       });
-    console.log(`   Scenario: ${s.name}`);
+    console.log(`   ${s.employeeSlug}: ${s.name}`);
   }
   console.log();
 

@@ -46,17 +46,26 @@ export function EmployeeQuickPanel({
       {/* Section header */}
       <div className="flex items-center justify-between mb-2 px-1">
         <span className="text-xs font-medium text-muted-foreground">AI 专家团队</span>
-        <Link
-          href="/ai-employees"
-          className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200"
-        >
-          全部员工 →
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/ai-employees/create"
+            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-200"
+          >
+            <Plus size={14} />
+            创建员工
+          </Link>
+          <Link
+            href="/ai-employees"
+            className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200"
+          >
+            全部员工 →
+          </Link>
+        </div>
       </div>
 
-      {/* Horizontal scroll row */}
+      {/* Employee row */}
       <motion.div
-        className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+        className="flex flex-wrap justify-center gap-3 pb-2"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -92,20 +101,6 @@ export function EmployeeQuickPanel({
             </motion.button>
           );
         })}
-
-        {/* Create employee button */}
-        <motion.div variants={cardVariants}>
-          <Link
-            href="/ai-employees/create"
-            className="flex-shrink-0 w-[88px] flex flex-col items-center gap-2 py-3 px-2 rounded-xl
-              bg-transparent hover:bg-muted/50 transition-colors duration-200"
-          >
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-              <Plus size={20} className="text-muted-foreground" />
-            </div>
-            <span className="text-[11px] text-muted-foreground">创建员工</span>
-          </Link>
-        </motion.div>
       </motion.div>
     </div>
   );

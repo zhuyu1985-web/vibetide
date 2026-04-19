@@ -441,22 +441,20 @@ export async function bindKnowledgeBaseToEmployee(
 ) {
   await requireAuth();
 
-  // Check if already bound
-  const existing = await db.query.employeeKnowledgeBases.findFirst({
-    where: and(
-      eq(employeeKnowledgeBases.employeeId, employeeId),
-      eq(employeeKnowledgeBases.knowledgeBaseId, knowledgeBaseId)
-    ),
-  });
+  const inserted = await db
+    .insert(employeeKnowledgeBases)
+    .values({ employeeId, knowledgeBaseId })
+    .onConflictDoNothing({
+      target: [
+        employeeKnowledgeBases.employeeId,
+        employeeKnowledgeBases.knowledgeBaseId,
+      ],
+    })
+    .returning({ id: employeeKnowledgeBases.id });
 
-  if (existing) {
+  if (inserted.length === 0) {
     throw new Error("该知识库已绑定");
   }
-
-  await db.insert(employeeKnowledgeBases).values({
-    employeeId,
-    knowledgeBaseId,
-  });
 
   revalidatePath("/employee");
 }

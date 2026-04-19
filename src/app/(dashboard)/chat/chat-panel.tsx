@@ -529,7 +529,7 @@ export function ChatPanel({
 
       {/* ── Header ── fixed at top of the chat panel; sticky + z-index acts
           as a safety net if any ancestor ever regains scrollability. */}
-      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
+      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-6 pt-[1px] pb-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
         <EmployeeAvatar
           employeeId={employee.id}
           size="md"

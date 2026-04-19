@@ -324,6 +324,7 @@ export interface ScenarioCardData {
   name: string;
   description: string;
   icon: string;
+  welcomeMessage?: string | null;
   inputFields: InputFieldDef[];
   toolsHint: string[];
 }

@@ -202,9 +202,11 @@ export function MissionsClient({
   // Reset visible count when filter changes
   useEffect(() => { setVisibleCount(20); }, [filter, searchText, scenarioFilter]);
 
-  // Only terminal-state missions can be deleted — matches the server-side
-  // `deleteMissions` enforcement.
-  const deletableStatuses = ["completed", "failed", "cancelled"];
+  // Missions that can be deleted — matches the server-side `deleteMissions`
+  // enforcement. `queued` / `planning` are allowed because they often get
+  // stuck without progressing. Actively running statuses (`executing`,
+  // `consolidating`, `coordinating`) still require an explicit cancel first.
+  const deletableStatuses = ["completed", "failed", "cancelled", "queued", "planning"];
   const deletableVisibleIds = useMemo(
     () => visibleMissions.filter((m) => deletableStatuses.includes(m.status)).map((m) => m.id),
     [visibleMissions],
@@ -266,12 +268,19 @@ export function MissionsClient({
       if (result.skipped.length > 0) {
         toast.warning(`${result.skipped.length} 个任务已跳过（运行中或无权限）`);
       }
-      clearSelection();
+      // Close dialog and refresh. We intentionally do NOT clearSelection()
+      // here — the selectedIds drop effect prunes no-longer-existing IDs
+      // once `router.refresh()` delivers the new list, so the floating
+      // bar and rows disappear in the same frame instead of two jarring
+      // beats ("bar vanishes → rows vanish").
       setDeleteConfirmOpen(false);
       router.refresh();
+      // Keep `deleting=true` until the dialog's exit animation has played
+      // out. Otherwise the confirm button flashes from "删除中..." back to
+      // "确认删除" while the dialog fades, which reads as a flicker.
+      window.setTimeout(() => setDeleting(false), 200);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "删除失败");
-    } finally {
       setDeleting(false);
     }
   }

@@ -20,6 +20,10 @@ export const employeeScenarios = pgTable("employee_scenarios", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   icon: text("icon").notNull().default("Zap"),
+  // Optional opening line sent as the first assistant message when the user
+  // enters this scenario. Supports Markdown. May reference inputFields
+  // placeholders ({{fieldName}}).
+  welcomeMessage: text("welcome_message"),
   systemInstruction: text("system_instruction").notNull(),
   inputFields: jsonb("input_fields")
     .$type<

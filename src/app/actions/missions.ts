@@ -293,16 +293,26 @@ export async function deleteMission(missionId: string) {
     where: and(eq(missions.id, missionId), eq(missions.organizationId, orgId)),
   });
   if (!mission) throw new Error("任务不存在或无权操作");
-  if (["queued", "planning", "executing", "consolidating", "coordinating"].includes(mission.status)) {
+  if (["executing", "consolidating", "coordinating"].includes(mission.status)) {
     throw new Error("不能删除运行中的任务，请先取消");
   }
 
   // Null out FK references from non-cascading tables first (see
   // deleteMissions for full rationale).
+  const taskIdRows = await db
+    .select({ id: missionTasks.id })
+    .from(missionTasks)
+    .where(eq(missionTasks.missionId, missionId));
+  const taskIds = taskIdRows.map((r) => r.id);
+
   await db.update(executionLogs).set({ missionId: null }).where(eq(executionLogs.missionId, missionId));
   await db.update(articles).set({ missionId: null }).where(eq(articles.missionId, missionId));
   await db.update(verificationRecords).set({ missionId: null }).where(eq(verificationRecords.missionId, missionId));
   await db.update(auditRecords).set({ missionId: null }).where(eq(auditRecords.missionId, missionId));
+  if (taskIds.length > 0) {
+    await db.update(verificationRecords).set({ taskId: null }).where(inArray(verificationRecords.taskId, taskIds));
+    await db.update(executionLogs).set({ missionTaskId: null }).where(inArray(executionLogs.missionTaskId, taskIds));
+  }
 
   await db.delete(missions).where(eq(missions.id, missionId));
   revalidatePath("/missions");
@@ -312,10 +322,16 @@ export async function deleteMission(missionId: string) {
  * 批量永久删除任务。只有当前组织的、处于终态（非运行中）的任务会被删除；
  * 运行中的任务会被跳过并在返回值里汇总。CASCADE 自动清理子表。
  */
+// `queued` / `planning` are included because these missions often get stuck
+// (leader plan step times out, API call fails) without progressing to a
+// terminal state. Actively running statuses remain blocked to avoid deleting
+// missions mid-execution.
 const DELETABLE_STATUSES = [
   "completed",
   "failed",
   "cancelled",
+  "queued",
+  "planning",
 ] as const;
 
 export async function deleteMissions(missionIds: string[]): Promise<{
@@ -364,12 +380,27 @@ export async function deleteMissions(missionIds: string[]): Promise<{
     // back everything.
     try {
       await db.transaction(async (tx) => {
+        // Collect task IDs belonging to the missions we're about to delete so
+        // we can null out non-cascading FKs from verification_records and
+        // execution_logs. Without this, CASCADE delete of mission_tasks fails
+        // because verification_records.task_id and execution_logs.mission_task_id
+        // have no ON DELETE action.
+        const taskIdRows = await tx
+          .select({ id: missionTasks.id })
+          .from(missionTasks)
+          .where(inArray(missionTasks.missionId, deletableIds));
+        const taskIds = taskIdRows.map((r) => r.id);
+
         await tx.update(executionLogs).set({ missionId: null }).where(inArray(executionLogs.missionId, deletableIds));
         await tx.update(articles).set({ missionId: null }).where(inArray(articles.missionId, deletableIds));
         await tx.update(verificationRecords).set({ missionId: null }).where(inArray(verificationRecords.missionId, deletableIds));
         await tx.update(auditRecords).set({ missionId: null }).where(inArray(auditRecords.missionId, deletableIds));
         await tx.update(channelMessages).set({ missionId: null }).where(inArray(channelMessages.missionId, deletableIds));
         await tx.update(skillUsageRecords).set({ missionId: null }).where(inArray(skillUsageRecords.missionId, deletableIds));
+        if (taskIds.length > 0) {
+          await tx.update(verificationRecords).set({ taskId: null }).where(inArray(verificationRecords.taskId, taskIds));
+          await tx.update(executionLogs).set({ missionTaskId: null }).where(inArray(executionLogs.missionTaskId, taskIds));
+        }
 
         await tx.delete(missions).where(inArray(missions.id, deletableIds));
       });

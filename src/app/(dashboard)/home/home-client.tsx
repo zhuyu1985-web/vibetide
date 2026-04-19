@@ -12,6 +12,7 @@ import { startMission } from "@/app/actions/missions";
 import { Mic, Paperclip, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatStream } from "@/hooks/use-chat-stream";
+import { renderScenarioTemplate } from "@/lib/scenario-template";
 import { ParticleBackground } from "@/components/shared/particle-background";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
@@ -130,18 +131,33 @@ export function HomeClient({
   const handleEmployeeScenarioClick = useCallback(
     (scenario: { id: string; name: string; icon?: string }) => {
       const fullScenario = allEmployeeScenarios.find((s) => s.id === scenario.id);
-      if (fullScenario) {
-        if (fullScenario.inputFields?.length > 0) {
-          // Show inline scenario form in chat
-          setInlineScenario(fullScenario);
-          setChatOpen(true);
-        } else {
-          // Execute directly
-          setChatOpen(true);
-          setTimeout(() => {
-            chat.sendMessage(`执行场景：${fullScenario.name}`);
-          }, 0);
+      if (!fullScenario) return;
+
+      setChatOpen(true);
+
+      // If the scenario has a welcome message, show it as the opening assistant
+      // message when entering the scenario. Rendered with empty inputs so any
+      // {{placeholder}} references remain visible (they'll resolve on submit
+      // via the instruction itself, so the welcome should usually avoid
+      // placeholders).
+      if (fullScenario.welcomeMessage) {
+        const welcome = renderScenarioTemplate(fullScenario.welcomeMessage, {});
+        if (welcome.trim()) {
+          chat.setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: welcome },
+          ]);
         }
+      }
+
+      if (fullScenario.inputFields?.length > 0) {
+        // Show inline scenario form in chat
+        setInlineScenario(fullScenario);
+      } else {
+        // Execute directly (no inputs to collect)
+        setTimeout(() => {
+          chat.sendMessage(`执行场景：${fullScenario.name}`);
+        }, 0);
       }
     },
     [allEmployeeScenarios, chat]
@@ -251,13 +267,9 @@ export function HomeClient({
     <div className="w-full">
       <div
         className={cn(
-          "rounded-2xl overflow-hidden",
+          "gemini-border rounded-2xl",
           "bg-white dark:bg-white/[0.06]",
-          "border border-gray-200 dark:border-white/[0.1]",
-          "shadow-[0_2px_12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
-          "focus-within:border-indigo-400 dark:focus-within:border-white/[0.18]",
-          "focus-within:shadow-[0_2px_20px_rgba(99,102,241,0.15)] dark:focus-within:shadow-[0_8px_40px_rgba(59,130,246,0.12)]",
-          "transition-all duration-300 ease-out"
+          "transition-shadow duration-300 ease-out"
         )}
       >
         {/* Textarea */}
@@ -392,12 +404,12 @@ export function HomeClient({
         <HeroSection />
 
         {/* Layer 1.5: Shared input box */}
-        <div className="max-w-3xl mx-auto mt-2">
+        <div className="max-w-[820px] mx-auto mt-2">
           {renderInputBox()}
         </div>
 
         {/* Layer 2: Employee quick panel */}
-        <div className="px-4 mt-4">
+        <div className="max-w-[820px] mx-auto mt-4">
           <EmployeeQuickPanel
             activeEmployee={activeEmployee}
             onEmployeeClick={handleSelectEmployee}

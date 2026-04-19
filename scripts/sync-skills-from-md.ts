@@ -55,12 +55,14 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL!, { prepare: false });
   const db = drizzle(client, { schema });
 
-  // Find the organization
+  // Find the default organization (oldest one — matches main seed behavior).
+  // Previously hard-coded to "vibe-media-demo"; that slug no longer exists
+  // after consolidating to a single tenant (华栖云传媒集团).
   const org = await db.query.organizations.findFirst({
-    where: (o, { eq }) => eq(o.slug, "vibe-media-demo"),
+    orderBy: (o, { asc }) => [asc(o.createdAt)],
   });
   if (!org) {
-    console.error("Organization 'vibe-media-demo' not found. Run db:seed first.");
+    console.error("No organization found. Run db:seed first.");
     process.exit(1);
   }
   console.log(`Organization: ${org.name} (${org.id})\n`);

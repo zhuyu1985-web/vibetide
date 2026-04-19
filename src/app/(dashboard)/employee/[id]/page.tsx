@@ -5,8 +5,9 @@ import { getPerformanceTrend } from "@/lib/dal/performance";
 import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectAttributions } from "@/lib/dal/evolution";
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
-import { getScenariosByEmployeeSlug } from "@/lib/dal/scenarios";
-import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { getScenariosByEmployeeSlug, listScenariosForEmployeeAdmin } from "@/lib/dal/scenarios";
+import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
+import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
 import { EmployeeProfileClient } from "./employee-profile-client";
 
@@ -32,9 +33,16 @@ export default async function EmployeeProfilePage({
   }
 
   let orgId = "";
+  let canManageScenarios = false;
   try {
-    const org = await getCurrentUserOrg();
+    const [org, profile] = await Promise.all([
+      getCurrentUserOrg(),
+      getCurrentUserProfile(),
+    ]);
     orgId = org || "";
+    canManageScenarios = Boolean(
+      profile?.permissions.includes(PERMISSIONS.AI_MANAGE),
+    );
   } catch {
     // fallback
   }
@@ -63,11 +71,13 @@ export default async function EmployeeProfilePage({
     getSkillCombos(orgId).catch(() => []),
   ]);
 
-  const [recentMemories, unprocessedFeedbackCount, scenarios] = await Promise.all([
-    getRecentMemories(employee.dbId, 20).catch(() => []),
-    getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
-    getScenariosByEmployeeSlug(employee.id).catch(() => []),
-  ]);
+  const [recentMemories, unprocessedFeedbackCount, scenarios, adminScenarios] =
+    await Promise.all([
+      getRecentMemories(employee.dbId, 20).catch(() => []),
+      getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
+      getScenariosByEmployeeSlug(employee.id).catch(() => []),
+      listScenariosForEmployeeAdmin(employee.id).catch(() => []),
+    ]);
 
   return (
     <EmployeeProfileClient
@@ -85,6 +95,8 @@ export default async function EmployeeProfilePage({
       recentMemories={recentMemories}
       unprocessedFeedbackCount={unprocessedFeedbackCount}
       scenarios={scenarios}
+      adminScenarios={adminScenarios}
+      canManageScenarios={canManageScenarios}
     />
   );
 }

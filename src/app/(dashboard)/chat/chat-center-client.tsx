@@ -13,6 +13,7 @@ import type { AIEmployee, ScenarioCardData } from "@/lib/types";
 import type { SavedConversationRow } from "@/db/types";
 import type { IntentResult } from "@/lib/agent/types";
 import { useChatStream } from "@/hooks/use-chat-stream";
+import { renderScenarioTemplate } from "@/lib/scenario-template";
 
 interface ChatCenterClientProps {
   employees: AIEmployee[];
@@ -400,17 +401,34 @@ export function ChatCenterClient({
   }, [selectedEmployee, selectedSlug, messages, isSaved, activeScenario]);
 
   /* ── Select scenario — show inline form or execute directly ── */
-  const handleSelectScenario = useCallback((scenario: ScenarioCardData) => {
-    if (scenario.inputFields.length > 0) {
-      setInlineScenario(scenario);
-    } else {
-      // No inputs needed, execute directly
-      setInlineScenario(null);
-      setActiveScenario(scenario);
-      handleScenarioSubmit(scenario, {});
-    }
+  const handleSelectScenario = useCallback(
+    (scenario: ScenarioCardData) => {
+      // Show welcome message as an opening assistant message when the user
+      // enters the scenario. Welcome text typically doesn't reference input
+      // placeholders, so we render with empty inputs here.
+      if (scenario.welcomeMessage) {
+        const welcome = renderScenarioTemplate(scenario.welcomeMessage, {});
+        if (welcome.trim()) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: welcome },
+          ]);
+        }
+      }
+
+      if (scenario.inputFields.length > 0) {
+        setInlineScenario(scenario);
+      } else {
+        // No inputs needed, execute directly
+        setInlineScenario(null);
+        setActiveScenario(scenario);
+        handleScenarioSubmit(scenario, {});
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    [setMessages],
+  );
 
   /* ── Execute scenario with inputs ── */
   const handleScenarioSubmit = useCallback(

@@ -113,12 +113,20 @@ export async function createCustomEmployee(input: {
 
   // Bind knowledge bases
   if (input.knowledgeBaseIds && input.knowledgeBaseIds.length > 0) {
-    await db.insert(employeeKnowledgeBases).values(
-      input.knowledgeBaseIds.map((knowledgeBaseId) => ({
-        employeeId: created.id,
-        knowledgeBaseId,
-      })),
-    );
+    await db
+      .insert(employeeKnowledgeBases)
+      .values(
+        input.knowledgeBaseIds.map((knowledgeBaseId) => ({
+          employeeId: created.id,
+          knowledgeBaseId,
+        })),
+      )
+      .onConflictDoNothing({
+        target: [
+          employeeKnowledgeBases.employeeId,
+          employeeKnowledgeBases.knowledgeBaseId,
+        ],
+      });
   }
 
   revalidatePath("/ai-employees");
@@ -208,12 +216,20 @@ export async function updateCustomEmployee(
       .where(eq(employeeKnowledgeBases.employeeId, employeeId));
 
     if (input.knowledgeBaseIds.length > 0) {
-      await db.insert(employeeKnowledgeBases).values(
-        input.knowledgeBaseIds.map((knowledgeBaseId) => ({
-          employeeId,
-          knowledgeBaseId,
-        })),
-      );
+      await db
+        .insert(employeeKnowledgeBases)
+        .values(
+          input.knowledgeBaseIds.map((knowledgeBaseId) => ({
+            employeeId,
+            knowledgeBaseId,
+          })),
+        )
+        .onConflictDoNothing({
+          target: [
+            employeeKnowledgeBases.employeeId,
+            employeeKnowledgeBases.knowledgeBaseId,
+          ],
+        });
     }
   }
 

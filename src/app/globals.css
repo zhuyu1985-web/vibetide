@@ -1273,20 +1273,88 @@
 }
 
 /* ================================================================
-   Input Box Animated Border
+   Gemini-style Animated Border
+   - Rotating conic gradient ring
+   - Breathing opacity + outer glow
+   - Applied to the homepage input box
    ================================================================ */
-@property --border-angle {
-  syntax: '<angle>';
+@property --gemini-angle {
+  syntax: "<angle>";
   initial-value: 0deg;
   inherits: false;
 }
-@keyframes border-rotate {
-  to { --border-angle: 360deg; }
+
+@keyframes gemini-border-rotate {
+  to { --gemini-angle: 360deg; }
 }
-.input-box-wrapper:hover .input-box-border-glow {
-  animation: border-rotate 3s linear infinite;
-  opacity: 1;
+
+@keyframes gemini-border-breath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
-.input-box-border-glow {
-  background: conic-gradient(from var(--border-angle, 0deg), #6366f1, #8b5cf6, #06b6d4, #6366f1);
+
+@keyframes gemini-border-glow {
+  0%, 100% { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); }
+  50% {
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.06),
+      0 0 26px rgba(99, 102, 241, 0.18);
+  }
+}
+
+@keyframes gemini-border-glow-dark {
+  0%, 100% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+  50% {
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 0 32px rgba(99, 102, 241, 0.32);
+  }
+}
+
+.gemini-border {
+  position: relative;
+  animation: gemini-border-glow 3.2s ease-in-out infinite;
+}
+
+/* Draws a 1.5px conic-gradient ring using the mask-composite trick:
+   fill the whole box with the gradient, then subtract the content-box
+   so only the `padding`-width ring remains. No interior tint. */
+.gemini-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--gemini-angle, 0deg),
+    #4285f4 0%,
+    #34a853 20%,
+    #fbbc05 40%,
+    #ea4335 60%,
+    #9333ea 80%,
+    #4285f4 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation:
+    gemini-border-rotate 6s linear infinite,
+    gemini-border-breath 3.2s ease-in-out infinite;
+}
+
+:is(.dark) .gemini-border {
+  animation: gemini-border-glow-dark 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gemini-border,
+  .gemini-border::before {
+    animation: none;
+  }
+  .gemini-border::before {
+    opacity: 0.7;
+  }
 }
