@@ -10,6 +10,7 @@ import {
 } from "@/lib/cms";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
+import { updateAppChannelBinding as dalUpdateAppChannelBinding } from "@/lib/dal/app-channels";
 
 // ---------------------------------------------------------------------------
 // Auth helpers (multi-tenant boundary)
@@ -109,5 +110,45 @@ export async function publishArticleToCmsAction(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: message };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// APP 栏目绑定更新（运营 UI 调用）
+// ---------------------------------------------------------------------------
+
+export interface UpdateAppChannelBindingInput {
+  slug: string;
+  catalogId: string;
+  listStyleType?: string;
+}
+
+/**
+ * 把某个 APP 栏目绑定到指定的 CMS catalog（UUID）。
+ *
+ * - 仅登录用户可调用；组织边界由 requireUserAndOrg 决定
+ * - listStyleType 目前固定为 "0"（默认），Phase 2 再开放多样式选择
+ * - 成功后 revalidate /settings/cms-mapping
+ */
+export async function updateAppChannelBindingAction(
+  input: UpdateAppChannelBindingInput,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { organizationId } = await requireUserAndOrg();
+    await dalUpdateAppChannelBinding(organizationId, input.slug, {
+      defaultCatalogId: input.catalogId,
+      defaultListStyle: {
+        listStyleType: input.listStyleType ?? "0",
+        listStyleName: "默认",
+        imageUrlList: [],
+      },
+    });
+    revalidatePath("/settings/cms-mapping");
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }

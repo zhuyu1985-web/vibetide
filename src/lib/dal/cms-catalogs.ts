@@ -118,3 +118,22 @@ export async function listAllActiveCmsCatalogs(organizationId: string) {
     ),
   });
 }
+
+/**
+ * 按 organization 列出"所有活跃栏目"的简化视图（UI 下拉用）。
+ *
+ * 与 `listAllActiveCmsCatalogs` 的区别：只返回绑定 UI 需要的字段，
+ * 避免把播放器 / 预览地址等大段 null 字段带到 client component。
+ */
+export async function listCmsCatalogsForBindingDropdown(organizationId: string) {
+  const rows = await listAllActiveCmsCatalogs(organizationId);
+  return rows.map((r) => ({
+    id: r.id,
+    cmsCatalogId: r.cmsCatalogId,
+    name: r.name,
+    innerCode: r.innerCode,
+    treeLevel: r.treeLevel,
+    appId: r.appId,
+    siteId: r.siteId,
+  }));
+}
