@@ -1,376 +1,171 @@
 ---
 name: script_generate
 displayName: 视频脚本生成（场景化重写版）
-description: 生成视频/音频脚本的核心 skill。按 5 大视频场景分化子模板（新闻视频 / 时政解读 / 赛事解说 / 综艺看点 / 纪录片）。每个子模板有独立分镜节奏、镜头语言、配音风格。与 duanju_script（短剧分集）、zhongcao_script/tandian_script（民生专用）形成互补：script_generate 专注"非系列化、非民生专用"视频场景。替代现有简单版 script_generate。
+description: 生成视频脚本的核心 skill。按 5 大视频场景分化子模板（新闻视频 / 时政解读 / 赛事解说 / 综艺看点 / 纪录片）。每子模板有独立分镜节奏、镜头语言、配音风格。与 duanju_script（分集短剧）、zhongcao_script / tandian_script（民生专用）、podcast_script（音频）形成互补：script_generate 专注"非系列化、非民生专用、非音频"的通用视频场景。
 version: 5.0.0
 category: generation
+
 metadata:
+  skill_kind: generation
   scenario_tags: [news, politics, sports, variety, documentary]
   compatibleEmployees: [xiaowen, xiaojian]
-  runtime:
-    type: llm_generation
-    avgLatencyMs: 18000
-    maxConcurrency: 3
-    modelDependency: anthropic:claude-opus-4-7
+  modelDependency: deepseek:deepseek-chat
   requires:
-    knowledgeBases:
-      - 视频分镜案例库（推荐）
-      - 镜头语言手册（推荐）
-      - 场景配乐参考库（推荐）
-  subtemplates:
-    - news_video
-    - politics_explainer
-    - sports_commentary
-    - variety_highlight_video
-    - documentary_short
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases: []
+    dependencies: []
+  implementation:
+    scriptPath: src/lib/agent/execution.ts
+    testPath: src/lib/agent/__tests__/
+  openclaw:
+    referenceSpec: docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md
 ---
 
 # 视频脚本生成（script_generate）
 
-## Language
-
-简体中文；配音稿口语化；分镜描述简洁专业。
-
-## When to Use
+## 使用条件
 
 ✅ **应调用场景**：
 - APP 新闻栏目的新闻视频脚本（非拆条）
 - 时政深度解读视频脚本
-- 川超等赛事的解说视频脚本
-- 综艺看点视频脚本（委托给 `zongyi_highlight` 也可）
+- 赛事（如川超）解说视频脚本
+- 综艺看点视频脚本（可内部委托 `zongyi_highlight`）
 - 短纪录片脚本（3-15 分钟）
 
 ❌ **不应调用场景**：
 - 分集短剧（走 `duanju_script`）
-- 种草视频（走 `zhongcao_script`）
-- 探店视频（走 `tandian_script`）
+- 种草视频（走 `zhongcao_script`）/ 探店视频（走 `tandian_script`）
 - 播客音频（走 `podcast_script`）
 
-## Input Schema
+**前置条件**：`topic` + `keyPoints ≥ 1`；`subtemplate` 必须是 5 个之一；LLM 可用；子模板对应 KB 已绑定（如可用）。
 
-```typescript
-export const ScriptGenerateInputSchema = z.object({
-  topic: z.string(),
-  subtemplate: z.enum([
-    "news_video",              // 新闻视频
-    "politics_explainer",      // 时政解读
-    "sports_commentary",       // 赛事解说
-    "variety_highlight_video", // 综艺看点
-    "documentary_short",       // 短纪录片
-  ]),
-  sourceArticle: z.object({                  // 可选：基于已有文章生成视频脚本
-    title: z.string(),
-    body: z.string(),
-  }).optional(),
-  keyPoints: z.array(z.string()).min(1),     // 关键信息点
-  targetDurationSec: z.number().int().min(30).max(1200).default(180),
-  aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("16:9"),
-  style: z.enum(["serious", "casual", "energetic", "cinematic"]).default("serious"),
-  narrator: z.enum(["anchor", "documentary_voice", "casual_host", "field_reporter"]).default("anchor"),
-  mustIncludeShots: z.array(z.string()).optional(),   // 必须出现的画面
-  customInstructions: z.string().optional(),
-});
-```
+## 输入 / 输出
 
-## Output Schema
+**输入简要表：**
 
-```typescript
-export const ScriptGenerateOutputSchema = z.object({
-  meta: z.object({
-    scriptId: z.string().uuid(),
-    subtemplate: z.string(),
-    aspectRatio: z.string(),
-    targetDurationSec: z.number(),
-    totalWords: z.number(),
-    shotCount: z.number(),
-  }),
-  hook: z.object({
-    durationSec: z.number().max(10),
-    visual: z.string(),
-    voiceover: z.string(),
-    subtitle: z.string().optional(),
-  }),
-  shotList: z.array(z.object({
-    sequence: z.number().int().positive(),
-    timecodeStart: z.string(),                // "MM:SS"
-    durationSec: z.number().positive(),
-    sceneDescription: z.string(),
-    shotType: z.enum([
-      "wide", "medium", "close_up",
-      "over_shoulder", "pov", "establishing",
-      "aerial", "tracking", "animated",
-    ]).optional(),
-    voiceover: z.string().optional(),
-    subtitle: z.string().optional(),
-    onScreenText: z.string().optional(),
-    transitionTo: z.string().optional(),
-    materialHints: z.array(z.string()).optional(),
-    specialEffects: z.string().optional(),
-  })).min(3),
-  musicPlan: z.array(z.object({
-    segment: z.string(),
-    timecodeRange: z.string(),
-    mood: z.string(),
-    volumePercent: z.number().int().min(0).max(100),
-  })),
-  materialRequirements: z.array(z.object({
-    description: z.string(),
-    type: z.enum(["footage", "photo", "graphic", "animation", "voiceover", "interview"]),
-    duration: z.string().optional(),
-    priority: z.enum(["must", "should", "nice"]),
-  })),
-  productionNotes: z.array(z.string()),       // 制作提醒
-  factsToVerify: z.array(z.string()),         // 事实核查项
-  complianceCheck: z.object({
-    passed: z.boolean(),
-    reviewTier: z.enum(["strict", "relaxed"]),
-    flaggedIssues: z.array(z.any()),
-  }),
-});
-```
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| topic | string | ✓ | 视频主题 |
+| subtemplate | enum | ✓ | 5 个子模板之一（见 §3） |
+| keyPoints | string[] | ✓ | 关键信息点（≥ 1） |
+| sourceArticle | `{title, body}` | ✗ | 基于已有文章生成视频版 |
+| targetDurationSec | int (30-1200) | ✗ | 默认 180 |
+| aspectRatio | enum | ✗ | `16:9` / `9:16` / `1:1`，默认 `16:9` |
+| style | enum | ✗ | `serious` / `casual` / `energetic` / `cinematic` |
+| narrator | enum | ✗ | `anchor` / `documentary_voice` / `casual_host` / `field_reporter` |
+| mustIncludeShots | string[] | ✗ | 必须出现的画面 |
+| customInstructions | string | ✗ | 额外指令 |
 
-## Pre-flight Check
+**输出简要表：**
 
-- `subtemplate` 匹配对应身份 + KB
-- 时政类必须严格合规扫描
-- 赛事类必须数据源可查
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| meta | object | `{scriptId, subtemplate, aspectRatio, targetDurationSec, totalWords, shotCount}` |
+| hook | object | `{durationSec (≤10), visual, voiceover, subtitle?}` |
+| shotList[] | array (≥3) | 每镜含 `sequence, timecodeStart, durationSec, sceneDescription, shotType, voiceover?, subtitle?, onScreenText?, transitionTo?, materialHints?, specialEffects?` |
+| musicPlan[] | array | `{segment, timecodeRange, mood, volumePercent (0-100)}` |
+| materialRequirements[] | array | `{description, type, duration?, priority ∈ must/should/nice}` |
+| productionNotes[] | string[] | 制作提醒 |
+| factsToVerify[] | string[] | 事实核查项 |
+| complianceCheck | object | `{passed, reviewTier ∈ strict/relaxed, flaggedIssues[]}` |
 
-## Workflow Checklist
+完整 Zod Schema 见 [src/lib/agent/execution.ts](../../src/lib/agent/execution.ts) 内 skill IO 定义。
 
-```
-视频脚本生成：
-- [ ] Step 0: 加载子模板风格指南 + 镜头语言手册
+## 5 大子模板分化（摘要表）
+
+详细子模板规范（分镜节奏百分比、24 项质量阈值、配音风格细则）可参考对应代码文件的常量（follow-up will extract）。以下为跨子模板的关键差异总览：
+
+| 子模板 | 身份 / 定位 | 节奏 & 镜头要点 | 配音 / 风格 | 审核档位 & 核心红线 |
+|--------|-----------|---------------|-----------|-------------------|
+| **news_video**（新闻视频） | 新华社视频编导 / 3 分钟讲清一件事 | Hook 5-10s → 5W1H 主体 60-70% → 专家 15-20% → 背景数据 10-15% → 结尾 5-10%；分镜 15-25；数字必带贴字动画 | `anchor` 主播体，语速 1.0，客观三人称，避免感叹 | 中；5W1H 覆盖 ≥ 90%；关键数字有 source |
+| **politics_explainer**（时政解读） | 时政深度团队总导演 / 央视政论体 | 政策背景 15% → 原文引用 35% → 学者解读 30% → 案例 15% → 升华 5%；稳定镜头 + 条文贴字；主持人/专家占显著位置 | `documentary_voice` + anchor，语速 0.95，权威严谨，无感叹 | **严**；禁娱乐元素 / 禁自行评价（"力度不够"）；原文引用 ≥ 3；所有数字必有来源 |
+| **sports_commentary**（赛事解说） | 川超专属解说 / 熟悉战术 & 球员 | Hook 绝杀画面 5-10s → 赛前 20% → 上半场 25% → 下半场 30% → 赛后 15%；3-5s 切镜 + 慢动作回放 + 数据飞入动画；分镜 30-50 | `field_reporter` energetic，节奏「平→快→爆→缓」，允许感叹（"进啦！"） | **松**；比分/数据准确 100%；禁地域攻击 / 球员侮辱 |
+| **variety_highlight_video**（综艺看点） | 综艺剪辑师 / 3 秒钩子 | Hook 金句 3-5s → Top N 盘点（每段 15-25s）→ CTA + 预告 5s；1-3s 快切 + 大量贴字 + 现场笑声；分镜 20-30 | `casual_host` / `field_reporter`，情绪丰富，有解说感 | 松；艺人名 100% 核查；禁艺人引战 / 伪造瓜；可内部委托 `zongyi_highlight` |
+| **documentary_short**（短纪录片） | 纪录片导演 / 5-15 分钟人文 | 出场 10% → 起承 30% → 转 30% → 合 20% → 收尾 10%；5-10s 慢镜 + 空镜 + 特写 + 采访穿插 | `documentary_voice`（低沉磁性），语速 0.85-0.95，诗意感性 | 按内容定（民生松 / 涉政严）；情感起伏 ≥ 1 高点 + 1 低点 |
+
+## 工作流 Checklist
+
+- [ ] Step 0: 加载子模板风格指南 + 镜头语言 KB
 - [ ] Step 1: 拆解 topic + keyPoints 为叙事弧
-- [ ] Step 2: 设计 hook（按子模板）
-- [ ] Step 3: 分镜编排（起承转合）
-- [ ] Step 4: 写配音稿 + 字幕 + 贴字
-- [ ] Step 5: 配乐规划
-- [ ] Step 6: 素材需求清单
-- [ ] Step 7: 质量自检（按阈值）
-- [ ] Step 8: 合规扫描
-```
+- [ ] Step 2: 按子模板设计 hook（≤ 10s）
+- [ ] Step 3: 分镜编排（起承转合）+ 匹配子模板分镜数区间
+- [ ] Step 4: 逐镜写配音稿 + 字幕 + 贴字（字幕覆盖率 ≥ 95%）
+- [ ] Step 5: 配乐规划（分段 mood + volume）
+- [ ] Step 6: 素材需求清单（must / should / nice 分级）
+- [ ] Step 7: 质量自检（通用阈值表 §5）
+- [ ] Step 8: 合规扫描（按子模板审核档位）
 
-## 5 个子模板详细规范
+## 质量把关
 
-### 子模板 1: news_video（新闻视频）
-
-**身份锚定**：新华社视频部资深编导，擅长 3 分钟讲清楚一件事。
-
-**分镜节奏**：
-- 开场 Hook：5-10s（事件现场/关键画面/冲击画面）
-- 主体（5W1H）：60-70% 时长
-- 专家/当事人采访：15-20% 时长
-- 背景/数据可视化：10-15% 时长
-- 结尾（意义/展望）：5-10% 时长
-
-**镜头语言**：
-- 现场画面 + 人物采访 + 数据动态图
-- 避免过多 B-roll 空镜
-- 关键数字必有**数字动画贴字**
-
-**配音风格**：
-- 主播体（anchor），语速 1.0
-- 客观第三人称
-- 避免感叹
-
-**正例（片段）**：
-```markdown
-## 新闻视频：深圳发布 AI 产业 200 亿新政
-时长：3 分钟 | 比例：16:9 | Style：serious
-
-### Hook（0-8s）
-[镜头] 无人机航拍深圳湾夜景，镜头缓推到市民中心大楼
-[配音] "4 月 17 日，深圳推出又一项重磅产业政策。"
-[贴字] 📍 深圳市民中心
-
-### 分镜表
-
-| 镜 | 时间 | 画面 | 配音 | 时长 | 转场 | 备注 |
-|----|------|------|------|------|------|------|
-| 01 | 00:08 | 新闻发布会现场，官员宣读政策 | "当天上午，深圳市政府发布《促进人工智能产业高质量发展若干措施》。" | 8s | cut | 现场声保留 10% |
-| 02 | 00:16 | 政策文件特写，镜头扫过关键数字 | "5 年投入 200 亿元，支持三大方向。" | 6s | 数字放大 | 动画强化 |
-| 03 | 00:22 | 信息图：三大方向（基础设施 / 企业扶持 / 人才引进） | "一是建设三个国家级 AI 产业园……" | 12s | 翻页 | 信息图需预制 |
-| 04 | 00:34 | 深圳 AI 企业办公环境 | "二是对符合条件的企业给予最高 5000 万元补贴。" | 10s | 淡入 | 可用合作企业素材 |
-| 05 | 00:44 | 专家采访 | [专家]"这项政策力度是近年最大的一次" | 15s | cut | 需提前录制 |
-| 06 | 00:59 | 深圳 AI 产业发展数据图（3 年 30% 年增长） | "深圳 AI 产业产值已连续三年保持 30% 以上增长。" | 12s | 动态图表 | 数据可视化 |
-| 07 | 01:11 | 园区规划效果图 | "三个国家级 AI 产业园已确定选址。" | 10s | 3D 动画 | 合作设计 |
-| ... | ... | ... | ... | ... | ... | ... |
-| 18 | 02:50 | 航拍回归深圳湾 | "深圳，正在用 AI 书写新的产业故事。" | 10s | fade out | 品牌结尾 |
-
-### 配乐
-- 00:00-00:10：科技感开场音乐
-- 00:10-02:40：轻快新闻 BGM（40%）
-- 02:40-03:00：情感收尾
-
-### 素材需求
-- [ ] must: 新闻发布会现场画面（来自台内素材库）
-- [ ] must: 政策文件特写
-- [ ] must: 专家采访（需联系录制）
-- [ ] should: 深圳 AI 企业办公画面
-- [ ] should: 航拍深圳湾
-- [ ] nice: 3D 产业园效果图
-```
-
----
-
-### 子模板 2: politics_explainer（时政解读）
-
-**身份锚定**：时政深度视频团队总导演，曾为央视政论节目撰稿。
-
-**分镜节奏**：
-- 开场：**政策背景 + 问题提出** 15%
-- 政策梳理：**原文引用 + 要点拆解** 35%
-- 深度解读：**专家/学者观点** 30%
-- 实践/影响：**具体案例** 15%
-- 收尾：**意义升华** 5%
-
-**镜头语言**：
-- 庄重感：稳定镜头、低机位少
-- 多用数据动效、政策条文贴字
-- 主持人/专家占镜头显著位置
-
-**配音风格**：
-- 权威感（news_anchor + documentary_voice）
-- 语速 0.95
-- 严谨用词（不感叹、不夸张）
-
-**严格禁忌**：
-- 视觉上不能出现与政策无关的娱乐元素
-- 不能自己总结"这很好""力度不够"
-- 所有数字/引用必有来源
-
-**质量阈值**：审核档位 **严**
-
----
-
-### 子模板 3: sports_commentary（赛事解说）
-
-**身份锚定**：川超专属解说，熟悉所有队伍战术、球员、历史。
-
-**分镜节奏**：
-- Hook：**绝杀瞬间 / 关键画面** 5-10s
-- 赛前：**双方状态 / 历史 / 看点** 20%
-- 上半场：**重点镜头 + 数据** 25%
-- 下半场：**关键进攻 + 战术解读** 30%
-- 赛后：**数据总结 + 球星访谈** 15%
-
-**镜头语言**：
-- 高速度：每 3-5s 切镜
-- 慢动作回放关键时刻
-- 数据飞入动画
-- 现场球迷镜头点缀
-
-**配音风格**：
-- 情绪拉满（energetic）
-- 解说节奏：**平 → 快 → 爆 → 缓**
-- 允许感叹（"进啦！""太精彩了！"）
-
-**必备元素**：
-- 比分与时间戳
-- 关键球员数据贴字
-- 战术关键点的分析
-- 现场氛围音保留
-
-**质量阈值**：审核档位 **松**
-
----
-
-### 子模板 4: variety_highlight_video（综艺看点视频）
-
-**身份锚定**：综艺剪辑师，经验丰富，熟悉 3 秒钩子。
-
-**分镜节奏**：
-- Hook：**金句/高光 3-5s**
-- 盘点段：**Top N 结构**（每段 15-25s）
-- 收尾：**CTA + 下期预告 5s**
-
-**镜头语言**：
-- 快切（1-3s 一个镜头）
-- 大量贴字（榜单号码、金句、艺人名）
-- 搭配现场观众笑声/欢呼
-- 梗图穿插（谨慎）
-
-**配音风格**：
-- casual_host 或 field_reporter
-- 情绪丰富，有"解说感"
-
-**委托**：可内部调用 `zongyi_highlight` 的 videoScript 部分，此子模板做"格式规范化包装"。
-
-**质量阈值**：松，艺人名 100% 核查。
-
----
-
-### 子模板 5: documentary_short（短纪录片）
-
-**身份锚定**：纪录片导演，擅长 5-15 分钟人文/社会纪录片。
-
-**分镜节奏**：
-- 开场：**人物出场 / 场景建立** 10%
-- 故事铺陈：**起承** 30%
-- 冲突/矛盾：**转** 30%
-- 反思/升华：**合** 20%
-- 收尾：**情绪收束** 10%
-
-**镜头语言**：
-- 慢节奏（5-10s 一镜）
-- 大量空镜、特写、情绪镜头
-- 人物采访与 B-roll 穿插
-
-**配音风格**：
-- documentary_voice（低沉磁性）
-- 语速 0.85-0.95
-- 诗意化、感性
-
-**质量阈值**：不限，按内容定档位（民生类松，涉政严）。
-
----
-
-## 质量自检清单
-
-### 通用
+**通用自检阈值表：**
 
 | # | 检查点 | 阈值 |
 |---|-------|-----|
-| G1 | 分镜数量 | news: 15-25 / politics: 20-35 / sports: 30-50 / variety: 20-30 / doc: 按时长 |
-| G2 | 每镜时长 | 最短 3s（避免过碎） / 最长 25s（避免拖沓） |
+| G1 | 分镜数量 | news 15-25 / politics 20-35 / sports 30-50 / variety 20-30 / doc 按时长 |
+| G2 | 每镜时长 | 最短 3s（避免过碎）/ 最长 25s（避免拖沓） |
 | G3 | hook 时长 | ≤ 10s |
 | G4 | 字幕覆盖率 | ≥ 95%（静音观看适配） |
-| G5 | 转场多样性 | 至少 3 种不同转场方式 |
-| G6 | 配音字数与时长匹配 | 字数 × 0.25s ≈ 配音时长 ±10% |
+| G5 | 转场多样性 | ≥ 3 种不同转场 |
+| G6 | 配音字数 / 时长匹配 | 字数 × 0.25s ≈ 配音时长 ±10% |
 | G7 | 关键数字有贴字 | 100% |
 | G8 | 事实核查项标注 | 有数据 → 必有 source 或 `factsToVerify` |
 
-### 子模板扩展
+> 子模板扩展阈值（5W1H 覆盖 / 原文引用数 / 比分准确 / 艺人名核查 / 情感起伏）见 §3 摘要表最右列与代码常量。
 
-- 新闻：5W1H 覆盖 ≥ 90%
-- 时政：原文引用数 ≥ 3
-- 赛事：比分/数据准确 100%
-- 综艺：艺人名 100%
-- 纪录片：情感起伏设计 ≥ 1 个高点 + 1 个低点
+**Top-4 典型失败模式：**
 
-## 典型失败模式
+| 失败模式 | 表现 | 修正 hint |
+|---------|------|----------|
+| 子模板错配 | 时政用了 sports 的情绪感 | Step 0 强制按 subtemplate 加载风格指南 |
+| 分镜数过少 | 3 分钟视频只有 5 镜 | 按子模板最低分镜数区间校验（G1） |
+| 无字幕 | 只有配音，没贴字 | Step 4 字幕必填；覆盖率 ≥ 95%（G4） |
+| 配音与时长不匹配 | 3 分钟视频配音稿 2000 字（塞不下） | Step 4 按 4 字/秒（0.25s/字）估算；字数 × 0.25s ≈ 时长 ±10%（G6） |
 
-### 失败 1: 子模板错配
+## 输出模板 / 示例
 
-**表现**：时政用了 sports_commentary 的情绪感
-**修正**：Step 0 强制加载对应风格指南
+```json
+{
+  "meta": {
+    "scriptId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "subtemplate": "news_video",
+    "aspectRatio": "16:9",
+    "targetDurationSec": 180,
+    "totalWords": 640,
+    "shotCount": 18
+  },
+  "hook": {
+    "durationSec": 8,
+    "visual": "无人机航拍深圳湾夜景，镜头缓推到市民中心大楼",
+    "voiceover": "4 月 17 日，深圳推出又一项重磅产业政策。",
+    "subtitle": "深圳市民中心"
+  },
+  "shotList": [
+    {
+      "sequence": 1,
+      "timecodeStart": "00:08",
+      "durationSec": 8,
+      "sceneDescription": "新闻发布会现场，官员宣读政策",
+      "shotType": "medium",
+      "voiceover": "深圳市政府发布《促进人工智能产业高质量发展若干措施》。",
+      "subtitle": "5 年投入 200 亿元",
+      "transitionTo": "cut",
+      "materialHints": ["台内素材库-发布会画面"]
+    }
+  ],
+  "musicPlan": [
+    { "segment": "开场", "timecodeRange": "00:00-00:10", "mood": "科技感", "volumePercent": 60 }
+  ],
+  "materialRequirements": [
+    { "description": "新闻发布会现场画面", "type": "footage", "priority": "must" },
+    { "description": "专家采访", "type": "interview", "priority": "must" }
+  ],
+  "productionNotes": ["现场声保留 10%", "数字需做放大动画"],
+  "factsToVerify": ["5 年投入 200 亿 - 来源：政策文件原文"],
+  "complianceCheck": { "passed": true, "reviewTier": "relaxed", "flaggedIssues": [] }
+}
+```
 
-### 失败 2: 分镜数过少
-
-**表现**：3 分钟视频只有 5 镜
-**修正**：按子模板最低分镜数校验
-
-### 失败 3: 无字幕
-
-**表现**：只有配音，没贴字
-**修正**：Step 4 字幕必填
-
-### 失败 4: 配音与时长不匹配
-
-**表现**：3 分钟视频配音稿 2000 字（塞不下）
-**修正**：Step 4 按 4 字/秒估算
-
-## EXTEND.md 用户配置
+## EXTEND.md 示例
 
 ```yaml
 default_subtemplate: news_video
@@ -381,11 +176,9 @@ subtemplate_configs:
   news_video:
     shot_count_range: [15, 25]
     must_have_expert_interview: true
-
   politics_explainer:
     strictness: maximum
     quote_count_min: 3
-
   sports_commentary:
     allow_emotional_voiceover: true
     data_animation_required: true
@@ -395,82 +188,22 @@ auto_add_brand_intro: true
 brand_intro_duration_sec: 3
 ```
 
-## Feature Comparison
+## 上下游协作
 
-| Feature | script_generate v5 | duanju_script | zhongcao_script | tandian_script |
-|---------|---------------------|----------------|-----------------|-----------------|
-| 定位 | 非系列化视频 | 分集短剧 | 种草 | 探店 |
-| 子模板数 | 5 | 2 mode × 6 类型 | 1 | 1 |
-| 时长 | 30-1200s | 60-1200s | 10-180s | 30-300s |
-| IP 管理 | ✗ | ✓ | ✗ | ✗ |
-| 合规档位 | 按子模板 | 严（广电） | 严（广告法） | 中 |
+- **上游**：`content_generate` 基于已有图文稿产出视频版；选题/热点触发；素材研究员（xiaozi）提供参考
+- **下游**：`aigc_script_push` 推送 AIGC；`cms_publish` 图文脚本档案；人工拍摄（导出分镜表 PDF）
 
-## Prerequisites
-
-- ✅ LLM
-- ✅ `topic` + `keyPoints` ≥ 1
-- ✅ 子模板对应 KB 已绑定
-
-## Troubleshooting
+## 常见问题
 
 | 问题 | 解决 |
 |------|------|
-| 分镜数不足 | 按子模板阈值重新生成 |
-| 时政脚本含私人评论 | strictness=maximum |
-| 赛事解说"无感"无情绪 | narrator=field_reporter + energetic style |
-| 配音稿与镜头脱节 | 分镜逐镜写对应配音 |
+| 分镜数不足（不到子模板最低区间） | 按 G1 阈值重新生成；Step 3 明确要求补足 |
+| 时政脚本含私人评论 / 感叹 | `subtemplate=politics_explainer` + EXTEND `strictness=maximum`；Step 8 合规严档扫描 |
+| 赛事解说"无感"无情绪 | `narrator=field_reporter` + `style=energetic`；允许感叹词词典 |
+| 配音稿与分镜脱节 | Step 4 要求逐镜写对应配音，不允许整段独立配音 |
+| 与姊妹 skill 选错 | 分集走 `duanju_script`；种草 / 探店 / 播客各有专用 skill；本 skill 只做"非系列化通用视频" |
 
-## Completion Report
+## 参考资料
 
-```
-🎞 视频脚本生成完成！
-
-📺 基础
-   • 子模板：{subtemplate}
-   • 比例：{aspectRatio}
-   • 时长：{targetDurationSec}s
-   • 分镜：{shotCount}
-
-🪝 Hook（{hookDur}s）
-   {hook.voiceover}
-
-✅ 自检
-   ✓ 分镜数符合范围
-   ✓ 字幕覆盖率：{subtitleCoverage}%
-   ✓ 事实核查项：{factsToVerify.length}
-   ✓ 合规：{complianceCheck.passed}
-
-🎬 素材需求
-   • must: {mustCount}
-   • should: {shouldCount}
-   • nice: {niceCount}
-
-📝 下一步
-   → `aigc_script_push` 推送
-   → 或导出 PDF 分镜表给拍摄团队
-```
-
-## 上下游协作
-
-### 上游
-- `content_generate`：基于已有图文稿产出视频版
-- 选题/热点触发
-- 素材研究员（xiaozi）提供参考
-
-### 下游
-- `aigc_script_push`：推送 AIGC
-- `cms_publish`：图文脚本档案
-- 人工拍摄（导出分镜表）
-
-## Changelog
-
-| Version | Date | 变更 |
-|---------|------|------|
-| 5.0.0 | 2026-04-18 | 重写：5 场景子模板，与 duanju_script/zhongcao_script/tandian_script/podcast_script 分工 |
-
-## 参考实现文件
-
-| 文件 | 路径 |
-|------|------|
-| Skill Runtime | `src/lib/agent/tools/script-generate.ts` |
-| 子模板注册 | `src/lib/agent/subtemplates/script/` |
+- 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)（通用 agent 执行入口；skill 逻辑通过 prompt 驱动）
+- 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md) · 历史：`git log --follow skills/script_generate/SKILL.md`
