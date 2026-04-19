@@ -576,10 +576,197 @@ function demoDailyScenariosToSeeds(): BuiltinSeedInput[] {
   return DEMO_DAILY_SCENARIOS;
 }
 
+// ─── 员工专属日常工作流（2026-04-20，8 位默认数字员工各一个代表性场景）──
+// 对应 EMPLOYEE_META 8 位员工的核心能力：
+//   xiaolei 热点分析师 / xiaoce 选题策划师 / xiaozi 素材研究员 /
+//   xiaowen 内容创作师 / xiaojian 视频制片人 / xiaoshen 质量审核官 /
+//   xiaofa 渠道运营师 / xiaoshu 数据分析师
+// 每个 workflow 第一个 defaultTeam 就是该员工本人，用作员工详情页"我的专属场景"。
+
+const EMPLOYEE_DAILY_SCENARIOS: BuiltinSeedInput[] = [
+  {
+    name: "热点分析师·每日全网热点",
+    description: "xiaolei 的日常工作流：全网热点监控 → 深度趋势分析 → 输出每日热点洞察简报。",
+    category: "news" as const,
+    icon: "Radar",
+    defaultTeam: ["xiaolei"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "以热点分析师身份产出每日热点洞察。结构：1) 今日 Top 10 热点榜（含热度/趋势）2) 3 条值得追踪的深度选题 3) 舆情风向 4) 建议跟进动作。字数 800-1500。",
+    inputFields: [
+      { name: "domain", label: "关注领域", type: "select" as const, required: false, placeholder: "全部", options: ["全部", "科技", "财经", "文娱", "体育", "民生"] },
+    ],
+    legacyScenarioKey: "employee_daily_xiaolei",
+    steps: [
+      step(1, "全网热点采集", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(2, "热度趋势分析", "trend_monitor", "趋势监控", "perception", "trend"),
+      step(3, "深度洞察提取", "topic_extraction", "选题提取", "analysis", "insight"),
+      step(4, "热点简报生成", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
+  {
+    name: "选题策划师·每日选题会",
+    description: "xiaoce 的日常工作流：挖掘用户需求 → 多角度选题策划 → 输出可落地选题清单。",
+    category: "deep" as const,
+    icon: "Lightbulb",
+    defaultTeam: ["xiaoce", "xiaolei"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "以选题策划师身份产出每日选题会内容。结构：1) 3-5 个核心候选选题（含背景/价值/受众）2) 每个选题的 3 个差异化角度 3) 推荐形态（图文/视频/播客）4) 预估完成周期。",
+    inputFields: [
+      { name: "focusArea", label: "聚焦领域", type: "text" as const, required: false, placeholder: "可留空，自动从热点推导" },
+      { name: "targetCount", label: "期望选题数", type: "number" as const, required: false, placeholder: "5" },
+    ],
+    legacyScenarioKey: "employee_daily_xiaoce",
+    steps: [
+      step(1, "热点背景调研", "news_aggregation", "新闻聚合", "perception", "research"),
+      step(2, "用户需求洞察", "audience_analysis", "受众分析", "analysis", "audience"),
+      step(3, "多角度选题生成", "topic_extraction", "选题提取", "analysis", "extract"),
+      step(4, "选题价值评估", "heat_scoring", "热度评分", "analysis", "score"),
+      step(5, "选题清单输出", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
+  {
+    name: "素材研究员·素材库归集",
+    description: "xiaozi 的日常工作流：指定主题 → 多源素材搜索 → 整合打标入库构建可检索媒资。",
+    category: "analytics" as const,
+    icon: "Library",
+    defaultTeam: ["xiaozi"],
+    appChannelSlug: null,
+    systemInstruction:
+      "以素材研究员身份为指定主题归集素材库。输出：1) 素材清单（文/图/视/音 分类）2) 每条素材的来源/时效/版权状态 3) 相关性评分 4) 建议用法。字段结构化便于检索。",
+    inputFields: [
+      { name: "topic", label: "主题关键词", type: "text" as const, required: true, placeholder: "深圳 AI 产业新政" },
+      { name: "sourceScope", label: "素材范围", type: "select" as const, required: false, placeholder: "全网", options: ["全网", "官方", "国内媒体", "海外媒体", "社交平台"] },
+    ],
+    legacyScenarioKey: "employee_daily_xiaozi",
+    steps: [
+      step(1, "主题背景分析", "topic_extraction", "选题提取", "analysis", "parse"),
+      step(2, "多源素材搜索", "web_search", "全网搜索", "perception", "search"),
+      step(3, "网页深度抓取", "web_deep_read", "网页深读", "perception", "crawl"),
+      step(4, "素材打标入库", "media_search", "媒资搜索", "knowledge", "tag"),
+    ],
+  },
+  {
+    name: "内容创作师·多版本内容",
+    description: "xiaowen 的日常工作流：主题 → 多风格标题/正文/摘要 → A/B 备选方案。",
+    category: "news" as const,
+    icon: "PenLine",
+    defaultTeam: ["xiaowen"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "以内容创作师身份产出多版本稿件。结构：1) 3 个标题（专业/网感/悬念）2) 完整正文（1 个主版本 + 2 个风格变体）3) 分享摘要（≤80 字）4) 社交媒体版（≤ 200 字）。",
+    inputFields: [
+      { name: "topic", label: "创作主题", type: "text" as const, required: true, placeholder: "主题或选题 ID" },
+      { name: "style", label: "主风格", type: "select" as const, required: false, placeholder: "news_standard", options: ["news_standard", "deep_analysis", "casual", "zhongcao"] },
+      { name: "targetWordCount", label: "目标字数", type: "number" as const, required: false, placeholder: "1500" },
+    ],
+    legacyScenarioKey: "employee_daily_xiaowen",
+    steps: [
+      step(1, "主题素材梳理", "topic_extraction", "选题提取", "analysis", "parse"),
+      step(2, "多风格标题生成", "headline_generate", "标题生成", "generation", "headline"),
+      step(3, "主版本正文撰写", "content_generate", "内容生成", "generation", "body"),
+      step(4, "风格变体生成", "style_rewrite", "风格改写", "generation", "variants"),
+      step(5, "摘要与分享版", "summary_generate", "摘要生成", "generation", "summary"),
+    ],
+  },
+  {
+    name: "视频制片人·视频制作方案",
+    description: "xiaojian 的日常工作流：脚本 → 分镜方案 + 封面 + 音频 + 剪辑指导一体化。",
+    category: "video" as const,
+    icon: "Clapperboard",
+    defaultTeam: ["xiaojian", "xiaowen"],
+    appChannelSlug: "app_variety",
+    systemInstruction:
+      "以视频制片人身份为指定脚本产出制作方案。结构：1) 完整分镜表（镜头号/时长/内容/贴字/配音/音效）2) 封面设计思路（3 版）3) 音频方案（BGM+配音风格）4) 剪辑节奏建议。",
+    inputFields: [
+      { name: "script", label: "脚本 / 主题", type: "textarea" as const, required: true, placeholder: "粘贴脚本或输入视频主题" },
+      { name: "duration", label: "目标时长", type: "select" as const, required: false, placeholder: "90s", options: ["30s", "60s", "90s", "3min", "5min"] },
+    ],
+    legacyScenarioKey: "employee_daily_xiaojian",
+    steps: [
+      step(1, "脚本结构分析", "topic_extraction", "选题提取", "analysis", "parse"),
+      step(2, "分镜方案设计", "video_edit_plan", "视频剪辑方案", "production", "shotlist"),
+      step(3, "封面设计", "layout_design", "版式设计", "production", "cover"),
+      step(4, "音频配乐规划", "audio_plan", "音频规划", "production", "audio"),
+      step(5, "缩略图生成", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+    ],
+  },
+  {
+    name: "质量审核官·事实质量审核",
+    description: "xiaoshen 的日常工作流：稿件 → 事实核查 + 合规扫描 + 质量评分 + 修改建议。",
+    category: "custom" as const,
+    icon: "ShieldCheck",
+    defaultTeam: ["xiaoshen"],
+    appChannelSlug: null,
+    systemInstruction:
+      "以质量审核官身份对稿件做全面审核。输出：1) 事实核查结果（真伪/出处）2) 合规扫描（政治/广告法/法律/伦理）3) 质量评分（结构/文字/深度/可读性 4 维 0-100）4) 具体修改建议。",
+    inputFields: [
+      { name: "articleText", label: "待审稿件", type: "textarea" as const, required: true, placeholder: "粘贴稿件内容" },
+      { name: "reviewTier", label: "审核档位", type: "select" as const, required: false, placeholder: "standard", options: ["relaxed", "standard", "strict"] },
+    ],
+    legacyScenarioKey: "employee_daily_xiaoshen",
+    steps: [
+      step(1, "事实核查", "fact_check", "事实核查", "management", "fact"),
+      step(2, "合规扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(3, "情感立场分析", "sentiment_analysis", "情感分析", "analysis", "sentiment"),
+      step(4, "质量综合评分", "quality_review", "质量审核", "management", "score"),
+    ],
+  },
+  {
+    name: "渠道运营师·多渠道分发策略",
+    description: "xiaofa 的日常工作流：稿件 → 平台适配改写 + 发布时机 + 渠道路由。",
+    category: "distribution" as const,
+    icon: "Send",
+    defaultTeam: ["xiaofa", "xiaowen"],
+    appChannelSlug: null,
+    systemInstruction:
+      "以渠道运营师身份制定多渠道分发策略。输出：1) 各平台适配版（微博/微信/抖音/小红书/视频号/APP）2) 最佳发布时机表 3) 标签/话题/@建议 4) 预期效果预估。",
+    inputFields: [
+      { name: "articleId", label: "稿件 ID", type: "text" as const, required: false, placeholder: "可留空，从上下文读取" },
+      { name: "targetPlatforms", label: "目标平台", type: "text" as const, required: false, placeholder: "weibo, wechat, douyin" },
+    ],
+    legacyScenarioKey: "employee_daily_xiaofa",
+    steps: [
+      step(1, "平台特性分析", "audience_analysis", "受众分析", "analysis", "audience"),
+      step(2, "多平台适配", "style_rewrite", "风格改写", "generation", "adapt"),
+      step(3, "时机与触达策略", "publish_strategy", "发布策略", "management", "strategy"),
+      step(4, "渠道路由编排", "publish_strategy", "发布策略", "management", "route"),
+    ],
+  },
+  {
+    name: "数据分析师·数据复盘报告",
+    description: "xiaoshu 的日常工作流：稿件/项目 → 数据洞察 + 效果追踪 + 下一步建议。",
+    category: "analytics" as const,
+    icon: "ChartColumn",
+    defaultTeam: ["xiaoshu"],
+    appChannelSlug: "app_home",
+    systemInstruction:
+      "以数据分析师身份产出复盘报告。结构：1) 核心指标摘要（阅读/互动/转化）2) 趋势分析（日/周/月）3) 渠道对比 4) 用户画像 5) 优化建议。用图表描述（文本形式）。",
+    inputFields: [
+      { name: "targetType", label: "复盘对象", type: "select" as const, required: true, placeholder: "article", options: ["article", "mission", "daily_brief", "weekly"] },
+      { name: "targetId", label: "对象 ID（可选）", type: "text" as const, required: false },
+    ],
+    legacyScenarioKey: "employee_daily_xiaoshu",
+    steps: [
+      step(1, "数据拉取", "data_report", "数据报告", "analysis", "fetch"),
+      step(2, "趋势对比分析", "data_report", "数据报告", "analysis", "trend"),
+      step(3, "受众画像分析", "audience_analysis", "受众分析", "analysis", "audience"),
+      step(4, "复盘报告撰写", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
+];
+
+function employeeDailyScenariosToSeeds(): BuiltinSeedInput[] {
+  return EMPLOYEE_DAILY_SCENARIOS;
+}
+
 /**
  * 汇总 builtin seeds：
  *   SCENARIO_CONFIG (10) + ADVANCED_SCENARIO_CONFIG (6) + xiaoleiScenarios (5)
- *   + DEMO_DAILY_SCENARIOS (10, 2026-04-19 新增) = 31 条。
+ *   + DEMO_DAILY_SCENARIOS (10, 2026-04-19)
+ *   + EMPLOYEE_DAILY_SCENARIOS (8, 2026-04-20 每位员工一个专属场景)
+ *   = 39 条。
  */
 export function buildBuiltinScenarioSeeds(): BuiltinSeedInput[] {
   return [
@@ -587,5 +774,6 @@ export function buildBuiltinScenarioSeeds(): BuiltinSeedInput[] {
     ...advancedScenarioConfigToSeeds(),
     ...xiaoleiScenariosToSeeds(),
     ...demoDailyScenariosToSeeds(),
+    ...employeeDailyScenariosToSeeds(),
   ];
 }
