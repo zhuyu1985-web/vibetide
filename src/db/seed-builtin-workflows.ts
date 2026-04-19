@@ -304,14 +304,288 @@ function xiaoleiScenariosToSeeds(): BuiltinSeedInput[] {
   }));
 }
 
+// ─── Demo Daily Scenarios (2026-04-19，为 E2E 演示补齐) ───────────────
+// 参考原 spec `2026-04-18-newsclaw-cms-aigc-scenario-design.md` §x dailyPlans。
+// 这 10 条是用户核心演示场景：新闻热点 / 精品 / 本地 / 全国 / 种草 /
+// 播客 / 探店 / 川超 / 每日 AI 资讯 / 科技周报。
+
+type StepDef = {
+  id: string;
+  order: number;
+  dependsOn: string[];
+  name: string;
+  type: "skill";
+  config: {
+    skillSlug: string;
+    skillName: string;
+    skillCategory: string;
+    parameters: Record<string, unknown>;
+  };
+  key: string;
+  label: string;
+};
+
+function step(
+  order: number,
+  name: string,
+  skillSlug: string,
+  skillName: string,
+  skillCategory: string,
+  key: string,
+): StepDef {
+  return {
+    id: `step-${order}`,
+    order,
+    dependsOn: order > 1 ? [`step-${order - 1}`] : [],
+    name,
+    type: "skill" as const,
+    config: { skillSlug, skillName, skillCategory, parameters: {} },
+    key,
+    label: name,
+  };
+}
+
+const DEMO_DAILY_SCENARIOS: BuiltinSeedInput[] = [
+  {
+    name: "每日 AI 资讯",
+    description: "每天聚合全网 AI / 大模型领域最新资讯，生成每日 AI 简报图文稿，发布到新闻 APP。",
+    category: "daily_brief" as const,
+    icon: "Brain",
+    defaultTeam: ["xiaolei", "xiaowen", "xiaofa"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "围绕 AI / 大模型领域，聚合今日全网热点，生成一份每日 AI 资讯简报。结构：1) 今日头条 AI 事件（3-5 条）2) 技术突破 3) 商业动态 4) 监管政策 5) 行业观察。字数 1200-2000。风格：专业快讯，面向技术关注者。",
+    inputFields: [
+      { name: "topicTag", label: "话题标签", type: "text" as const, required: false, placeholder: "AI" },
+      { name: "targetWordCount", label: "目标字数", type: "number" as const, required: false, placeholder: "1500" },
+    ],
+    legacyScenarioKey: "daily_ai_brief",
+    steps: [
+      step(1, "全网 AI 资讯聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(2, "热点价值评估", "topic_extraction", "选题提取", "analysis", "evaluate"),
+      step(3, "AI 简报生成", "content_generate", "内容生成", "generation", "generate"),
+      step(4, "质量审核", "quality_review", "质量审核", "management", "review"),
+      step(5, "发布到新闻 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "科技周报",
+    description: "每周深度整理科技行业重点事件，生成 3000+ 字深度解读周报，发布到新闻 APP。",
+    category: "deep" as const,
+    icon: "Newspaper",
+    defaultTeam: ["xiaolei", "xiaoce", "xiaowen", "xiaoshen", "xiaofa"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "过去 7 天科技行业重点事件深度解读。结构：1) 本周十大事件排名 2) 重点事件深度分析 (3-5 篇) 3) 数据洞察 4) 下周预告。每事件 500+ 字，总篇幅 3000-5000 字。风格：专业深度，有观点。",
+    inputFields: [
+      { name: "weekRange", label: "本周时间范围", type: "text" as const, required: false, placeholder: "2026-04-14 至 2026-04-20" },
+      { name: "focusSectors", label: "重点细分领域", type: "text" as const, required: false, placeholder: "AI, 新能源, 芯片" },
+    ],
+    legacyScenarioKey: "weekly_tech_report",
+    steps: [
+      step(1, "全周科技事件抓取", "news_aggregation", "新闻聚合", "perception", "crawl"),
+      step(2, "事件筛选与排名", "topic_extraction", "选题提取", "analysis", "rank"),
+      step(3, "数据洞察分析", "data_report", "数据报告", "analysis", "analyze"),
+      step(4, "深度周报撰写", "content_generate", "内容生成", "generation", "write"),
+      step(5, "质量与合规审核", "quality_review", "质量审核", "management", "review"),
+      step(6, "发布到新闻 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "每日时政热点",
+    description: "每天聚合时政领域重要动态，严档审核后生成时政图文稿，发布到时政 APP。",
+    category: "news" as const,
+    icon: "Landmark",
+    defaultTeam: ["xiaolei", "xiaowen", "xiaoshen", "xiaofa"],
+    appChannelSlug: "app_politics",
+    systemInstruction:
+      "聚合今日时政重要动态。结构：1) 今日时政要闻（3-5 条）2) 政策解读 3) 官方表态。字数 800-1500。**严档审核**：政治站位、敏感词、未授权信息一律拒。风格：严谨、客观、权威。",
+    inputFields: [
+      { name: "focusRegion", label: "重点地域", type: "select" as const, required: false, placeholder: "全国", options: ["全国", "深圳", "广东", "北京"] },
+    ],
+    legacyScenarioKey: "daily_politics",
+    steps: [
+      step(1, "官方信源采集", "news_aggregation", "新闻聚合", "perception", "collect"),
+      step(2, "要闻筛选", "topic_extraction", "选题提取", "analysis", "filter"),
+      step(3, "合规前置扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(4, "时政稿件撰写", "content_generate", "内容生成", "generation", "write"),
+      step(5, "严档质量审核", "quality_review", "质量审核", "management", "review"),
+      step(6, "发布到时政 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "每日热点播客",
+    description: "每日把今日全网热点整理成播客脚本（音频稿），推送到 AIGC 渲染后发布到播客 APP。",
+    category: "podcast" as const,
+    icon: "Mic",
+    defaultTeam: ["xiaoce", "xiaowen", "xiaofa", "xiaojian"],
+    appChannelSlug: "app_livelihood_podcast",
+    systemInstruction:
+      "把今日 5-7 条全网热点整理成 8-12 分钟的对话体播客脚本。结构：1) 开场白 30s 2) 热点逐条点评（每条 1-2 分钟）3) 结尾互动 30s。双主持对话，自然、有网感、口语化。",
+    inputFields: [
+      { name: "format", label: "播客格式", type: "select" as const, required: false, placeholder: "daily_brief", options: ["daily_brief", "deep_dive", "weekend_chat"] },
+      { name: "targetMinutes", label: "目标时长（分钟）", type: "number" as const, required: false, placeholder: "10" },
+    ],
+    legacyScenarioKey: "daily_podcast",
+    steps: [
+      step(1, "今日热点聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(2, "热点筛选", "topic_extraction", "选题提取", "analysis", "filter"),
+      step(3, "播客脚本生成", "podcast_script", "播客脚本", "generation", "script"),
+      step(4, "TTS 合成（AIGC）", "audio_plan", "音频规划", "production", "tts"),
+      step(5, "质量审核", "quality_review", "质量审核", "management", "review"),
+      step(6, "发布到播客 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "每日探店",
+    description: "每天从本地热门探店话题中选出 1 个生成探店脚本，推送到 AIGC 生成视频后发布到民生-探店 APP。",
+    category: "livelihood" as const,
+    icon: "UtensilsCrossed",
+    defaultTeam: ["xiaoce", "xiaowen", "xiaojian", "xiaofa"],
+    appChannelSlug: "app_livelihood_tandian",
+    systemInstruction:
+      "生成一份探店脚本。6 阶段流程：店门外 → 环境氛围 → 招牌菜品 → 试吃反应 → 人均消费 → 结尾推荐。每段配镜头/贴字/配音建议。字数 600-900。风格：真实、有人情味、有画面感。**合规**：广告法禁极限词；合作类内容必须声明。",
+    inputFields: [
+      { name: "city", label: "城市", type: "select" as const, required: true, placeholder: "成都", options: ["成都", "深圳", "重庆", "上海", "北京"] },
+      { name: "category", label: "店型", type: "select" as const, required: false, placeholder: "餐饮", options: ["餐饮", "茶饮", "烘焙", "甜品", "夜市"] },
+    ],
+    legacyScenarioKey: "daily_tandian",
+    steps: [
+      step(1, "本地探店话题聚合", "trending_topics", "热榜聚合", "perception", "aggregate"),
+      step(2, "热门店铺筛选", "topic_extraction", "选题提取", "analysis", "filter"),
+      step(3, "探店脚本生成", "tandian_script", "探店脚本", "generation", "script"),
+      step(4, "合规扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(5, "AIGC 视频生成", "video_edit_plan", "视频剪辑方案", "production", "render"),
+      step(6, "发布到探店 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "每日川超战报",
+    description: "每天 22:30 赛后聚合当日川超联赛数据，生成战报并发布到体育 APP。",
+    category: "news" as const,
+    icon: "Trophy",
+    defaultTeam: ["xiaolei", "xiaowen", "xiaoshu", "xiaofa"],
+    appChannelSlug: "app_sports",
+    systemInstruction:
+      "赛后生成当日川超战报。结构：1) 比赛结果速报 2) 核心数据（射门/控球/关键球员）3) 精彩瞬间回顾 4) 赛后点评。字数 800-1200。风格：激情专业，数据说话。",
+    inputFields: [
+      { name: "matchDate", label: "比赛日期", type: "text" as const, required: false, placeholder: "2026-04-19" },
+    ],
+    legacyScenarioKey: "daily_sports_report",
+    steps: [
+      step(1, "赛事数据采集", "news_aggregation", "新闻聚合", "perception", "collect"),
+      step(2, "关键数据提取", "data_report", "数据报告", "analysis", "analyze"),
+      step(3, "战报生成", "content_generate", "内容生成", "generation", "write"),
+      step(4, "质量审核", "quality_review", "质量审核", "management", "review"),
+      step(5, "发布到体育 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "种草日更",
+    description: "每天从全网热门商品/趋势中提取素材生成种草文案，推送到民生-种草 APP。",
+    category: "livelihood" as const,
+    icon: "Heart",
+    defaultTeam: ["xiaoce", "xiaowen", "xiaofa", "xiaoshu"],
+    appChannelSlug: "app_livelihood_zhongcao",
+    systemInstruction:
+      "每日生成 1 篇种草文案，平台差异化（小红书 / 抖音 / B 站 / 视频号）。结构：钩子 → 痛点 → 解决方案（产品）→ 细节展示 → CTA。字数按平台 400-1200 浮动。**合规**：广告法极限词严禁；合作披露按《互联网广告管理办法》执行。",
+    inputFields: [
+      { name: "platform", label: "目标平台", type: "select" as const, required: true, placeholder: "xiaohongshu", options: ["xiaohongshu", "douyin", "bilibili", "video_channel"] },
+      { name: "productCategory", label: "品类", type: "select" as const, required: false, placeholder: "美妆", options: ["美妆", "数码", "家居", "食品", "穿搭", "母婴"] },
+    ],
+    legacyScenarioKey: "daily_zhongcao",
+    steps: [
+      step(1, "热门商品/趋势聚合", "trending_topics", "热榜聚合", "perception", "aggregate"),
+      step(2, "品类筛选", "topic_extraction", "选题提取", "analysis", "filter"),
+      step(3, "种草脚本生成", "zhongcao_script", "种草脚本", "generation", "script"),
+      step(4, "广告法合规扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(5, "发布到种草 APP", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "精品内容",
+    description: "精心策划的高质量深度稿件：长文深度 + 多维度调研 + 数据图表，发布到新闻 APP 头条。",
+    category: "deep" as const,
+    icon: "Gem",
+    defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaoshen", "xiaofa"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "围绕用户指定的精品主题，生成 3000+ 字的深度稿件。结构：1) 悬念开头 2) 事件全景回顾 3) 多方观点（至少 3 方）4) 数据支撑 5) 深度洞察与展望。配 3-5 张图表。风格：高质量长文，有思辨深度。",
+    inputFields: [
+      { name: "topic", label: "精品选题", type: "text" as const, required: true, placeholder: "深圳 AI 产业新政 200 亿解读" },
+      { name: "angles", label: "分析角度", type: "text" as const, required: false, placeholder: "政策/市场/从业者三视角" },
+      { name: "targetWordCount", label: "目标字数", type: "number" as const, required: false, placeholder: "3500" },
+    ],
+    legacyScenarioKey: "premium_content",
+    steps: [
+      step(1, "多维度背景调研", "news_aggregation", "新闻聚合", "perception", "research"),
+      step(2, "核心观点萃取", "topic_extraction", "选题提取", "analysis", "extract"),
+      step(3, "数据支撑分析", "data_report", "数据报告", "analysis", "analyze"),
+      step(4, "多角度深度撰写", "content_generate", "内容生成", "generation", "write"),
+      step(5, "事实核查", "fact_check", "事实核查", "management", "fact_check"),
+      step(6, "高级质量审核", "quality_review", "质量审核", "management", "review"),
+      step(7, "发布到头条", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "本地新闻",
+    description: "每日聚合本地（城市/区）新闻要闻，生成本地新闻图文稿，发布到新闻 APP 本地频道。",
+    category: "news" as const,
+    icon: "MapPin",
+    defaultTeam: ["xiaolei", "xiaowen", "xiaofa"],
+    appChannelSlug: "app_news",
+    systemInstruction:
+      "聚合指定城市/区域的今日要闻。结构：1) 城市要闻 3-5 条 2) 民生动态 3) 政府公告 4) 本地活动预告。字数 800-1500。风格：贴近本地、实用导向。",
+    inputFields: [
+      { name: "city", label: "城市", type: "select" as const, required: true, placeholder: "深圳", options: ["深圳", "广州", "北京", "上海", "成都", "杭州"] },
+      { name: "district", label: "区（可选）", type: "text" as const, required: false, placeholder: "南山区" },
+    ],
+    legacyScenarioKey: "local_news",
+    steps: [
+      step(1, "本地信源聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(2, "本地要闻筛选", "topic_extraction", "选题提取", "analysis", "filter"),
+      step(3, "本地新闻撰写", "content_generate", "内容生成", "generation", "write"),
+      step(4, "质量审核", "quality_review", "质量审核", "management", "review"),
+      step(5, "发布到本地频道", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+  {
+    name: "全国热点图文",
+    description: "每日聚合全国性热点话题，生成全国热点图文稿，发布到首页 APP 头条位。",
+    category: "daily_brief" as const,
+    icon: "Flame",
+    defaultTeam: ["xiaolei", "xiaowen", "xiaofa", "xiaoce"],
+    appChannelSlug: "app_home",
+    systemInstruction:
+      "聚合今日全国性热点。结构：1) 今日头条（1 条最大）2) 十大热点排名（带一句摘要）3) 聚焦深度解读 1-2 条。字数 1500-2500。风格：权威聚合、高质量摘要。",
+    inputFields: [
+      { name: "topNCount", label: "Top N", type: "number" as const, required: false, placeholder: "10" },
+    ],
+    legacyScenarioKey: "national_daily_brief",
+    steps: [
+      step(1, "全网热榜聚合", "trending_topics", "热榜聚合", "perception", "aggregate"),
+      step(2, "热点排名与筛选", "topic_extraction", "选题提取", "analysis", "rank"),
+      step(3, "聚合图文生成", "content_generate", "内容生成", "generation", "write"),
+      step(4, "质量审核", "quality_review", "质量审核", "management", "review"),
+      step(5, "发布到首页头条", "publish_strategy", "发布策略", "management", "publish"),
+    ],
+  },
+];
+
+function demoDailyScenariosToSeeds(): BuiltinSeedInput[] {
+  return DEMO_DAILY_SCENARIOS;
+}
+
 /**
- * 汇总 Task 10 + Task 11 的 builtin seeds：
- *   SCENARIO_CONFIG (10) + ADVANCED_SCENARIO_CONFIG (6) + xiaoleiScenarios (5) = 21 条。
+ * 汇总 builtin seeds：
+ *   SCENARIO_CONFIG (10) + ADVANCED_SCENARIO_CONFIG (6) + xiaoleiScenarios (5)
+ *   + DEMO_DAILY_SCENARIOS (10, 2026-04-19 新增) = 31 条。
  */
 export function buildBuiltinScenarioSeeds(): BuiltinSeedInput[] {
   return [
     ...scenarioConfigToSeeds(),
     ...advancedScenarioConfigToSeeds(),
     ...xiaoleiScenariosToSeeds(),
+    ...demoDailyScenariosToSeeds(),
   ];
 }
