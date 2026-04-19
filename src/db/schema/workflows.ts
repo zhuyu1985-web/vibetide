@@ -16,6 +16,7 @@ import {
   workflowCategoryEnum,
   workflowTriggerTypeEnum,
 } from "./enums";
+import type { InputFieldDef } from "@/lib/types";
 
 // ─── Workflow Step Definition ───
 
@@ -64,6 +65,14 @@ export const workflowTemplates = pgTable("workflow_templates", {
   createdBy: uuid("created_by"),
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
   runCount: integer("run_count").notNull().default(0),
+
+  // B.1 Unified Scenario Workflow extensions
+  icon: text("icon"),
+  inputFields: jsonb("input_fields").$type<InputFieldDef[]>().default([]),
+  defaultTeam: jsonb("default_team").$type<string[]>().default([]),
+  appChannelSlug: text("app_channel_slug"),
+  systemInstruction: text("system_instruction"),
+  legacyScenarioKey: text("legacy_scenario_key"),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

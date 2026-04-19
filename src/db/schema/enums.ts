@@ -525,6 +525,13 @@ export const workflowCategoryEnum = pgEnum("workflow_category", [
   "video",
   "analytics",
   "distribution",
+  "deep",
+  "social",
+  "advanced",
+  "livelihood",
+  "podcast",
+  "drama",
+  "daily_brief",
   "custom",
 ]);
 

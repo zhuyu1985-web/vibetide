@@ -113,6 +113,13 @@ export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
     runCount: 0,
     createdAt: epoch,
     updatedAt: epoch,
+    // B.1 Unified Scenario Workflow fields — null/empty defaults for virtual rows
+    icon: null,
+    inputFields: [],
+    defaultTeam: [],
+    appChannelSlug: null,
+    systemInstruction: null,
+    legacyScenarioKey: null,
   }));
 
   return [...rows, ...virtualRows];

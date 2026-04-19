@@ -54,6 +54,11 @@ export const missions = pgTable("missions", {
   sourceEntityId: text("source_entity_id"), // ID of triggering entity
   sourceEntityType: text("source_entity_type"), // 'hot_topic' | 'publish_plan' | 'benchmark_alert' | 'anomaly' | 'creation_session'
 
+  // B.1 Unified Scenario Workflow: link mission → template that spawned it.
+  // Deferred reference (no .references()) to avoid circular import with ./workflows.
+  // FK constraint is enforced in the DB migration layer (missions_workflow_template_id_fkey).
+  workflowTemplateId: uuid("workflow_template_id"),
+
   // Token budget
   tokenBudget: integer("token_budget").notNull().default(200000),
   tokensUsed: integer("tokens_used").notNull().default(0),
