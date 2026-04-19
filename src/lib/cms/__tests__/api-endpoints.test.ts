@@ -52,3 +52,38 @@ describe("getChannels", () => {
     await expect(getChannels(client)).rejects.toThrow(/CHANNEL|invalid|code/i);
   });
 });
+
+import { getAppList } from "../api-endpoints";
+
+describe("getAppList", () => {
+  afterEach(() => restoreCmsFetch());
+
+  it("returns an array of CmsApp entries", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse([
+        { id: 1, siteid: 73, name: "A", type: 1, appkey: null, appsecret: null, addtime: null },
+        { id: 2, siteid: 73, name: "B", type: 1, appkey: "ak", appsecret: "as", addtime: "2024-01-01" },
+      ]),
+    ]);
+    const client = new CmsClient(cfg);
+    const res = await getAppList(client, "1");
+    expect(res.data).toHaveLength(2);
+    expect(res.data?.[1].appkey).toBe("ak");
+  });
+
+  it("sends the correct body { type }", async () => {
+    let captured: unknown;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse((init?.body as string) ?? "{}");
+      return cmsSuccessResponse([]);
+    }) as typeof globalThis.fetch;
+    try {
+      const client = new CmsClient(cfg);
+      await getAppList(client, "2");
+      expect(captured).toEqual({ type: "2" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
