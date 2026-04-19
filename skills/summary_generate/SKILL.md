@@ -190,6 +190,8 @@ scenario_weights:
 
 ## 参考资料
 
+- **按平台差异化 Style Guide**：[references/summary-style-by-platform.md](./references/summary-style-by-platform.md)（CMS / 朋友圈 / 微博 / 抖音 / 小红书 / RSS / SEO Meta / TTS 播客 9 种平台差异化规范）
+- **媒体行业规范**：[docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
 - 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)（通用 agent 执行入口）
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
 - 历史版本：`git log --follow skills/summary_generate/SKILL.md`

@@ -216,5 +216,7 @@ variant_diff_min_edit: 5        # variant 间最小编辑距离
 
 ## 参考资料
 
+- **场景 × 句式模式库**：[references/headline-patterns-by-scenario.md](./references/headline-patterns-by-scenario.md)（9 场景推荐句式 + 反面案例 + 合规红线）
+- **媒体行业规范**：[docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)（广告法极限词 / 中央媒体用语白黑名单 / 政治红线）
 - 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)（通用 agent 执行入口；skill 逻辑通过 prompt 驱动）
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md) · 历史：`git log --follow skills/headline_generate/SKILL.md`

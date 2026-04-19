@@ -1,148 +1,322 @@
 ---
 name: quality_review
-displayName: 质量审核
-description: 对内容进行全面质量审核评分
+displayName: 质量审核（媒体行业专业版）
+description: 对内容做媒体行业专业级质量审核 —— 8 维评分 + 3 档审核 + 9 场景分化 rubric + 合规红线扫描。输出质量分、违规命中、位置精确的修改建议、发布档位判定。supports strict / standard / relaxed 三档；strict 档可拒绝 95 分以下，标记强制人工复核。对接《广告法》《网络信息内容生态治理规定》《新华社发稿规范》等国家法规。
 category: management
-version: "3.5"
+version: "5.0"
+
+metadata:
+  skill_kind: management
+  scenario_tags: [all]
+  compatibleEmployees: [xiaoshen]
+  modelDependency: deepseek:deepseek-chat
+  requires:
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases: []
+    dependencies: [fact_check, compliance_check]
+  implementation:
+    scriptPath: src/lib/agent/execution.ts
+    testPath: src/lib/agent/__tests__/
+
 inputSchema:
-  content: 待审核内容
-  contentType: 内容类型
-  standards: 审核标准
+  content: 待审核的完整稿件（markdown 或 html）
+  contentType: 内容类型 (article / video_script / podcast / social_post / daily_brief)
+  scenario: 内容场景 (news_standard / politics_shenzhen / sports_chuanchao / ...)
+  reviewTier: 审核档位 (strict / standard / relaxed)
+  targetChannel: 目标发布渠道 (app_news / app_politics / app_sports / ...)
 outputSchema:
-  grade: 等级A/B/C/D
-  totalScore: 总分
-  dimensions: 四维评分
-  issues: 问题列表
-  verdict: 审核结论
+  overallScore: 综合分 0-100
+  grade: 等级 S/A/B/C/D
+  dimensionScores: 8 维评分详情
+  complianceHits: 合规违规命中列表
+  verdict: 审核结论 (approved / needs_revision / rejected)
+  issues: 位置精确的问题清单
+  revisionSuggestions: 具体修改建议
+  requiresHumanReview: 是否需要人工复核
 runtimeConfig:
   type: llm_analysis
-  avgLatencyMs: 10000
+  avgLatencyMs: 12000
   maxConcurrency: 3
-  modelDependency: zhipu:glm-4-plus
+  modelDependency: deepseek:deepseek-chat
 compatibleRoles:
   - quality_reviewer
 ---
 
-# 质量审核
+# 质量审核（quality_review）
 
-你是资深内容质量审核专家，用四维评分体系（准确性、可读性、原创度、新闻价值）对内容进行全面审核，确保发布内容的专业水准。
+## 1. 使用条件
 
-## 输入规格
+**应调用场景**：
+- 任何 `content_generate` 产出后的自动化审核
+- 稿件发布到 CMS 前的最后一道关卡
+- 编辑手动提交审核
+- 每日 / 每周批量抽检已发稿件
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| content | string | 是 | 待审核的完整内容文本 |
-| contentType | string | 否 | 内容类型：article / video_script / social_post，默认 article |
-| standards | string | 否 | 审核标准：standard / strict / relaxed，默认 standard |
+**不应调用场景**：
+- 素材 / 草稿 / 笔记类内容（未完成的中间态）
+- 纯标题 / 摘要审核（走 headline_generate / summary_generate 自带校验）
+- 视频成片视觉审核（另行使用人工 + AIGC 审核工具链）
 
-## 执行流程
+**前置条件**：
+- `content` 非空，字数 ≥ 200
+- `scenario` 必须是 9 个合法 scenario 之一（见 content_generate §9）
+- 涉政治 / 未成年人 / 医疗类内容默认 `reviewTier=strict`
+- 涉种草 / 探店 / 广告合作内容默认广告法扫描必开
 
-1. **通读全文**：完整阅读内容，把握整体质量水平和主题方向
-2. **四维评分**：
-   - 准确性（30%）：事实、数据、引用是否准确，来源是否可信
-   - 可读性（25%）：逻辑通顺、表达流畅、无语病、段落结构合理
-   - 原创度（25%）：非简单搬运、有独特视角和深度分析
-   - 新闻价值（20%）：信息量、时效性、受众价值
-3. **逐项标注**：对每一处问题精确标注位置（段落/句子），给出修改建议
-4. **等级评定**：A（≥85）/ B（70-84）/ C（60-69）/ D（<60），C 级以下打回修改
-5. **审核清单确认**：逐项检查事实准确性、语法错误、标题匹配度、原创度、敏感内容、数据来源
+## 2. 8 维审核体系（扩展原 4 维）
 
-## 输出规格
+| # | 维度 | 权重 | 说明 |
+|---|------|------|------|
+| 1 | 事实准确性 | 20% | 具体数字 / 人名 / 时间 / 地点 / 引言是否经得起核查 |
+| 2 | 信源权威度 | 10% | 引用信源是否 S/A/B/C 级（详见 [media-industry-standards.md §8](../../docs/skills/media-industry-standards.md)） |
+| 3 | 逻辑通顺度 | 10% | 段落衔接、因果链、论证严密性 |
+| 4 | 语言流畅度 | 10% | 句式多变、无病句、标点规范 |
+| 5 | 原创深度 | 10% | 非机械复述、有独立观点 / 视角 / 数据 |
+| 6 | 结构完整性 | 10% | 符合 scenario 的结构要求（倒金字塔 / Top N / 钩子-痛点-CTA 等） |
+| 7 | 受众价值 | 10% | 信息密度、时效性、对目标受众的实用性 |
+| 8 | 合规性 | 20% | 广告法 / 政治红线 / 未成年人保护 / 网信办负面词 |
 
-### 输出结构
+**综合分 = Σ(维度分 × 权重)**，映射等级：
+- **S 级**（95-100）：顶尖稿件，直接置顶 / 头条
+- **A 级**（85-94）：优秀稿件，正常发布
+- **B 级**（75-84）：合格稿件，可发布但有优化空间
+- **C 级**（60-74）：待修改，返回作者修订
+- **D 级**（< 60）：打回重写
 
-```markdown
-## 质量审核报告
+## 3. 三档审核 + 档位阈值
 
-### 综合评定：{A/B/C/D}级 | 总分：{X}/100
-**审核结论**: {通过/修改后通过/打回修改}
+| 档位 | 发布最低分 | 合规要求 | 典型应用 |
+|------|-----------|---------|---------|
+| **strict** | ≥ 95（S 级） | 全部红线必须 0 命中；涉政治 / 未成年人必选此档 | 时政稿件、深度稿件、头条、播客、短剧 |
+| **standard** | ≥ 85（A 级） | 硬违规 0 命中；软违规 ≤ 2 处 | 普通新闻、民生、综艺、体育战报 |
+| **relaxed** | ≥ 75（B 级） | 无命中极限词 + 基本合规 | 种草、探店、每日简报 |
 
-### 四维评分
-| 维度 | 得分 | 权重 | 加权分 | 说明 |
-|------|------|------|--------|------|
-| 准确性 | {X}/100 | 30% | {Y} | {一句话说明} |
-| 可读性 | {X}/100 | 25% | {Y} | |
-| 原创度 | {X}/100 | 25% | {Y} | |
-| 新闻价值 | {X}/100 | 20% | {Y} | |
+**强制 `strict` 场景**：
+- `politics_*`（所有时政场景）
+- 涉未成年人内容
+- 涉军队 / 国家安全
+- 涉重大突发事件（事故、灾害、危机）
+- 涉股价敏感 / 企业重大人事变动
 
-### 问题标注
-| 序号 | 位置 | 问题类型 | 原文 | 问题说明 | 修改建议 | 严重度 |
-|------|------|----------|------|----------|----------|--------|
+**档位跨越**：业务方可以要求 `relaxed` → `standard` 升级（更严格）；
+不允许主动降级（除非明确授权 + 留痕）。
 
-### 审核清单
-- [x/x] 事实准确性验证
-- [x/x] 语法和错别字检查
-- [x/x] 标题与内容匹配
-- [x/x] 原创度≥85%
-- [x/x] 敏感内容过滤
-- [x/x] 数据来源标注
+## 4. 场景化审核 rubric（按 scenario 分化）
 
-### 优化建议
-1. {具体可操作的改进建议}
+### 4.1 news_standard（新闻标准）
+
+- 必查：5W1H 覆盖 ≥ 90%、导语 ≤ 100 字、引述 ≥ 2 处
+- 扣分项：情绪化动词（震惊 / 爆 / 颠覆）
+- 红线：政治领导人姓名 / 职务 / 机构名称错误
+- 加分：新华体动词使用率 ≥ 60%
+
+### 4.2 politics_shenzhen（时政）
+
+- 必查：**strict 档**；会议 / 政策全称；领导人姓名职务；政策原文引号包裹
+- 扣分项：评价性词汇（力度不够 / 值得商榷）
+- 红线：领导人姓名职务任何错误、擅自延伸政策解读、非 S/A 级信源
+- 加分：引用原文 ≥ 3 处并附来源链接
+
+### 4.3 sports_chuanchao（川超）
+
+- 必查：比分 / 球员姓名 100% 准确（对照 KB）、数据来源一致
+- 扣分项：暴虐词汇（血洗 / 碾压 / 暴虐）
+- 红线：地域攻击、球员人身攻击、裁判黑哨定性
+- 加分：数据维度 ≥ 5（射门 / 控球 / 传球 / 犯规 / 评分）
+
+### 4.4 variety_highlight（综艺）
+
+- 必查：艺人名 KB 核查通过
+- 扣分项：化名 / 代称（某 L 姓男星）
+- 红线：捏造艺人绯闻 / 黑料、涉塌房 / 翻车等诽谤性词汇
+- 加分：盘点逻辑清晰（按出场 / 热度 / 话题度排序）
+
+### 4.5 livelihood_zhongcao（种草）
+
+- 必查：广告法极限词扫描（0 容忍）、合作披露（如有）
+- 扣分项：未披露推广 / 夸大功效
+- 红线：医疗器械 / 药品 / 处方药种草、烟酒赌博
+- 加分：加「（个人使用感受）」等主观声明
+
+### 4.6 livelihood_tandian（探店）
+
+- 必查：地址精确到门牌号、人均精确到元、价格时效标注
+- 扣分项：价格虚假（高 / 低于实际 ≥ 20%）、地址模糊
+- 红线：虚构试吃体验、使用 stock 素材冒充现场
+- 加分：营业时间 / 预约 / 停车等实用信息完整
+
+### 4.7 livelihood_podcast（播客文字稿）
+
+- 必查：**strict 档**；与音频逐字对齐；句长适合 TTS
+- 扣分项：书面语 / 从句过多
+- 红线：政治敏感 TTS 错读风险、版权争议
+- 加分：双主持对话风格稳定（全季度一致）
+
+### 4.8 drama_serial（短剧）
+
+- 必查：**strict 档**；章节 / 集数完整；标签丰富
+- 扣分项：剧透关键反转、过度娱乐化
+- 红线：涉未成年人不当情节、涉违法犯罪正面刻画
+- 加分：CMS 适配完整（type / 标签 / 简介分层）
+
+### 4.9 daily_brief（每日简报）
+
+- 必查：3-5 条热点覆盖 ≥ 4 个领域、每条 100-200 字
+- 扣分项：单领域霸榜、过期新闻（≥ 24 小时）
+- 红线：虚假热点、未验证事件
+- 加分：每条有「一句话看点」+ 数据点
+
+## 5. 工作流 Checklist
+
+- [ ] **Step 1**：加载 scenario 对应的 rubric + 档位阈值
+- [ ] **Step 2**：8 维评分（逐维给分 + 依据说明）
+- [ ] **Step 3**：合规红线扫描（广告法 / 政治 / 未成年人 / 网信办）
+- [ ] **Step 4**：问题精确定位（段落 + 句号 + 原文）
+- [ ] **Step 5**：生成具体修改建议（必须可执行）
+- [ ] **Step 6**：计算综合分 + 档位判定
+- [ ] **Step 7**：输出结构化报告
+- [ ] **Step 8**：判定是否需要人工复核（strict 档 + 高分仍建议人工抽查）
+
+## 6. 输出结构
+
+```json
+{
+  "overallScore": 87,
+  "grade": "A",
+  "verdict": "approved",
+  "reviewTier": "standard",
+  "dimensionScores": {
+    "factAccuracy": { "score": 92, "weight": 20, "note": "3 个数字已核对，1 处引述来源模糊" },
+    "sourceAuthority": { "score": 85, "weight": 10, "note": "新华社 + 深圳政府官网 S 级信源" },
+    "logicFlow": { "score": 88, "weight": 10, "note": "整体流畅，第 5 段过渡生硬" },
+    "languageFluency": { "score": 90, "weight": 10, "note": "句式多变，无病句" },
+    "originality": { "score": 82, "weight": 10, "note": "视角新颖但论证偏单一" },
+    "structure": { "score": 95, "weight": 10, "note": "完全符合 news_standard 倒金字塔" },
+    "audienceValue": { "score": 85, "weight": 10, "note": "对科技读者有实用价值" },
+    "compliance": { "score": 100, "weight": 20, "note": "无任何命中" }
+  },
+  "complianceHits": [],
+  "issues": [
+    {
+      "location": { "section": "正文", "paragraph": 3, "sentenceNumber": 2 },
+      "originalText": "该公司 2025 Q3 营收增长 200%",
+      "problemType": "factAccuracy",
+      "problem": "未标注来源，官方财报显示为 185%",
+      "suggestion": "修正为「据 XX 财报，该公司 2025 Q3 营收同比增长 185%」",
+      "severity": "high"
+    }
+  ],
+  "revisionSuggestions": [
+    "第 3 段修正数据并添加来源链接",
+    "第 5 段增加过渡句改善段落衔接",
+    "补充 1-2 个独家采访或调研数据提升原创深度"
+  ],
+  "requiresHumanReview": false
+}
 ```
 
-### 输出示例
+## 7. 合规扫描专项（4 大类）
 
-```markdown
-## 质量审核报告
+### 7.1 广告法极限词（0 容忍）
 
-### 综合评定：B级 | 总分：78/100
-**审核结论**: 修改后通过
+扫描词库（详见 [media-industry-standards.md §4](../../docs/skills/media-industry-standards.md)）：
+最 / 第一 / 独家 / 唯一 / 顶级 / 国家级 / 绝对 / 100% / 保证 / 首个
 
-### 四维评分
-| 维度 | 得分 | 权重 | 加权分 | 说明 |
-|------|------|------|--------|------|
-| 准确性 | 82/100 | 30% | 24.6 | 第3段引用的融资数据需核实来源 |
-| 可读性 | 85/100 | 25% | 21.25 | 整体流畅，第5段过渡稍显生硬 |
-| 原创度 | 70/100 | 25% | 17.5 | 前半部分与36氪报道框架相似，需加入更多独立观点 |
-| 新闻价值 | 73/100 | 20% | 14.6 | 选题有价值，但缺乏独家信息源 |
+**命中处理**：标记严重度 **high**，建议修改词；strict / standard 档必须修改后才能通过。
 
-### 问题标注
-| 序号 | 位置 | 问题类型 | 原文 | 问题说明 | 修改建议 | 严重度 |
-|------|------|----------|------|----------|----------|--------|
-| 1 | 第3段第2句 | 数据准确性 | "该公司2025年Q3营收增长200%" | 未标注数据来源，财报显示为185% | 修正为185%并标注"据XX财报" | 高 |
-| 2 | 第5段首句 | 逻辑衔接 | "与此同时，AI行业也在加速发展" | 前后段主题跳跃，缺乏过渡 | 添加承上启下的过渡句 | 中 |
-| 3 | 标题 | 标题党倾向 | "震惊！这家公司要颠覆整个行业" | 标题夸大，与正文论证力度不符 | 改为"XX公司发布新战略，瞄准行业核心痛点" | 高 |
+### 7.2 政治红线（硬违规）
 
-### 审核清单
-- [x] 事实准确性验证
-- [x] 语法和错别字检查
-- [x] 标题与内容匹配
-- [x] 原创度≥85%
-- [x] 敏感内容过滤
-- [x] 数据来源标注
+扫描项：
+- 领导人姓名职务对照《党政机关工作人员称呼规范》
+- 会议名称对照当年度官方通稿
+- 政策原文对照国务院 / 各部委官网
+- 敏感话题对照网信办最新负面词清单
 
-### 优化建议
-1. 第3段融资数据需替换为财报原始数据并标注来源
-2. 标题修改为客观表述，避免标题党倾向
-3. 增加1-2个独家采访或调研数据提升原创度
+**命中处理**：直接判 **rejected**；任何档位都不得通过。
+
+### 7.3 未成年人保护
+
+扫描项（详见 [media-industry-standards.md §6](../../docs/skills/media-industry-standards.md)）：
+- 未成年人真实姓名 / 学校 / 班级 / 住址
+- 面部清晰图像（需检测图片元数据）
+- 自杀 / 自残 / 犯罪细节
+
+**命中处理**：
+- 身份信息命中 → 强制脱敏；脱敏后重审
+- 自杀 / 自残细节命中 → 直接 **rejected**
+
+### 7.4 网信办负面词（含不良信息）
+
+扫描词库：网信办 2020《规定》第 7/8 条禁止 + 不良内容清单。
+
+**命中处理**：
+- 违法信息（第 7 条）→ **rejected**
+- 不良信息（第 8 条）→ **needs_revision** + 警告日志
+
+## 8. 边界场景处理
+
+| 场景 | 处理策略 |
+|------|---------|
+| 内容过短（< 200 字） | 仍评分，但 `originality` 维度标注「长度不足以评估」 |
+| 多语言混合 | 按主语言标准审核，外语部分单独标注 |
+| 纯观点类 | `factAccuracy` 改评逻辑自洽性 |
+| 视频脚本格式 | `languageFluency` 侧重口语化 |
+| reviewTier=relaxed | 阈值下调 10 分；但红线仍严格 |
+| LLM 评分自相矛盾 | 触发二次评分（不同模型），取平均 |
+
+## 9. EXTEND.md 示例
+
+```yaml
+review_config:
+  strict_channels: [app_politics, app_drama, app_livelihood_podcast]
+  default_tier: standard
+  require_human_review_above_score: 95  # S 级仍建议人工抽查
+  require_human_review_for_strict_tier: true
+
+custom_weights:
+  politics_shenzhen:
+    compliance: 30      # 时政稿合规权重加倍
+    factAccuracy: 25
+    sourceAuthority: 15
+  livelihood_zhongcao:
+    compliance: 30      # 广告法合规同样加重
+    languageFluency: 5  # 种草可读性轻一点
 ```
 
-## 质量标准
+## 10. 参考资料
 
-| 维度 | 要求 | 权重 |
-|------|------|------|
-| 评分客观 | 每项评分有具体依据，不凭主观印象打分 | 30% |
-| 问题定位 | 问题位置精确到段落/句子，原文引用准确 | 25% |
-| 建议可行 | 修改建议具体可操作，非笼统表述 | 25% |
-| 覆盖完整 | 审核清单六项逐项检查，不遗漏 | 20% |
+- **详细审核 rubric**：[references/review-rubric-extended.md](./references/review-rubric-extended.md)（8 维评分详细打分标准 + 场景扩展）
+- **媒体行业规范**：[docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)（法规 / 白黑名单 / 信源分级 / 违规案例库）
+- **上游 skill**：`fact_check`（先跑事实核查）/ `compliance_check`（合规专项）
+- **下游 skill**：`cms_publish`（A/B 级通过直接入库）
+- 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)
+- 历史版本：`git log --follow skills/quality_review/SKILL.md`
 
-## 边界情况
+## 11. 上下游协作
 
-1. **内容过短（<200字）**：仍按四维体系评分，但在报告中注明"内容长度不足以充分评估原创度"，原创度维度给出保守评分
-2. **多语言混合内容**：按主要语言标准审核，外语部分单独标注翻译准确性问题
-3. **纯观点类内容（无事实引用）**：准确性维度聚焦于逻辑自洽性和论证严密性，而非事实核查
-4. **视频脚本格式**：可读性评估侧重口语化表达和画面配合度，而非书面写作标准
-5. **审核标准为 relaxed 时**：等级阈值下调10分（如 A 级≥75），但高风险问题（事实错误、敏感内容）仍按严格标准处理
+**上游输入方**：
+- `content_generate`：产出稿件 → 送审
+- `xiaoshen`（质量审核官）：人工触发审核
+- Inngest `leader-consolidate`：任务完成后自动触发
 
-## 上下游协作
+**下游消费方**：
+- `cms_publish`：verdict=approved 直接入库
+- `learning-engine`：审核意见作为反馈写回 `employee_memories`
+- 编辑工作台：rejected / needs_revision 进入人工修订队列
 
-**上游输入方：**
-- **小文（内容创作师）**：提供原创文章、视频脚本等待审内容
-- **小剪（视频制片人）**：提供视频脚本和分镜文案待审
-- **小策（选题策划师）**：提供选题方案和内容大纲供预审
+## 12. 常见问题
 
-**下游输出方：**
-- **小文（内容创作师）**：接收审核报告，按修改建议修订内容
-- **小发（渠道运营师）**：A/B 级内容直接进入发布流程
-- **合规检查（compliance_check）**：质量审核通过后进入合规检查环节
+**Q1：为什么同一篇稿件两次打分差异大？**
+A：LLM 评分有随机性。本 skill 自带「二次评分一致性校验」：两次评分差 ≥ 15 时触发第三次评分，取中位数。
+
+**Q2：strict 档位太严，稿件经常打回怎么办？**
+A：这是设计目的。strict 档就是要"宁缺毋滥"。策略：
+1. 上游 `content_generate` 多跑几版 variant
+2. 人工介入调整关键段落
+3. 必要时切到 standard 档（需主管授权）
+
+**Q3：合规扫描为什么不能降档？**
+A：合规不是"软指标"，是国家法规底线。降档 = 违法风险。任何时候都是 0 容忍。
+
+**Q4：8 维为什么不是 10 维或更多？**
+A：维度过多会让 LLM 评分稀释（每维权重太低）。8 维经过实际测试是最佳平衡。

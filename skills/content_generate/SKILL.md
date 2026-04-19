@@ -255,6 +255,8 @@ strict_catalogs: [app_politics, app_drama, app_livelihood_podcast]
 
 ## 参考资料
 
+- **详细评分 Rubric**：[references/scenario-rubric-detailed.md](./references/scenario-rubric-detailed.md)（9 场景子模板详细打分标准 + 加减分项）
+- **媒体行业规范**：[docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)（广告法 / 新华社规范 / 时政红线 / 未成年人保护 / AIGC 合规）
 - 代码实现：[src/lib/agent/tools/content-generate.ts](../../src/lib/agent/tools/content-generate.ts)
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
 - 历史版本：`git log --follow skills/content_generate/SKILL.md`
