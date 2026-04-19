@@ -36,6 +36,7 @@ import {
   cmsCatalogSyncOnDemand,
 } from "./cms-catalog-sync";
 import { cmsStatusPoll } from "./cms-status-poll";
+import { cmsPublishRetry } from "./cms-publish-retry";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -78,4 +79,5 @@ export const functions = [
   cmsCatalogSyncDaily,
   cmsCatalogSyncOnDemand,
   cmsStatusPoll,
+  cmsPublishRetry,
 ];
