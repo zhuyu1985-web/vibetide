@@ -232,3 +232,80 @@ export async function getWorkflowTemplateByLegacyKey(
     .limit(1);
   return row ?? null;
 }
+
+// ─── B.1 Unified Scenario Workflow — mutations ───
+
+export interface CreateWorkflowTemplateInput {
+  name: string;
+  description?: string | null;
+  category: WorkflowTemplateCategory;
+  steps: unknown[];   // WorkflowStepDef[]
+  isBuiltin?: boolean;        // default false
+  icon?: string | null;
+  inputFields?: unknown[];
+  defaultTeam?: string[];
+  appChannelSlug?: string | null;
+  systemInstruction?: string | null;
+  legacyScenarioKey?: string | null;
+  triggerType?: "manual" | "scheduled";
+  triggerConfig?: Record<string, unknown>;
+  createdBy?: string;
+}
+
+export async function createWorkflowTemplate(
+  organizationId: string,
+  input: CreateWorkflowTemplateInput,
+) {
+  const [row] = await db
+    .insert(workflowTemplates)
+    .values({
+      organizationId,
+      name: input.name,
+      description: input.description ?? null,
+      category: input.category,
+      steps: input.steps as never,
+      isBuiltin: input.isBuiltin ?? false,
+      isEnabled: true,
+      icon: input.icon ?? null,
+      inputFields: (input.inputFields ?? []) as never,
+      defaultTeam: (input.defaultTeam ?? []) as never,
+      appChannelSlug: input.appChannelSlug ?? null,
+      systemInstruction: input.systemInstruction ?? null,
+      legacyScenarioKey: input.legacyScenarioKey ?? null,
+      triggerType: input.triggerType ?? "manual",
+      triggerConfig: (input.triggerConfig ?? {}) as never,
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+  return row;
+}
+
+export interface UpdateWorkflowTemplateInput {
+  name?: string;
+  description?: string | null;
+  category?: WorkflowTemplateCategory;
+  icon?: string | null;
+  inputFields?: unknown[];
+  defaultTeam?: string[];
+  appChannelSlug?: string | null;
+  systemInstruction?: string | null;
+  isEnabled?: boolean;
+  steps?: unknown[];
+}
+
+export async function updateWorkflowTemplate(
+  id: string,
+  patch: UpdateWorkflowTemplateInput,
+) {
+  await db
+    .update(workflowTemplates)
+    .set({
+      ...patch,
+      updatedAt: new Date(),
+    } as never)
+    .where(eq(workflowTemplates.id, id));
+}
+
+export async function softDisableWorkflowTemplate(id: string) {
+  await updateWorkflowTemplate(id, { isEnabled: false });
+}

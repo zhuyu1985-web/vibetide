@@ -6,6 +6,10 @@ import { eq } from "drizzle-orm";
 import {
   listWorkflowTemplatesByOrg,
   getWorkflowTemplateByLegacyKey,
+  createWorkflowTemplate,
+  updateWorkflowTemplate,
+  softDisableWorkflowTemplate,
+  getWorkflowTemplate,
 } from "../workflow-templates";
 
 describe("listWorkflowTemplatesByOrg", () => {
@@ -153,5 +157,85 @@ describe("getWorkflowTemplateByLegacyKey", () => {
     // Don't actually seed another org — just confirm the query is org-scoped
     const row = await getWorkflowTemplateByLegacyKey(otherOrgId, "breaking_news_test");
     expect(row).toBeNull();
+  });
+});
+
+describe("createWorkflowTemplate / updateWorkflowTemplate / softDisableWorkflowTemplate", () => {
+  const orgId = randomUUID();
+
+  beforeAll(async () => {
+    const stamp = Date.now();
+    await db.insert(organizations)
+      .values({ id: orgId, name: "test-org-mutations", slug: `test-mutations-${stamp}` })
+      .onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db.delete(workflowTemplates).where(eq(workflowTemplates.organizationId, orgId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  it("createWorkflowTemplate inserts a custom template with defaults", async () => {
+    const created = await createWorkflowTemplate(orgId, {
+      name: "test-create-1",
+      description: "test description",
+      category: "custom",
+      steps: [],
+      defaultTeam: ["xiaoshu"],
+    });
+    expect(created.id).toBeTruthy();
+    expect(created.isBuiltin).toBe(false);
+    expect(created.isEnabled).toBe(true);
+    expect(created.name).toBe("test-create-1");
+    expect(created.defaultTeam).toEqual(["xiaoshu"]);
+    expect(created.category).toBe("custom");
+  });
+
+  it("updateWorkflowTemplate updates fields", async () => {
+    const created = await createWorkflowTemplate(orgId, {
+      name: "test-update-1",
+      category: "custom",
+      steps: [],
+    });
+    await updateWorkflowTemplate(created.id, {
+      description: "updated-desc",
+      icon: "Zap",
+    });
+    const fetched = await getWorkflowTemplate(created.id);
+    expect(fetched?.description).toBe("updated-desc");
+    expect(fetched?.icon).toBe("Zap");
+  });
+
+  it("softDisableWorkflowTemplate sets isEnabled=false", async () => {
+    const created = await createWorkflowTemplate(orgId, {
+      name: "test-soft-1",
+      category: "custom",
+      steps: [],
+    });
+    await softDisableWorkflowTemplate(created.id);
+    const fetched = await getWorkflowTemplate(created.id);
+    expect(fetched?.isEnabled).toBe(false);
+  });
+
+  it("createWorkflowTemplate persists all B.1 new fields", async () => {
+    const created = await createWorkflowTemplate(orgId, {
+      name: "test-create-fields",
+      category: "news",
+      steps: [],
+      icon: "FileText",
+      inputFields: [{ name: "topic", label: "话题", type: "text", required: true }],
+      defaultTeam: ["xiaolei", "xiaowen"],
+      appChannelSlug: "app_news",
+      systemInstruction: "测试指令",
+      legacyScenarioKey: "test_legacy_key",
+      isBuiltin: true,
+    });
+    expect(created.icon).toBe("FileText");
+    expect(created.inputFields).toEqual([{ name: "topic", label: "话题", type: "text", required: true }]);
+    expect(created.defaultTeam).toEqual(["xiaolei", "xiaowen"]);
+    expect(created.appChannelSlug).toBe("app_news");
+    expect(created.systemInstruction).toBe("测试指令");
+    expect(created.legacyScenarioKey).toBe("test_legacy_key");
+    expect(created.isBuiltin).toBe(true);
   });
 });
