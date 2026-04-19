@@ -10,7 +10,6 @@ import { getUserSubscriptions } from "@/lib/dal/topic-subscriptions";
 import { getTopicReadState } from "@/lib/dal/topic-reads";
 import { getCalendarEvents } from "@/lib/dal/calendar-events";
 import { updateLastViewedAt } from "@/lib/dal/topic-reads";
-import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import { InspirationClient } from "./inspiration-client";
 
 export default async function InspirationPage() {
@@ -19,7 +18,6 @@ export default async function InspirationPage() {
   let monitors: Awaited<ReturnType<typeof getPlatformMonitors>> = [];
   let subscriptions: Awaited<ReturnType<typeof getUserSubscriptions>> = null;
   let calendarEventsData: Awaited<ReturnType<typeof getCalendarEvents>> = [];
-  let workflows: Awaited<ReturnType<typeof listWorkflowTemplatesByOrg>> = [];
   let lastViewedAt = new Date().toISOString();
 
   try {
@@ -28,7 +26,7 @@ export default async function InspirationPage() {
       const readState = await getTopicReadState(auth.userId, auth.organizationId);
       lastViewedAt = readState.lastViewedAt;
 
-      [topics, monitors, subscriptions, calendarEventsData, workflows] = await Promise.all([
+      [topics, monitors, subscriptions, calendarEventsData] = await Promise.all([
         getInspirationTopics(auth.organizationId, auth.userId),
         getPlatformMonitors(auth.organizationId),
         getUserSubscriptions(auth.userId, auth.organizationId),
@@ -37,10 +35,6 @@ export default async function InspirationPage() {
           new Date(),
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         ),
-        listWorkflowTemplatesByOrg(auth.organizationId, {
-          isBuiltin: true,
-          isEnabled: true,
-        }),
       ]);
 
       // Update lastViewedAt (fire and forget — don't await)
@@ -60,7 +54,6 @@ export default async function InspirationPage() {
       subscriptions={subscriptions}
       calendarEvents={calendarEventsData}
       lastViewedAt={lastViewedAt}
-      workflows={workflows}
     />
   );
 }

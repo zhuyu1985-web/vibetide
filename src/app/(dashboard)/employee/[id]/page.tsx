@@ -6,6 +6,7 @@ import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectA
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
 import { getScenariosByEmployeeSlug, listScenariosForEmployeeAdmin } from "@/lib/dal/scenarios";
+import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
 import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
@@ -71,12 +72,21 @@ export default async function EmployeeProfilePage({
     getSkillCombos(orgId).catch(() => []),
   ]);
 
-  const [recentMemories, unprocessedFeedbackCount, scenarios, adminScenarios] =
+  const [recentMemories, unprocessedFeedbackCount, scenarios, adminScenarios, employeeWorkflows] =
     await Promise.all([
       getRecentMemories(employee.dbId, 20).catch(() => []),
       getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
       getScenariosByEmployeeSlug(employee.id).catch(() => []),
       listScenariosForEmployeeAdmin(employee.id).catch(() => []),
+      // B.1: workflow_templates filtered by this employee's slug (via jsonb
+      // `default_team @> '["slug"]'`). These ARE the employee's "scenarios"
+      // in the unified model — 场景 = 工作流.
+      orgId
+        ? listWorkflowTemplatesByOrg(orgId, {
+            isEnabled: true,
+            employeeSlug: employee.id,
+          }).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
   return (
@@ -96,6 +106,7 @@ export default async function EmployeeProfilePage({
       unprocessedFeedbackCount={unprocessedFeedbackCount}
       scenarios={scenarios}
       adminScenarios={adminScenarios}
+      employeeWorkflows={employeeWorkflows}
       canManageScenarios={canManageScenarios}
     />
   );

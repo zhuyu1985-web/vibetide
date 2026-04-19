@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -78,6 +78,11 @@ import { ScenarioWorkbench } from "./scenario-workbench";
 import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo, ScenarioCardData } from "@/lib/types";
 import type { ScenarioAdminRow } from "@/lib/dal/scenarios";
 import type { SkillRecommendation } from "@/lib/dal/skills";
+import type { WorkflowTemplateRow } from "@/db/types";
+import { startMission } from "@/app/actions/missions";
+import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
+import * as LucideIcons from "lucide-react";
+import { FileText as FileTextIcon, type LucideIcon } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   working: "工作中",
@@ -131,6 +136,12 @@ interface EmployeeProfileClientProps {
   unprocessedFeedbackCount?: number;
   scenarios?: ScenarioCardData[];
   adminScenarios?: ScenarioAdminRow[];
+  /**
+   * B.1 — workflow_templates bound to this employee via `defaultTeam`.
+   * These ARE the employee's scenarios in the unified model (场景 = 工作流).
+   * Rendered alongside legacy `scenarios` until B.2 removes the dual system.
+   */
+  employeeWorkflows?: WorkflowTemplateRow[];
   /** Whether the current user can write scenarios (ai:manage permission).
    * For now we derive this lazily inside the tab via the server action's
    * own guard — no gating on the client. */
@@ -153,6 +164,7 @@ export function EmployeeProfileClient({
   unprocessedFeedbackCount = 0,
   scenarios = [],
   adminScenarios = [],
+  employeeWorkflows = [],
   canManageScenarios = true,
 }: EmployeeProfileClientProps) {
   const router = useRouter();
@@ -354,7 +366,19 @@ export function EmployeeProfileClient({
         </div>
       </GlassCard>
 
-      {/* Scenario Workbench */}
+      {/* B.1 Unified Scenario Workflow — workflow_templates bound to this
+          employee (场景 = 工作流). Clicking a card directly starts a mission
+          using `workflowTemplateId` dual-write. These are daily-capability
+          cards, not per-article pickers. */}
+      {employeeWorkflows.length > 0 && (
+        <EmployeeWorkflowsSection
+          workflows={employeeWorkflows}
+          employeeNickname={employee.nickname}
+        />
+      )}
+
+      {/* Legacy scenario workbench — interactive scenarios from the old
+          `employee_scenarios` table. Kept until B.2 fully migrates. */}
       {scenarios.length > 0 && (
         <ScenarioWorkbench
           scenarios={scenarios}
@@ -1334,5 +1358,96 @@ function EditProfileDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================================
+// EmployeeWorkflowsSection
+// ============================================================================
+// Renders workflow_templates bound to this employee as clickable cards.
+// Each card triggers `startMission` with `workflowTemplateId` dual-write and
+// navigates to the created mission. 场景 = 工作流 — these ARE the employee's
+// daily-capability scenarios (不是"选文章再挑模板"的 picker).
+
+function EmployeeWorkflowsSection({
+  workflows,
+  employeeNickname,
+}: {
+  workflows: WorkflowTemplateRow[];
+  employeeNickname: string;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const handleStart = (wf: WorkflowTemplateRow) => {
+    if (isPending) return;
+    setPendingId(wf.id);
+    startTransition(async () => {
+      try {
+        const result = await startMission({
+          title: wf.name,
+          scenario: templateToScenarioSlug(wf),
+          userInstruction: wf.description ?? "",
+          workflowTemplateId: wf.id,
+        });
+        if (result?.id) {
+          router.push(`/missions/${result.id}`);
+        }
+      } catch (err) {
+        console.error("[employee-workflows] startMission failed:", err);
+      } finally {
+        setPendingId(null);
+      }
+    });
+  };
+
+  const resolveIcon = (iconName: string | null | undefined): LucideIcon => {
+    if (!iconName) return FileTextIcon;
+    const maybe = (LucideIcons as unknown as Record<string, LucideIcon>)[iconName];
+    return maybe ?? FileTextIcon;
+  };
+
+  return (
+    <GlassCard className="mt-4">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          日常工作流
+        </h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          {employeeNickname}已固化的 {workflows.length} 个场景能力 — 点击立即启动
+        </p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {workflows.map((wf) => {
+          const Icon = resolveIcon(wf.icon);
+          const loading = pendingId === wf.id;
+          return (
+            <button
+              key={wf.id}
+              type="button"
+              onClick={() => handleStart(wf)}
+              disabled={isPending}
+              className="flex flex-col items-start gap-2 p-4 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20 flex items-center justify-center group-hover:from-indigo-500/20 group-hover:to-violet-500/20 transition-colors">
+                <Icon
+                  size={20}
+                  className="text-indigo-600 dark:text-indigo-400"
+                />
+              </div>
+              <div className="w-full">
+                <p className="text-xs font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
+                  {wf.name}
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                  {loading ? "启动中..." : wf.description ?? "—"}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </GlassCard>
   );
 }
