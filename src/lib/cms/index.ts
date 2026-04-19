@@ -76,3 +76,10 @@ export {
   classifyCmsError,
   type CmsErrorStage,
 } from "./errors";
+
+// —— 发布主流程 ——
+export {
+  publishArticleToCms,
+  type PublishInput,
+  type PublishResult,
+} from "./publish";

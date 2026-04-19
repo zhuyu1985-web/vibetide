@@ -4,6 +4,73 @@ import { eq, desc, and } from "drizzle-orm";
 import { getCurrentUserOrg } from "./auth";
 import type { ArticleListItem, ArticleDetail, ArticleStats } from "@/lib/types";
 
+/**
+ * 面向 CMS 发布流程的文章视图（读模型）。
+ *
+ * 实际 DB（`articles` 表）缺失的字段（authorName/shortTitle/coverImageUrl/
+ * externalUrl/galleryImages/videoId/audioId）在 Phase 1 先以 null 占位；Phase 2+
+ * 按需从 article_assets / media_assets 关联补齐。publishStatus 是 DB 列 `status`
+ * 的别名，用于对齐 mapper 契约（ArticleForMapper.publishStatus）。
+ */
+export interface PublishableArticle {
+  id: string;
+  organizationId: string;
+  title: string;
+  body: string | null;
+  summary: string | null;
+  authorName: string | null;
+  shortTitle: string | null;
+  tags: string[];
+  coverImageUrl: string | null;
+  publishedAt: Date | null;
+  /** 别名 `articles.status`（articleStatusEnum：draft/reviewing/approved/published/archived） */
+  publishStatus: string;
+  externalUrl: string | null;
+  galleryImages: Array<{ url: string; caption: string | null }> | null;
+  videoId: string | null;
+  audioId: string | null;
+  mediaType: string;
+  missionId: string | null;
+}
+
+/**
+ * 按 ID 获取文章原始数据（不走 org 过滤，供 CMS 发布流程等跨层调用使用）。
+ *
+ * 与 `getArticle(id)`（走组织过滤、返回 UI 类型 ArticleDetail）区分开：
+ *  - 调用方：publishArticleToCms 等系统级流程
+ *  - 返回：`PublishableArticle | null`，包含 missionId、body 等发布所需字段
+ */
+export async function getArticleById(
+  id: string,
+): Promise<PublishableArticle | null> {
+  const row = await db.query.articles.findFirst({
+    where: eq(articles.id, id),
+  });
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    title: row.title,
+    body: row.body ?? null,
+    summary: row.summary ?? null,
+    tags: (row.tags as string[] | null) ?? [],
+    publishedAt: row.publishedAt ?? null,
+    publishStatus: row.status,
+    mediaType: row.mediaType ?? "article",
+    missionId: row.missionId ?? null,
+    // DB schema 里暂不存在的字段：发布流程从 mapper 的 ArticleForMapping 契约
+    // 读取；Phase 1 填 null，mapper 逻辑有兜底。
+    authorName: null,
+    shortTitle: null,
+    coverImageUrl: null,
+    externalUrl: null,
+    galleryImages: null,
+    videoId: null,
+    audioId: null,
+  };
+}
+
 export async function getArticles(): Promise<ArticleListItem[]> {
   const orgId = await getCurrentUserOrg();
   if (!orgId) return [];
