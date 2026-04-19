@@ -211,3 +211,24 @@ export async function listWorkflowTemplatesByOrg(
 
   return await query;
 }
+
+/**
+ * Look up a workflow template by (organizationId, legacy_scenario_key).
+ *
+ * 使用：startMission 时，若调用方未传 workflowTemplateId 但传了 scenario slug，
+ * 自动通过此函数从 legacyScenarioKey 反查 template.id 补上。
+ */
+export async function getWorkflowTemplateByLegacyKey(
+  organizationId: string,
+  legacyKey: string,
+) {
+  const [row] = await db
+    .select()
+    .from(workflowTemplates)
+    .where(and(
+      eq(workflowTemplates.organizationId, organizationId),
+      eq(workflowTemplates.legacyScenarioKey, legacyKey),
+    ))
+    .limit(1);
+  return row ?? null;
+}

@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { organizations, workflowTemplates } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { listWorkflowTemplatesByOrg } from "../workflow-templates";
+import {
+  listWorkflowTemplatesByOrg,
+  getWorkflowTemplateByLegacyKey,
+} from "../workflow-templates";
 
 describe("listWorkflowTemplatesByOrg", () => {
   const orgId = randomUUID();
@@ -104,5 +107,51 @@ describe("listWorkflowTemplatesByOrg", () => {
     });
     expect(rows.every((r) => r.isBuiltin && r.category === "deep")).toBe(true);
     expect(rows.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("getWorkflowTemplateByLegacyKey", () => {
+  const orgId = randomUUID();
+
+  beforeAll(async () => {
+    const stamp = Date.now();
+    await db.insert(organizations)
+      .values({ id: orgId, name: "test-org-legacy-key", slug: `test-legacy-key-${stamp}` })
+      .onConflictDoNothing();
+
+    await db.insert(workflowTemplates).values([
+      {
+        organizationId: orgId,
+        name: "test-legacy-lookup",
+        category: "news",
+        isBuiltin: true,
+        isEnabled: true,
+        legacyScenarioKey: "breaking_news_test",
+        defaultTeam: [],
+        steps: [],
+      },
+    ]).onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db.delete(workflowTemplates).where(eq(workflowTemplates.organizationId, orgId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  it("returns row matching legacy_scenario_key for org", async () => {
+    const row = await getWorkflowTemplateByLegacyKey(orgId, "breaking_news_test");
+    expect(row?.name).toBe("test-legacy-lookup");
+  });
+
+  it("returns null when legacy key not found", async () => {
+    const row = await getWorkflowTemplateByLegacyKey(orgId, "nonexistent_key_xyz");
+    expect(row).toBeNull();
+  });
+
+  it("does not match rows from other orgs with same key", async () => {
+    const otherOrgId = randomUUID();
+    // Don't actually seed another org — just confirm the query is org-scoped
+    const row = await getWorkflowTemplateByLegacyKey(otherOrgId, "breaking_news_test");
+    expect(row).toBeNull();
   });
 });
