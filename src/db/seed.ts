@@ -4,6 +4,8 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { EMPLOYEE_CORE_SKILLS } from "../lib/constants";
 import { getAllBuiltinSkills } from "../lib/skill-loader";
+import { seedBuiltinTemplatesForOrg } from "../lib/dal/workflow-templates";
+import { buildBuiltinScenarioSeeds } from "./seed-builtin-workflows";
 
 // Load env manually for standalone script (.env.local takes priority)
 import { config } from "dotenv";
@@ -583,6 +585,10 @@ async function seed() {
     {
       name: "快讯工作流",
       description: "突发新闻快速响应，15分钟内完成从监控到发布的全流程",
+      category: "news" as const,
+      icon: "Zap",
+      defaultTeam: ["xiaolei", "xiaowen"] as string[],
+      appChannelSlug: "app_news" as string | null,
       steps: [
         { id: "step-1", order: 1, dependsOn: [] as string[], name: "热点监控", type: "skill" as const, config: { skillSlug: "trend_monitor", skillName: "趋势监控", skillCategory: "perception", parameters: {} }, key: "monitor", label: "热点监控" },
         { id: "step-2", order: 2, dependsOn: ["step-1"], name: "选题策划", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "plan", label: "选题策划" },
@@ -594,6 +600,10 @@ async function seed() {
     {
       name: "深度报道工作流",
       description: "深度调研+数据分析+多媒体制作，高质量长文全流程",
+      category: "deep" as const,
+      icon: "FileSearch",
+      defaultTeam: ["xiaolei", "xiaoce", "xiaowen", "xiaoshen", "xiaofa", "xiaoshu"] as string[],
+      appChannelSlug: "app_news" as string | null,
       steps: [
         { id: "step-1", order: 1, dependsOn: [] as string[], name: "热点监控", type: "skill" as const, config: { skillSlug: "trend_monitor", skillName: "趋势监控", skillCategory: "perception", parameters: {} }, key: "monitor", label: "热点监控" },
         { id: "step-2", order: 2, dependsOn: ["step-1"], name: "选题策划", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "plan", label: "选题策划" },
@@ -608,7 +618,10 @@ async function seed() {
     {
       name: "每日热点新闻推荐",
       description: "每天早晨自动聚合全网热点，评估价值后生成推荐列表并推送到编辑部",
-      category: "news" as const,
+      category: "daily_brief" as const,
+      icon: "BarChart3",
+      defaultTeam: ["xiaolei"] as string[],
+      appChannelSlug: "app_home" as string | null,
       triggerType: "scheduled" as const,
       triggerConfig: { cron: "0 7 * * *", timezone: "Asia/Shanghai" },
       steps: [
@@ -622,6 +635,9 @@ async function seed() {
       name: "金融科技监管日报",
       description: "工作日定时抓取金融监管政策，分析影响后生成日报并合规审核发布",
       category: "news" as const,
+      icon: "FileText",
+      defaultTeam: ["xiaoce", "xiaoshen"] as string[],
+      appChannelSlug: "app_news" as string | null,
       triggerType: "scheduled" as const,
       triggerConfig: { cron: "0 9 * * 1-5", timezone: "Asia/Shanghai" },
       steps: [
@@ -636,6 +652,9 @@ async function seed() {
       name: "每周竞争对手情报报告",
       description: "每周一自动抓取竞品动态，对比分析差异与机会后生成情报报告推送管理层",
       category: "analytics" as const,
+      icon: "BarChart3",
+      defaultTeam: ["xiaozi", "xiaoshu"] as string[],
+      appChannelSlug: "app_home" as string | null,
       triggerType: "scheduled" as const,
       triggerConfig: { cron: "0 10 * * 1", timezone: "Asia/Shanghai" },
       steps: [
@@ -650,6 +669,9 @@ async function seed() {
       name: "客户投诉邮件分类",
       description: "手动触发客户投诉邮件分类流程，自动识别情感与紧急度后派发到对应部门",
       category: "distribution" as const,
+      icon: "Mail",
+      defaultTeam: ["xiaofa"] as string[],
+      appChannelSlug: null as string | null,
       triggerType: "manual" as const,
       steps: [
         { id: "step-1", order: 1, dependsOn: [] as string[], name: "邮件拉取与预处理", type: "skill" as const, config: { skillSlug: "email_classifier", skillName: "邮件分类", skillCategory: "perception", parameters: {} }, key: "ingest", label: "邮件拉取与预处理" },
@@ -660,29 +682,39 @@ async function seed() {
     },
   ];
 
+  // B.1 Unified Scenario Workflow — Task 12:
+  // Use seedBuiltinTemplatesForOrg for idempotent upsert via the partial unique
+  // index `(org_id, name) WHERE is_builtin=true AND legacy_scenario_key IS NULL`.
+  // This ensures re-runs propagate new fields (icon/defaultTeam/appChannelSlug/etc.) to existing rows.
+  const templatesDataSeeds = templatesData.map((tmpl) => ({
+    name: tmpl.name,
+    description: tmpl.description,
+    category: tmpl.category,
+    icon: tmpl.icon,
+    defaultTeam: tmpl.defaultTeam,
+    appChannelSlug: tmpl.appChannelSlug,
+    systemInstruction: null,
+    legacyScenarioKey: null,
+    steps: tmpl.steps,
+    triggerType:
+      "triggerType" in tmpl && tmpl.triggerType ? tmpl.triggerType : "manual",
+    triggerConfig:
+      "triggerConfig" in tmpl && tmpl.triggerConfig ? tmpl.triggerConfig : {},
+  }));
+  await seedBuiltinTemplatesForOrg(org.id, templatesDataSeeds);
   for (const tmpl of templatesData) {
-    const extras: {
-      category?: "news" | "video" | "analytics" | "distribution" | "custom";
-      triggerType?: "manual" | "scheduled";
-      triggerConfig?: { cron?: string; timezone?: string } | null;
-    } = {};
-    if ("category" in tmpl && tmpl.category) extras.category = tmpl.category;
-    if ("triggerType" in tmpl && tmpl.triggerType)
-      extras.triggerType = tmpl.triggerType;
-    if ("triggerConfig" in tmpl && tmpl.triggerConfig)
-      extras.triggerConfig = tmpl.triggerConfig;
-
-    await db.insert(schema.workflowTemplates).values({
-      organizationId: org.id,
-      name: tmpl.name,
-      description: tmpl.description,
-      steps: tmpl.steps,
-      isBuiltin: true,
-      ...extras,
-    });
     console.log(`   Template: ${tmpl.name}`);
   }
   console.log();
+
+  // B.1 Unified Scenario Workflow — Task 12:
+  // Insert builtin scenarios (SCENARIO_CONFIG + ADVANCED_SCENARIO_CONFIG + xiaolei) into workflow_templates.
+  console.log("   Inserting builtin scenarios to workflow_templates...");
+  const builtinSeeds = buildBuiltinScenarioSeeds();
+  await seedBuiltinTemplatesForOrg(org.id, builtinSeeds);
+  console.log(
+    `   Seeded ${builtinSeeds.length} builtin scenarios (SCENARIO_CONFIG + ADVANCED + xiaolei)\n`,
+  );
 
   // 8. Insert categories (tree structure)
   console.log("8. Inserting categories...");
