@@ -43,8 +43,17 @@ export {
   type CmsListStyleDto,
 } from "./types";
 
+// —— Mapper 入口 ——
+export {
+  mapArticleToCms,
+  loadMapperContext,
+  determineType,
+  type MapperContext,
+  type ArticleForMapper,
+  type ArticleForMapping,
+} from "./article-mapper";
+
 // —— 后续 Task 会追加 ——
-// export { mapArticleToCms, determineType } from "./article-mapper";
 // export { syncCmsCatalogs } from "./catalog-sync";
 // export { classifyState, isRetriableError } from "./status-machine";
 
