@@ -50,6 +50,7 @@ import {
   EMPLOYEE_META,
   type EmployeeId,
 } from "@/lib/constants";
+import { resolveScenarioConfig } from "@/lib/scenario-fallback";
 import type { MissionSummary } from "@/lib/dal/missions";
 import { cn } from "@/lib/utils";
 
@@ -400,7 +401,7 @@ function MissionRow({
     : m.totalTaskCount > 0 ? Math.round((m.completedTaskCount / m.totalTaskCount) * 100) : 0;
   const progressCls = PROGRESS_CLASS[m.status] ?? "bg-gray-400";
   const skippedCount = isDone ? m.totalTaskCount - m.completedTaskCount - m.inProgressTaskCount : 0;
-  const scCfg = SCENARIO_CONFIG[m.scenario] ?? ADVANCED_SCENARIO_CONFIG[m.scenario as keyof typeof ADVANCED_SCENARIO_CONFIG];
+  const scCfg = resolveScenarioConfig(m);
   const isActive = ["executing", "consolidating"].includes(m.status);
 
   // Extract error message from finalOutput for failed missions
