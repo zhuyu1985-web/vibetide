@@ -43,9 +43,9 @@ export interface CustomScenario {
 
 interface ScenarioGridProps {
   /**
-   * Map of tab key → workflow templates for that tab. Keys are the 8 employee
-   * slugs plus `"custom"` for user-defined workflows. Produced server-side in
-   * `/home/page.tsx` via `listTemplatesForHomepageByEmployee`.
+   * Map of tab key → workflow templates for that tab. Keys are "featured"
+   * + 8 employee slugs + "custom". Produced server-side in `/home/page.tsx`
+   * via `listTemplatesForHomepageByTab`.
    */
   templatesByTab: Record<string, WorkflowTemplateRow[]>;
 }
