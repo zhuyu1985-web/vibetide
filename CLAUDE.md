@@ -367,6 +367,16 @@ After implementing features, always verify before considering work complete:
 - Use OpenSpec workflow for architectural changes (see `openspec/AGENTS.md`)
 - Glass UI design system: follow existing component patterns in `src/components/shared/` for consistent styling (GlassCard, frosted backgrounds, gradient accents)
 
+## Git Workflow（强制：单分支开发）
+
+**本仓库只有 `main` 一个分支，所有功能迭代直接在 `main` 上进行。**
+
+- **禁止创建 feature / worktree 分支**（包括 `feature/*`、`claude/*`、`.worktrees/`、`.claude/worktrees/` 等）。历史上多分支 + worktree 并行导致过多次合并冲突；目前是单人开发，没有分支隔离的收益。
+- **所有 commit 直接落在 `main`**。每个完成的逻辑单元立即 commit + push。
+- **Agent / subagent 工作也必须在 `main` 上进行**，不要"为了隔离"而私自开分支。如果担心 breaking change，就把工作拆小成多个独立 commit，每个都能独立 build，而不是用分支隔离。
+- **不要使用 `git worktree add`**。`.worktrees/` 和 `.claude/worktrees/` 已在 `.gitignore` 中；即便创建也不会被追踪。
+- **Phase 级 / 大 refactor 的临时中间态**：用 tsc 零错误 + 每个 commit 都能独立 build 来保证安全，而不是分支隔离。如果中间态必然 break（例如 Phase 3 的常量删除引发 Phase 4 连锁修改），把 Phase 3 + Phase 4 合为一次 commit，不要拆成跨 commit 的 red→green 状态。
+
 所有的按钮或lab等任何可以点击触发事件的按钮，不要带边框
 
 所有的回复采用中文
