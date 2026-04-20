@@ -332,6 +332,15 @@ export interface BuiltinSeedInput {
   steps: unknown[];
   triggerType?: "manual" | "scheduled";
   triggerConfig?: Record<string, unknown>;
+  // 2026-04-20 realignment — 新 4 列
+  /** 全组织可见，默认 true；org admin 手动关闭后不会被重置 */
+  isPublic?: boolean;
+  /** 员工专属归属；null = 公共场景 */
+  ownerEmployeeId?: string | null;
+  /** form = 需填表；direct = 一键启动 */
+  launchMode?: "form" | "direct";
+  /** Mustache 风格 prompt 模板 */
+  promptTemplate?: string | null;
 }
 
 /**
@@ -362,8 +371,18 @@ export async function seedBuiltinTemplatesForOrg(
       steps: seed.steps as never,
       triggerType: seed.triggerType ?? "manual",
       triggerConfig: (seed.triggerConfig ?? {}) as never,
+      // 2026-04-20 realignment — 新 4 列
+      isPublic: seed.isPublic ?? true,
+      ownerEmployeeId: seed.ownerEmployeeId ?? null,
+      launchMode: seed.launchMode ?? "form",
+      promptTemplate: seed.promptTemplate ?? null,
     };
 
+    // onConflictDoUpdate 规则：
+    // - 重置（seed 即真相）：description / category / icon / input_fields / default_team
+    //   / app_channel_slug / system_instruction / steps / trigger_type / trigger_config
+    //   / launch_mode / prompt_template / updated_at
+    // - 不覆盖（保留 org admin 手动设置）：is_public / owner_employee_id / is_enabled
     const setOnConflict = {
       description: baseValues.description,
       category: baseValues.category,
@@ -375,18 +394,35 @@ export async function seedBuiltinTemplatesForOrg(
       steps: baseValues.steps,
       triggerType: baseValues.triggerType,
       triggerConfig: baseValues.triggerConfig,
+      launchMode: baseValues.launchMode,
+      promptTemplate: baseValues.promptTemplate,
       updatedAt: new Date(),
     };
 
     if (seed.legacyScenarioKey) {
-      await db
-        .insert(workflowTemplates)
-        .values(baseValues)
-        .onConflictDoUpdate({
-          target: [workflowTemplates.organizationId, workflowTemplates.legacyScenarioKey],
-          targetWhere: sql`${workflowTemplates.legacyScenarioKey} IS NOT NULL`,
-          set: setOnConflict,
-        });
+      try {
+        await db
+          .insert(workflowTemplates)
+          .values(baseValues)
+          .onConflictDoUpdate({
+            target: [workflowTemplates.organizationId, workflowTemplates.legacyScenarioKey],
+            targetWhere: sql`${workflowTemplates.legacyScenarioKey} IS NOT NULL`,
+            set: setOnConflict,
+          });
+      } catch (err) {
+        // 2026-04-20 realignment — Phase 1 Chunk C：若 DB 中存在 legacy builtin 行
+        // 占用了同 name（但 legacy_scenario_key 不同或为 NULL），onConflictDoUpdate
+        // 走不到那一行，insert 会因 name unique index 失败。这属于已知的遗留数据，
+        // Phase 3 会通过迁移清理。此处仅 warn，不 delete，继续处理后续 seed。
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("workflow_templates_org_builtin_name_uidx")) {
+          console.warn(
+            `[seedBuiltinTemplatesForOrg] name collision with legacy row — skipping seed "${seed.legacyScenarioKey}" (${seed.name}). Phase 3 migration will resolve. Detail: ${msg.split("\n")[0]}`,
+          );
+        } else {
+          throw err;
+        }
+      }
     } else {
       await db
         .insert(workflowTemplates)

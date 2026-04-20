@@ -1091,18 +1091,252 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(4, "对标报告摘要", "summary_generate", "摘要生成", "generation", "summary"),
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 公共协作模板 · 5 条（ownerEmployeeId = null）
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "pub.daily_news_push",
+    name: "每日要闻推送",
+    description: "每日早晨自动聚合要闻并产出推送稿件，支持一键启动。",
+    icon: "rss",
+    category: "news",
+    ownerEmployeeId: null,
+    defaultTeam: ["xiaolei", "xiaozi", "xiaofa"],
+    appChannelSlug: "app_news",
+    launchMode: "direct",
+    inputFields: [],
+    systemInstruction:
+      "生成今日要闻推送包。流程：1) 扫描全网热榜 2) 多源聚合今日要闻 3) 按重要性排序产出 Top 5~8 条 4) 每条含一句话摘要 / 延伸阅读 / 推荐发布时段。",
+    promptTemplate:
+      "生成今日要闻推送包，包含 Top 热点 + 摘要 + 发布策略。",
+    steps: [
+      step(1, "热榜扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "要闻聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(3, "推送稿撰写", "content_generate", "内容生成", "generation", "write"),
+      step(4, "发布策略规划", "publish_strategy", "发布策略", "management", "strategy"),
+    ],
+  },
+
+  {
+    slug: "pub.press_conf_relay",
+    name: "发布会直播联动",
+    description: "围绕发布会做联动直播 + 快讯 + 长稿 + 短视频 + 海报全链路协同。",
+    icon: "calendar-check",
+    category: "news",
+    ownerEmployeeId: null,
+    defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaojian", "xiaofa"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "conference_name",
+        label: "发布会名称",
+        type: "text",
+        required: true,
+        placeholder: "如：华栖云 2026 春季产品发布会",
+      },
+      {
+        name: "go_live_at",
+        label: "开播时间",
+        type: "date",
+        required: true,
+      },
+      {
+        name: "deliverables",
+        label: "需要的产物",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "flash", label: "快讯" },
+          { value: "long_form", label: "长稿" },
+          { value: "short_video", label: "短视频" },
+          { value: "poster", label: "海报" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕「{{conference_name}}」（{{go_live_at}} 开播）做直播联动。按需产出 {{deliverables}}：快讯（第一时间）/ 长稿（事后深度）/ 短视频（高光混剪）/ 海报（关键信息图）。注意时序协同与文案一致。",
+    promptTemplate:
+      "为「{{conference_name}}」（{{go_live_at}}）做直播联动，产出 {{deliverables}}。",
+    steps: [
+      step(1, "发布会背景预研", "web_search", "全网搜索", "perception", "research"),
+      step(2, "联动文案撰写", "content_generate", "内容生成", "generation", "write"),
+      step(3, "短视频分镜规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
+      step(4, "海报排版设计", "layout_design", "排版设计", "generation", "layout"),
+      step(5, "多平台发布策略", "publish_strategy", "发布策略", "management", "strategy"),
+    ],
+  },
+
+  {
+    slug: "pub.viral_video_kit",
+    name: "爆款短视频生产",
+    description: "爆款公式驱动的短视频生产套件，从选题到分镜一站式。",
+    icon: "video",
+    category: "video",
+    ownerEmployeeId: null,
+    defaultTeam: ["xiaoce", "xiaozi", "xiaojian"],
+    appChannelSlug: "app_variety",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic",
+        label: "话题",
+        type: "text",
+        required: true,
+        placeholder: "如：AI 新政策 30 秒速看",
+      },
+      {
+        name: "reference_accounts",
+        label: "参考账号",
+        type: "textarea",
+        required: false,
+        placeholder: "一行一个，可带平台前缀（douyin: xxx）",
+      },
+      {
+        name: "duration_sec",
+        label: "目标时长（秒）",
+        type: "number",
+        required: false,
+        defaultValue: 45,
+        validation: { min: 10, max: 120 },
+      },
+    ],
+    systemInstruction:
+      "围绕「{{topic}}」生产爆款短视频（目标 {{duration_sec}} 秒）。参考 {{reference_accounts}} 的节奏与钩子。产出：1) 热度洞察 2) 3 版种草脚本（前 3 秒钩子 / 中段高潮 / 结尾引导） 3) 分镜与字幕 4) 封面方向。",
+    promptTemplate:
+      "为「{{topic}}」生产 {{duration_sec}} 秒爆款短视频，参考 {{reference_accounts}}。",
+    steps: [
+      step(1, "热点趋势抓取", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "种草脚本生成", "zhongcao_script", "种草脚本", "generation", "script"),
+      step(3, "分镜与钩子规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
+      step(4, "爆款封面生成", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+    ],
+  },
+
+  {
+    slug: "pub.feature_story_pipeline",
+    name: "特稿生产线",
+    description: "重大特稿的从调研到合规的完整生产链路，支持多档深度。",
+    icon: "pen-tool",
+    category: "deep",
+    ownerEmployeeId: null,
+    defaultTeam: ["xiaolei", "xiaowen", "xiaozi", "xiaoshen"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "feature_topic",
+        label: "特稿主题",
+        type: "text",
+        required: true,
+        placeholder: "如：中国芯片产业十年回望",
+      },
+      {
+        name: "background_materials",
+        label: "背景资料",
+        type: "textarea",
+        required: false,
+        placeholder: "粘贴已有背景资料、链接或素材要点",
+      },
+      {
+        name: "deadline",
+        label: "截稿时间",
+        type: "date",
+        required: true,
+      },
+      {
+        name: "depth_level",
+        label: "深度等级",
+        type: "select",
+        required: false,
+        placeholder: "选择深度等级",
+        options: [
+          { value: "standard", label: "标准" },
+          { value: "deep", label: "深度" },
+          { value: "investigative", label: "调查" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕「{{feature_topic}}」产出 {{depth_level}} 档次特稿，{{deadline}} 前交稿。背景资料：{{background_materials}}。链路：深读→情感→撰写→核查→合规。结构：1) 悬念开篇 2) 事件全景 3) 多方观点 4) 数据支撑 5) 深度洞察。",
+    promptTemplate:
+      "为「{{feature_topic}}」产出 {{depth_level}} 特稿，{{deadline}} 前完成。",
+    steps: [
+      step(1, "多源网页深读", "web_deep_read", "网页深读", "perception", "read"),
+      step(2, "情感倾向分析", "sentiment_analysis", "情感分析", "analysis", "sentiment"),
+      step(3, "特稿正文撰写", "content_generate", "内容生成", "generation", "write"),
+      step(4, "事实核查", "fact_check", "事实核查", "management", "verify"),
+      step(5, "合规审核", "compliance_check", "合规审核", "management", "compliance"),
+    ],
+  },
+
+  {
+    slug: "pub.incident_rapid_response",
+    name: "突发应急响应",
+    description: "突发事件的快速响应链路，从核实到合规过审一气呵成。",
+    icon: "siren",
+    category: "news",
+    ownerEmployeeId: null,
+    defaultTeam: ["xiaolei", "xiaozi", "xiaoshen", "xiaofa"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "incident_location",
+        label: "事件地点",
+        type: "text",
+        required: true,
+        placeholder: "如：四川成都 · 武侯区",
+      },
+      {
+        name: "incident_type",
+        label: "事件性质",
+        type: "select",
+        required: true,
+        placeholder: "选择事件性质",
+        options: [
+          { value: "natural_disaster", label: "自然灾害" },
+          { value: "public_health", label: "公共卫生" },
+          { value: "social", label: "社会" },
+          { value: "transport", label: "交通" },
+        ],
+      },
+      {
+        name: "urgent_deliverables",
+        label: "急需产物",
+        type: "multiselect",
+        required: true,
+        options: [
+          { value: "flash", label: "快讯" },
+          { value: "statement", label: "说明" },
+          { value: "debunk", label: "辟谣" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "针对 {{incident_location}} 的 {{incident_type}} 突发事件，快速响应。急需产物：{{urgent_deliverables}}。链路：搜索取证→核查→撰写→合规→分发。强调多源交叉印证与风险提示。",
+    promptTemplate:
+      "响应 {{incident_location}} 的 {{incident_type}}，产出 {{urgent_deliverables}}。",
+    steps: [
+      step(1, "多源快速搜索", "web_search", "全网搜索", "perception", "search"),
+      step(2, "关键事实核查", "fact_check", "事实核查", "management", "verify"),
+      step(3, "应急稿件撰写", "content_generate", "内容生成", "generation", "write"),
+      step(4, "合规快扫", "compliance_check", "合规审核", "management", "compliance"),
+      step(5, "多平台紧急分发", "publish_strategy", "发布策略", "management", "strategy"),
+    ],
+  },
 ];
 
-// ─── 向后兼容 export ──────────────────────────────────────────────────────
-// Chunk C 将进一步让 `seedBuiltinTemplatesForOrg` 直接消费 BUILTIN_WORKFLOWS
-// 并写入新的 4 列（isPublic / ownerEmployeeId / launchMode / promptTemplate）。
-// 当前 chunk 保留同名函数以维持 seed.ts 与 scripts/seed-demo-workflows.ts 可用。
+// ─── Seed input 映射 ──────────────────────────────────────────────────────
+// Chunk C：`toBuiltinSeedInput` 现携带新 4 列（isPublic / ownerEmployeeId
+// / launchMode / promptTemplate），由 `seedBuiltinTemplatesForOrg` 写入 DB。
 
 /**
- * Map a `BuiltinWorkflowSeed` to the legacy `BuiltinSeedInput` shape consumed
- * by `seedBuiltinTemplatesForOrg`. Extended fields (ownerEmployeeId / launchMode
- * / promptTemplate / isPublic) are dropped here — Chunk C will extend the DAL
- * signature to carry them through.
+ * Map a `BuiltinWorkflowSeed` to `BuiltinSeedInput` shape consumed by
+ * `seedBuiltinTemplatesForOrg`. 新 4 列（isPublic / ownerEmployeeId / launchMode
+ * / promptTemplate）以原样透传；`isPublic` 默认 true。
  */
 function toBuiltinSeedInput(w: BuiltinWorkflowSeed): BuiltinSeedInput {
   return {
@@ -1116,6 +1350,11 @@ function toBuiltinSeedInput(w: BuiltinWorkflowSeed): BuiltinSeedInput {
     systemInstruction: w.systemInstruction ?? null,
     legacyScenarioKey: w.slug,
     steps: w.steps,
+    // 2026-04-20 realignment — 新 4 列
+    isPublic: true,
+    ownerEmployeeId: w.ownerEmployeeId,
+    launchMode: w.launchMode,
+    promptTemplate: w.promptTemplate ?? null,
   };
 }
 
