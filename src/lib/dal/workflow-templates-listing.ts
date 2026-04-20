@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { workflowTemplates } from "@/db/schema/workflows";
-import { and, eq, asc, type SQL } from "drizzle-orm";
+import { and, eq, asc, or, ilike, type SQL } from "drizzle-orm";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { EmployeeId } from "@/lib/constants";
 
@@ -84,6 +84,38 @@ export async function getDefaultHotTopicTemplate(
  *
  * 按 `createdAt` 升序排，和 `listWorkflowTemplatesByOrg` 一致，保证 UI 稳定。
  */
+/**
+ * Phase 4B — keyword lookup for channel gateway quick-commands.
+ *
+ * 替代 `ADVANCED_SCENARIO_CONFIG[key]` 常量查找。IM 渠道（DingTalk / WeCom）
+ * 的 `#场景名 ...` 指令会把 `#` 后面的 tag 传给本函数，我们在组织内按模板
+ * 中文名或 `legacyScenarioKey` 做模糊匹配，取第一条命中。
+ *
+ * 返回 `null` 由调用方反馈给用户「未找到场景 xxx」。
+ */
+export async function findTemplateByNameOrSlug(
+  orgId: string,
+  keyword: string,
+): Promise<WorkflowTemplateRow | null> {
+  const trimmed = keyword?.trim() ?? "";
+  if (trimmed.length === 0) return null;
+  const pattern = `%${trimmed}%`;
+  const rows = await db
+    .select()
+    .from(workflowTemplates)
+    .where(
+      and(
+        eq(workflowTemplates.organizationId, orgId),
+        or(
+          ilike(workflowTemplates.name, pattern),
+          ilike(workflowTemplates.legacyScenarioKey, pattern),
+        ),
+      ),
+    )
+    .limit(1);
+  return (rows[0] as WorkflowTemplateRow | undefined) ?? null;
+}
+
 export async function listTemplatesForHomepageByEmployee(
   orgId: string,
   employeeId: EmployeeId | null,
