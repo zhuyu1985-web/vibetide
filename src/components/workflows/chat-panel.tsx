@@ -6,8 +6,6 @@ import {
   Plus,
   Wrench,
   Sparkles,
-  Cpu,
-  Check,
   CheckCircle2,
   AlertCircle,
   SendHorizonal,
@@ -18,19 +16,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
-
-// ---------------------------------------------------------------------------
-// Model options
-// ---------------------------------------------------------------------------
-
-const AVAILABLE_MODELS = [
-  { id: "auto", label: "智能路由", description: "自动选择最佳模型" },
-  { id: "deepseek-chat", label: "DeepSeek", description: "通用对话" },
-  { id: "glm-5", label: "GLM-5", description: "智谱最新模型" },
-  { id: "glm-4-flash", label: "GLM-4 Flash", description: "快速响应" },
-] as const;
+import {
+  ModelSwitcher,
+  DEFAULT_MODEL_ID,
+} from "@/components/shared/model-switcher";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,10 +59,7 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [connectorOpen, setConnectorOpen] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("auto");
-
-  const activeModelInfo = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
 
   const handleFileSelect = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -459,52 +446,11 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
           </Popover>
 
           {/* Model switcher */}
-          <Popover open={modelOpen} onOpenChange={setModelOpen}>
-            <PopoverTrigger asChild>
-              <button
-                className="flex items-center gap-1 px-2 py-1.5 rounded-lg border-0 bg-transparent text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
-                title="切换模型"
-              >
-                <Cpu className="w-4 h-4" />
-                <span className="text-[11px]">
-                  {activeModelInfo?.label ?? "智能路由"}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              sideOffset={8}
-              className="w-52 p-1.5"
-            >
-              <div className="space-y-0.5">
-                {AVAILABLE_MODELS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setSelectedModel(m.id);
-                      setModelOpen(false);
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors border-0 bg-transparent cursor-pointer",
-                      selectedModel === m.id
-                        ? "bg-black/[0.05] dark:bg-white/[0.08] text-foreground"
-                        : "text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
-                    )}
-                  >
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium">{m.label}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {m.description}
-                      </span>
-                    </div>
-                    {selectedModel === m.id && (
-                      <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+          <ModelSwitcher
+            value={selectedModel}
+            onChange={setSelectedModel}
+            size="sm"
+          />
 
           {/* Spacer + Send button */}
           <div className="flex-1" />

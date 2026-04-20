@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { renderScenarioTemplate } from "@/lib/scenario-template";
 import { ParticleBackground } from "@/components/shared/particle-background";
+import { ModelSwitcher, DEFAULT_MODEL_ID } from "@/components/shared/model-switcher";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
@@ -60,17 +61,15 @@ export function HomeClient({
   // ── State ──
   const [inputValue, setInputValue] = useState("");
   const [activeEmployee, setActiveEmployee] = useState<EmployeeId | null>(null);
-  const [selectedModel, setSelectedModel] = useState("auto");
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
   const [isRecording, setIsRecording] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [inlineScenario, setInlineScenario] = useState<ScenarioCardData | null>(null);
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Silence unused-var warnings for props/setters reserved for follow-ups.
+  // Silence unused-var warnings for props reserved for follow-ups.
   void _employeeDbIdMap;
-  void selectedModel;
-  void setSelectedModel;
 
   // Task 2.3 — custom-scenario localStorage migration is handled by the
   // "我的工作流" tab in <ScenarioGrid>, which reads from workflow_templates.
@@ -284,6 +283,12 @@ export function HomeClient({
             >
               <Paperclip size={16} />
             </button>
+            <span className="mx-1 h-4 w-px bg-border" />
+            <ModelSwitcher
+              value={selectedModel}
+              onChange={setSelectedModel}
+              size="sm"
+            />
           </div>
           <button
             onClick={chatOpen ? handleChatSend : handleSubmit}

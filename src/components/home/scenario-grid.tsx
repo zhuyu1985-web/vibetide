@@ -115,7 +115,7 @@ export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
   );
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-4">
       {/* Section header */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-foreground/80">
@@ -165,8 +165,8 @@ export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
         <p className="text-xs text-red-600">{directError}</p>
       )}
 
-      <Tabs defaultValue="featured" className="w-full">
-        <TabsList className="flex-wrap">
+      <Tabs defaultValue="featured" className="w-full gap-5">
+        <TabsList variant="glass" className="gap-0.5 max-w-full whitespace-nowrap">
           {TAB_ORDER.map((t) => (
             <TabsTrigger key={t.key} value={t.key}>
               {t.label}
@@ -177,7 +177,7 @@ export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
         {TAB_ORDER.map((tab) => {
           const list = templatesByTab[tab.key] ?? [];
           return (
-            <TabsContent key={tab.key} value={tab.key}>
+            <TabsContent key={tab.key} value={tab.key} className="mt-1">
               {list.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-sky-200 p-8 text-center text-sm text-muted-foreground">
                   <p>

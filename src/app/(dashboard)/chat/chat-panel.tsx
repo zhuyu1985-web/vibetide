@@ -64,6 +64,10 @@ import {
   IntentConfirmCard,
 } from "@/components/chat/intent-bubble";
 import { MessageActions } from "@/components/chat/message-actions";
+import {
+  ModelSwitcher,
+  DEFAULT_MODEL_ID,
+} from "@/components/shared/model-switcher";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Radar,
@@ -273,6 +277,7 @@ export function ChatPanel({
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
 
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1314,6 +1319,12 @@ export function ChatPanel({
                         <span className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-red-400/60 animate-[send-pulse_1.4s_ease-in-out_infinite]" />
                       )}
                     </button>
+                    <span className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
+                    <ModelSwitcher
+                      value={selectedModel}
+                      onChange={setSelectedModel}
+                      size="sm"
+                    />
                     <span className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
                     <div className="flex items-center gap-1 text-[11px] text-gray-400">
                       <Globe size={12} className="text-blue-500" />
