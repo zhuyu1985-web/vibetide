@@ -127,6 +127,7 @@ export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
     ownerEmployeeId: null,
     launchMode: "form",
     promptTemplate: null,
+    isFeatured: false,
   }));
 
   return [...rows, ...virtualRows];
@@ -341,6 +342,8 @@ export interface BuiltinSeedInput {
   launchMode?: "form" | "direct";
   /** Mustache 风格 prompt 模板 */
   promptTemplate?: string | null;
+  /** 主流场景 tab 标记；默认 false。仅内置预设会设为 true。 */
+  isFeatured?: boolean;
 }
 
 /**
@@ -376,6 +379,8 @@ export async function seedBuiltinTemplatesForOrg(
       ownerEmployeeId: seed.ownerEmployeeId ?? null,
       launchMode: seed.launchMode ?? "form",
       promptTemplate: seed.promptTemplate ?? null,
+      // 2026-04-20 homepage — "主流场景" tab 标识
+      isFeatured: seed.isFeatured ?? false,
     };
 
     // onConflictDoUpdate 规则：
@@ -396,6 +401,7 @@ export async function seedBuiltinTemplatesForOrg(
       triggerConfig: baseValues.triggerConfig,
       launchMode: baseValues.launchMode,
       promptTemplate: baseValues.promptTemplate,
+      isFeatured: baseValues.isFeatured,
       updatedAt: new Date(),
     };
 
