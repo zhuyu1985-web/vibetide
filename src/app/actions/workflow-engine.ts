@@ -3,6 +3,7 @@
 import { db } from "@/db";
 import { workflowTemplates } from "@/db/schema";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+import type { InputFieldDef } from "@/lib/types";
 import { eq, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -81,6 +82,9 @@ export async function updateWorkflowTemplate(
     description?: string;
     steps?: WorkflowStepDef[];
     content?: string;
+    inputFields?: InputFieldDef[];
+    launchMode?: "form" | "direct";
+    promptTemplate?: string;
   }
 ) {
   await requireAuth();
@@ -190,6 +194,9 @@ export async function saveWorkflow(data: {
   triggerType?: "manual" | "scheduled";
   triggerConfig?: { cron?: string; timezone?: string } | null;
   steps: WorkflowStepDef[];
+  inputFields?: InputFieldDef[];
+  launchMode?: "form" | "direct";
+  promptTemplate?: string;
 }) {
   const user = await requireAuth();
   const orgId = await getCurrentUserOrg();
@@ -208,6 +215,15 @@ export async function saveWorkflow(data: {
       isBuiltin: false,
       isEnabled: false,
       createdBy: user.id,
+      ...(data.inputFields !== undefined
+        ? { inputFields: data.inputFields }
+        : {}),
+      ...(data.launchMode !== undefined
+        ? { launchMode: data.launchMode }
+        : {}),
+      ...(data.promptTemplate !== undefined
+        ? { promptTemplate: data.promptTemplate }
+        : {}),
     })
     .returning();
 
@@ -227,6 +243,9 @@ export async function updateWorkflow(
     triggerType?: "manual" | "scheduled";
     triggerConfig?: { cron?: string; timezone?: string } | null;
     steps?: WorkflowStepDef[];
+    inputFields?: InputFieldDef[];
+    launchMode?: "form" | "direct";
+    promptTemplate?: string;
   }
 ) {
   await requireAuth();

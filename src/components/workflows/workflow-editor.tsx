@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -15,10 +16,12 @@ import { WorkflowCanvas } from "./workflow-canvas";
 import { RightPanel } from "./right-panel";
 import { BottomActionBar } from "./bottom-action-bar";
 import { ChatPanel } from "./chat-panel";
+import { InputFieldsEditor } from "./input-fields-editor";
 import { useWorkflowSteps } from "./use-workflow-steps";
 import { useTestRun } from "./use-test-run";
 import { saveWorkflow, updateWorkflow } from "@/app/actions/workflow-engine";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+import type { InputFieldDef } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +36,9 @@ interface WorkflowEditorProps {
     triggerType: string;
     triggerConfig?: { cron?: string; timezone?: string } | null;
     steps: WorkflowStepDef[];
+    inputFields?: InputFieldDef[];
+    launchMode?: "form" | "direct";
+    promptTemplate?: string;
   };
   mode: "create" | "edit";
 }
@@ -73,6 +79,17 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     initialData?.triggerConfig ?? null
   );
   const [isEnabled, setIsEnabled] = useState(false);
+
+  // ── Launch / input fields / prompt template ──
+  const [inputFields, setInputFields] = useState<InputFieldDef[]>(
+    initialData?.inputFields ?? []
+  );
+  const [launchMode, setLaunchMode] = useState<"form" | "direct">(
+    initialData?.launchMode ?? "form"
+  );
+  const [promptTemplate, setPromptTemplate] = useState<string>(
+    initialData?.promptTemplate ?? ""
+  );
 
   // ── Steps (custom hook) ──
   const stepsHook = useWorkflowSteps(initialData?.steps ?? []);
@@ -153,6 +170,9 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           triggerType,
           triggerConfig,
           steps: stepsHook.steps,
+          inputFields,
+          launchMode,
+          promptTemplate: promptTemplate.trim() || undefined,
         });
       } else {
         await saveWorkflow({
@@ -162,6 +182,9 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           triggerType,
           triggerConfig,
           steps: stepsHook.steps,
+          inputFields,
+          launchMode,
+          promptTemplate: promptTemplate.trim() || undefined,
         });
       }
       router.push("/workflows");
@@ -179,6 +202,9 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     triggerType,
     triggerConfig,
     stepsHook.steps,
+    inputFields,
+    launchMode,
+    promptTemplate,
     router,
   ]);
 
@@ -274,6 +300,22 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           </SelectContent>
         </Select>
 
+        <Select
+          value={launchMode}
+          onValueChange={(v) => {
+            setLaunchMode(v as "form" | "direct");
+            stepsHook.setHasChanges(true);
+          }}
+        >
+          <SelectTrigger className="w-[140px] h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="form">启动方式：表单</SelectItem>
+            <SelectItem value="direct">启动方式：直发</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex-1" />
       </div>
 
@@ -287,7 +329,31 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
 
         {/* ── Center: Canvas + Bottom Bar ── */}
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="space-y-4 rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
+              <InputFieldsEditor
+                value={inputFields}
+                onChange={(fields) => {
+                  setInputFields(fields);
+                  stepsHook.setHasChanges(true);
+                }}
+              />
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Prompt 模板</h3>
+                <Textarea
+                  value={promptTemplate}
+                  onChange={(e) => {
+                    setPromptTemplate(e.target.value);
+                    stepsHook.setHasChanges(true);
+                  }}
+                  placeholder="例：请追踪{{topic_title}}的最新进展……（Mustache 模板，占位符对应上方字段名）"
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  支持 Mustache 占位符：使用上方字段名包在双大括号内，例如 {"{{topic_title}}"}。
+                </p>
+              </div>
+            </div>
             <WorkflowCanvas
               triggerType={triggerType}
               triggerConfig={triggerConfig}
