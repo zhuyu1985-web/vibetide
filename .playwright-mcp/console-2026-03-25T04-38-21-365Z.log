@@ -1,8 +1,0 @@
-[   60408ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  120403ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  180403ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  240406ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  300402ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  360404ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  420400ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
-[  480399ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/inspiration/new-topics?since=2026-03-25T04%3A38%3A21.747Z:0
