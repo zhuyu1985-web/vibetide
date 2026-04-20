@@ -10,7 +10,7 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { validateInputs } from "@/lib/input-fields-validation";
 import type { InputFieldDef } from "@/lib/types";
 import { revalidatePath } from "next/cache";
-import { inngest } from "@/inngest/client";
+import { executeMissionDirect } from "@/lib/mission-executor";
 
 /**
  * Private auth guard — mirrors the inline `requireAuth` pattern used in
@@ -166,10 +166,27 @@ export async function startMissionFromTemplate(
     })
     .returning({ id: missions.id });
 
-  await inngest.send({
-    name: "mission/created",
-    data: { missionId: created.id, organizationId: orgId },
-  });
+  // Fire-and-forget inline execution（对齐 src/app/actions/missions.ts:170 的 startMission 老路径）：
+  // dev 环境下不依赖 Inngest dev server 也能推进 mission；production 同样走 executeMissionDirect。
+  executeMissionDirect(created.id, orgId)
+    .then(() => console.log(`[workflow-launch] mission ${created.id} completed`))
+    .catch(async (err) => {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[workflow-launch] mission ${created.id} failed:`, err);
+      await db
+        .update(missions)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+          finalOutput: {
+            error: true,
+            message: errorMsg,
+            failedAt: new Date().toISOString(),
+          },
+        })
+        .where(eq(missions.id, created.id))
+        .catch(() => {});
+    });
 
   revalidatePath("/missions");
   return { ok: true, missionId: created.id };
