@@ -48,6 +48,8 @@ export interface BuiltinWorkflowSeed {
   systemInstruction?: string;
   /** Mustache 风格 prompt 模板，含 {{field_name}} 占位 */
   promptTemplate?: string;
+  /** 主流场景 tab 标记；默认 false。 */
+  isFeatured?: boolean;
 }
 
 // ─── Step builder helper ──────────────────────────────────────────────────
@@ -1355,6 +1357,8 @@ function toBuiltinSeedInput(w: BuiltinWorkflowSeed): BuiltinSeedInput {
     ownerEmployeeId: w.ownerEmployeeId,
     launchMode: w.launchMode,
     promptTemplate: w.promptTemplate ?? null,
+    // 2026-04-20 homepage
+    isFeatured: w.isFeatured ?? false,
   };
 }
 
