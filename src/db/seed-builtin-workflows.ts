@@ -561,6 +561,536 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(4, "话题标签推荐", "publish_strategy", "发布策略", "management", "tags"),
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // xiaowen 文字深稿师 · 2 条（深度写作）
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "analysis",
+    name: "深度分析稿",
+    description: "围绕选题产出多维度深度分析稿，含情感倾向与多方观点融合。",
+    icon: "file-text",
+    category: "deep",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaoce", "xiaoshen"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic",
+        label: "主题",
+        type: "text",
+        required: true,
+        placeholder: "如:新能源汽车出口新政解读",
+      },
+      {
+        name: "angle",
+        label: "分析角度",
+        type: "select",
+        required: true,
+        placeholder: "选择分析角度",
+        options: [
+          { value: "policy", label: "政策解读" },
+          { value: "data", label: "数据洞察" },
+          { value: "industry", label: "产业视角" },
+          { value: "impact", label: "社会影响" },
+        ],
+      },
+      {
+        name: "deadline",
+        label: "截稿日期",
+        type: "date",
+        required: false,
+      },
+    ],
+    systemInstruction:
+      "围绕「{{topic}}」从 {{angle}} 视角产出深度分析稿,截稿 {{deadline}}。结构:1) 现象 / 事实速览 2) 核心矛盾梳理 3) 多方观点对比 4) 情感倾向分析 5) 结论与行动建议。",
+    promptTemplate:
+      "就「{{topic}}」从 {{angle}} 做深度分析稿,{{deadline}} 前交稿。",
+    steps: [
+      step(1, "多源网页深读", "web_deep_read", "网页深读", "perception", "read"),
+      step(2, "情感倾向分析", "sentiment_analysis", "情感分析", "analysis", "sentiment"),
+      step(3, "深度分析稿撰写", "content_generate", "内容生成", "generation", "write"),
+      step(4, "成稿质量复核", "quality_review", "质量审核", "management", "review"),
+    ],
+  },
+
+  {
+    slug: "data_journalism",
+    name: "数据新闻",
+    description: "以数据驱动的新闻叙事,含数据清洗、可视化选型与解读。",
+    icon: "bar-chart",
+    category: "deep",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaoshu", "xiaozi"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "data_topic",
+        label: "数据主题",
+        type: "text",
+        required: true,
+        placeholder: "如:2026 Q1 中国电动车销量地图",
+      },
+      {
+        name: "data_source_url",
+        label: "数据源 URL",
+        type: "url",
+        required: false,
+        placeholder: "https://...",
+      },
+      {
+        name: "presentation_forms",
+        label: "呈现形式",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "table", label: "数据表格" },
+          { value: "chart", label: "图表可视化" },
+          { value: "timeline", label: "时间轴叙事" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "针对「{{data_topic}}」产出数据新闻,数据来源 {{data_source_url}},呈现形式 {{presentation_forms}}。结构:1) 核心结论 2) 数据表格 3) 图表建议(注明图种 / 字段映射) 4) 记者解读 5) 数据局限性说明。",
+    promptTemplate:
+      "基于「{{data_topic}}」({{data_source_url}}) 产出数据新闻,呈现 {{presentation_forms}}。",
+    steps: [
+      step(1, "数据源背景搜索", "web_search", "全网搜索", "perception", "search"),
+      step(2, "数据报告生成", "data_report", "数据报告", "analysis", "data"),
+      step(3, "排版布局设计", "layout_design", "排版设计", "generation", "layout"),
+      step(4, "数据新闻撰写", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // xiaojian 视频剪辑师 · 3 条(视频)
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "vlog_edit",
+    name: "Vlog 剪辑",
+    description: "面向博主 / 记者 Vlog 的剪辑方案,含节奏、配乐与封面一条龙。",
+    icon: "film",
+    category: "video",
+    ownerEmployeeId: "xiaojian",
+    defaultTeam: ["xiaojian", "xiaozi"],
+    appChannelSlug: "app_variety",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic",
+        label: "主题",
+        type: "text",
+        required: true,
+        placeholder: "如:我的一天 · 深圳科技展打卡",
+      },
+      {
+        name: "duration_sec",
+        label: "时长(秒)",
+        type: "number",
+        required: true,
+        defaultValue: 180,
+        validation: { min: 10, max: 1800 },
+      },
+      {
+        name: "pace_style",
+        label: "剪辑节奏",
+        type: "select",
+        required: false,
+        placeholder: "选择节奏",
+        options: [
+          { value: "fast", label: "快节奏卡点" },
+          { value: "smooth", label: "舒适平滑" },
+          { value: "cinematic", label: "电影感慢镜" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "为 Vlog「{{topic}}」(时长 {{duration_sec}} 秒,节奏 {{pace_style}}) 出剪辑方案。结构:1) 分镜表(含时长 / 景别 / 转场) 2) 配乐建议(BPM / 情绪) 3) 封面设计方向 4) 字幕与花字节奏。",
+    promptTemplate:
+      "为 Vlog「{{topic}}」出 {{duration_sec}} 秒 {{pace_style}} 剪辑方案。",
+    steps: [
+      step(1, "视频剪辑分镜规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
+      step(2, "配乐与音效规划", "audio_plan", "音频规划", "generation", "audio"),
+      step(3, "封面生成方案", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+    ],
+  },
+
+  {
+    slug: "short_video",
+    name: "短视频",
+    description: "面向抖音 / 视频号的竖屏短视频剪辑方案,强调前 3 秒钩子。",
+    icon: "video",
+    category: "video",
+    ownerEmployeeId: "xiaojian",
+    defaultTeam: ["xiaojian", "xiaozi", "xiaofa"],
+    appChannelSlug: "app_variety",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic",
+        label: "主题",
+        type: "text",
+        required: true,
+        placeholder: "如:30 秒看懂新能源补贴新政",
+      },
+      {
+        name: "duration_sec",
+        label: "时长(秒)",
+        type: "number",
+        required: true,
+        defaultValue: 45,
+        validation: { min: 10, max: 1800 },
+      },
+      {
+        name: "music_style",
+        label: "配乐风格",
+        type: "select",
+        required: false,
+        placeholder: "选择配乐风格",
+        options: [
+          { value: "trending", label: "热门卡点" },
+          { value: "emotional", label: "情绪感染" },
+          { value: "news", label: "新闻陈述" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "为短视频「{{topic}}」(时长 {{duration_sec}} 秒,配乐 {{music_style}}) 出剪辑方案。必须:1) 前 3 秒钩子 2) 竖屏构图 3) 字幕驱动信息密度 4) 结尾引导互动。",
+    promptTemplate:
+      "为短视频「{{topic}}」出 {{duration_sec}} 秒竖屏方案,配乐 {{music_style}}。",
+    steps: [
+      step(1, "分镜与钩子规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
+      step(2, "配乐规划", "audio_plan", "音频规划", "generation", "audio"),
+      step(3, "竖屏封面生成", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+    ],
+  },
+
+  {
+    slug: "doc_video",
+    name: "纪录片",
+    description: "中长篇纪录片剪辑方案,含章节结构、叙事弧与配乐分层。",
+    icon: "file-video",
+    category: "video",
+    ownerEmployeeId: "xiaojian",
+    defaultTeam: ["xiaojian", "xiaowen", "xiaozi"],
+    appChannelSlug: "app_variety",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic",
+        label: "主题",
+        type: "text",
+        required: true,
+        placeholder: "如:一座城市的夜:深圳凌晨 3 点",
+      },
+      {
+        name: "duration_sec",
+        label: "时长(秒)",
+        type: "number",
+        required: true,
+        defaultValue: 900,
+        validation: { min: 10, max: 1800 },
+      },
+      {
+        name: "narrative_style",
+        label: "叙事风格",
+        type: "select",
+        required: false,
+        placeholder: "选择叙事风格",
+        options: [
+          { value: "observational", label: "观察式" },
+          { value: "expository", label: "解说式" },
+          { value: "poetic", label: "诗意化" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "为纪录片「{{topic}}」(时长 {{duration_sec}} 秒,风格 {{narrative_style}}) 出剪辑方案。结构:1) 章节(≥3 幕) 2) 叙事弧与高潮设计 3) 分层配乐(环境 / 主题 / 情绪) 4) 关键画面封面。",
+    promptTemplate:
+      "为纪录片「{{topic}}」出 {{duration_sec}} 秒 {{narrative_style}} 方案。",
+    steps: [
+      step(1, "章节与分镜规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
+      step(2, "分层配乐规划", "audio_plan", "音频规划", "generation", "audio"),
+      step(3, "代表画面封面", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+      step(4, "成片质量复核", "quality_review", "质量审核", "management", "review"),
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // xiaoshen 审核员 · 2 条(审)
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "fact_check",
+    name: "事实核查",
+    description: "针对待核查文本做多源交叉验证,输出信源置信度报告。",
+    icon: "shield-check",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen", "xiaolei"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "text_to_check",
+        label: "待核查文本",
+        type: "textarea",
+        required: true,
+        placeholder: "粘贴需要核查的文本内容",
+      },
+      {
+        name: "check_depth",
+        label: "核查深度",
+        type: "select",
+        required: false,
+        placeholder: "standard",
+        options: [
+          { value: "fast", label: "快速(关键事实)" },
+          { value: "standard", label: "标准(逐条核查)" },
+          { value: "deep", label: "深度(含引文溯源)" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "针对待核查文本做 {{check_depth}} 层核查。输出:1) 事实清单(含可疑项标红) 2) 多源交叉验证结果 3) 信源置信度打分 4) 修正建议摘要。",
+    promptTemplate:
+      "对下述文本做 {{check_depth}} 核查:\n\n{{text_to_check}}",
+    steps: [
+      step(1, "多源网络搜索取证", "web_search", "全网搜索", "perception", "search"),
+      step(2, "事实逐条核查", "fact_check", "事实核查", "management", "verify"),
+      step(3, "核查报告摘要", "summary_generate", "摘要生成", "generation", "summary"),
+    ],
+  },
+
+  {
+    slug: "compliance_review",
+    name: "合规审查",
+    description: "对待发内容做政治 / 广告 / 敏感词多维合规审查。",
+    icon: "shield-alert",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen", "xiaofa"],
+    appChannelSlug: "app_news",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "content_to_review",
+        label: "待审内容",
+        type: "textarea",
+        required: true,
+        placeholder: "粘贴需要合规审查的内容",
+      },
+      {
+        name: "review_dimensions",
+        label: "审查维度",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "politics", label: "政治导向" },
+          { value: "advertising", label: "广告法合规" },
+          { value: "sensitive", label: "敏感词过滤" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "对待审内容按 {{review_dimensions}} 维度做合规审查。输出:1) 总体评级(通过 / 修改后通过 / 不通过) 2) 问题清单(含原文定位 / 风险等级 / 整改建议) 3) 替代表达建议。",
+    promptTemplate:
+      "对下述内容做 {{review_dimensions}} 合规审查:\n\n{{content_to_review}}",
+    steps: [
+      step(1, "合规多维扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(2, "整改建议复核", "quality_review", "质量审核", "management", "review"),
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // xiaofa 分发员 · 2 条(发)
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "multi_platform",
+    name: "全平台分发",
+    description: "基于既有稿件按各平台规则自动改写并生成发布策略。",
+    icon: "send",
+    category: "distribution",
+    ownerEmployeeId: "xiaofa",
+    defaultTeam: ["xiaofa", "xiaozi"],
+    appChannelSlug: "app_home",
+    launchMode: "direct",
+    inputFields: [],
+    systemInstruction:
+      "针对当前待分发稿件,自动识别可分发平台(APP / 微信 / 微博 / 抖音 / 视频号),按各平台规则改写文案并生成发布时序与策略。输出:1) 各平台改写稿 2) 发布时序 3) 互动引导 4) 风险提示。",
+    promptTemplate:
+      "把当前稿件按各平台规则自动改写并生成分发策略。",
+    steps: [
+      step(1, "多平台差异化改写", "style_rewrite", "风格改写", "generation", "rewrite"),
+      step(2, "发布策略生成", "publish_strategy", "发布策略", "management", "strategy"),
+    ],
+  },
+
+  {
+    slug: "channel_adapt",
+    name: "单渠道适配",
+    description: "针对指定平台做深度文案适配,含平台化标题与发布策略。",
+    icon: "share",
+    category: "distribution",
+    ownerEmployeeId: "xiaofa",
+    defaultTeam: ["xiaofa", "xiaozi"],
+    appChannelSlug: "app_home",
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "target_platform",
+        label: "目标平台",
+        type: "select",
+        required: true,
+        placeholder: "选择目标平台",
+        options: [
+          { value: "app", label: "APP" },
+          { value: "wechat", label: "微信公众号" },
+          { value: "weibo", label: "微博" },
+          { value: "douyin", label: "抖音" },
+        ],
+      },
+      {
+        name: "source_article_id",
+        label: "原稿件 ID",
+        type: "text",
+        required: false,
+        placeholder: "粘贴已有稿件 ID(可选)",
+      },
+    ],
+    systemInstruction:
+      "将原稿件 {{source_article_id}} 深度适配为 {{target_platform}} 平台版本。产出:1) 3 个平台化候选标题 2) 平台风格改写稿 3) 发布时段与话题建议。",
+    promptTemplate:
+      "把稿件 {{source_article_id}} 深度适配为 {{target_platform}} 版本。",
+    steps: [
+      step(1, "平台风格改写", "style_rewrite", "风格改写", "generation", "rewrite"),
+      step(2, "平台化标题生成", "headline_generate", "标题生成", "generation", "headline"),
+      step(3, "发布策略生成", "publish_strategy", "发布策略", "management", "strategy"),
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // xiaoshu 数据分析师 · 3 条(数)
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "daily_brief",
+    name: "每日数据日报",
+    description: "每日定时生成核心数据日报,覆盖阅读 / 互动 / 转化 / 舆情。",
+    icon: "trending-up",
+    category: "daily_brief",
+    ownerEmployeeId: "xiaoshu",
+    defaultTeam: ["xiaoshu", "xiaowen"],
+    appChannelSlug: null,
+    launchMode: "direct",
+    inputFields: [],
+    systemInstruction:
+      "生成今日数据日报。结构:1) 核心指标速览(阅读 / 互动 / 转化) 2) 热点舆情摘要 3) 同环比趋势 4) 异动预警 5) 明日关注点。",
+    promptTemplate:
+      "生成今日数据日报,覆盖核心指标与舆情速览。",
+    steps: [
+      step(1, "数据指标拉取", "data_report", "数据报告", "analysis", "data"),
+      step(2, "日报摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
+      step(3, "日报排版设计", "layout_design", "排版设计", "generation", "layout"),
+    ],
+  },
+
+  {
+    slug: "weekly_report",
+    name: "周度数据周报",
+    description: "按周产出数据周报,含受众分析与多指标趋势对比。",
+    icon: "calendar",
+    category: "daily_brief",
+    ownerEmployeeId: "xiaoshu",
+    defaultTeam: ["xiaoshu", "xiaowen", "xiaoce"],
+    appChannelSlug: null,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "period",
+        label: "数据周期",
+        type: "daterange",
+        required: true,
+      },
+      {
+        name: "metrics",
+        label: "关注指标",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "reading", label: "阅读" },
+          { value: "interaction", label: "互动" },
+          { value: "conversion", label: "转化" },
+          { value: "sentiment", label: "舆情" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "针对 {{period}} 产出数据周报,关注指标 {{metrics}}。结构:1) 本周关键数据 2) 受众画像变化 3) Top 稿件 / 话题榜 4) 异动解读 5) 下周行动建议。",
+    promptTemplate:
+      "针对 {{period}} 产出周报,关注 {{metrics}}。",
+    steps: [
+      step(1, "周度数据拉取", "data_report", "数据报告", "analysis", "data"),
+      step(2, "受众画像分析", "audience_analysis", "受众分析", "analysis", "audience"),
+      step(3, "周报摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
+      step(4, "周报排版设计", "layout_design", "排版设计", "generation", "layout"),
+    ],
+  },
+
+  {
+    slug: "benchmark_analysis",
+    name: "同题对标分析",
+    description: "围绕指定主题对标竞品账号,输出多维度差距分析。",
+    icon: "target",
+    category: "analytics",
+    ownerEmployeeId: "xiaoshu",
+    defaultTeam: ["xiaoshu", "xiaolei", "xiaoce"],
+    appChannelSlug: null,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "analysis_topic",
+        label: "分析主题",
+        type: "text",
+        required: true,
+        placeholder: "如:AI 新政报道对标",
+      },
+      {
+        name: "competitor_accounts",
+        label: "竞品账号",
+        type: "textarea",
+        required: false,
+        placeholder: "一行一个账号,可带平台前缀(weibo: xxx)",
+      },
+      {
+        name: "dimensions",
+        label: "分析维度",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "headline", label: "标题" },
+          { value: "cover", label: "配图" },
+          { value: "timing", label: "时效" },
+          { value: "interaction", label: "互动" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕「{{analysis_topic}}」对标 {{competitor_accounts}},从 {{dimensions}} 维度分析。输出:1) 对标矩阵表 2) 我方表现评分 3) 差距 Top 3 4) 可复用的优秀做法 5) 改进行动清单。",
+    promptTemplate:
+      "就「{{analysis_topic}}」对标 {{competitor_accounts}},分析 {{dimensions}}。",
+    steps: [
+      step(1, "竞品媒资搜索", "media_search", "媒资搜索", "perception", "search"),
+      step(2, "受众对比分析", "audience_analysis", "受众分析", "analysis", "audience"),
+      step(3, "热度评分对比", "heat_scoring", "热度评分", "analysis", "score"),
+      step(4, "对标报告摘要", "summary_generate", "摘要生成", "generation", "summary"),
+    ],
+  },
 ];
 
 // ─── 向后兼容 export ──────────────────────────────────────────────────────
