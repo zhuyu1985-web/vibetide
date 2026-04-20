@@ -11,16 +11,18 @@ config({ path: ".env.local" });
 config();
 
 async function main() {
-  const sqlPath = path.resolve(
-    __dirname,
-    "../supabase/migrations/0029_catchup_hand_written_migrations.sql",
-  );
+  // 可通过命令行参数指定 SQL 文件，默认 0029_catchup_hand_written_migrations.sql。
+  const argPath = process.argv[2];
+  const sqlPath = argPath
+    ? path.resolve(process.cwd(), argPath)
+    : path.resolve(__dirname, "../supabase/migrations/0029_catchup_hand_written_migrations.sql");
+  const fileName = path.basename(sqlPath);
   const sql = fs.readFileSync(sqlPath, "utf-8");
 
   const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
   try {
-    console.log("执行 0029_catchup_hand_written_migrations.sql...");
+    console.log(`执行 ${fileName}...`);
     // 按 --> statement-breakpoint 拆分并逐条执行
     const statements = sql
       .split("--> statement-breakpoint")

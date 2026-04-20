@@ -211,6 +211,13 @@
       "when": 1776654294895,
       "tag": "0029_catchup_hand_written_migrations",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776671953470,
+      "tag": "0030_workflow_templates_featured",
+      "breakpoints": true
     }
   ]
 }
