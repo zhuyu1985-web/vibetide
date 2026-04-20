@@ -86,6 +86,8 @@ export const workflowTemplates = pgTable("workflow_templates", {
   ownerEmployeeId: text("owner_employee_id"),
   launchMode: text("launch_mode").notNull().default("form"),
   promptTemplate: text("prompt_template"),
+  // 2026-04-20 homepage scenario tabs — "主流场景" tab 过滤字段
+  isFeatured: boolean("is_featured").notNull().default(false),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
