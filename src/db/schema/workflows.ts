@@ -81,6 +81,12 @@ export const workflowTemplates = pgTable("workflow_templates", {
   // dispatchers) read from here or the file, whichever is newer.
   content: text("content").default(""),
 
+  // 2026-04-20 realignment
+  isPublic: boolean("is_public").notNull().default(true),
+  ownerEmployeeId: text("owner_employee_id"),
+  launchMode: text("launch_mode").notNull().default("form"),
+  promptTemplate: text("prompt_template"),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

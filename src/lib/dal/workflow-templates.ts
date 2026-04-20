@@ -122,6 +122,11 @@ export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
     legacyScenarioKey: null,
     // 2026-04-20 规格文档（baoyu SKILL.md body）— virtual rows 暂时空串
     content: "",
+    // 2026-04-20 realignment — virtual rows 默认值
+    isPublic: true,
+    ownerEmployeeId: null,
+    launchMode: "form",
+    promptTemplate: null,
   }));
 
   return [...rows, ...virtualRows];

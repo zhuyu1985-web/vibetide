@@ -39,7 +39,6 @@ export * from "./advisor-tests";
 export * from "./skill-files";
 export * from "./skill-versions";
 export * from "./skill-usage-records";
-export * from "./employee-scenarios";
 export * from "./hot-topic-crawl-logs";
 export * from "./saved-conversations";
 

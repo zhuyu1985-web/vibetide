@@ -16,6 +16,7 @@ import {
   missionMessageTypeEnum,
   missionPhaseEnum,
 } from "./enums";
+import { workflowTemplates } from "./workflows";
 
 // ─── Missions (task sessions — replaces workflow_instances + teams) ───
 
@@ -59,6 +60,9 @@ export const missions = pgTable("missions", {
   // Deferred reference (no .references()) to avoid circular import with ./workflows.
   // FK constraint is enforced in the DB migration layer (missions_workflow_template_id_fkey).
   workflowTemplateId: uuid("workflow_template_id"),
+
+  // 2026-04-20 realignment: serialized scenario input form values.
+  inputParams: jsonb("input_params").$type<Record<string, unknown>>().default({}).notNull(),
 
   // Token budget
   tokenBudget: integer("token_budget").notNull().default(200000),
@@ -199,6 +203,12 @@ export const missionsRelations = relations(missions, ({ one, many }) => ({
   leader: one(aiEmployees, {
     fields: [missions.leaderEmployeeId],
     references: [aiEmployees.id],
+  }),
+  // 2026-04-20 realignment: relation so Phase 4 can
+  // `findMany({ with: { workflowTemplate: true } })`.
+  workflowTemplate: one(workflowTemplates, {
+    fields: [missions.workflowTemplateId],
+    references: [workflowTemplates.id],
   }),
   tasks: many(missionTasks),
   messages: many(missionMessages),
