@@ -230,3 +230,6 @@ channel_overrides:
 - 测试：[src/lib/cms/__tests__/publish/](../../src/lib/cms/__tests__/publish/)（`publish-article.test.ts` / `request-hash.test.ts`）
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
 - 关联 skill：[cms_catalog_sync](../cms_catalog_sync/SKILL.md)（栏目映射前置）
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+

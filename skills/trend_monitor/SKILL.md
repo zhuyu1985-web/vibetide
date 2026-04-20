@@ -112,3 +112,9 @@ compatibleRoles:
 - **小雷（热点猎手）**：接收趋势报告，决策是否启动热点追踪工作流
 - **小策（内容策划师）**：接收S/A级热点作为选题池输入，制定内容排期
 - **小数（数据分析师）**：接收热度数据用于内容表现预测和ROI估算
+
+## 参考资料
+
+- **趋势检测方法论**：[./references/trend-detection-methods.md](./references/trend-detection-methods.md)
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/trend_monitor/SKILL.md`

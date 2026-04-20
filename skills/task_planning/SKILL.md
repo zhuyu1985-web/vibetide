@@ -146,3 +146,8 @@ Phase 5 (210-230min)：发布策略制定
 - **工作流引擎**：接收任务规划方案，自动创建工作流实例并按步骤调度执行
 - **全部AI员工**：根据分配结果接收各自的子任务
 - **小策（选题策划师）**：在规划阶段协作确认选题方向和内容策略
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/task_planning/SKILL.md`

@@ -129,3 +129,8 @@ compatibleRoles:
 | **下游输出** | 小策（选题策划师） | 将差异化机会转化为具体选题方向 |
 | **下游输出** | 小数（数据分析师） | 竞品数据纳入定期分析报告，追踪竞争态势变化 |
 | **下游输出** | 小发（渠道运营师） | 基于竞品平台分布调整渠道投入策略 |
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/competitor_analysis/SKILL.md`

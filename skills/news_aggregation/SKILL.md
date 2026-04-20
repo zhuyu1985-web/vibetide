@@ -119,3 +119,9 @@ compatibleRoles:
 - **小策（内容策划师）**：接收聚合新闻作为内容策划的事实基础和素材来源
 - **小文（内容创作者）**：接收新闻摘要和数据，作为文章写作的引用材料
 - **小资（资产管理师）**：接收高质量新闻内容入库，丰富知识库资产
+
+## 参考资料
+
+- **去重与事件归档规则**：[./references/deduplication-and-merging.md](./references/deduplication-and-merging.md)
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/news_aggregation/SKILL.md`

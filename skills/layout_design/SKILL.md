@@ -139,3 +139,8 @@ compatibleRoles:
 | 下游输出 | 小审（质量审核） | 审核排版方案是否符合品牌规范 |
 | 下游输出 | 小发（渠道分发） | 根据排版规范在各平台落地发布 |
 | 协同配合 | 小剑（视频制作） | 视频中引用图文内容时保持排版风格一致 |
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/layout_design/SKILL.md`

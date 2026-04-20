@@ -164,3 +164,9 @@ compatibleRoles:
 - **工作流引擎**：接收发布时间表，按计划自动触发各渠道的定时发布任务
 - **小雷（热点猎手）**：发布后的传播数据反馈，用于后续热点监测校准
 - **小书（数据分析师）**：接收发布策略元数据，纳入传播效果归因分析
+
+## 参考资料
+
+- **多渠道运营手册**：[./references/publishing-playbook.md](./references/publishing-playbook.md)（9 平台特性 + 最佳时机 + 账号矩阵 + 效果预估 + 紧急预案）
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/publish_strategy/SKILL.md`

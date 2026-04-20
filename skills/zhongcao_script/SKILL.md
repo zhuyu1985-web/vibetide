@@ -261,3 +261,6 @@ douyin_style:
 - 子模板规范：[src/lib/agent/skills/zhongcao-subtemplates.ts](../../src/lib/agent/skills/zhongcao-subtemplates.ts)（stub，待 follow-up 填充）
 - 合规扫描：[src/lib/compliance/ad-law-scanner.ts](../../src/lib/compliance/ad-law-scanner.ts)
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md) · 历史：`git log --follow skills/zhongcao_script/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+

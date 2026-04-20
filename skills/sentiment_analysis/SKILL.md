@@ -113,3 +113,9 @@ compatibleRoles:
 | **下游输出** | 小审（质量审核官） | 情感分析结果作为审核维度之一，负面情绪过强时触发人工复核 |
 | **下游输出** | 小数（数据分析师） | 将情感数据纳入内容表现分析，追踪不同情感基调与互动率的关联 |
 | **下游输出** | 小策（选题策划师） | 基于受众评论的情感分析结果优化后续选题方向 |
+
+## 参考资料
+
+- **情感维度与中立判定**：[./references/sentiment-dimensions-extended.md](./references/sentiment-dimensions-extended.md)
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/sentiment_analysis/SKILL.md`

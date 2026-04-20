@@ -112,3 +112,8 @@ compatibleRoles:
 
 - **上游输入**：小策（选题策划师）提供选题方向和创作主题作为检索查询；小雷（热点猎手）提供热点关键词触发知识补充检索
 - **下游输出**：检索结果供小文（内容创作师）作为创作参考素材；供小审（质量审核官）作为事实核查的知识依据；供小资（素材管家）自身在素材整合流程中补充背景知识
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/knowledge_retrieval/SKILL.md`

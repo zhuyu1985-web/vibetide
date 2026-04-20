@@ -130,3 +130,8 @@ compatibleRoles:
 | 下游输出 | 小发（渠道分发） | 接收封面方案用于各平台发布配图 |
 | 下游输出 | 排版设计技能 | 封面风格与正文排版保持视觉统一 |
 | 协同配合 | 小剑（视频制作） | 视频封面与视频内容风格一致 |
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/thumbnail_generate/SKILL.md`

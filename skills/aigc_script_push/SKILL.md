@@ -211,3 +211,6 @@ submission_timeout_extra_hours: 2
 - 测试目录：[src/lib/cms/__tests__/](../../src/lib/cms/__tests__/)
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
 - 历史版本：`git log --follow skills/aigc_script_push/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+

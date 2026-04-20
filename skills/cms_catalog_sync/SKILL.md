@@ -213,3 +213,6 @@ notify_recipients: [ops@example.com]
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
 - 测试：[src/lib/cms/__tests__/catalog-sync/](../../src/lib/cms/__tests__/catalog-sync/)
 - 历史版本：`git log --follow skills/cms_catalog_sync/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+

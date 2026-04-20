@@ -125,3 +125,8 @@ compatibleRoles:
 
 - **上游输入**：小策（选题策划师）提供内容方向和素材需求描述；小文（内容创作师）在创作过程中按需发起素材检索请求
 - **下游输出**：检索到的素材供小文（内容创作师）嵌入文章；供小剪（视频制片人）剪辑使用；供小发（渠道运营师）在分发时选择渠道适配封面图
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/media_search/SKILL.md`

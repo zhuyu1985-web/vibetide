@@ -160,3 +160,8 @@ compatibleRoles:
 
 - **上游输入**：小雷（热点猎手）提供热点话题和热度评分；小数（数据分析师）提供受众数据和历史内容表现
 - **下游输出**：小文（内容写手）根据选定角度和大纲进行内容创作；小剪（视频导演）根据角度设计视频脚本方向
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/angle_design/SKILL.md`

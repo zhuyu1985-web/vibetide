@@ -136,3 +136,8 @@ compatibleRoles:
 | 下游输出 | 小审（质量审核） | 审核分镜方案的合规性和质量 |
 | 下游输出 | 小发（渠道分发） | 接收成片后执行多平台分发 |
 | 协同配合 | 音频方案技能 | 配乐音效方案与音频方案技能联动 |
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/video_edit_plan/SKILL.md`

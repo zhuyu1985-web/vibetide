@@ -133,3 +133,9 @@ compatibleRoles:
 | **下游输出** | 小策（选题策划师） | 基于受众分群结果制定差异化选题策略 |
 | **下游输出** | 小文（内容创作师） | 依据受众画像调整写作风格和内容深度 |
 | **下游输出** | 小发（渠道运营师） | 基于受众行为模式优化发布时间和平台选择 |
+
+## 参考资料
+
+- **画像模板库**：[./references/persona-template-library.md](./references/persona-template-library.md)
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/audience_analysis/SKILL.md`

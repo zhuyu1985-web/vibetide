@@ -163,3 +163,8 @@ Generate a summary report in this format:
 
 ### references/
 - [framework-detection.md](references/framework-detection.md) — Framework detection table, TypeScript check commands, and common error patterns
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/page-qa-fix/SKILL.md`

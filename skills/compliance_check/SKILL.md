@@ -139,3 +139,9 @@ compatibleRoles:
 - **小文（内容创作师）**：接收合规问题清单，按建议修改后重新提交
 - **小发（渠道运营师）**：合规通过的内容进入发布策略制定环节
 - **工作流引擎**：合规检查结果作为质量门禁，不通过则阻断发布流程
+
+## 参考资料
+
+- **详细合规检查清单**：[./references/compliance-checklist-detailed.md](./references/compliance-checklist-detailed.md)（4 大类违规清单 + 词库 + 扫描策略 + 档位阈值）
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/compliance_check/SKILL.md`

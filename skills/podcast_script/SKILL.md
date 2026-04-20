@@ -253,3 +253,6 @@ enable_ssml: true
 - 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)（通用 agent 执行入口；skill 逻辑通过 prompt 驱动）
 - 子模板规范：[src/lib/agent/skills/podcast-subtemplates.ts](../../src/lib/agent/skills/podcast-subtemplates.ts)（stub，待 follow-up 填充）
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md) · 历史：`git log --follow skills/podcast_script/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+

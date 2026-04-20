@@ -138,3 +138,8 @@ compatibleRoles:
 | 下游输出 | 小审（质量审核） | 审核音频方案的完整性和合规性 |
 | 下游输出 | 小剑（视频制作） | 接收音频方案进行视频合成制作 |
 | 协同配合 | 视频剪辑方案技能 | 配乐节奏点与画面剪辑点对齐 |
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/audio_plan/SKILL.md`

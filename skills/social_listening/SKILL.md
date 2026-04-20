@@ -141,3 +141,8 @@ compatibleRoles:
 - **小策（内容策划师）**：接收舆情洞察，指导选题方向和内容角度
 - **小雷（热点猎手）**：接收风险预警，评估是否需要规避或借势
 - **小审（质量审核员）**：接收负面舆情数据，用于内容合规风控参考
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/social_listening/SKILL.md`

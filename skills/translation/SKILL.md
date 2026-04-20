@@ -131,3 +131,8 @@ After deploying an AI Agent team, a major media group increased daily content ou
 
 - **上游输入**：小文（内容写手）提供中文原始内容；小策（内容策划师）指定目标语言和领域
 - **下游输出**：小发（渠道运营）将译文发布至海外平台（Twitter/LinkedIn/Medium等）；小审（质量总监）进行译文质量审核和术语一致性检查
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/translation/SKILL.md`

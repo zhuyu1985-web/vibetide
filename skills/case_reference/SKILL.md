@@ -155,3 +155,8 @@ compatibleRoles:
 
 - **上游输入**：小策（选题策划师）提供选题方向和创作主题；小雷（热点猎手）提供热点事件关键词触发相关案例检索
 - **下游输出**：案例分析报告供小策（选题策划师）优化选题角度；供小文（内容创作师）作为创作风格和结构的参考模板；供小发（渠道运营师）参考爆款的发布策略和时间选择
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/case_reference/SKILL.md`

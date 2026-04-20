@@ -133,3 +133,9 @@ compatibleRoles:
 | **下游输出** | 小数（数据分析师） | 热度数据纳入内容表现分析，追踪"热度-阅读量"相关性 |
 | **下游输出** | 小发（渠道运营师） | 基于话题热度等级和趋势调整各渠道发布优先级 |
 | **下游输出** | 小审（质量审核官） | S级话题内容进入加急审核通道，缩短审核时间 |
+
+## 参考资料
+
+- **热度算法公式与基准**：[./references/heat-algorithm-formulas.md](./references/heat-algorithm-formulas.md)
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/heat_scoring/SKILL.md`

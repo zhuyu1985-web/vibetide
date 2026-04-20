@@ -218,3 +218,8 @@ compatibleRoles:
 - 小雷（热点猎手）：用于判断是否值得继续追踪
 - 小策（内容策划师）：用于沉淀选题背景、事实依据与角度
 - 小资（素材管家）：用于收集优质来源与候选资料
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/web_search/SKILL.md`

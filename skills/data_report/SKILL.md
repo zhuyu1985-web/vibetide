@@ -149,3 +149,8 @@ compatibleRoles:
 
 - **上游输入**：小发（渠道运营师）提供各渠道的发布记录和基础传播数据；各AI员工的工作流产出内容作为分析对象
 - **下游输出**：周报/月报供小策（选题策划师）调整下期选题方向；渠道效果对比供小发（渠道运营师）优化分发策略；爆款归因分析供小文（内容创作师）改进创作方法；异常预警供团队管理者及时干预
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/data_report/SKILL.md`

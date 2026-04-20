@@ -56,3 +56,8 @@ compatibleRoles:
 | 提取准确性 | 正文内容完整无遗漏 | 40% |
 | 格式清洁度 | 无广告、导航等噪音 | 30% |
 | 结构保留 | 保留标题层级和段落结构 | 30% |
+
+## 参考资料
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 历史版本：`git log --follow skills/web_deep_read/SKILL.md`
