@@ -5,6 +5,7 @@ import {
   missionTasks,
   missionMessages,
 } from "@/db/schema";
+import { workflowTemplates, type WorkflowStepDef } from "@/db/schema/workflows";
 import { eq } from "drizzle-orm";
 import { assembleAgent, executeAgent } from "@/lib/agent";
 import {
@@ -52,6 +53,130 @@ export const leaderPlan = inngest.createFunction(
         return loadAvailableEmployees(organizationId);
       }
     );
+
+    // ─── Template fast path ────────────────────────────────────────────────
+    // 当 mission 来自 workflow_templates 且模板有预设 steps[] 时，直接 materialize
+    // 步骤到 mission_tasks（跳过 LLM 分解）。LLM 分解只用于 custom / ad-hoc mission。
+    const templateSteps = mission.workflowTemplateId
+      ? await step.run("load-template-steps", async () => {
+          const tpl = await db.query.workflowTemplates.findFirst({
+            where: eq(workflowTemplates.id, mission.workflowTemplateId!),
+          });
+          if (!tpl || !Array.isArray(tpl.steps) || tpl.steps.length === 0) return null;
+          return tpl.steps as WorkflowStepDef[];
+        })
+      : null;
+
+    if (templateSteps) {
+      const materialized = await step.run("materialize-template-steps", async () => {
+        // 按 order 排序（保守）
+        const sorted = [...templateSteps].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        // stepId → taskId 映射（用于解析 dependsOn）
+        const stepIdToTaskId = new Map<string, string>();
+        const selectedEmployeeIds = new Set<string>();
+
+        for (const s of sorted) {
+          // 员工分配：step.config.employeeSlug → 其他相关 fallback → leader
+          const slugFromConfig = s.config?.employeeSlug ?? s.employeeSlug;
+          const matched = slugFromConfig
+            ? availableEmployees.find((e) => e.slug === slugFromConfig)
+            : null;
+          const assignedEmployeeId = matched?.id ?? mission.leaderEmployeeId;
+          selectedEmployeeIds.add(assignedEmployeeId);
+
+          // 描述：优先 config.description，退化为 step name + skill 提示
+          const skillHint = s.config?.skillName || s.config?.skillSlug;
+          const description =
+            s.config?.description ||
+            (skillHint ? `${s.name}（使用技能：${skillHint}）` : s.name);
+
+          // 依赖解析：step.dependsOn 是 step id 数组，映射到已创建的 task id
+          const depTaskIds = (s.dependsOn ?? [])
+            .map((stepId) => stepIdToTaskId.get(stepId))
+            .filter((v): v is string => !!v);
+
+          const [created] = await db
+            .insert(missionTasks)
+            .values({
+              missionId,
+              title: s.name,
+              description,
+              expectedOutput: null,
+              assignedEmployeeId,
+              dependencies: depTaskIds,
+              priority: s.order ?? 0,
+              status: "pending",
+            })
+            .returning({ id: missionTasks.id });
+
+          stepIdToTaskId.set(s.id, created.id);
+        }
+
+        return {
+          taskIds: [...stepIdToTaskId.values()],
+          selectedEmployeeIds: [...selectedEmployeeIds],
+        };
+      });
+
+      // 更新 mission
+      await step.run("update-mission-template-path", async () => {
+        await db
+          .update(missions)
+          .set({
+            teamMembers: materialized.selectedEmployeeIds,
+            status: "executing",
+          })
+          .where(eq(missions.id, missionId));
+      });
+
+      // 协调消息（模板路径专用文案，说明跳过了 LLM 分解）
+      await step.run("post-template-plan-message", async () => {
+        await db.insert(missionMessages).values({
+          missionId,
+          fromEmployeeId: mission.leaderEmployeeId,
+          messageType: "coordination",
+          content: `按工作流模板预设的 ${materialized.taskIds.length} 个步骤启动任务（团队 ${materialized.selectedEmployeeIds.length} 人）。`,
+        });
+      });
+
+      // Fire ready tasks
+      await step.run("fire-ready-tasks-template-path", async () => {
+        const allTasks = await db
+          .select()
+          .from(missionTasks)
+          .where(eq(missionTasks.missionId, missionId));
+
+        const readyTasks = allTasks.filter(
+          (t) => !t.dependencies || (t.dependencies as string[]).length === 0
+        );
+
+        for (const task of readyTasks) {
+          await db
+            .update(missionTasks)
+            .set({ status: "ready" })
+            .where(eq(missionTasks.id, task.id));
+
+          await inngest.send({
+            name: "mission/task-ready",
+            data: {
+              missionId,
+              taskId: task.id,
+              organizationId,
+            },
+          });
+        }
+      });
+
+      return {
+        status: "planned",
+        source: "template",
+        taskCount: materialized.taskIds.length,
+        teamSize: materialized.selectedEmployeeIds.length,
+      };
+    }
+
+    // ─── LLM decompose path (custom / ad-hoc missions) ──────────────────────
 
     // 3. Assemble the leader agent and ask it to decompose the task
     const planResult = await step.run("leader-decompose", async () => {
