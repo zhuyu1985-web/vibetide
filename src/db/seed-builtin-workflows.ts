@@ -1224,7 +1224,7 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     icon: "pen-tool",
     category: "deep",
     ownerEmployeeId: "xiaowen",
-    defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaoshen", "xiaofa"],
+    defaultTeam: ["xiaowen", "xiaolei", "xiaoce", "xiaozi", "xiaoshen", "xiaofa"],
     appChannelSlug: "app_home",
     isFeatured: true,
     launchMode: "form",
