@@ -25,6 +25,7 @@ import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dia
 import { startMissionFromTemplate } from "@/app/actions/workflow-launch";
 import type { EmployeeId } from "@/lib/constants";
 import type { WorkflowTemplateRow } from "@/db/types";
+import type { HomepageTabKey } from "@/lib/dal/workflow-templates-listing";
 
 // Task 2.3 — The custom-scenario type is retained as an export for any
 // lingering consumer, but the homepage grid no longer renders the
@@ -50,11 +51,12 @@ interface ScenarioGridProps {
 }
 
 interface TabDef {
-  key: string;
+  key: HomepageTabKey;
   label: string;
 }
 
 const TAB_ORDER: TabDef[] = [
+  { key: "featured", label: "主流场景" },
   { key: "xiaolei", label: "热点分析" },
   { key: "xiaoce", label: "选题策划" },
   { key: "xiaozi", label: "素材研究" },
@@ -163,7 +165,7 @@ export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
         <p className="text-xs text-red-600">{directError}</p>
       )}
 
-      <Tabs defaultValue="xiaolei" className="w-full">
+      <Tabs defaultValue="featured" className="w-full">
         <TabsList className="flex-wrap">
           {TAB_ORDER.map((t) => (
             <TabsTrigger key={t.key} value={t.key}>
