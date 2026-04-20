@@ -21,6 +21,8 @@ import {
   TOPHUB_DEFAULT_NODES,
   type TrendingItem,
 } from "@/lib/trending-api";
+import { getDefaultHotTopicTemplate } from "@/lib/dal/workflow-templates-listing";
+import { startMissionFromTemplate } from "@/app/actions/workflow-launch";
 
 
 async function requireAuth() {
@@ -107,52 +109,58 @@ export async function startTopicMission(
     throw new Error("Topic not found");
   }
 
-  // Build user instruction with topic context
+  // B.1/Phase 4B: 走默认热点模板，不再硬编码 scenario='breaking_news'。
+  const template = await getDefaultHotTopicTemplate(profile.organizationId);
+
+  // 把热点上下文/角度信息塞进 event_keywords 的描述里（模板只有 3 个 input
+  // 字段：event_keywords / urgency_level / event_time），无法 1:1 映射旧字段，
+  // 所以用 event_keywords 承载话题 + 角度，event_time 取当前时间，urgency_level
+  // 按 P0/P1/P2 映射到 critical/urgent/normal。
   const angleHints = topic.angles?.length
-    ? `\n\n可参考的切入角度：\n${topic.angles.map((a: { angleText: string }) => `- ${a.angleText}`).join("\n")}`
+    ? `\n可参考的切入角度：\n${topic.angles
+        .map((a: { angleText: string }) => `- ${a.angleText}`)
+        .join("\n")}`
     : "";
-
   const platformInfo = (topic.platforms as string[])?.length
-    ? `来源平台：${(topic.platforms as string[]).join("、")}。`
+    ? `\n来源平台：${(topic.platforms as string[]).join("、")}`
     : "";
-
   const angleContext = selectedAngle
-    ? `\n\n选定创作角度：${selectedAngle.angle}\n大纲要点：\n${(selectedAngle.outline || []).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    ? `\n选定创作角度：${selectedAngle.angle}\n大纲要点：\n${(selectedAngle.outline || [])
+        .map((p, i) => `${i + 1}. ${p}`)
+        .join("\n")}`
     : "";
 
-  const { startMissionFromModule } = await import("@/app/actions/missions");
-  const result = await startMissionFromModule({
-    organizationId: profile.organizationId,
-    title: `热点追踪：${topic.title}`,
-    scenario: "breaking_news",
-    userInstruction: `请围绕热点话题「${topic.title}」，生成多视角的内容稿件。
+  const eventKeywords = [
+    topic.title,
+    topic.summary ? `摘要：${topic.summary}` : "",
+    `当前热度：${topic.heatScore}/100，趋势：${topic.trend}`,
+    topic.category ? `分类：${topic.category}` : "",
+    platformInfo,
+    angleHints,
+    angleContext,
+  ]
+    .filter((s) => s && s.length > 0)
+    .join("\n");
 
-话题摘要：${topic.summary || "暂无"}
-当前热度：${topic.heatScore}/100，趋势：${topic.trend}
-分类：${topic.category || "未分类"}
-${platformInfo}${angleHints}${angleContext}
+  const urgencyLevel =
+    topic.priority === "P0"
+      ? "critical"
+      : topic.priority === "P1"
+        ? "urgent"
+        : "normal";
 
-任务要求：
-1. 搜集该话题的最新信息和多方观点
-2. 从不同角度拆解话题，规划 2-3 篇不同视角的稿件
-3. 撰写稿件初稿（图文形式）
-4. 对稿件进行质量审核
-5. 准备好发布所需的标题、摘要、标签`,
-    sourceModule: "hot_topics",
-    sourceEntityId: topicId,
-    sourceEntityType: "hot_topic",
-    sourceContext: {
-      heatScore: topic.heatScore,
-      trend: topic.trend,
-      source: topic.source,
-      category: topic.category,
-      platforms: topic.platforms,
-      ...(selectedAngle && {
-        selectedAngle: selectedAngle.angle,
-        selectedOutline: selectedAngle.outline,
-      }),
-    },
-  });
+  const inputs: Record<string, unknown> = {
+    event_keywords: eventKeywords,
+    urgency_level: urgencyLevel,
+    event_time: new Date().toISOString().slice(0, 10),
+  };
+
+  const res = await startMissionFromTemplate(template.id, inputs);
+  if (!res.ok) {
+    throw new Error(
+      `启动热点追踪失败：${Object.values(res.errors).join("; ")}`,
+    );
+  }
 
   // Mark topic as P0 (being tracked)
   await db
@@ -163,7 +171,7 @@ ${platformInfo}${angleHints}${angleContext}
   revalidatePath("/inspiration");
   revalidatePath("/missions");
 
-  return result;
+  return { id: res.missionId };
 }
 
 export async function addTopicAngle(data: {
@@ -432,21 +440,28 @@ export async function updateTopicHeatScore(
     .set({ heatScore, updatedAt: new Date() })
     .where(eq(hotTopics.id, id));
 
-  // Auto-trigger mission when heat score reaches P0 threshold (≥80)
-  if (heatScore >= 80) {
+  // Auto-trigger mission when heat score reaches P0 threshold (≥80).
+  // B.1/Phase 4B: 走默认热点模板，不再硬编码 scenario='breaking_news'。
+  if (heatScore >= AUTO_TRIGGER_HEAT_THRESHOLD) {
     const topic = await db.query.hotTopics.findFirst({ where: eq(hotTopics.id, id) });
     if (topic) {
-      const { startMissionFromModule } = await import("@/app/actions/missions");
-      await startMissionFromModule({
-        organizationId,
-        title: `热点追踪：${topic.title}`,
-        scenario: "breaking_news",
-        userInstruction: `紧急追踪热点话题「${topic.title}」，当前热度 ${heatScore}。完成信息搜集、要点分析和快讯撰写。`,
-        sourceModule: "hot_topics",
-        sourceEntityId: id,
-        sourceEntityType: "hot_topic",
-        sourceContext: { heatScore, source: topic.source },
-      }).catch((err) => console.error("[hot-topics] auto-trigger failed:", err));
+      try {
+        const template = await getDefaultHotTopicTemplate(organizationId);
+        const inputs: Record<string, unknown> = {
+          event_keywords: `${topic.title}\n当前热度：${heatScore}/100${topic.source ? `\n信源：${topic.source}` : ""}`,
+          urgency_level: "critical",
+          event_time: new Date().toISOString().slice(0, 10),
+        };
+        const res = await startMissionFromTemplate(template.id, inputs);
+        if (!res.ok) {
+          console.error(
+            "[hot-topics] auto-trigger failed:",
+            Object.values(res.errors).join("; "),
+          );
+        }
+      } catch (err) {
+        console.error("[hot-topics] auto-trigger failed:", err);
+      }
     }
   }
 

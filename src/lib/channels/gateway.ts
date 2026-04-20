@@ -8,10 +8,10 @@
  * 4. Format outbound payloads for each platform
  */
 
-import { ADVANCED_SCENARIO_CONFIG } from "@/lib/constants";
 import { recognizeIntent } from "@/lib/agent/intent-recognition";
 import { EMPLOYEE_META } from "@/lib/constants";
 import { recordInboundMessage, recordOutboundMessage } from "@/app/actions/channels";
+import { findTemplateByNameOrSlug } from "@/lib/dal/workflow-templates-listing";
 
 // ---------------------------------------------------------------------------
 // Standardized inbound message
@@ -33,13 +33,16 @@ export interface StandardizedMessage {
 // ---------------------------------------------------------------------------
 
 interface ParsedCommand {
-  scenarioKey: string;
+  /** #tag 后面的场景关键词（模板名或 legacyScenarioKey 的模糊匹配 key） */
+  scenarioKeyword: string;
   params: Record<string, string>;
 }
 
 /**
  * Parse a quick command in the form "#场景名 key:value key:value ..."
- * Returns null if the text does not match any known scenario label or key.
+ * 只做语法解析，不在此处做 DB/常量查找——匹配交给 handleQuickCommand
+ * 调用 `findTemplateByNameOrSlug` 完成（Phase 4B：从 ADVANCED_SCENARIO_CONFIG
+ * 常量迁移到 workflow_templates DB 查）。
  */
 function parseQuickCommand(text: string): ParsedCommand | null {
   const trimmed = text.trim();
@@ -50,17 +53,7 @@ function parseQuickCommand(text: string): ParsedCommand | null {
 
   const tag = match[1].trim();
   const rest = (match[2] ?? "").trim();
-
-  // Try to find a matching scenario by label or key
-  let matchedKey: string | null = null;
-  for (const [key, cfg] of Object.entries(ADVANCED_SCENARIO_CONFIG)) {
-    if (cfg.label === tag || key === tag) {
-      matchedKey = key;
-      break;
-    }
-  }
-
-  if (!matchedKey) return null;
+  if (tag.length === 0) return null;
 
   // Parse "key:value" pairs from the rest of the text
   const params: Record<string, string> = {};
@@ -75,7 +68,7 @@ function parseQuickCommand(text: string): ParsedCommand | null {
     params["topic"] = rest;
   }
 
-  return { scenarioKey: matchedKey, params };
+  return { scenarioKeyword: tag, params };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,15 +123,22 @@ async function handleQuickCommand(
   command: ParsedCommand,
   msg: StandardizedMessage
 ): Promise<{ reply: string; missionId?: string }> {
-  const cfg = ADVANCED_SCENARIO_CONFIG[command.scenarioKey as keyof typeof ADVANCED_SCENARIO_CONFIG];
-  if (!cfg) {
-    return { reply: `未找到场景：${command.scenarioKey}` };
+  // Phase 4B: 用 `findTemplateByNameOrSlug` 替代 ADVANCED_SCENARIO_CONFIG
+  // 常量查找。支持用模板中文名或 legacyScenarioKey 模糊匹配（组织级隔离）。
+  const template = await findTemplateByNameOrSlug(
+    msg.organizationId,
+    command.scenarioKeyword,
+  );
+  if (!template) {
+    return { reply: `未找到场景：${command.scenarioKeyword}` };
   }
 
   try {
     // Use startMissionFromModule so we can pass an idempotency key from the
     // IM platform. IM webhooks are at-least-once delivery (DingTalk retries
     // 3x, WeCom 5x) — without this every retry created a duplicate mission.
+    // 走 startMissionFromModule 而非 startMissionFromTemplate，是因为 webhook
+    // 上下文没有 user auth，而 startMissionFromTemplate 要求 requireAuth。
     const { startMissionFromModule } = await import("@/app/actions/missions");
 
     // Build a human-readable instruction from params
@@ -151,8 +151,11 @@ async function handleQuickCommand(
 
     const mission = await startMissionFromModule({
       organizationId: msg.organizationId,
-      title: cfg.label,
-      scenario: command.scenarioKey,
+      title: template.name,
+      // `scenario` 继续写入 legacyScenarioKey（或 name 兜底）作为 denormalized
+      // label cache，下游 mission-executor / leader-plan 仍按 slug 分发，直到
+      // B.2 全部迁到 workflowTemplateId。
+      scenario: template.legacyScenarioKey ?? template.name,
       userInstruction,
       sourceModule: `channel:${msg.platform}`,
       sourceEntityId: msg.externalMessageId,
@@ -162,6 +165,7 @@ async function handleQuickCommand(
         externalUserId: msg.externalUserId,
         chatId: msg.chatId,
       },
+      workflowTemplateId: template.id,
     });
 
     // Persist outbound acknowledgement (fire-and-forget)
@@ -171,7 +175,7 @@ async function handleQuickCommand(
       platform: msg.platform,
       externalUserId: msg.externalUserId || undefined,
       chatId: msg.chatId || undefined,
-      content: { text: `已启动 ${cfg.label}，任务ID: ${mission.id}` },
+      content: { text: `已启动 ${template.name}，任务ID: ${mission.id}` },
       missionId: mission.id,
       status: "sent",
     }).catch((err) =>
@@ -179,13 +183,13 @@ async function handleQuickCommand(
     );
 
     return {
-      reply: `已启动 ${cfg.label}，任务ID: ${mission.id}`,
+      reply: `已启动 ${template.name}，任务ID: ${mission.id}`,
       missionId: mission.id,
     };
   } catch (err) {
     console.error("[gateway] startMission failed:", err);
     return {
-      reply: `启动场景「${cfg.label}」失败，请稍后重试。`,
+      reply: `启动场景「${template.name}」失败，请稍后重试。`,
     };
   }
 }
