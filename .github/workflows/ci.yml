@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test
+
+  drift-check:
+    name: Drizzle schema drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      # drizzle-kit generate 纯读 schema.ts + 对比 migration snapshots，无需真实 DB。
+      # 如果 schema 改了但没 generate migration，会产出新 SQL，在此 fail CI。
+      - name: Check for uncommitted migrations
+        run: |
+          # 空输入绕过交互 prompt；stdin 关了即可
+          printf '\n' | npx drizzle-kit generate --name ci_drift_probe > /tmp/drizzle.log 2>&1 || true
+          cat /tmp/drizzle.log
+          if grep -Eq "Your SQL migration file|Changes in" /tmp/drizzle.log; then
+            echo "::error::Schema drift detected. Run 'npx drizzle-kit generate' locally and commit the migration."
+            # 清理试探性生成的 SQL 文件，避免影响后续步骤
+            git clean -fd supabase/migrations/ || true
+            exit 1
+          fi
+          echo "✅ No schema drift"
