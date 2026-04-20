@@ -1219,13 +1219,14 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
 
   {
     slug: "pub.feature_story_pipeline",
-    name: "特稿生产线",
-    description: "重大特稿的从调研到合规的完整生产链路，支持多档深度。",
+    name: "精品内容（深度大稿）",
+    description: "重大热点或指定选题的 6 人协同深度大稿生产，覆盖调研→撰写→核查→合规全链路，发布到 APP 首页精品内容栏目。",
     icon: "pen-tool",
     category: "deep",
-    ownerEmployeeId: null,
-    defaultTeam: ["xiaolei", "xiaowen", "xiaozi", "xiaoshen"],
-    appChannelSlug: "app_news",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaoshen", "xiaofa"],
+    appChannelSlug: "app_home",
+    isFeatured: true,
     launchMode: "form",
     inputFields: [
       {
