@@ -116,23 +116,57 @@ export async function findTemplateByNameOrSlug(
   return (rows[0] as WorkflowTemplateRow | undefined) ?? null;
 }
 
-export async function listTemplatesForHomepageByEmployee(
+/**
+ * Homepage "10-tab" grid tab key union.
+ *
+ * - `"featured"` —— 主流场景 tab（新增，is_featured=true 过滤）
+ * - `EmployeeId` —— 8 员工职能 tab（xiaolei / xiaoce / ... / xiaoshu）
+ * - `"custom"` —— 我的工作流 tab（is_builtin=false）
+ */
+export type HomepageTabKey = "featured" | EmployeeId | "custom";
+
+/**
+ * Unified homepage-grid query. 替代原 `listTemplatesForHomepageByEmployee`。
+ *
+ * - `"featured"`：`is_featured=true AND is_public=true`
+ * - `"custom"`：`is_builtin=false AND is_public=true`
+ * - EmployeeId：`owner_employee_id=<id> AND is_public=true`
+ *
+ * 所有分支附加 `organization_id=orgId` + `orderBy(asc(createdAt))`。
+ */
+export async function listTemplatesForHomepageByTab(
   orgId: string,
-  employeeId: EmployeeId | null,
+  tab: HomepageTabKey,
 ): Promise<WorkflowTemplateRow[]> {
   const conds: SQL[] = [
     eq(workflowTemplates.organizationId, orgId),
     eq(workflowTemplates.isPublic, true),
   ];
-  if (employeeId) {
-    conds.push(eq(workflowTemplates.ownerEmployeeId, employeeId));
-  } else {
+
+  if (tab === "featured") {
+    conds.push(eq(workflowTemplates.isFeatured, true));
+  } else if (tab === "custom") {
     conds.push(eq(workflowTemplates.isBuiltin, false));
+  } else {
+    // tab 是 EmployeeId
+    conds.push(eq(workflowTemplates.ownerEmployeeId, tab));
   }
+
   const rows = await db
     .select()
     .from(workflowTemplates)
     .where(and(...conds))
     .orderBy(asc(workflowTemplates.createdAt));
   return rows as WorkflowTemplateRow[];
+}
+
+/**
+ * @deprecated 2026-04-20 首页 tab 重构 —— 请改用 `listTemplatesForHomepageByTab`。
+ * 保留别名是为了不破坏现有调用点。
+ */
+export async function listTemplatesForHomepageByEmployee(
+  orgId: string,
+  employeeId: EmployeeId | null,
+): Promise<WorkflowTemplateRow[]> {
+  return listTemplatesForHomepageByTab(orgId, employeeId ?? "custom");
 }

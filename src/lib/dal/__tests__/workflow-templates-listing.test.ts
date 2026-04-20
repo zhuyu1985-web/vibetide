@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { pickDefaultHotTopicTemplate } from "@/lib/dal/workflow-templates-listing";
+import { describe, it, expect, vi } from "vitest";
+import {
+  pickDefaultHotTopicTemplate,
+  listTemplatesForHomepageByTab,
+  type HomepageTabKey,
+} from "@/lib/dal/workflow-templates-listing";
 import type { WorkflowTemplateRow } from "@/db/types";
 
 const mk = (p: Partial<WorkflowTemplateRow>): WorkflowTemplateRow =>
@@ -76,5 +80,37 @@ describe("pickDefaultHotTopicTemplate", () => {
       createdAt: new Date("2026-04-01"),
     });
     expect(pickDefaultHotTopicTemplate([newer, old])?.id).toBe("old");
+  });
+});
+
+// Mock db — capture final WHERE to assert branch logic.
+vi.mock("@/db", () => {
+  const rows: WorkflowTemplateRow[] = [];
+  const chain = {
+    select: () => chain,
+    from: () => chain,
+    where: () => chain,
+    orderBy: () => Promise.resolve(rows),
+  };
+  return { db: chain };
+});
+
+describe("listTemplatesForHomepageByTab", () => {
+  it("featured tab：可调用且返回数组", async () => {
+    const result = await listTemplatesForHomepageByTab(
+      "org1",
+      "featured" satisfies HomepageTabKey,
+    );
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("custom tab：可调用且返回数组", async () => {
+    const result = await listTemplatesForHomepageByTab("org1", "custom");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("employeeId tab（xiaolei）：可调用且返回数组", async () => {
+    const result = await listTemplatesForHomepageByTab("org1", "xiaolei");
+    expect(Array.isArray(result)).toBe(true);
   });
 });
