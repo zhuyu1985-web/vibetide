@@ -1500,6 +1500,103 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(5, "合规审查", "compliance_check", "合规审核", "management", "compliance"),
     ],
   },
+
+  {
+    slug: "daily_podcast",
+    name: "每日热点播客",
+    description: "自动锁定今日热点，输出 1-3 集播客脚本（开场 / 主讲 / 互动 / 收尾），可发送至 AIGC 播客加工。",
+    icon: "mic",
+    category: "podcast",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaolei", "xiaojian"],
+    appChannelSlug: "app_livelihood_podcast",
+    isFeatured: true,
+    launchMode: "direct",
+    inputFields: [],
+    systemInstruction:
+      "从今日热榜挑选 1-3 个适合播客节奏的选题，每个输出一集播客脚本。结构：开场钩子（30 秒）/ 主讲（6-8 分钟，口语化）/ 互动问答（2-3 个）/ 收尾金句。末尾给出音频节奏建议（BPM / 音乐风格）。",
+    promptTemplate:
+      "基于今日热榜生成 1-3 集每日热点播客脚本，含 4 段结构与音频节奏建议。",
+    steps: [
+      step(1, "今日热榜扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "选题价值评分", "heat_scoring", "热度评分", "analysis", "score"),
+      step(3, "播客脚本撰写", "content_generate", "内容生成", "generation", "write"),
+      step(4, "音频节奏规划", "audio_plan", "音频规划", "generation", "audio"),
+    ],
+  },
+
+  {
+    slug: "daily_tandian",
+    name: "每日探店",
+    description: "按城市 + 店型生成 6 阶段探店脚本 + 图文稿件，含广告法合规扫描。",
+    icon: "map-pin",
+    category: "livelihood",
+    ownerEmployeeId: "xiaojian",
+    defaultTeam: ["xiaojian", "xiaowen", "xiaoshen"],
+    appChannelSlug: "app_livelihood_tandian",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "city",
+        label: "城市",
+        type: "select",
+        required: true,
+        defaultValue: "成都",
+        options: ["成都", "重庆", "深圳", "广州", "上海", "北京", "杭州", "武汉"],
+      },
+      {
+        name: "shop_type",
+        label: "店型",
+        type: "select",
+        required: true,
+        defaultValue: "餐饮",
+        options: ["餐饮", "茶饮", "咖啡", "烘焙", "美妆", "亲子", "夜生活"],
+      },
+      {
+        name: "shop_name",
+        label: "具体门店",
+        type: "text",
+        required: false,
+        placeholder: "留空则由系统在该城市 × 店型中挑选热门店",
+      },
+    ],
+    systemInstruction:
+      "为 {{city}} 的 {{shop_type}}（具体门店：{{shop_name}}）产出「每日探店」。视频脚本必须含 6 阶段：到店 / 环境 / 招牌菜 / 试吃 / 服务 / 回味，每段标注时长与景别。配套图文稿 600-900 字。全文经广告法极限词扫描。",
+    promptTemplate:
+      "为 {{city}} 的 {{shop_type}}（{{shop_name}}）产出 6 阶段探店脚本 + 图文 + 合规扫描。",
+    steps: [
+      step(1, "门店信息检索", "web_search", "全网搜索", "perception", "search"),
+      step(2, "本地口碑聚合", "social_listening", "社交舆情", "perception", "listen"),
+      step(3, "探店脚本生成（6 阶段）", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
+      step(4, "图文稿撰写", "content_generate", "内容生成", "generation", "write"),
+      step(5, "广告法合规扫描", "compliance_check", "合规审核", "management", "compliance"),
+    ],
+  },
+
+  {
+    slug: "daily_chuanchao",
+    name: "每日川超战报",
+    description: "通过热点检索匹配近期川超热门比赛，输出赛事简介 / 进球集锦 / 赛前花絮 / 赛后影响的图文新闻。",
+    icon: "trophy",
+    category: "news",
+    ownerEmployeeId: "xiaolei",
+    defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
+    appChannelSlug: "app_sports",
+    isFeatured: true,
+    launchMode: "direct",
+    inputFields: [],
+    systemInstruction:
+      "检索近期川超热门比赛（优先最近 3 天），挑选 1-2 场重点赛事。每场产出：1) 赛事简介（对阵 / 比分 / 关键时刻）2) 进球集锦要点（含时间点）3) 赛前准备 / 花絮 4) 赛后影响（积分 / 舆情）。图文可直发体育频道。",
+    promptTemplate:
+      "检索近期川超热门比赛，产出每日川超战报（4 段结构图文）。",
+    steps: [
+      step(1, "川超赛事热点扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "赛事信息深读", "web_deep_read", "网页深读", "perception", "crawl"),
+      step(3, "同类赛事案例参考", "case_reference", "案例参考", "analysis", "case"),
+      step(4, "战报图文撰写", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────
