@@ -1,26 +1,39 @@
 "use client";
 
+import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
 import { FileText, Settings2, Workflow, type LucideIcon } from "lucide-react";
+
 import {
-  ADVANCED_SCENARIO_CONFIG,
-  type AdvancedScenarioKey,
-  type EmployeeId,
-} from "@/lib/constants";
-import type { WorkflowTemplateRow } from "@/db/types";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/shared/glass-card";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
+import { startMissionFromTemplate } from "@/app/actions/workflow-launch";
+import type { EmployeeId } from "@/lib/constants";
+import type { WorkflowTemplateRow } from "@/db/types";
 
+// Task 2.3 — The custom-scenario type is retained as an export for any
+// lingering consumer, but the homepage grid no longer renders the
+// localStorage-backed "我的场景" chips. Custom workflows now live in the
+// "我的工作流" tab and are sourced from `workflow_templates`.
 export interface CustomScenario {
   id: string;
   name: string;
-  baseKey: AdvancedScenarioKey;
+  baseKey: string;
   teamMembers: EmployeeId[];
   workflowSteps: unknown[];
   inputFields: unknown[];
@@ -29,125 +42,116 @@ export interface CustomScenario {
 
 interface ScenarioGridProps {
   /**
-   * B.1 Unified Scenario Workflow — workflow templates loaded from DB.
-   * The grid iterates this list as the primary source of truth. If a workflow
-   * has `legacyScenarioKey` matching an `AdvancedScenarioKey`, we surface the
-   * legacy config's color/bg/team avatars for visual parity with existing UI.
+   * Map of tab key → workflow templates for that tab. Keys are the 8 employee
+   * slugs plus `"custom"` for user-defined workflows. Produced server-side in
+   * `/home/page.tsx` via `listTemplatesForHomepageByEmployee`.
    */
-  workflows: WorkflowTemplateRow[];
-  /**
-   * When provided, only workflows whose `defaultTeam` includes this slug are
-   * shown (useful when an employee is actively selected on the homepage).
-   */
-  currentEmployeeSlug?: EmployeeId | null;
-  /**
-   * Callback for starting a mission directly from a workflow card. Receives
-   * the full `WorkflowTemplateRow` so the parent can dispatch `startMission`
-   * with `workflowTemplateId` + `scenario: templateToScenarioSlug(wf)`.
-   * NOTE: for B.1, the parent may still open `ScenarioDetailSheet` when the
-   * workflow maps to a legacy `AdvancedScenarioKey` (dual-write preserved).
-   */
-  onStart?: (wf: WorkflowTemplateRow) => void;
-  /**
-   * Legacy callback — opens `ScenarioDetailSheet` keyed by `AdvancedScenarioKey`.
-   * Called when the clicked workflow has a matching `legacyScenarioKey`.
-   * B.2 will unify this; for now we keep both paths to avoid breaking UX.
-   */
-  onScenarioClick?: (key: AdvancedScenarioKey) => void;
-  onCustomClick?: () => void;
-  customScenarios?: CustomScenario[];
-  onCustomScenarioClick?: (scenario: CustomScenario) => void;
+  templatesByTab: Record<string, WorkflowTemplateRow[]>;
 }
+
+interface TabDef {
+  key: string;
+  label: string;
+}
+
+const TAB_ORDER: TabDef[] = [
+  { key: "xiaolei", label: "小雷" },
+  { key: "xiaoce", label: "小策" },
+  { key: "xiaozi", label: "小子" },
+  { key: "xiaowen", label: "小文" },
+  { key: "xiaojian", label: "小剑" },
+  { key: "xiaoshen", label: "小审" },
+  { key: "xiaofa", label: "小发" },
+  { key: "xiaoshu", label: "小数" },
+  { key: "custom", label: "我的工作流" },
+];
 
 /**
  * Dynamically resolve a Lucide icon by its component name string (stored in
  * `workflow_templates.icon`). Falls back to `FileText` if the name doesn't
- * match any exported icon. This keeps the DB schema lightweight (single text
- * column) while still rendering the full Lucide set.
+ * match any exported icon.
  */
 function resolveLucideIcon(iconName: string | null | undefined): LucideIcon {
   if (!iconName) return FileText;
-  const maybeIcon = (LucideIcons as unknown as Record<string, LucideIcon>)[iconName];
+  const maybeIcon = (LucideIcons as unknown as Record<string, LucideIcon>)[
+    iconName
+  ];
   return maybeIcon ?? FileText;
 }
 
-/**
- * If a workflow maps to a legacy `AdvancedScenarioKey` (via `legacyScenarioKey`),
- * return the legacy config so we can reuse color/bg/team visuals. Otherwise
- * null — caller renders neutral fallback styling.
- */
-function resolveLegacyConfig(wf: WorkflowTemplateRow) {
-  const key = wf.legacyScenarioKey as AdvancedScenarioKey | null;
-  if (!key) return null;
-  return ADVANCED_SCENARIO_CONFIG[key] ?? null;
-}
-
-export function ScenarioGrid({
-  workflows,
-  currentEmployeeSlug,
-  onStart,
-  onScenarioClick,
-  onCustomClick: _onCustomClick,
-  customScenarios = [],
-  onCustomScenarioClick,
-}: ScenarioGridProps) {
+export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
   const router = useRouter();
+  const [launching, setLaunching] =
+    React.useState<WorkflowTemplateRow | null>(null);
+  const [directStartingId, setDirectStartingId] = React.useState<string | null>(
+    null,
+  );
+  const [directError, setDirectError] = React.useState<string | null>(null);
 
-  // Filter by current employee when provided; otherwise show all builtin workflows.
-  const visibleWorkflows = currentEmployeeSlug
-    ? workflows.filter((wf) =>
-        ((wf.defaultTeam ?? []) as string[]).includes(currentEmployeeSlug),
-      )
-    : workflows;
-
-  const handleClick = (wf: WorkflowTemplateRow) => {
-    const legacyKey = wf.legacyScenarioKey as AdvancedScenarioKey | null;
-    // Preferred path: parent-provided direct-start handler.
-    if (onStart) {
-      onStart(wf);
-      return;
-    }
-    // Legacy path: open ScenarioDetailSheet when we have a matching key.
-    if (legacyKey && onScenarioClick && ADVANCED_SCENARIO_CONFIG[legacyKey]) {
-      onScenarioClick(legacyKey);
-    }
-    // Otherwise: no-op. B.2 will introduce a Sheet that accepts
-    // WorkflowTemplateRow directly; until then non-legacy workflows rely on
-    // the parent-provided `onStart` callback.
-  };
+  const handleCardClick = React.useCallback(
+    async (tpl: WorkflowTemplateRow) => {
+      setDirectError(null);
+      if (tpl.launchMode === "direct") {
+        setDirectStartingId(tpl.id);
+        try {
+          const res = await startMissionFromTemplate(tpl.id, {});
+          if (res.ok) {
+            router.push(`/missions/${res.missionId}`);
+          } else {
+            setDirectError(res.errors._global ?? "启动失败");
+          }
+        } catch (e) {
+          setDirectError(e instanceof Error ? e.message : "启动失败");
+        } finally {
+          setDirectStartingId(null);
+        }
+      } else {
+        setLaunching(tpl);
+      }
+    },
+    [router],
+  );
 
   return (
     <div className="space-y-2.5">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground/80">场景快捷启动</span>
+        <span className="text-sm font-medium text-foreground/80">
+          场景快捷启动
+        </span>
         <Popover>
           <PopoverTrigger asChild>
-            <button className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer border-0">
+            <button className="border-0 cursor-pointer text-xs text-muted-foreground transition-colors duration-200 hover:text-foreground">
               + 自定义场景
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" sideOffset={8} className="w-56 p-2">
             <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground px-2 pt-1 pb-2 font-medium">选择创建方式</p>
+              <p className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
+                选择创建方式
+              </p>
               <button
                 onClick={() => router.push("/scenarios/customize")}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition-colors duration-150 cursor-pointer text-left"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors duration-150 hover:bg-accent"
               >
-                <Settings2 size={14} className="text-indigo-500 shrink-0" />
+                <Settings2 size={14} className="shrink-0 text-indigo-500" />
                 <div>
                   <p className="font-medium leading-tight">基于现有场景修改</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">从预设场景调参</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    从预设场景调参
+                  </p>
                 </div>
               </button>
               <button
                 onClick={() => router.push("/workflows/new")}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition-colors duration-150 cursor-pointer text-left"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors duration-150 hover:bg-accent"
               >
-                <Workflow size={14} className="text-violet-500 shrink-0" />
+                <Workflow size={14} className="shrink-0 text-violet-500" />
                 <div>
                   <p className="font-medium leading-tight">从零创建工作流</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">完全自定义步骤</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    完全自定义步骤
+                  </p>
                 </div>
               </button>
             </div>
@@ -155,137 +159,121 @@ export function ScenarioGrid({
         </Popover>
       </div>
 
-      {/* Preset grid — driven by `workflows` prop (B.1 unified source of truth) */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {visibleWorkflows.map((wf, index) => {
-          const legacy = resolveLegacyConfig(wf);
-          const color = legacy?.color ?? "#6366f1";
-          const bgColor = legacy?.bgColor ?? "rgba(99,102,241,0.12)";
-          const team = (legacy?.teamMembers ??
-            ((wf.defaultTeam ?? []) as EmployeeId[])) as EmployeeId[];
-          const Icon = legacy?.icon ?? resolveLucideIcon(wf.icon);
-          const description = legacy?.description ?? wf.description ?? "";
+      {directError && (
+        <p className="text-xs text-red-600">{directError}</p>
+      )}
 
+      <Tabs defaultValue="xiaolei" className="w-full">
+        <TabsList className="flex-wrap">
+          {TAB_ORDER.map((t) => (
+            <TabsTrigger key={t.key} value={t.key}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {TAB_ORDER.map((tab) => {
+          const list = templatesByTab[tab.key] ?? [];
           return (
-            <motion.button
-              key={wf.id}
-              type="button"
-              onClick={() => handleClick(wf)}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.06, ease: "easeOut" }}
-              whileHover={{ y: -2 }}
-              className="text-left rounded-xl px-3 py-2.5 cursor-pointer transition-shadow duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-0"
-              style={{
-                background: `linear-gradient(135deg, ${bgColor}, ${bgColor.replace(/[\d.]+\)$/, "0.05)")})`,
-              }}
-            >
-              {/* Icon */}
-              <div className="mb-1.5">
-                <Icon size={22} style={{ color }} />
-              </div>
+            <TabsContent key={tab.key} value={tab.key}>
+              {list.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-sky-200 p-8 text-center text-sm text-muted-foreground">
+                  <p>
+                    {tab.key === "custom"
+                      ? "还没有自定义工作流"
+                      : `${tab.label} 暂无预设工作流`}
+                  </p>
+                  <Button variant="link" asChild className="mt-2">
+                    <Link href="/workflows">前往工作流模块查看</Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {list.map((tpl, index) => {
+                    const Icon = resolveLucideIcon(tpl.icon);
+                    const team = (tpl.defaultTeam ?? []) as EmployeeId[];
+                    const isStarting = directStartingId === tpl.id;
+                    return (
+                      <motion.div
+                        key={tpl.id}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: 0.3,
+                          delay: index * 0.04,
+                          ease: "easeOut",
+                        }}
+                      >
+                        <GlassCard
+                          padding="md"
+                          hover
+                          className="cursor-pointer"
+                          onClick={() => handleCardClick(tpl)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1.5">
+                                <Icon size={22} className="text-sky-500" />
+                              </div>
+                              <h3 className="truncate text-base font-medium">
+                                {tpl.name}
+                              </h3>
+                              {tpl.description && (
+                                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                  {tpl.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
 
-              {/* Label — prefer workflow name (authoritative) */}
-              <div
-                className="text-xs font-semibold leading-tight mb-0.5"
-                style={{ color }}
-              >
-                {wf.name}
-              </div>
+                          {team.length > 0 && (
+                            <div className="mt-3 flex items-center -space-x-1">
+                              {team.slice(0, 5).map((memberId) => (
+                                <EmployeeAvatar
+                                  key={memberId}
+                                  employeeId={memberId}
+                                  size="sm"
+                                />
+                              ))}
+                              {team.length > 5 && (
+                                <span className="ml-1 text-[10px] text-muted-foreground">
+                                  +{team.length - 5}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-              {/* Description */}
-              <div className="text-[10px] text-foreground/50 leading-tight mb-2 line-clamp-1">
-                {description}
-              </div>
-
-              {/* Team member avatars */}
-              <div className="flex items-center -space-x-1">
-                {team.map((memberId) => (
-                  <EmployeeAvatar
-                    key={memberId}
-                    employeeId={memberId}
-                    size="sm"
-                  />
-                ))}
-              </div>
-            </motion.button>
+                          <div className="mt-4 flex justify-end">
+                            <Button
+                              size="sm"
+                              disabled={isStarting}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCardClick(tpl);
+                              }}
+                            >
+                              {isStarting ? "启动中…" : "启动"}
+                            </Button>
+                          </div>
+                        </GlassCard>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
           );
         })}
-      </div>
+      </Tabs>
 
-      {/* Custom scenarios (localStorage-backed, untouched by B.1) */}
-      {customScenarios.length > 0 && (
-        <div className="space-y-1.5 pt-1">
-          <span className="text-xs text-muted-foreground/60 font-medium">我的场景</span>
-          <div className="grid grid-cols-3 gap-2.5">
-            {customScenarios.map((scenario, index) => {
-              const baseConfig = ADVANCED_SCENARIO_CONFIG[scenario.baseKey];
-              return (
-                <motion.button
-                  key={scenario.id}
-                  onClick={() => onCustomScenarioClick?.(scenario)}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.3,
-                    delay: (visibleWorkflows.length + index) * 0.06,
-                    ease: "easeOut",
-                  }}
-                  whileHover={{ y: -2 }}
-                  className="text-left rounded-xl px-3 py-2.5 cursor-pointer transition-shadow duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1)] border-0 relative"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04))",
-                    boxShadow: "inset 0 0 0 1px rgba(99,102,241,0.18)",
-                  }}
-                >
-                  {/* 自定义 badge */}
-                  <div className="absolute top-2 right-2">
-                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500">
-                      自定义
-                    </span>
-                  </div>
-
-                  {/* Base scenario icon */}
-                  <div className="mb-1.5">
-                    {baseConfig ? (
-                      <baseConfig.icon size={22} style={{ color: baseConfig.color }} />
-                    ) : (
-                      <Settings2 size={22} className="text-indigo-400" />
-                    )}
-                  </div>
-
-                  {/* Name */}
-                  <div className="text-xs font-semibold leading-tight mb-0.5 text-indigo-500 pr-10">
-                    {scenario.name}
-                  </div>
-
-                  {/* Base label */}
-                  <div className="text-[10px] text-foreground/40 leading-tight mb-2 line-clamp-1">
-                    基于 {baseConfig?.label ?? scenario.baseKey}
-                  </div>
-
-                  {/* Team member avatars */}
-                  <div className="flex items-center -space-x-1">
-                    {scenario.teamMembers.slice(0, 5).map((memberId) => (
-                      <EmployeeAvatar
-                        key={memberId}
-                        employeeId={memberId}
-                        size="sm"
-                        className="ring-2 ring-background"
-                      />
-                    ))}
-                    {scenario.teamMembers.length > 5 && (
-                      <span className="text-[9px] text-muted-foreground ml-1">
-                        +{scenario.teamMembers.length - 5}
-                      </span>
-                    )}
-                  </div>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
+      {launching && (
+        <WorkflowLaunchDialog
+          template={launching}
+          open={!!launching}
+          onOpenChange={(o) => {
+            if (!o) setLaunching(null);
+          }}
+        />
       )}
     </div>
   );

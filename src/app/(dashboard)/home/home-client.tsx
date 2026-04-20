@@ -2,13 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import {
-  ADVANCED_SCENARIO_CONFIG,
-  type EmployeeId,
-  type AdvancedScenarioKey,
-} from "@/lib/constants";
-import { startMission } from "@/app/actions/missions";
+import { type EmployeeId } from "@/lib/constants";
 import { Mic, Paperclip, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatStream } from "@/hooks/use-chat-stream";
@@ -16,13 +10,11 @@ import { renderScenarioTemplate } from "@/lib/scenario-template";
 import { ParticleBackground } from "@/components/shared/particle-background";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
-import { ScenarioGrid, type CustomScenario } from "@/components/home/scenario-grid";
-import { ScenarioDetailSheet } from "@/components/home/scenario-detail-sheet";
+import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { RecentSection } from "@/components/home/recent-section";
 import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
 import type { ScenarioCardData } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
-import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,11 +37,11 @@ interface HomeClientProps {
   scenarioMap?: Record<string, ScenarioCardData[]>;
   employeeDbIdMap?: Record<string, string>;
   /**
-   * B.1 Unified Scenario Workflow — enabled builtin workflow templates for the
-   * current org. Accepted here and passed through; Task 16 wires scenario-grid
-   * to consume it.
+   * Task 2.3 — Map of tab key → workflow templates for that tab. Keys are the
+   * 8 employee slugs plus `"custom"` for user-defined workflows. Replaces the
+   * former flat `workflows` prop and legacy scenario-detail-sheet plumbing.
    */
-  workflows?: WorkflowTemplateRow[];
+  templatesByTab?: Record<string, WorkflowTemplateRow[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,32 +52,32 @@ export function HomeClient({
   recentMissions,
   recentConversations,
   scenarioMap = {},
-  employeeDbIdMap = {},
-  workflows = [],
+  employeeDbIdMap: _employeeDbIdMap = {},
+  templatesByTab = {},
 }: HomeClientProps) {
   const router = useRouter();
 
   // ── State ──
   const [inputValue, setInputValue] = useState("");
-  const [customScenarios, setCustomScenarios] = useState<CustomScenario[]>([]);
   const [activeEmployee, setActiveEmployee] = useState<EmployeeId | null>(null);
   const [selectedModel, setSelectedModel] = useState("auto");
   const [isRecording, setIsRecording] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<AdvancedScenarioKey | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [inlineScenario, setInlineScenario] = useState<ScenarioCardData | null>(null);
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load custom scenarios from localStorage on mount
+  // Silence unused-var warnings for props/setters reserved for follow-ups.
+  void _employeeDbIdMap;
+  void selectedModel;
+  void setSelectedModel;
+
+  // Task 2.3 — custom-scenario localStorage migration is handled by the
+  // "我的工作流" tab in <ScenarioGrid>, which reads from workflow_templates.
+  // Previously we hydrated `customScenarios` from `vibetide_custom_scenarios`
+  // here; that state has been removed.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("vibetide_custom_scenarios");
-      if (raw) setCustomScenarios(JSON.parse(raw) as CustomScenario[]);
-    } catch {
-      // ignore parse errors
-    }
+    // intentionally no-op (retained for future onboarding hooks)
   }, []);
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
@@ -130,41 +122,6 @@ export function HomeClient({
   const handleVoiceToggle = useCallback(() => {
     setIsRecording((prev) => !prev);
   }, []);
-
-  const handleScenarioClick = useCallback((key: AdvancedScenarioKey) => {
-    setSelectedScenario(key);
-    setSheetOpen(true);
-  }, []);
-
-  // B.1 Unified Scenario Workflow: when a WorkflowTemplateRow card is clicked.
-  // If the workflow maps to a legacy `AdvancedScenarioKey`, preserve the existing
-  // ScenarioDetailSheet UX (form → one-click launch). Otherwise, dispatch
-  // `startMission` directly with `workflowTemplateId` dual-write. B.2 will
-  // unify the Sheet interface so this branch collapses.
-  const handleWorkflowStart = useCallback(
-    async (wf: WorkflowTemplateRow) => {
-      const legacyKey = wf.legacyScenarioKey as AdvancedScenarioKey | null;
-      if (legacyKey && ADVANCED_SCENARIO_CONFIG[legacyKey]) {
-        setSelectedScenario(legacyKey);
-        setSheetOpen(true);
-        return;
-      }
-      // Non-legacy workflow: direct start with dual-write.
-      try {
-        const result = await startMission({
-          title: wf.name,
-          scenario: templateToScenarioSlug(wf),
-          userInstruction: wf.description ?? "",
-          workflowTemplateId: wf.id,
-        });
-        toast.success(`${wf.name} 已启动`);
-        if (result?.id) router.push(`/missions/${result.id}`);
-      } catch {
-        toast.error("启动失败，请重试");
-      }
-    },
-    [router],
-  );
 
   // Click employee scenario chip → open chat with inline scenario form
   const handleEmployeeScenarioClick = useCallback(
@@ -249,57 +206,10 @@ export function HomeClient({
     [handleChatSend]
   );
 
-  const handleCustomScenario = useCallback(() => {
-    router.push("/workflows?action=create");
-  }, [router]);
-
-  const handleCustomScenarioClick = useCallback((scenario: CustomScenario) => {
-    // Open the base scenario detail sheet as a starting point
-    setSelectedScenario(scenario.baseKey);
-    setSheetOpen(true);
-  }, []);
-
-  // Ignore re-entrant launch clicks while a mission is being created. Without
-  // this, a double-click on the scenario launch button could fire two
-  // startMission() calls in parallel before the server action's soft dedup
-  // window catches them.
-  const launchInFlight = useRef(false);
-  const handleScenarioLaunch = useCallback(
-    async (key: AdvancedScenarioKey, inputs: Record<string, string>) => {
-      if (launchInFlight.current) return;
-      launchInFlight.current = true;
-      const sc = ADVANCED_SCENARIO_CONFIG[key];
-      try {
-        const result = await startMission({
-          title: `${sc.label} - ${inputs[sc.inputFields[0]?.name] ?? ""}`.trim(),
-          scenario: key,
-          userInstruction: Object.entries(inputs)
-            .filter(([, v]) => v)
-            .map(([k, v]) => `${sc.inputFields.find((f) => f.name === k)?.label}: ${v}`)
-            .join("\n"),
-        });
-        toast.success(`${sc.label} 已启动`);
-        setSheetOpen(false);
-        if (result?.id) router.push(`/missions/${result.id}`);
-      } catch {
-        toast.error("启动失败，请重试");
-      } finally {
-        launchInFlight.current = false;
-      }
-    },
-    [router]
-  );
-
-  const handleScenarioChat = useCallback(
-    (key: AdvancedScenarioKey) => {
-      const sc = ADVANCED_SCENARIO_CONFIG[key];
-      setActiveEmployee(sc.teamMembers[0]);
-      setSheetOpen(false);
-      setChatOpen(true);
-      chat.clearMessages();
-    },
-    [chat]
-  );
+  // `router` retained for future scenario-level navigation hooks (e.g. the
+  // per-employee chat panel may push to `/missions/:id`). Silence unused-var
+  // warning if no current call path reaches router.push() here.
+  void router;
 
   // ── Shared input box (used in both normal and chat modes) ──
   const renderInputBox = () => (
@@ -455,17 +365,12 @@ export function HomeClient({
           />
         </div>
 
-        {/* Layer 3: Scenario grid — B.1 driven by `workflows` prop */}
+        {/* Layer 3: Scenario grid — Task 2.3: 9-tab view driven by
+            `templatesByTab` (8 employees + "我的工作流"). Each card either
+            opens <WorkflowLaunchDialog> (template has input fields) or starts
+            the mission directly via `startMissionFromTemplate`. */}
         <div className="px-4 mt-6">
-          <ScenarioGrid
-            workflows={workflows}
-            currentEmployeeSlug={activeEmployee}
-            onStart={handleWorkflowStart}
-            onScenarioClick={handleScenarioClick}
-            onCustomClick={handleCustomScenario}
-            customScenarios={customScenarios}
-            onCustomScenarioClick={handleCustomScenarioClick}
-          />
+          <ScenarioGrid templatesByTab={templatesByTab} />
         </div>
 
         {/* Layer 4: Recent missions & conversations */}
@@ -478,15 +383,6 @@ export function HomeClient({
           </div>
         )}
       </div>
-
-      {/* Scenario detail sheet (side panel) */}
-      <ScenarioDetailSheet
-        scenarioKey={selectedScenario}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        onLaunch={handleScenarioLaunch}
-        onChat={handleScenarioChat}
-      />
     </div>
   );
 }

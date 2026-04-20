@@ -6,12 +6,27 @@ import { savedConversations } from "@/db/schema/saved-conversations";
 import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
 import { getEmployees } from "@/lib/dal/employees";
-import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
+import { listTemplatesForHomepageByEmployee } from "@/lib/dal/workflow-templates-listing";
 import type { ScenarioCardData } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
+import type { EmployeeId } from "@/lib/constants";
 import { HomeClient } from "./home-client";
 
 export const dynamic = "force-dynamic";
+
+// Task 2.3 — The homepage scenario grid is rendered as 9 tabs (8 employees +
+// "custom"). We pre-load the templates for every tab in parallel server-side
+// so the grid can switch tabs instantly without follow-up round-trips.
+const EMPLOYEE_TAB_IDS: EmployeeId[] = [
+  "xiaolei",
+  "xiaoce",
+  "xiaozi",
+  "xiaowen",
+  "xiaojian",
+  "xiaoshen",
+  "xiaofa",
+  "xiaoshu",
+];
 
 export default async function HomePage() {
   let recentMissions: Array<{
@@ -27,9 +42,9 @@ export default async function HomePage() {
     employeeSlug: string;
     updatedAt: string;
   }> = [];
-  let scenarioMap: Record<string, ScenarioCardData[]> = {};
+  const scenarioMap: Record<string, ScenarioCardData[]> = {};
   let employeeDbIdMap: Record<string, string> = {};
-  let workflows: WorkflowTemplateRow[] = [];
+  let templatesByTab: Record<string, WorkflowTemplateRow[]> = {};
 
   try {
     const supabase = await createClient();
@@ -87,23 +102,38 @@ export default async function HomePage() {
         updatedAt: c.updatedAt.toISOString(),
       }));
 
-      // B.1 Unified Scenario Workflow — fetch enabled builtin workflow templates
-      // for this org so <HomeClient> can render them (Task 16 consumes the prop).
+      // Task 2.3 — Load templates per employee + custom tab in parallel.
+      // `null` → "我的工作流" tab (isBuiltin=false AND isPublic=true per DAL).
       if (orgId) {
         try {
-          workflows = await listWorkflowTemplatesByOrg(orgId, {
-            isBuiltin: true,
-            isEnabled: true,
-          });
+          const [byEmployee, customList] = await Promise.all([
+            Promise.all(
+              EMPLOYEE_TAB_IDS.map((eid) =>
+                listTemplatesForHomepageByEmployee(orgId, eid),
+              ),
+            ),
+            listTemplatesForHomepageByEmployee(orgId, null),
+          ]);
+          templatesByTab = {
+            xiaolei: byEmployee[0],
+            xiaoce: byEmployee[1],
+            xiaozi: byEmployee[2],
+            xiaowen: byEmployee[3],
+            xiaojian: byEmployee[4],
+            xiaoshen: byEmployee[5],
+            xiaofa: byEmployee[6],
+            xiaoshu: byEmployee[7],
+            custom: customList,
+          };
         } catch {
-          // Graceful degradation — fall through with workflows = []
+          // Graceful degradation — fall through with an empty tab map.
         }
       }
     }
 
     // Legacy `employee_scenarios` table dropped 2026-04-20 —
-    // scenarioMap stays as an empty record until HomeClient is rewritten
-    // to consume workflow_templates directly (Phase 3).
+    // scenarioMap stays as an empty record; per-employee "chip" scenarios in
+    // the chat input are sourced elsewhere now.
 
     // Fetch employees to build slug → dbId map for scenario execution
     try {
@@ -125,7 +155,7 @@ export default async function HomePage() {
         recentConversations={recentConversations}
         scenarioMap={scenarioMap}
         employeeDbIdMap={employeeDbIdMap}
-        workflows={workflows}
+        templatesByTab={templatesByTab}
       />
     </Suspense>
   );
