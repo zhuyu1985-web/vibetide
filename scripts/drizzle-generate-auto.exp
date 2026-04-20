@@ -1,0 +1,36 @@
+#!/usr/bin/expect -f
+# drizzle-generate-auto.exp
+# 非交互式跑 drizzle-kit generate，所有 create-or-rename 提示都选 "+ create"
+# （第一项，默认高亮），所有确认都按回车。
+
+set timeout 60
+
+# 从环境取 DATABASE_URL（脚本前需要 source .env.local）
+spawn npx drizzle-kit generate --name catchup_hand_written_migrations
+
+# 有交互时持续按回车选默认
+expect {
+    -re "create table|rename table|create column|rename column|create enum|rename enum" {
+        send "\r"
+        exp_continue
+    }
+    -re "Is .* created or renamed" {
+        send "\r"
+        exp_continue
+    }
+    -re "✓ Your SQL migration file" {
+        # 成功完成
+        expect eof
+    }
+    -re "no schema changes|nothing to generate" {
+        # no-op 也算成功
+        expect eof
+    }
+    eof {
+        # 任意 EOF 结束
+    }
+    timeout {
+        puts "\n⚠ Timeout waiting for drizzle-kit response"
+        exit 1
+    }
+}
