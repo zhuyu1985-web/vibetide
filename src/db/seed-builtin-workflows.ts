@@ -1597,6 +1597,165 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(4, "战报图文撰写", "content_generate", "内容生成", "generation", "write"),
     ],
   },
+
+  {
+    slug: "zhongcao_daily",
+    name: "种草日更",
+    description: "针对指定平台产出种草内容（含广告法极限词扫描），经合规审核后可一键分发到 APP 种草栏目。",
+    icon: "sprout",
+    category: "social",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaoshen", "xiaofa"],
+    appChannelSlug: "app_livelihood_zhongcao",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "platform",
+        label: "目标平台",
+        type: "select",
+        required: true,
+        defaultValue: "xiaohongshu",
+        options: [
+          { value: "xiaohongshu", label: "小红书" },
+          { value: "douyin", label: "抖音" },
+          { value: "bilibili", label: "B 站" },
+          { value: "video_channel", label: "视频号" },
+        ],
+      },
+      {
+        name: "product_type",
+        label: "种草品类",
+        type: "text",
+        required: true,
+        placeholder: "如：平价彩妆 / 3C 数码 / 儿童图书",
+      },
+      {
+        name: "post_count",
+        label: "条目数",
+        type: "number",
+        required: false,
+        defaultValue: 3,
+        validation: { min: 1, max: 8 },
+      },
+    ],
+    systemInstruction:
+      "为 {{platform}} 产出 {{post_count}} 条关于「{{product_type}}」的种草内容。每条含：1) 钩子标题 2) 3-5 段种草正文（痛点 / 体验 / 对比 / 推荐理由）3) 推荐 tag 4) 发布时段建议。全文经广告法极限词扫描。",
+    promptTemplate:
+      "为 {{platform}} 产出 {{post_count}} 条「{{product_type}}」种草，含合规扫描与发布策略。",
+    steps: [
+      step(1, "平台趋势扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "种草脚本生成", "zhongcao_script", "种草脚本", "generation", "script"),
+      step(3, "广告法合规扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(4, "发布策略生成", "publish_strategy", "发布策略", "management", "strategy"),
+    ],
+  },
+
+  {
+    slug: "local_news",
+    name: "本地新闻",
+    description: "按本地区域 + 范围匹配全网与内部数据源内容，多篇改写后产出本地新闻稿件。",
+    icon: "map",
+    category: "news",
+    ownerEmployeeId: "xiaoce",
+    defaultTeam: ["xiaoce", "xiaolei", "xiaowen"],
+    appChannelSlug: "app_news",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "region",
+        label: "本地区域",
+        type: "text",
+        required: true,
+        defaultValue: "成都",
+        placeholder: "如：成都 / 成都·武侯区",
+      },
+      {
+        name: "topic_scope",
+        label: "新闻范围",
+        type: "multiselect",
+        required: true,
+        options: [
+          { value: "food", label: "美食" },
+          { value: "travel", label: "旅游" },
+          { value: "livelihood", label: "民生" },
+          { value: "culture", label: "文化" },
+          { value: "transport", label: "交通" },
+        ],
+      },
+      {
+        name: "article_count",
+        label: "产出条数",
+        type: "number",
+        required: false,
+        defaultValue: 3,
+        validation: { min: 1, max: 6 },
+      },
+    ],
+    systemInstruction:
+      "围绕 {{region}} 在 {{topic_scope}} 范围的本地新闻，通过全网检索 + 内部数据源匹配素材，产出 {{article_count}} 篇改写稿件。每篇：1) 本地化标题 2) 800-1500 字正文（含本地视角）3) 引用信源标注。",
+    promptTemplate:
+      "为 {{region}} 产出 {{article_count}} 篇 {{topic_scope}} 范围的本地新闻改写稿。",
+    steps: [
+      step(1, "本地新闻聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(2, "全网搜索补充", "web_search", "全网搜索", "perception", "search"),
+      step(3, "多源素材改写", "style_rewrite", "风格改写", "generation", "rewrite"),
+      step(4, "本地新闻成稿", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
+
+  {
+    slug: "national_hotspot",
+    name: "全国热点图文",
+    description: "输入关注的热点范围（苏超 / AI 发展 / ...），通过全网检索 + 数据源匹配，多篇内容改写输出全国热点图文。",
+    icon: "flame",
+    category: "news",
+    ownerEmployeeId: "xiaolei",
+    defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
+    appChannelSlug: "app_news",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic_range",
+        label: "热点范围",
+        type: "text",
+        required: true,
+        placeholder: "如：苏超 / AI 发展 / 新能源政策",
+      },
+      {
+        name: "article_count",
+        label: "产出条数",
+        type: "number",
+        required: false,
+        defaultValue: 3,
+        validation: { min: 1, max: 6 },
+      },
+      {
+        name: "rewrite_tone",
+        label: "改写风格",
+        type: "select",
+        required: false,
+        defaultValue: "news_standard",
+        options: [
+          { value: "news_standard", label: "标准新闻" },
+          { value: "serious", label: "严肃权威" },
+          { value: "casual", label: "轻松叙事" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕「{{topic_range}}」做全网热点匹配（外网检索 + 内部数据源），产出 {{article_count}} 篇 {{rewrite_tone}} 风格的改写稿件，每篇 600-1200 字。含：钩子标题 / 事实回顾 / 多方观点 / 延伸阅读。",
+    promptTemplate:
+      "为「{{topic_range}}」产出 {{article_count}} 篇全国热点图文（{{rewrite_tone}}）。",
+    steps: [
+      step(1, "全网热点扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "多源新闻聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(3, "多篇素材改写", "style_rewrite", "风格改写", "generation", "rewrite"),
+      step(4, "热点图文成稿", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────
