@@ -204,6 +204,13 @@
       "when": 1776572115615,
       "tag": "0028_warm_quicksilver",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776654294895,
+      "tag": "0029_catchup_hand_written_migrations",
+      "breakpoints": true
     }
   ]
 }
