@@ -95,6 +95,17 @@ export const leaderConsolidate = inngest.createFunction(
         .where(eq(missionMessages.missionId, missionId));
     });
 
+    // 3.5 Resolve scenario display label: 优先 workflow_template.name，legacy slug 回退。
+    const scenarioLabel = mission.workflowTemplateId
+      ? await step.run("load-template-name", async () => {
+          const tpl = await db.query.workflowTemplates.findFirst({
+            where: eq(workflowTemplates.id, mission.workflowTemplateId!),
+            columns: { name: true },
+          });
+          return tpl?.name ?? mission.scenario;
+        })
+      : mission.scenario;
+
     // 4. Assemble leader agent and run consolidation
     const consolidationResult = await step.run(
       "consolidate",
@@ -117,7 +128,7 @@ export const leaderConsolidate = inngest.createFunction(
         const result = await executeAgent(agent, {
           stepKey: "leader-consolidate",
           stepLabel: "成果汇总与交付",
-          scenario: mission.scenario,
+          scenario: scenarioLabel,
           topicTitle: mission.title,
           previousSteps,
           userInstructions: prompt,
