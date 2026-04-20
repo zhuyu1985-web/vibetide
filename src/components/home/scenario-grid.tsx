@@ -55,14 +55,14 @@ interface TabDef {
 }
 
 const TAB_ORDER: TabDef[] = [
-  { key: "xiaolei", label: "小雷" },
-  { key: "xiaoce", label: "小策" },
-  { key: "xiaozi", label: "小子" },
-  { key: "xiaowen", label: "小文" },
-  { key: "xiaojian", label: "小剑" },
-  { key: "xiaoshen", label: "小审" },
-  { key: "xiaofa", label: "小发" },
-  { key: "xiaoshu", label: "小数" },
+  { key: "xiaolei", label: "热点分析" },
+  { key: "xiaoce", label: "选题策划" },
+  { key: "xiaozi", label: "素材研究" },
+  { key: "xiaowen", label: "内容创作" },
+  { key: "xiaojian", label: "视频脚本" },
+  { key: "xiaoshen", label: "质量审核" },
+  { key: "xiaofa", label: "渠道运营" },
+  { key: "xiaoshu", label: "数据分析" },
   { key: "custom", label: "我的工作流" },
 ];
 
@@ -203,11 +203,12 @@ export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
                           delay: index * 0.04,
                           ease: "easeOut",
                         }}
+                        className="h-full"
                       >
                         <GlassCard
                           padding="md"
                           hover
-                          className="cursor-pointer"
+                          className="flex h-full cursor-pointer flex-col"
                           onClick={() => handleCardClick(tpl)}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -243,7 +244,7 @@ export function ScenarioGrid({ templatesByTab }: ScenarioGridProps) {
                             </div>
                           )}
 
-                          <div className="mt-4 flex justify-end">
+                          <div className="mt-auto flex justify-end pt-4">
                             <Button
                               size="sm"
                               disabled={isStarting}
