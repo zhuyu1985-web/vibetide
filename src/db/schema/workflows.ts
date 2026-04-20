@@ -6,8 +6,10 @@ import {
   jsonb,
   integer,
   boolean,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
 import { missions } from "./missions";
@@ -95,7 +97,24 @@ export const workflowTemplates = pgTable("workflow_templates", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  // 2026-04-20 把 raw SQL migration 里的 partial indexes 上行到 schema，
+  // 防止 `drizzle-kit push` 因 schema 与 DB 不对齐而把它们丢掉。
+  //
+  // (org_id, legacy_scenario_key) 唯一 —— 仅当 slug 非 null 时生效。
+  // 供 seedBuiltinTemplatesForOrg 的 onConflictDoUpdate 使用。
+  legacyKeyUidx: uniqueIndex("workflow_templates_org_legacy_key_uidx")
+    .on(table.organizationId, table.legacyScenarioKey)
+    .where(sql`${table.legacyScenarioKey} IS NOT NULL`),
+  // (org_id, name) 唯一 —— 仅 builtin 无 slug 的遗留行生效（避免撞旧 seed）。
+  builtinNameUidx: uniqueIndex("workflow_templates_org_builtin_name_uidx")
+    .on(table.organizationId, table.name)
+    .where(sql`${table.isBuiltin} = true AND ${table.legacyScenarioKey} IS NULL`),
+  // 主流场景 tab 查询热路径。
+  featuredIdx: index("idx_workflow_templates_featured")
+    .on(table.organizationId, table.isFeatured)
+    .where(sql`${table.isFeatured} = true AND ${table.isPublic} = true`),
+}));
 
 // ─── Workflow Artifacts (now linked to missions instead of workflow_instances) ───
 
