@@ -207,7 +207,7 @@ git commit -m "feat(seed): BuiltinWorkflowSeed 支持 isFeatured 字段透传"
 | `name` | `"特稿生产线"` | `"精品内容（深度大稿）"` |
 | `description` | `"重大特稿的从调研到合规的完整生产链路，支持多档深度。"` | `"重大热点或指定选题的 6 人协同深度大稿生产，覆盖调研→撰写→核查→合规全链路，发布到 APP 首页精品内容栏目。"` |
 | `ownerEmployeeId` | `null` | `"xiaowen"` |
-| `defaultTeam` | `["xiaolei", "xiaowen", "xiaozi", "xiaoshen"]` | `["xiaolei", "xiaoce", "xiaozi", "xiaowen", "xiaoshen", "xiaofa"]` |
+| `defaultTeam` | `["xiaolei", "xiaowen", "xiaozi", "xiaoshen"]` | `["xiaowen", "xiaolei", "xiaoce", "xiaozi", "xiaoshen", "xiaofa"]`（owner 首位） |
 | `appChannelSlug` | `"app_news"` | `"app_home"` |
 | 新增 | — | `isFeatured: true,`（放在 `appChannelSlug` 后） |
 
