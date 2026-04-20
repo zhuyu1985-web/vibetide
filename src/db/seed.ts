@@ -179,12 +179,6 @@ async function seed() {
         .returning();
   console.log(`   ${existingOrg ? "Found" : "Created"} org: ${org.name} (${org.id})\n`);
 
-  // B.1 Unified Scenario Workflow: employee_scenarios seed 停写，
-  // 历史数据清理（xiaolei 5 条已迁到 workflow_templates builtin seed）
-  await db
-    .delete(schema.employeeScenarios)
-    .where(eq(schema.employeeScenarios.organizationId, org.id));
-
   // 2. Insert builtin skills into skills table (from skills/*/SKILL.md)
   console.log("2. Inserting builtin skills...");
   const builtinSkills = getAllBuiltinSkills();
@@ -1403,7 +1397,7 @@ async function seed() {
 
   // 23. Employee scenarios seed removed — migrated to workflow_templates builtin seed
   //     (see src/db/seed-builtin-workflows.ts xiaoleiScenariosToSeeds).
-  //     employee_scenarios table stays until B.2 DROP; cleanup happens at top of seed().
+  //     employee_scenarios table dropped 2026-04-20 (migration 20260420_drop_employee_scenarios).
 
   // -----------------------------------------------------------------------
   // Monitored Platforms (Benchmarking Deep-Dive)

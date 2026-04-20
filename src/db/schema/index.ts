@@ -82,3 +82,9 @@ export * from "./cms-mapping";
 export * from "./cms-publications";
 // CMS Adapter Phase 1 — Task 12：APP 栏目 ↔ CMS 栏目绑定（运营配置）
 export * from "./app-channels";
+
+// NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
+// (Task 0.3 of 2026-04-20-scenario-workflow-realignment). The table was
+// DROPPED in migration 20260420000001; the ghost schema + all 14 TS
+// references were deleted in this commit. See
+// docs/superpowers/specs/2026-04-20-scenario-workflow-realignment-design.md.

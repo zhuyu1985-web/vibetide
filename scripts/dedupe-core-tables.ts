@@ -2,7 +2,8 @@
  * One-time cleanup: dedupe ai_employees, skills, knowledge_bases, and the
  * employee_skills / employee_knowledge_bases join tables.
  *
- * These tables all had the same bug pattern as employee_scenarios:
+ * These tables all had the same bug pattern as the now-dropped
+ * `employee_scenarios` table:
  *   - No unique constraint on the natural key
  *   - Seed writes / server-action auto-provision uses plain INSERT
  *   - Re-runs / races accumulate duplicate rows
@@ -36,7 +37,6 @@ import {
   missionArtifacts,
   missionMessages,
   employeeMemories,
-  employeeScenarios,
 } from "@/db/schema";
 import { sql, inArray } from "drizzle-orm";
 
@@ -231,9 +231,8 @@ async function main() {
   for (const g of skillDups) await mergeSkill(g.ids);
   for (const g of kbDups) await mergeKb(g.ids);
 
-  // Note: employee_scenarios is handled by its own script (run first).
-  // Keep a suppressed warning import so a typo here gets caught at TS time.
-  void employeeScenarios;
+  // Note: the former `employee_scenarios` dedupe path is gone — the table was
+  // dropped in migration 20260420_drop_employee_scenarios.
 
   console.log("[dedupe-core-tables] done");
 }

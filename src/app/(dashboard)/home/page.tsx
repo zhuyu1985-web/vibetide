@@ -5,7 +5,6 @@ import { missions } from "@/db/schema/missions";
 import { savedConversations } from "@/db/schema/saved-conversations";
 import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
-import { getAllScenariosByOrg } from "@/lib/dal/scenarios";
 import { getEmployees } from "@/lib/dal/employees";
 import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import type { ScenarioCardData } from "@/lib/types";
@@ -102,13 +101,9 @@ export default async function HomePage() {
       }
     }
 
-    // Fetch scenarios grouped by employee slug — pass full data so the
-    // home chat can show inline scenario forms (matching chat center UX)
-    try {
-      scenarioMap = await getAllScenariosByOrg();
-    } catch {
-      // Graceful degradation
-    }
+    // Legacy `employee_scenarios` table dropped 2026-04-20 —
+    // scenarioMap stays as an empty record until HomeClient is rewritten
+    // to consume workflow_templates directly (Phase 3).
 
     // Fetch employees to build slug → dbId map for scenario execution
     try {

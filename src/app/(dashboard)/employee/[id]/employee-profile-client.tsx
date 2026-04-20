@@ -74,9 +74,7 @@ import { EvolutionTab } from "./evolution-tab";
 import { VersionHistory } from "./version-history";
 import { SkillTestDialog } from "./skill-test-dialog";
 import { SkillComboManager } from "./skill-combo-manager";
-import { ScenarioWorkbench } from "./scenario-workbench";
-import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo, ScenarioCardData } from "@/lib/types";
-import type { ScenarioAdminRow } from "@/lib/dal/scenarios";
+import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo } from "@/lib/types";
 import type { SkillRecommendation } from "@/lib/dal/skills";
 import type { WorkflowTemplateRow } from "@/db/types";
 import { startMission } from "@/app/actions/missions";
@@ -134,12 +132,9 @@ interface EmployeeProfileClientProps {
     createdAt: string;
   }>;
   unprocessedFeedbackCount?: number;
-  scenarios?: ScenarioCardData[];
-  adminScenarios?: ScenarioAdminRow[];
   /**
    * B.1 — workflow_templates bound to this employee via `defaultTeam`.
    * These ARE the employee's scenarios in the unified model (场景 = 工作流).
-   * Rendered alongside legacy `scenarios` until B.2 removes the dual system.
    */
   employeeWorkflows?: WorkflowTemplateRow[];
   /** Whether the current user can write scenarios (ai:manage permission).
@@ -162,8 +157,6 @@ export function EmployeeProfileClient({
   skillCombos = [],
   recentMemories = [],
   unprocessedFeedbackCount = 0,
-  scenarios = [],
-  adminScenarios = [],
   employeeWorkflows = [],
   canManageScenarios = true,
 }: EmployeeProfileClientProps) {
@@ -377,16 +370,9 @@ export function EmployeeProfileClient({
         />
       )}
 
-      {/* Legacy scenario workbench — interactive scenarios from the old
-          `employee_scenarios` table. Kept until B.2 fully migrates. */}
-      {scenarios.length > 0 && (
-        <ScenarioWorkbench
-          scenarios={scenarios}
-          employeeDbId={employee.dbId}
-          employeeSlug={employee.id}
-          employeeNickname={employee.nickname}
-        />
-      )}
+      {/* Legacy scenario workbench removed 2026-04-20 — employee_scenarios
+           table dropped (migration 20260420). 场景 = 工作流 in the unified
+           model; see EmployeeScenarios tab above for workflow_templates. */}
 
       {/* Tabs */}
       <Tabs defaultValue="skills">

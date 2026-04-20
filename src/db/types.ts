@@ -67,7 +67,6 @@ import type {
   eventHighlights,
   eventOutputs,
   eventTranscriptions,
-  employeeScenarios,
   hotTopicCrawlLogs,
   savedConversations,
 } from "./schema";
@@ -241,10 +240,6 @@ export type NewSkillVersion = InferInsertModel<typeof skillVersions>;
 // Skill Usage Records
 export type SkillUsageRecordRow = InferSelectModel<typeof skillUsageRecords>;
 export type NewSkillUsageRecord = InferInsertModel<typeof skillUsageRecords>;
-
-// Employee Scenarios
-export type EmployeeScenarioRow = InferSelectModel<typeof employeeScenarios>;
-export type NewEmployeeScenario = InferInsertModel<typeof employeeScenarios>;
 
 // Hot Topic Crawl Logs
 export type HotTopicCrawlLogRow = InferSelectModel<typeof hotTopicCrawlLogs>;

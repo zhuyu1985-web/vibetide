@@ -5,7 +5,6 @@ import { getPerformanceTrend } from "@/lib/dal/performance";
 import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectAttributions } from "@/lib/dal/evolution";
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
-import { getScenariosByEmployeeSlug, listScenariosForEmployeeAdmin } from "@/lib/dal/scenarios";
 import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
 import { PERMISSIONS } from "@/lib/rbac-constants";
@@ -72,15 +71,15 @@ export default async function EmployeeProfilePage({
     getSkillCombos(orgId).catch(() => []),
   ]);
 
-  const [recentMemories, unprocessedFeedbackCount, scenarios, adminScenarios, employeeWorkflows] =
+  const [recentMemories, unprocessedFeedbackCount, employeeWorkflows] =
     await Promise.all([
       getRecentMemories(employee.dbId, 20).catch(() => []),
       getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
-      getScenariosByEmployeeSlug(employee.id).catch(() => []),
-      listScenariosForEmployeeAdmin(employee.id).catch(() => []),
       // B.1: workflow_templates filtered by this employee's slug (via jsonb
       // `default_team @> '["slug"]'`). These ARE the employee's "scenarios"
       // in the unified model — 场景 = 工作流.
+      // Legacy `employee_scenarios` table has been DROPPED (commit a066cbb);
+      // scenarios/adminScenarios no longer loaded.
       orgId
         ? listWorkflowTemplatesByOrg(orgId, {
             isEnabled: true,
@@ -104,8 +103,6 @@ export default async function EmployeeProfilePage({
       skillCombos={skillCombos}
       recentMemories={recentMemories}
       unprocessedFeedbackCount={unprocessedFeedbackCount}
-      scenarios={scenarios}
-      adminScenarios={adminScenarios}
       employeeWorkflows={employeeWorkflows}
       canManageScenarios={canManageScenarios}
     />
