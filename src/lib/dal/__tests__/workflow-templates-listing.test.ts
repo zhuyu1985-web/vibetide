@@ -104,8 +104,15 @@ describe("listTemplatesForHomepageByTab", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("custom tab：可调用且返回数组", async () => {
+  it("custom tab 缺 userId：返回空数组（与 /workflows 语义对齐，未登录不显示）", async () => {
     const result = await listTemplatesForHomepageByTab("org1", "custom");
+    expect(result).toEqual([]);
+  });
+
+  it("custom tab 带 userId：可调用且返回数组", async () => {
+    const result = await listTemplatesForHomepageByTab("org1", "custom", {
+      userId: "user1",
+    });
     expect(Array.isArray(result)).toBe(true);
   });
 

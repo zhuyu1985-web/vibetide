@@ -106,11 +106,12 @@ export default async function HomePage() {
       }));
 
       // 2026-04-20 首页 tab 重构 — 并行 fetch 10 个 tab 数据。
+      // custom tab 需要 userId 来匹配 /workflows 页 "我的工作流" 语义（只显示当前用户创建的）。
       if (orgId) {
         try {
           const results = await Promise.all(
             HOMEPAGE_TAB_KEYS.map((key) =>
-              listTemplatesForHomepageByTab(orgId, key),
+              listTemplatesForHomepageByTab(orgId, key, { userId: user.id }),
             ),
           );
           templatesByTab = Object.fromEntries(

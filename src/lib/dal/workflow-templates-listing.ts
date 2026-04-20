@@ -129,26 +129,33 @@ export type HomepageTabKey = "featured" | EmployeeId | "custom";
  * Unified homepage-grid query. 替代原 `listTemplatesForHomepageByEmployee`。
  *
  * - `"featured"`：`is_featured=true AND is_public=true`
- * - `"custom"`：`is_builtin=false AND is_public=true`
+ * - `"custom"`：`is_builtin=false AND created_by=userId`（= /workflows 页 "我的工作流" 语义）
  * - EmployeeId：`owner_employee_id=<id> AND is_public=true`
  *
+ * `"custom"` 分支需要 `opts.userId`；若未提供则返回 []（未登录不显示"我的"）。
  * 所有分支附加 `organization_id=orgId` + `orderBy(asc(createdAt))`。
  */
 export async function listTemplatesForHomepageByTab(
   orgId: string,
   tab: HomepageTabKey,
+  opts?: { userId?: string },
 ): Promise<WorkflowTemplateRow[]> {
-  const conds: SQL[] = [
-    eq(workflowTemplates.organizationId, orgId),
-    eq(workflowTemplates.isPublic, true),
-  ];
+  if (tab === "custom" && !opts?.userId) {
+    return [];
+  }
+
+  const conds: SQL[] = [eq(workflowTemplates.organizationId, orgId)];
 
   if (tab === "featured") {
+    conds.push(eq(workflowTemplates.isPublic, true));
     conds.push(eq(workflowTemplates.isFeatured, true));
   } else if (tab === "custom") {
+    // 与 /workflows 页 getMyWorkflows 语义一致：isBuiltin=false AND createdBy=userId
     conds.push(eq(workflowTemplates.isBuiltin, false));
+    conds.push(eq(workflowTemplates.createdBy, opts!.userId!));
   } else {
     // tab 是 EmployeeId
+    conds.push(eq(workflowTemplates.isPublic, true));
     conds.push(eq(workflowTemplates.ownerEmployeeId, tab));
   }
 
@@ -162,11 +169,12 @@ export async function listTemplatesForHomepageByTab(
 
 /**
  * @deprecated 2026-04-20 首页 tab 重构 —— 请改用 `listTemplatesForHomepageByTab`。
- * 保留别名是为了不破坏现有调用点。
+ * 保留别名是为了不破坏现有调用点；custom 分支需要 userId 才返回结果。
  */
 export async function listTemplatesForHomepageByEmployee(
   orgId: string,
   employeeId: EmployeeId | null,
+  opts?: { userId?: string },
 ): Promise<WorkflowTemplateRow[]> {
-  return listTemplatesForHomepageByTab(orgId, employeeId ?? "custom");
+  return listTemplatesForHomepageByTab(orgId, employeeId ?? "custom", opts);
 }
