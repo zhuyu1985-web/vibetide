@@ -36,6 +36,7 @@ import {
   mapTaskOutputsToStepOutputs,
   checkTokenBudget,
 } from "@/lib/mission-core";
+import { loadScenarioLabel } from "@/lib/mission-scenario-label";
 
 const MISSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 分钟
 
@@ -149,7 +150,7 @@ export async function leaderPlanDirect(
   const planResult = await executeAgent(agent, {
     stepKey: "leader-plan",
     stepLabel: "任务分解与分配",
-    scenario: mission.scenario,
+    scenario: await loadScenarioLabel(mission),
     topicTitle: mission.title,
     previousSteps: [],
     userInstructions: prompt,
@@ -250,7 +251,7 @@ async function executeTaskDirect(
   taskId: string,
   missionId: string,
   /** Pre-loaded mission to avoid redundant queries in parallel execution */
-  cachedMission?: { id: string; scenario: string; title: string; tokenBudget: number; tokensUsed: number; leaderEmployeeId: string },
+  cachedMission?: { id: string; scenario: string; title: string; tokenBudget: number; tokensUsed: number; leaderEmployeeId: string; workflowTemplateId: string | null },
 ) {
   // Batch pre-execution reads: task + mission (if not cached) + deps + messages
   const task = await db.query.missionTasks.findFirst({ where: eq(missionTasks.id, taskId) });
@@ -303,7 +304,7 @@ async function executeTaskDirect(
     const result = await executeAgent(agent, {
       stepKey: task.id,
       stepLabel: task.title,
-      scenario: mission.scenario,
+      scenario: await loadScenarioLabel(mission),
       topicTitle: mission.title,
       previousSteps,
       userInstructions,
@@ -430,6 +431,7 @@ export async function executeAllTasksDirect(missionId: string, missionStartTime:
     id: mission.id, scenario: mission.scenario, title: mission.title,
     tokenBudget: mission.tokenBudget, tokensUsed: mission.tokensUsed,
     leaderEmployeeId: mission.leaderEmployeeId,
+    workflowTemplateId: mission.workflowTemplateId,
   };
 
   let rounds = 0;
@@ -629,7 +631,7 @@ export async function leaderConsolidateDirect(
   const result = await executeAgent(agent, {
     stepKey: "leader-consolidate",
     stepLabel: "成果汇总与交付",
-    scenario: mission.scenario,
+    scenario: await loadScenarioLabel(mission),
     topicTitle: mission.title,
     previousSteps,
     userInstructions: prompt,

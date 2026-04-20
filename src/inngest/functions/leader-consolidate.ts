@@ -14,6 +14,7 @@ import {
   buildConsolidatePrompt,
   mapTaskOutputsToStepOutputs,
 } from "@/lib/mission-core";
+import { loadScenarioLabel } from "@/lib/mission-scenario-label";
 import {
   publishArticleToCms,
   isCmsPublishEnabled,
@@ -96,15 +97,9 @@ export const leaderConsolidate = inngest.createFunction(
     });
 
     // 3.5 Resolve scenario display label: 优先 workflow_template.name，legacy slug 回退。
-    const scenarioLabel = mission.workflowTemplateId
-      ? await step.run("load-template-name", async () => {
-          const tpl = await db.query.workflowTemplates.findFirst({
-            where: eq(workflowTemplates.id, mission.workflowTemplateId!),
-            columns: { name: true },
-          });
-          return tpl?.name ?? mission.scenario;
-        })
-      : mission.scenario;
+    const scenarioLabel = await step.run("load-scenario-label", () =>
+      loadScenarioLabel(mission),
+    );
 
     // 4. Assemble leader agent and run consolidation
     const consolidationResult = await step.run(

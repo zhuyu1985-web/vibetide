@@ -7,7 +7,6 @@ import {
   missionArtifacts,
   aiEmployees,
   employeeSkills,
-  workflowTemplates,
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { assembleAgent, executeAgent } from "@/lib/agent";
@@ -17,6 +16,7 @@ import {
   loadEmployeeMessages,
   checkTokenBudget,
 } from "@/lib/mission-core";
+import { loadScenarioLabel } from "@/lib/mission-scenario-label";
 import { recordSkillUsageInternal } from "@/app/actions/skills";
 
 /**
@@ -199,15 +199,9 @@ export const executeMissionTask = inngest.createFunction(
     );
 
     // 5.5 Resolve scenario display label: 优先 workflow_template.name，legacy slug 回退。
-    const scenarioLabel = mission.workflowTemplateId
-      ? await step.run("load-template-name", async () => {
-          const tpl = await db.query.workflowTemplates.findFirst({
-            where: eq(workflowTemplates.id, mission.workflowTemplateId!),
-            columns: { name: true },
-          });
-          return tpl?.name ?? mission.scenario;
-        })
-      : mission.scenario;
+    const scenarioLabel = await step.run("load-scenario-label", () =>
+      loadScenarioLabel(mission),
+    );
 
     // 6. Assemble the agent and execute
     let executionResult: Awaited<ReturnType<typeof executeAgent>>;

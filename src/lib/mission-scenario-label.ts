@@ -11,7 +11,12 @@
  * - Client 组件：如果 server 已经注入了 `scenarioLabel` 字段，直接读。若实在拿不到
  *   template，降级为 `resolveMissionScenarioLabel(mission)` 只靠 `mission.scenario`
  *   文本兜底（历史数据或 pre-B.1 mission）。
+ * - Executor / Inngest 路径：用异步 `loadScenarioLabel(mission)`，内部自己 DB 查
+ *   template.name；专门喂给 `executeAgent({ scenario })` 作为 LLM prompt 里的显示名。
  */
+import { db } from "@/db";
+import { workflowTemplates } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import type { WorkflowTemplateRow } from "@/db/types";
 
 export interface MissionScenarioInfo {
@@ -59,4 +64,22 @@ export function resolveMissionScenarioLabel(
     label: slug,
     slug,
   };
+}
+
+/**
+ * 异步版：根据 mission 的 workflowTemplateId 去 DB 查模板名，回退到 scenario slug。
+ * 专门给 mission-executor / Inngest 消费者作为 `executeAgent({ scenario })` 的显示名。
+ */
+export async function loadScenarioLabel(mission: {
+  workflowTemplateId: string | null;
+  scenario: string | null;
+}): Promise<string> {
+  if (mission.workflowTemplateId) {
+    const tpl = await db.query.workflowTemplates.findFirst({
+      where: eq(workflowTemplates.id, mission.workflowTemplateId),
+      columns: { name: true },
+    });
+    if (tpl?.name) return tpl.name;
+  }
+  return mission.scenario ?? "通用任务";
 }
