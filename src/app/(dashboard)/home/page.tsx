@@ -6,18 +6,20 @@ import { savedConversations } from "@/db/schema/saved-conversations";
 import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
 import { getEmployees } from "@/lib/dal/employees";
-import { listTemplatesForHomepageByEmployee } from "@/lib/dal/workflow-templates-listing";
+import {
+  listTemplatesForHomepageByTab,
+  type HomepageTabKey,
+} from "@/lib/dal/workflow-templates-listing";
 import type { ScenarioCardData } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
-import type { EmployeeId } from "@/lib/constants";
 import { HomeClient } from "./home-client";
 
 export const dynamic = "force-dynamic";
 
-// Task 2.3 — The homepage scenario grid is rendered as 9 tabs (8 employees +
-// "custom"). We pre-load the templates for every tab in parallel server-side
-// so the grid can switch tabs instantly without follow-up round-trips.
-const EMPLOYEE_TAB_IDS: EmployeeId[] = [
+// 2026-04-20 首页 tab 重构 — "主流场景 + 8 职能 + 我的工作流" = 10 tab，
+// 服务端并行 fetch 所有 tab 数据，支持切换无感。
+const HOMEPAGE_TAB_KEYS: HomepageTabKey[] = [
+  "featured",
   "xiaolei",
   "xiaoce",
   "xiaozi",
@@ -26,6 +28,7 @@ const EMPLOYEE_TAB_IDS: EmployeeId[] = [
   "xiaoshen",
   "xiaofa",
   "xiaoshu",
+  "custom",
 ];
 
 export default async function HomePage() {
@@ -102,29 +105,17 @@ export default async function HomePage() {
         updatedAt: c.updatedAt.toISOString(),
       }));
 
-      // Task 2.3 — Load templates per employee + custom tab in parallel.
-      // `null` → "我的工作流" tab (isBuiltin=false AND isPublic=true per DAL).
+      // 2026-04-20 首页 tab 重构 — 并行 fetch 10 个 tab 数据。
       if (orgId) {
         try {
-          const [byEmployee, customList] = await Promise.all([
-            Promise.all(
-              EMPLOYEE_TAB_IDS.map((eid) =>
-                listTemplatesForHomepageByEmployee(orgId, eid),
-              ),
+          const results = await Promise.all(
+            HOMEPAGE_TAB_KEYS.map((key) =>
+              listTemplatesForHomepageByTab(orgId, key),
             ),
-            listTemplatesForHomepageByEmployee(orgId, null),
-          ]);
-          templatesByTab = {
-            xiaolei: byEmployee[0],
-            xiaoce: byEmployee[1],
-            xiaozi: byEmployee[2],
-            xiaowen: byEmployee[3],
-            xiaojian: byEmployee[4],
-            xiaoshen: byEmployee[5],
-            xiaofa: byEmployee[6],
-            xiaoshu: byEmployee[7],
-            custom: customList,
-          };
+          );
+          templatesByTab = Object.fromEntries(
+            HOMEPAGE_TAB_KEYS.map((key, i) => [key, results[i]]),
+          );
         } catch {
           // Graceful degradation — fall through with an empty tab map.
         }
