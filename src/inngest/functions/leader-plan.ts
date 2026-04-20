@@ -57,15 +57,23 @@ export const leaderPlan = inngest.createFunction(
     // ─── Template fast path ────────────────────────────────────────────────
     // 当 mission 来自 workflow_templates 且模板有预设 steps[] 时，直接 materialize
     // 步骤到 mission_tasks（跳过 LLM 分解）。LLM 分解只用于 custom / ad-hoc mission。
-    const templateSteps = mission.workflowTemplateId
-      ? await step.run("load-template-steps", async () => {
+    // 同时把模板 name 作为场景显示名（优先于 mission.scenario slug）。
+    const templateInfo = mission.workflowTemplateId
+      ? await step.run("load-template", async () => {
           const tpl = await db.query.workflowTemplates.findFirst({
             where: eq(workflowTemplates.id, mission.workflowTemplateId!),
           });
-          if (!tpl || !Array.isArray(tpl.steps) || tpl.steps.length === 0) return null;
-          return tpl.steps as WorkflowStepDef[];
+          if (!tpl) return null;
+          const steps =
+            Array.isArray(tpl.steps) && tpl.steps.length > 0
+              ? (tpl.steps as WorkflowStepDef[])
+              : null;
+          return { name: tpl.name, steps };
         })
       : null;
+    const templateSteps = templateInfo?.steps ?? null;
+    // 优先展示模板名，fallback 到 legacy slug。
+    const scenarioLabel = templateInfo?.name ?? mission.scenario;
 
     if (templateSteps) {
       const materialized = await step.run("materialize-template-steps", async () => {
@@ -187,7 +195,7 @@ export const leaderPlan = inngest.createFunction(
       const result = await executeAgent(agent, {
         stepKey: "leader-plan",
         stepLabel: "任务分解与分配",
-        scenario: mission.scenario,
+        scenario: scenarioLabel,
         topicTitle: mission.title,
         previousSteps: [],
         userInstructions: prompt,
