@@ -62,15 +62,13 @@ import {
 } from "@/components/ui/select";
 import { startMission, deleteMissions } from "@/app/actions/missions";
 import {
-  SCENARIO_CONFIG,
-  ADVANCED_SCENARIO_CONFIG,
   ORDERED_CATEGORIES,
   CATEGORY_LABELS,
   EMPLOYEE_META,
   type EmployeeId,
   type OrderedCategory,
 } from "@/lib/constants";
-import { resolveScenarioConfig } from "@/lib/scenario-fallback";
+import { getLegacyTemplateInstruction } from "@/lib/scenario-fallback";
 import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 import type { MissionSummary } from "@/lib/dal/missions";
 import type { WorkflowTemplateRow } from "@/db/types";
@@ -384,15 +382,12 @@ export function MissionsClient({
   }
   function pickWorkflow(wf: WorkflowTemplateRow) {
     setSelectedWorkflow(wf);
-    // Pre-fill instruction from legacy config when the workflow maps to a
-    // builtin SCENARIO_CONFIG key. Custom workflows leave the field blank.
-    const legacyKey = wf.legacyScenarioKey;
-    if (legacyKey) {
-      const cfg = SCENARIO_CONFIG[legacyKey];
-      if (cfg?.templateInstruction) {
-        setInstruction(cfg.templateInstruction);
-      }
-    }
+    // Pre-fill instruction from the legacy template-instruction helper when
+    // the workflow maps to a builtin scenario key. Custom workflows leave the
+    // field blank. Phase 3 can remove the helper + underlying constant in one
+    // place (src/lib/scenario-fallback.ts).
+    const preset = getLegacyTemplateInstruction(wf.legacyScenarioKey);
+    if (preset) setInstruction(preset);
   }
 
   return (
@@ -632,11 +627,13 @@ export function MissionsClient({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全部场景</SelectItem>
-              {Object.entries(SCENARIO_CONFIG).map(([k, c]) => (
-                <SelectItem key={k} value={k}>{c.label}</SelectItem>
-              ))}
-              {Object.entries(ADVANCED_SCENARIO_CONFIG).map(([k, c]) => (
-                <SelectItem key={k} value={k}>{c.label}</SelectItem>
+              {/* Phase 4A: iterate over org workflow templates (single source of
+                  truth). The filter value is the scenario slug that
+                  `templateToScenarioSlug` writes into `mission.scenario`. */}
+              {workflows.map((wf) => (
+                <SelectItem key={wf.id} value={templateToScenarioSlug(wf)}>
+                  {wf.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -785,7 +782,11 @@ function MissionRow({
     : m.totalTaskCount > 0 ? Math.round((m.completedTaskCount / m.totalTaskCount) * 100) : 0;
   const progressCls = PROGRESS_CLASS[m.status] ?? "bg-gray-400";
   const skippedCount = isDone ? m.totalTaskCount - m.completedTaskCount - m.inProgressTaskCount : 0;
-  const scCfg = resolveScenarioConfig(m);
+  // Phase 4A: scenario display label comes from server-resolved
+  // `m.scenarioLabel` (see `MissionSummary`). Color/bgColor are not stored on
+  // `workflow_templates` — fall back to a neutral tint here. (Phase 3 may
+  // migrate palette data into the DB; for now this keeps the pill visible.)
+  const scLabel = m.scenarioLabel || m.scenario;
   const isActive = ["executing", "consolidating"].includes(m.status);
 
   // Extract error message from finalOutput for failed missions
@@ -868,13 +869,9 @@ function MissionRow({
         {/* Scenario */}
         <div className="w-20 shrink-0">
           <span
-            className="text-[10px] font-medium px-2 py-0.5 rounded"
-            style={{
-              backgroundColor: scCfg?.bgColor ?? "rgba(107,114,128,0.12)",
-              color: scCfg?.color ?? "#6b7280",
-            }}
+            className="text-[10px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
           >
-            {scCfg?.label ?? m.scenario}
+            {scLabel}
           </span>
         </div>
 

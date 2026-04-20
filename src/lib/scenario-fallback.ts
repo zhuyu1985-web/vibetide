@@ -8,6 +8,20 @@ import {
 } from "@/lib/constants";
 
 /**
+ * Look up the default user-instruction pre-fill text for a legacy scenario
+ * slug. UI layer (e.g. missions-client 的 "发起新任务" sheet) should call this
+ * instead of reaching into SCENARIO_CONFIG directly, so Phase 3 can delete
+ * SCENARIO_CONFIG by only touching this file.
+ */
+export function getLegacyTemplateInstruction(
+  legacyKey: string | null | undefined,
+): string | null {
+  if (!legacyKey) return null;
+  const cfg = SCENARIO_CONFIG[legacyKey];
+  return cfg?.templateInstruction ?? null;
+}
+
+/**
  * Shape any mission-like object needs to provide for scenario resolution.
  * Compatible with `Mission`, `MissionSummary`, `MissionWithDetails`.
  */

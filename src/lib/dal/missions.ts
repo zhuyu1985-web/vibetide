@@ -4,6 +4,7 @@ import {
   missionTasks,
   missionMessages,
   aiEmployees,
+  workflowTemplates,
 } from "@/db/schema";
 import { eq, and, desc, asc, inArray, sql, or } from "drizzle-orm";
 import type {
@@ -14,7 +15,9 @@ import type {
   MissionTaskStatus,
   AIEmployee,
 } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { resolveMissionScenarioLabel } from "@/lib/mission-scenario-label";
 
 function rowToEmployee(row: typeof aiEmployees.$inferSelect): AIEmployee {
   const slug = row.slug as EmployeeId;
@@ -320,6 +323,20 @@ export interface MissionSummary extends Mission {
   latestActivityFromSlug: string | null;
   latestActivityText: string | null;
   latestActivityTime: string | null;
+  /**
+   * Phase 4A: server-side resolved scenario display info (from
+   * mission.workflowTemplateId → workflow_templates join). UI reads these
+   * instead of SCENARIO_CONFIG / ADVANCED_SCENARIO_CONFIG.
+   * - `scenarioLabel`    — display name (template.name or scenario slug fallback)
+   * - `scenarioCategory` — category (for filtering)
+   * - `scenarioIcon`     — lucide icon name (string)
+   * - `workflowTemplateId` — template uuid when mission was linked (may be null
+   *   for pre-B.1 legacy missions)
+   */
+  scenarioLabel: string;
+  scenarioCategory: string | null;
+  scenarioIcon: string | null;
+  workflowTemplateId: string | null;
 }
 
 export async function getMissionsWithActiveTasks(
@@ -327,7 +344,7 @@ export async function getMissionsWithActiveTasks(
 ): Promise<MissionSummary[]> {
   // Run ALL queries in parallel — 1 network round-trip instead of 4 sequential.
   // Uses org-level employee query (small table) to avoid dependency on mission results.
-  const [missionRows, taskRows, msgRows, empRows] = await Promise.all([
+  const [missionRows, taskRows, msgRows, empRows, workflowRows] = await Promise.all([
     db.select().from(missions).where(eq(missions.organizationId, organizationId)).orderBy(desc(missions.createdAt)),
     db.select({
       missionId: missionTasks.missionId,
@@ -348,9 +365,17 @@ export async function getMissionsWithActiveTasks(
       .orderBy(desc(missionMessages.createdAt)),
     db.select({ id: aiEmployees.id, slug: aiEmployees.slug }).from(aiEmployees)
       .where(eq(aiEmployees.organizationId, organizationId)),
+    // Phase 4A: preload org's workflow templates so we can resolve
+    // `scenarioLabel` server-side (replaces SCENARIO_CONFIG lookup in client).
+    db.select().from(workflowTemplates)
+      .where(eq(workflowTemplates.organizationId, organizationId)),
   ]);
 
   if (missionRows.length === 0) return [];
+
+  const tplById = new Map<string, WorkflowTemplateRow>(
+    (workflowRows as WorkflowTemplateRow[]).map((t) => [t.id, t]),
+  );
 
   const empSlugMap = new Map(empRows.map((e) => [e.id, e.slug]));
 
@@ -413,6 +438,13 @@ export async function getMissionsWithActiveTasks(
       .filter((s): s is string => !!s);
     const latestMsg = latestMsgMap.get(r.id);
 
+    // Phase 4A: resolve scenario display info via template join + helper.
+    const template = r.workflowTemplateId ? tplById.get(r.workflowTemplateId) : undefined;
+    const scInfo = resolveMissionScenarioLabel(
+      { scenario: r.scenario, title: r.title },
+      template,
+    );
+
     return {
       id: r.id,
       organizationId: r.organizationId,
@@ -445,6 +477,10 @@ export async function getMissionsWithActiveTasks(
       latestActivityFromSlug: latestMsg?.fromSlug ?? null,
       latestActivityText: latestMsg?.content ?? null,
       latestActivityTime: latestMsg?.time ?? null,
+      scenarioLabel: scInfo.label,
+      scenarioCategory: scInfo.category ?? null,
+      scenarioIcon: scInfo.icon ?? null,
+      workflowTemplateId: r.workflowTemplateId ?? null,
     };
   });
 }
