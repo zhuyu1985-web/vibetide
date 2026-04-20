@@ -1,0 +1,63 @@
+{
+  "capturedAt": "2026-04-20T03:00:56.697Z",
+  "promptBuilderSource": "src/lib/mission-core.ts:buildLeaderDecomposePrompt",
+  "promptBuilderSignature": "(mission: { userInstruction: string; scenario: string; title: string }, employeesWithSkills: Array<{ slug, name, nickname, title, skills: string[] }>) => string",
+  "dbAvailable": false,
+  "scenarios": {
+    "breaking_news": {
+      "source": "synthetic",
+      "scenario": "breaking_news",
+      "title": "突发新闻快讯 · 合成基线样本",
+      "userInstruction": "刚刚监测到某市发生交通事故，请在 30 分钟内出一条 300 字快讯，附 1 张示意图片和 3 家媒体平台分发。",
+      "employeeCount": 8,
+      "prompt": "你是任务总监，需要将用户的指令分解为多个子任务，并分配给合适的团队成员。\n\n## 用户指令\n刚刚监测到某市发生交通事故，请在 30 分钟内出一条 300 字快讯，附 1 张示意图片和 3 家媒体平台分发。\n\n## 任务场景\nbreaking_news\n\n## 任务标题\n突发新闻快讯 · 合成基线样本\n\n## 可用团队成员\n- slug: xiaolei | 名称: 热点分析师（热点分析师） | 职位: 热点分析师 | 技能: 热点监控、趋势识别、平台数据分析\n- slug: xiaoce | 名称: 选题策划师（选题策划师） | 职位: 选题策划师 | 技能: 选题策划、角度设计、标题优化\n- slug: xiaozi | 名称: 素材研究员（素材研究员） | 职位: 素材研究员 | 技能: 资料检索、多源整合、数据核验\n- slug: xiaowen | 名称: 稿件撰写师（稿件撰写师） | 职位: 稿件撰写师 | 技能: 深度写作、短讯撰写、改写编辑\n- slug: xiaojian | 名称: 视频制作师（视频制作师） | 职位: 视频制作师 | 技能: 视频剪辑、脚本分镜、字幕配音\n- slug: xiaoshen | 名称: 内容审核师（内容审核师） | 职位: 内容审核师 | 技能: 合规审核、事实核查、敏感词过滤\n- slug: xiaofa | 名称: 渠道分发师（渠道分发师） | 职位: 渠道分发师 | 技能: 多平台适配、CMS 入库、定时发布\n- slug: xiaoshu | 名称: 数据分析师（数据分析师） | 职位: 数据分析师 | 技能: 传播数据分析、效果复盘、报表生成\n\n## 要求\n1. 分析用户指令，拆解为具体的子任务\n2. 为每个子任务选择最合适的执行人（基于其技能）\n3. 确定子任务之间的依赖关系（哪些任务必须在其他任务完成后才能开始）\n4. 每个子任务需要有清晰的标题、详细描述和期望输出\n\n## 输出格式\n请严格按照以下 JSON 格式输出，不要包含任何其他文本：\n\n```json\n{\n  \"tasks\": [\n    {\n      \"title\": \"子任务标题\",\n      \"description\": \"详细描述，包括具体要求和注意事项\",\n      \"expectedOutput\": \"期望的输出内容描述\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 1,\n      \"dependsOn\": []\n    },\n    {\n      \"title\": \"第二个子任务\",\n      \"description\": \"详细描述\",\n      \"expectedOutput\": \"期望输出\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 0,\n      \"dependsOn\": [0]\n    }\n  ]\n}\n```\n\n注意：\n- dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务\n- priority 数值越大越重要\n- 确保不要产生循环依赖\n- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务\n- 不要为同一类型的工作创建多个子任务（如\"信息搜集\"只需一个任务，不要拆成多个）",
+      "note": "DB unavailable, used synthetic sample"
+    },
+    "press_conference": {
+      "source": "synthetic",
+      "scenario": "press_conference",
+      "title": "新闻发布会深度报道 · 合成基线样本",
+      "userInstruction": "国务院新闻办下午 3 点召开发布会，主题为新能源汽车补贴政策调整。请产出通稿、短视频、官微速评各 1 条。",
+      "employeeCount": 8,
+      "prompt": "你是任务总监，需要将用户的指令分解为多个子任务，并分配给合适的团队成员。\n\n## 用户指令\n国务院新闻办下午 3 点召开发布会，主题为新能源汽车补贴政策调整。请产出通稿、短视频、官微速评各 1 条。\n\n## 任务场景\npress_conference\n\n## 任务标题\n新闻发布会深度报道 · 合成基线样本\n\n## 可用团队成员\n- slug: xiaolei | 名称: 热点分析师（热点分析师） | 职位: 热点分析师 | 技能: 热点监控、趋势识别、平台数据分析\n- slug: xiaoce | 名称: 选题策划师（选题策划师） | 职位: 选题策划师 | 技能: 选题策划、角度设计、标题优化\n- slug: xiaozi | 名称: 素材研究员（素材研究员） | 职位: 素材研究员 | 技能: 资料检索、多源整合、数据核验\n- slug: xiaowen | 名称: 稿件撰写师（稿件撰写师） | 职位: 稿件撰写师 | 技能: 深度写作、短讯撰写、改写编辑\n- slug: xiaojian | 名称: 视频制作师（视频制作师） | 职位: 视频制作师 | 技能: 视频剪辑、脚本分镜、字幕配音\n- slug: xiaoshen | 名称: 内容审核师（内容审核师） | 职位: 内容审核师 | 技能: 合规审核、事实核查、敏感词过滤\n- slug: xiaofa | 名称: 渠道分发师（渠道分发师） | 职位: 渠道分发师 | 技能: 多平台适配、CMS 入库、定时发布\n- slug: xiaoshu | 名称: 数据分析师（数据分析师） | 职位: 数据分析师 | 技能: 传播数据分析、效果复盘、报表生成\n\n## 要求\n1. 分析用户指令，拆解为具体的子任务\n2. 为每个子任务选择最合适的执行人（基于其技能）\n3. 确定子任务之间的依赖关系（哪些任务必须在其他任务完成后才能开始）\n4. 每个子任务需要有清晰的标题、详细描述和期望输出\n\n## 输出格式\n请严格按照以下 JSON 格式输出，不要包含任何其他文本：\n\n```json\n{\n  \"tasks\": [\n    {\n      \"title\": \"子任务标题\",\n      \"description\": \"详细描述，包括具体要求和注意事项\",\n      \"expectedOutput\": \"期望的输出内容描述\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 1,\n      \"dependsOn\": []\n    },\n    {\n      \"title\": \"第二个子任务\",\n      \"description\": \"详细描述\",\n      \"expectedOutput\": \"期望输出\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 0,\n      \"dependsOn\": [0]\n    }\n  ]\n}\n```\n\n注意：\n- dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务\n- priority 数值越大越重要\n- 确保不要产生循环依赖\n- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务\n- 不要为同一类型的工作创建多个子任务（如\"信息搜集\"只需一个任务，不要拆成多个）",
+      "note": "DB unavailable, used synthetic sample"
+    },
+    "daily_brief": {
+      "source": "synthetic",
+      "scenario": "daily_brief",
+      "title": "每日简报 · 合成基线样本",
+      "userInstruction": "整理今日 8:00-18:00 全网科技行业 10 条要闻，按重要性排序生成简报，附 3 张趋势图。",
+      "employeeCount": 8,
+      "prompt": "你是任务总监，需要将用户的指令分解为多个子任务，并分配给合适的团队成员。\n\n## 用户指令\n整理今日 8:00-18:00 全网科技行业 10 条要闻，按重要性排序生成简报，附 3 张趋势图。\n\n## 任务场景\ndaily_brief\n\n## 任务标题\n每日简报 · 合成基线样本\n\n## 可用团队成员\n- slug: xiaolei | 名称: 热点分析师（热点分析师） | 职位: 热点分析师 | 技能: 热点监控、趋势识别、平台数据分析\n- slug: xiaoce | 名称: 选题策划师（选题策划师） | 职位: 选题策划师 | 技能: 选题策划、角度设计、标题优化\n- slug: xiaozi | 名称: 素材研究员（素材研究员） | 职位: 素材研究员 | 技能: 资料检索、多源整合、数据核验\n- slug: xiaowen | 名称: 稿件撰写师（稿件撰写师） | 职位: 稿件撰写师 | 技能: 深度写作、短讯撰写、改写编辑\n- slug: xiaojian | 名称: 视频制作师（视频制作师） | 职位: 视频制作师 | 技能: 视频剪辑、脚本分镜、字幕配音\n- slug: xiaoshen | 名称: 内容审核师（内容审核师） | 职位: 内容审核师 | 技能: 合规审核、事实核查、敏感词过滤\n- slug: xiaofa | 名称: 渠道分发师（渠道分发师） | 职位: 渠道分发师 | 技能: 多平台适配、CMS 入库、定时发布\n- slug: xiaoshu | 名称: 数据分析师（数据分析师） | 职位: 数据分析师 | 技能: 传播数据分析、效果复盘、报表生成\n\n## 要求\n1. 分析用户指令，拆解为具体的子任务\n2. 为每个子任务选择最合适的执行人（基于其技能）\n3. 确定子任务之间的依赖关系（哪些任务必须在其他任务完成后才能开始）\n4. 每个子任务需要有清晰的标题、详细描述和期望输出\n\n## 输出格式\n请严格按照以下 JSON 格式输出，不要包含任何其他文本：\n\n```json\n{\n  \"tasks\": [\n    {\n      \"title\": \"子任务标题\",\n      \"description\": \"详细描述，包括具体要求和注意事项\",\n      \"expectedOutput\": \"期望的输出内容描述\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 1,\n      \"dependsOn\": []\n    },\n    {\n      \"title\": \"第二个子任务\",\n      \"description\": \"详细描述\",\n      \"expectedOutput\": \"期望输出\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 0,\n      \"dependsOn\": [0]\n    }\n  ]\n}\n```\n\n注意：\n- dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务\n- priority 数值越大越重要\n- 确保不要产生循环依赖\n- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务\n- 不要为同一类型的工作创建多个子任务（如\"信息搜集\"只需一个任务，不要拆成多个）",
+      "note": "DB unavailable, used synthetic sample"
+    },
+    "video_content": {
+      "source": "synthetic",
+      "scenario": "video_content",
+      "title": "短视频栏目 · 合成基线样本",
+      "userInstruction": "围绕最近热门的 AI 芯片话题，策划并制作一条 60 秒短视频，包含脚本、分镜、旁白文本。",
+      "employeeCount": 8,
+      "prompt": "你是任务总监，需要将用户的指令分解为多个子任务，并分配给合适的团队成员。\n\n## 用户指令\n围绕最近热门的 AI 芯片话题，策划并制作一条 60 秒短视频，包含脚本、分镜、旁白文本。\n\n## 任务场景\nvideo_content\n\n## 任务标题\n短视频栏目 · 合成基线样本\n\n## 可用团队成员\n- slug: xiaolei | 名称: 热点分析师（热点分析师） | 职位: 热点分析师 | 技能: 热点监控、趋势识别、平台数据分析\n- slug: xiaoce | 名称: 选题策划师（选题策划师） | 职位: 选题策划师 | 技能: 选题策划、角度设计、标题优化\n- slug: xiaozi | 名称: 素材研究员（素材研究员） | 职位: 素材研究员 | 技能: 资料检索、多源整合、数据核验\n- slug: xiaowen | 名称: 稿件撰写师（稿件撰写师） | 职位: 稿件撰写师 | 技能: 深度写作、短讯撰写、改写编辑\n- slug: xiaojian | 名称: 视频制作师（视频制作师） | 职位: 视频制作师 | 技能: 视频剪辑、脚本分镜、字幕配音\n- slug: xiaoshen | 名称: 内容审核师（内容审核师） | 职位: 内容审核师 | 技能: 合规审核、事实核查、敏感词过滤\n- slug: xiaofa | 名称: 渠道分发师（渠道分发师） | 职位: 渠道分发师 | 技能: 多平台适配、CMS 入库、定时发布\n- slug: xiaoshu | 名称: 数据分析师（数据分析师） | 职位: 数据分析师 | 技能: 传播数据分析、效果复盘、报表生成\n\n## 要求\n1. 分析用户指令，拆解为具体的子任务\n2. 为每个子任务选择最合适的执行人（基于其技能）\n3. 确定子任务之间的依赖关系（哪些任务必须在其他任务完成后才能开始）\n4. 每个子任务需要有清晰的标题、详细描述和期望输出\n\n## 输出格式\n请严格按照以下 JSON 格式输出，不要包含任何其他文本：\n\n```json\n{\n  \"tasks\": [\n    {\n      \"title\": \"子任务标题\",\n      \"description\": \"详细描述，包括具体要求和注意事项\",\n      \"expectedOutput\": \"期望的输出内容描述\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 1,\n      \"dependsOn\": []\n    },\n    {\n      \"title\": \"第二个子任务\",\n      \"description\": \"详细描述\",\n      \"expectedOutput\": \"期望输出\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 0,\n      \"dependsOn\": [0]\n    }\n  ]\n}\n```\n\n注意：\n- dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务\n- priority 数值越大越重要\n- 确保不要产生循环依赖\n- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务\n- 不要为同一类型的工作创建多个子任务（如\"信息搜集\"只需一个任务，不要拆成多个）",
+      "note": "DB unavailable, used synthetic sample"
+    },
+    "deep_report": {
+      "source": "synthetic",
+      "scenario": "deep_report",
+      "title": "深度报道 · 合成基线样本",
+      "userInstruction": "围绕今年两会经济政策核心议题，完成 3000 字深度报道：背景、数据、专家观点、结论。",
+      "employeeCount": 8,
+      "prompt": "你是任务总监，需要将用户的指令分解为多个子任务，并分配给合适的团队成员。\n\n## 用户指令\n围绕今年两会经济政策核心议题，完成 3000 字深度报道：背景、数据、专家观点、结论。\n\n## 任务场景\ndeep_report\n\n## 任务标题\n深度报道 · 合成基线样本\n\n## 可用团队成员\n- slug: xiaolei | 名称: 热点分析师（热点分析师） | 职位: 热点分析师 | 技能: 热点监控、趋势识别、平台数据分析\n- slug: xiaoce | 名称: 选题策划师（选题策划师） | 职位: 选题策划师 | 技能: 选题策划、角度设计、标题优化\n- slug: xiaozi | 名称: 素材研究员（素材研究员） | 职位: 素材研究员 | 技能: 资料检索、多源整合、数据核验\n- slug: xiaowen | 名称: 稿件撰写师（稿件撰写师） | 职位: 稿件撰写师 | 技能: 深度写作、短讯撰写、改写编辑\n- slug: xiaojian | 名称: 视频制作师（视频制作师） | 职位: 视频制作师 | 技能: 视频剪辑、脚本分镜、字幕配音\n- slug: xiaoshen | 名称: 内容审核师（内容审核师） | 职位: 内容审核师 | 技能: 合规审核、事实核查、敏感词过滤\n- slug: xiaofa | 名称: 渠道分发师（渠道分发师） | 职位: 渠道分发师 | 技能: 多平台适配、CMS 入库、定时发布\n- slug: xiaoshu | 名称: 数据分析师（数据分析师） | 职位: 数据分析师 | 技能: 传播数据分析、效果复盘、报表生成\n\n## 要求\n1. 分析用户指令，拆解为具体的子任务\n2. 为每个子任务选择最合适的执行人（基于其技能）\n3. 确定子任务之间的依赖关系（哪些任务必须在其他任务完成后才能开始）\n4. 每个子任务需要有清晰的标题、详细描述和期望输出\n\n## 输出格式\n请严格按照以下 JSON 格式输出，不要包含任何其他文本：\n\n```json\n{\n  \"tasks\": [\n    {\n      \"title\": \"子任务标题\",\n      \"description\": \"详细描述，包括具体要求和注意事项\",\n      \"expectedOutput\": \"期望的输出内容描述\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 1,\n      \"dependsOn\": []\n    },\n    {\n      \"title\": \"第二个子任务\",\n      \"description\": \"详细描述\",\n      \"expectedOutput\": \"期望输出\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 0,\n      \"dependsOn\": [0]\n    }\n  ]\n}\n```\n\n注意：\n- dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务\n- priority 数值越大越重要\n- 确保不要产生循环依赖\n- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务\n- 不要为同一类型的工作创建多个子任务（如\"信息搜集\"只需一个任务，不要拆成多个）",
+      "note": "DB unavailable, used synthetic sample"
+    },
+    "custom": {
+      "source": "synthetic",
+      "scenario": "custom",
+      "title": "自定义任务 · 合成基线样本",
+      "userInstruction": "我们需要一份面向 Z 世代用户的音乐节活动传播方案，包含 5 个平台的差异化内容策略。",
+      "employeeCount": 8,
+      "prompt": "你是任务总监，需要将用户的指令分解为多个子任务，并分配给合适的团队成员。\n\n## 用户指令\n我们需要一份面向 Z 世代用户的音乐节活动传播方案，包含 5 个平台的差异化内容策略。\n\n## 任务场景\ncustom\n\n## 任务标题\n自定义任务 · 合成基线样本\n\n## 可用团队成员\n- slug: xiaolei | 名称: 热点分析师（热点分析师） | 职位: 热点分析师 | 技能: 热点监控、趋势识别、平台数据分析\n- slug: xiaoce | 名称: 选题策划师（选题策划师） | 职位: 选题策划师 | 技能: 选题策划、角度设计、标题优化\n- slug: xiaozi | 名称: 素材研究员（素材研究员） | 职位: 素材研究员 | 技能: 资料检索、多源整合、数据核验\n- slug: xiaowen | 名称: 稿件撰写师（稿件撰写师） | 职位: 稿件撰写师 | 技能: 深度写作、短讯撰写、改写编辑\n- slug: xiaojian | 名称: 视频制作师（视频制作师） | 职位: 视频制作师 | 技能: 视频剪辑、脚本分镜、字幕配音\n- slug: xiaoshen | 名称: 内容审核师（内容审核师） | 职位: 内容审核师 | 技能: 合规审核、事实核查、敏感词过滤\n- slug: xiaofa | 名称: 渠道分发师（渠道分发师） | 职位: 渠道分发师 | 技能: 多平台适配、CMS 入库、定时发布\n- slug: xiaoshu | 名称: 数据分析师（数据分析师） | 职位: 数据分析师 | 技能: 传播数据分析、效果复盘、报表生成\n\n## 要求\n1. 分析用户指令，拆解为具体的子任务\n2. 为每个子任务选择最合适的执行人（基于其技能）\n3. 确定子任务之间的依赖关系（哪些任务必须在其他任务完成后才能开始）\n4. 每个子任务需要有清晰的标题、详细描述和期望输出\n\n## 输出格式\n请严格按照以下 JSON 格式输出，不要包含任何其他文本：\n\n```json\n{\n  \"tasks\": [\n    {\n      \"title\": \"子任务标题\",\n      \"description\": \"详细描述，包括具体要求和注意事项\",\n      \"expectedOutput\": \"期望的输出内容描述\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 1,\n      \"dependsOn\": []\n    },\n    {\n      \"title\": \"第二个子任务\",\n      \"description\": \"详细描述\",\n      \"expectedOutput\": \"期望输出\",\n      \"assignedEmployeeSlug\": \"employee_slug\",\n      \"priority\": 0,\n      \"dependsOn\": [0]\n    }\n  ]\n}\n```\n\n注意：\n- dependsOn 使用任务在数组中的索引（从 0 开始），表示依赖哪些前置任务\n- priority 数值越大越重要\n- 确保不要产生循环依赖\n- **子任务数量不得超过 10 个**。请精简合并同类任务，避免重复。每个成员最多分配 2 个子任务\n- 不要为同一类型的工作创建多个子任务（如\"信息搜集\"只需一个任务，不要拆成多个）",
+      "note": "DB unavailable, used synthetic sample"
+    }
+  },
+  "dbError": "Failed query: select \"id\", \"scenario\", \"user_instruction\", \"title\", \"organization_id\" from \"missions\" where \"missions\".\"scenario\" in ($1, $2, $3, $4, $5, $6)\nparams: breaking_news,press_conference,daily_brief,video_content,deep_report,custom"
+}
