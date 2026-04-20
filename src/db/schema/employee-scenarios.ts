@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
+import type { InputFieldDef } from "@/lib/types";
 
 export const employeeScenarios = pgTable("employee_scenarios", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -26,16 +27,7 @@ export const employeeScenarios = pgTable("employee_scenarios", {
   welcomeMessage: text("welcome_message"),
   systemInstruction: text("system_instruction").notNull(),
   inputFields: jsonb("input_fields")
-    .$type<
-      {
-        name: string;
-        label: string;
-        type: "text" | "textarea" | "select";
-        required: boolean;
-        placeholder?: string;
-        options?: string[];
-      }[]
-    >()
+    .$type<InputFieldDef[]>()
     .notNull()
     .default([]),
   toolsHint: jsonb("tools_hint").$type<string[]>().notNull().default([]),

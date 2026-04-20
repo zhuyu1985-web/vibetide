@@ -32,6 +32,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import { CollapsibleMessageContent, markdownComponents, remarkPlugins } from "./collapsible-markdown";
 import type { ScenarioCardData } from "@/lib/types";
+import { normalizeFieldOption } from "@/lib/types";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Radar,
@@ -219,7 +220,7 @@ export function ScenarioChatSheet({
       if (scenario) {
         for (const field of scenario.inputFields) {
           if (field.type === "select" && field.options?.length) {
-            defaults[field.name] = field.options[0];
+            defaults[field.name] = normalizeFieldOption(field.options[0]).value;
           }
         }
       }
@@ -519,24 +520,27 @@ export function ScenarioChatSheet({
                           </Label>
                           {field.type === "select" && field.options ? (
                             <div className="flex flex-wrap gap-2">
-                              {field.options.map((opt) => (
-                                <button
-                                  key={opt}
-                                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                                    inputs[field.name] === opt
-                                      ? "bg-blue-500 text-white shadow-sm"
-                                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-600"
-                                  }`}
-                                  onClick={() =>
-                                    setInputs((prev) => ({
-                                      ...prev,
-                                      [field.name]: opt,
-                                    }))
-                                  }
-                                >
-                                  {opt}
-                                </button>
-                              ))}
+                              {field.options.map((opt) => {
+                                const o = normalizeFieldOption(opt);
+                                return (
+                                  <button
+                                    key={o.value}
+                                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                                      inputs[field.name] === o.value
+                                        ? "bg-blue-500 text-white shadow-sm"
+                                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-600"
+                                    }`}
+                                    onClick={() =>
+                                      setInputs((prev) => ({
+                                        ...prev,
+                                        [field.name]: o.value,
+                                      }))
+                                    }
+                                  >
+                                    {o.label}
+                                  </button>
+                                );
+                              })}
                             </div>
                           ) : field.type === "textarea" ? (
                             <Textarea

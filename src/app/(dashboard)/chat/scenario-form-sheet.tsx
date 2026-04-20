@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Sparkles } from "lucide-react";
 import type { ScenarioCardData } from "@/lib/types";
+import { normalizeFieldOption } from "@/lib/types";
 
 interface ScenarioFormSheetProps {
   open: boolean;
@@ -90,11 +91,14 @@ export function ScenarioFormSheet({
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {field.options.map((opt) => (
-                      <SelectItem key={opt} value={opt}>
-                        {opt}
-                      </SelectItem>
-                    ))}
+                    {field.options.map((opt) => {
+                      const o = normalizeFieldOption(opt);
+                      return (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : field.type === "textarea" ? (

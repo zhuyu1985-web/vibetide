@@ -329,13 +329,37 @@ export interface ScenarioCardData {
   toolsHint: string[];
 }
 
+export type InputFieldOption = string | { value: string; label: string };
+
 export interface InputFieldDef {
   name: string;
   label: string;
-  type: "text" | "textarea" | "select";
-  required: boolean;
+  type:
+    | "text"
+    | "textarea"
+    | "select"
+    | "multiselect"
+    | "date"
+    | "daterange"
+    | "url"
+    | "number"
+    | "toggle";
+  required?: boolean;
   placeholder?: string;
-  options?: string[];
+  defaultValue?: unknown;
+  options?: InputFieldOption[];
+  helpText?: string;
+  validation?: {
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    min?: number;
+    max?: number;
+  };
+}
+
+export function normalizeFieldOption(opt: InputFieldOption): { value: string; label: string } {
+  return typeof opt === "string" ? { value: opt, label: opt } : opt;
 }
 
 export type AuthorityLevel = "observer" | "advisor" | "executor" | "coordinator";

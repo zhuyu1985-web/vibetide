@@ -54,6 +54,7 @@ import {
 import Link from "next/link";
 import { EMPLOYEE_META, EMPLOYEE_SHORT_DESC, type EmployeeId } from "@/lib/constants";
 import type { AIEmployee, ScenarioCardData } from "@/lib/types";
+import { normalizeFieldOption } from "@/lib/types";
 import type { ChatMessage, ThinkingStep, SkillUsed } from "@/lib/chat-utils";
 import type { SavedConversationRow } from "@/db/types";
 import { cn } from "@/lib/utils";
@@ -1002,9 +1003,12 @@ export function ChatPanel({
                             }
                           >
                             <option value="">{field.placeholder || "请选择"}</option>
-                            {field.options?.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
+                            {field.options?.map((opt) => {
+                              const o = normalizeFieldOption(opt);
+                              return (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                              );
+                            })}
                           </select>
                         ) : field.type === "textarea" ? (
                           <textarea
