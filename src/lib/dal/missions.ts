@@ -81,7 +81,11 @@ export async function getMissionById(
   // Run ALL 4 queries in parallel — mission + tasks + messages + all org employees
   // This is 1 network round-trip instead of 2-3 sequential ones.
   const [missionRow, taskRows, msgRows, allEmpRows] = await Promise.all([
-    db.query.missions.findFirst({ where: eq(missions.id, missionId) }),
+    // Phase 4A: load linked workflow_template so we can resolve scenarioLabel server-side
+    db.query.missions.findFirst({
+      where: eq(missions.id, missionId),
+      with: { workflowTemplate: true },
+    }),
     db.select({
       id: missionTasks.id,
       missionId: missionTasks.missionId,
@@ -167,6 +171,14 @@ export async function getMissionById(
     .map((id) => empMap.get(id))
     .filter((e): e is AIEmployee => !!e);
 
+  // Phase 4A: resolve scenario display info via template join + helper.
+  const template = (row as typeof row & { workflowTemplate?: WorkflowTemplateRow | null })
+    .workflowTemplate;
+  const scInfo = resolveMissionScenarioLabel(
+    { scenario: row.scenario, title: row.title },
+    template,
+  );
+
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -194,6 +206,10 @@ export async function getMissionById(
     artifacts: [],
     leader: empMap.get(row.leaderEmployeeId)!,
     team,
+    scenarioLabel: scInfo.label,
+    scenarioCategory: scInfo.category ?? null,
+    scenarioIcon: scInfo.icon ?? null,
+    workflowTemplateId: row.workflowTemplateId ?? null,
   };
 }
 

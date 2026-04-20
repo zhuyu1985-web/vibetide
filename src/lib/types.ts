@@ -599,6 +599,13 @@ export interface MissionWithDetails extends Mission {
   artifacts: MissionArtifact[];
   leader: AIEmployee;
   team: AIEmployee[];
+  /** Phase 4A: server-resolved scenario display info (mirrors
+   *  MissionSummary.scenarioLabel/… so the mission console can render the
+   *  scenario pill without reaching into SCENARIO_CONFIG). */
+  scenarioLabel: string;
+  scenarioCategory: string | null;
+  scenarioIcon: string | null;
+  workflowTemplateId: string | null;
 }
 
 // ---------------------------------------------------------------------------

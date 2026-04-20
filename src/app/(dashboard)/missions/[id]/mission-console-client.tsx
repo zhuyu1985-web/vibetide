@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useTransition, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import * as LucideIcons from "lucide-react";
 import {
   CheckCircle,
   Circle,
@@ -23,6 +24,7 @@ import {
   Zap,
   Lock,
   BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +44,6 @@ import {
   type EmployeeId,
   type EmployeeMeta,
 } from "@/lib/constants";
-import { resolveScenarioConfig } from "@/lib/scenario-fallback";
 import { cancelMission, retryMission, deleteMission, archiveMission } from "@/app/actions/missions";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import type {
@@ -184,8 +185,7 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
     };
   }, [isActive, mission.id, router, startTransition]);
 
-  const scenarioCfg = resolveScenarioConfig(mission);
-  const scenarioLabel = scenarioCfg.label;
+  const scenarioLabel = mission.scenarioLabel;
 
   const taskTitleMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -884,8 +884,16 @@ function EmployeeChip({ meta }: { meta: EmployeeMeta | null }) {
 // ---------------------------------------------------------------------------
 
 function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
-  const scenarioCfg = resolveScenarioConfig(mission);
-  const ScenarioIcon = scenarioCfg.icon;
+  // 从 lucide-react 动态解析 icon 名（mission.scenarioIcon 可能为 null）
+  const ScenarioIcon = mission.scenarioIcon
+    ? ((LucideIcons as unknown as Record<string, LucideIcon | undefined>)[
+        // 转为 PascalCase：file-text → FileText
+        mission.scenarioIcon
+          .split("-")
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+          .join("")
+      ] ?? LucideIcons.FileText)
+    : LucideIcons.FileText;
 
   const elapsedMs = mission.completedAt
     ? new Date(mission.completedAt).getTime() - new Date(mission.createdAt).getTime()
@@ -913,12 +921,12 @@ function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
     <GlassCard padding="none" className="overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-white/5">
         <span className="text-sm font-semibold flex items-center gap-1.5">
-          {ScenarioIcon && <ScenarioIcon size={12} style={{ color: scenarioCfg?.color }} />}
+          <ScenarioIcon size={12} className="text-sky-500" />
           场景信息
         </span>
       </div>
       <div className="px-4 py-3 space-y-2.5">
-        <InfoRow label="场景模板" value={scenarioCfg?.label ?? mission.scenario} />
+        <InfoRow label="场景模板" value={mission.scenarioLabel ?? mission.scenario} />
         {mission.sourceModule && (
           <InfoRow label="触发来源" value={SOURCE_LABEL[mission.sourceModule] ?? mission.sourceModule} />
         )}
