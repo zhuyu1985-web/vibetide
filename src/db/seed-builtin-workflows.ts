@@ -1330,6 +1330,176 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(5, "多平台紧急分发", "publish_strategy", "发布策略", "management", "strategy"),
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 主流场景 · 10 条（isFeatured=true，双重归类：owner tab + featured tab）
+  // 对应 spec: 2026-04-20-homepage-scenario-tabs-redesign-design.md §5
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "daily_ai_news",
+    name: "每日 AI 资讯",
+    description: "从热点发现匹配今日 AI 资讯，聚合多源、逐条摘要，合并成稿，发布到 APP 每日 AI 资讯栏目。",
+    icon: "sparkles",
+    category: "news",
+    ownerEmployeeId: "xiaolei",
+    defaultTeam: ["xiaolei", "xiaozi", "xiaofa"],
+    appChannelSlug: "app_news",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "focus_subdomain",
+        label: "AI 子方向",
+        type: "select",
+        required: false,
+        defaultValue: "all",
+        options: [
+          { value: "all", label: "全部 AI" },
+          { value: "llm", label: "大模型" },
+          { value: "agent", label: "智能体" },
+          { value: "hardware", label: "AI 硬件" },
+          { value: "policy", label: "AI 政策" },
+        ],
+      },
+      {
+        name: "item_count",
+        label: "条目数",
+        type: "number",
+        required: false,
+        defaultValue: 8,
+        validation: { min: 3, max: 20 },
+      },
+    ],
+    systemInstruction:
+      "聚焦今日 AI（{{focus_subdomain}}）资讯，挑选 Top {{item_count}} 条代表性新闻，每条产出 80-120 字概要（事实 + 影响），最后合并为一篇《每日 AI 资讯》稿件，含导语 / 分条目列表 / 收尾观察。",
+    promptTemplate:
+      "检索并聚合今日 AI 资讯（聚焦 {{focus_subdomain}}），挑选 Top {{item_count}} 条，每条 80-120 字摘要，合并为可直发稿件。",
+    steps: [
+      step(1, "AI 热榜扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
+      step(2, "多源 AI 资讯聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(3, "全网深度搜索", "web_search", "全网搜索", "perception", "search"),
+      step(4, "逐条摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
+      step(5, "合并成稿", "content_generate", "内容生成", "generation", "write"),
+    ],
+  },
+
+  {
+    slug: "tech_weekly",
+    name: "科技周报（深度长文）",
+    description: "围绕指定科技主题范围产出一篇深度长文周报，含趋势洞察、数据支撑与多方观点。",
+    icon: "newspaper",
+    category: "deep",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaoce", "xiaozi"],
+    appChannelSlug: "app_news",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic_scope",
+        label: "主题范围",
+        type: "text",
+        required: true,
+        placeholder: "如：大模型应用 / 半导体产业链 / 机器人产业",
+      },
+      {
+        name: "week_range",
+        label: "周期范围",
+        type: "daterange",
+        required: false,
+      },
+      {
+        name: "word_count",
+        label: "目标字数",
+        type: "number",
+        required: false,
+        defaultValue: 4500,
+        validation: { min: 2500, max: 10000 },
+      },
+      {
+        name: "depth_level",
+        label: "深度档位",
+        type: "select",
+        required: false,
+        defaultValue: "standard",
+        options: [
+          { value: "light", label: "轻度速览" },
+          { value: "standard", label: "标准深度" },
+          { value: "heavy", label: "重度研报" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "产出一篇围绕「{{topic_scope}}」（覆盖周期 {{week_range}}）的科技周报深度长文，目标 {{word_count}} 字，档位 {{depth_level}}。结构：1) 本周关键事件速览 2) 趋势主题归纳（2-3 条）3) 多方观点 4) 数据支撑 5) 下周看点。",
+    promptTemplate:
+      "写一篇「{{topic_scope}}」科技周报深度长文（{{week_range}}，{{word_count}} 字，{{depth_level}}）。",
+    steps: [
+      step(1, "主题背景调研", "web_search", "全网搜索", "perception", "research"),
+      step(2, "周度热点聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(3, "同业对标参考", "case_reference", "案例参考", "analysis", "case"),
+      step(4, "深度周报撰写", "content_generate", "内容生成", "generation", "write"),
+      step(5, "成稿质量复核", "quality_review", "质量审核", "management", "review"),
+    ],
+  },
+
+  {
+    slug: "daily_politics",
+    name: "每日时政热点",
+    description: "按区域 / 紧急程度聚合每日时政热点，经事实核查与合规扫描后产出可发布的时政稿件。",
+    icon: "landmark",
+    category: "news",
+    ownerEmployeeId: "xiaolei",
+    defaultTeam: ["xiaolei", "xiaowen", "xiaoshen"],
+    appChannelSlug: "app_politics",
+    isFeatured: true,
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "region",
+        label: "关注区域",
+        type: "select",
+        required: true,
+        defaultValue: "national",
+        options: [
+          { value: "national", label: "全国" },
+          { value: "sichuan", label: "四川" },
+          { value: "chengdu", label: "成都" },
+          { value: "international", label: "国际" },
+        ],
+      },
+      {
+        name: "urgency_level",
+        label: "紧急程度",
+        type: "select",
+        required: false,
+        defaultValue: "normal",
+        options: [
+          { value: "urgent", label: "紧急（优先发布）" },
+          { value: "normal", label: "常规" },
+        ],
+      },
+      {
+        name: "item_count",
+        label: "条目数",
+        type: "number",
+        required: false,
+        defaultValue: 5,
+        validation: { min: 1, max: 10 },
+      },
+    ],
+    systemInstruction:
+      "产出 {{region}} 区域的每日时政热点（紧急程度 {{urgency_level}}），{{item_count}} 条。每条含：1) 100 字内事实摘要 2) 政策背景一句话 3) 影响与走向。全文必经事实核查与合规扫描。",
+    promptTemplate:
+      "为 {{region}} 产出 {{item_count}} 条每日时政热点（{{urgency_level}}），含核查与合规。",
+    steps: [
+      step(1, "时政信源聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
+      step(2, "多源全网搜索", "web_search", "全网搜索", "perception", "search"),
+      step(3, "事实核查", "fact_check", "事实核查", "management", "verify"),
+      step(4, "时政稿件撰写", "content_generate", "内容生成", "generation", "write"),
+      step(5, "合规审查", "compliance_check", "合规审核", "management", "compliance"),
+    ],
+  },
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────
