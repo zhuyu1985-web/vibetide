@@ -68,7 +68,6 @@ import {
   type EmployeeId,
   type OrderedCategory,
 } from "@/lib/constants";
-import { getLegacyTemplateInstruction } from "@/lib/scenario-fallback";
 import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 import type { MissionSummary } from "@/lib/dal/missions";
 import type { WorkflowTemplateRow } from "@/db/types";
@@ -166,9 +165,8 @@ export function MissionsClient({
   /**
    * B.1 Unified Scenario Workflow: workflow_templates rows for this org. The
    * "发起新任务" Sheet iterates this list grouped by `category` as the single
-   * source of truth. Replaces the prior SCENARIO_CONFIG / SCENARIO_CATEGORIES
-   * hardcoded iteration. Mission row rendering still uses resolveScenarioConfig
-   * (Task 14) for legacy slugs / custom fallback.
+   * source of truth. Mission row rendering uses mission.scenarioLabel /
+   * scenarioIcon (denormalized at DAL layer).
    */
   workflows: WorkflowTemplateRow[];
 }) {
@@ -382,11 +380,10 @@ export function MissionsClient({
   }
   function pickWorkflow(wf: WorkflowTemplateRow) {
     setSelectedWorkflow(wf);
-    // Pre-fill instruction from the legacy template-instruction helper when
-    // the workflow maps to a builtin scenario key. Custom workflows leave the
-    // field blank. Phase 3 can remove the helper + underlying constant in one
-    // place (src/lib/scenario-fallback.ts).
-    const preset = getLegacyTemplateInstruction(wf.legacyScenarioKey);
+    // Phase 3: 直接用 workflow_templates.promptTemplate 作为"发起新任务"
+    // 默认指令预填。seed-builtin-workflows.ts 已为所有 builtin 场景提供
+    // promptTemplate；custom workflow 若没填，字段留空。
+    const preset = wf.promptTemplate ?? null;
     if (preset) setInstruction(preset);
   }
 
