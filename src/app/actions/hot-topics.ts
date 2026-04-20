@@ -7,8 +7,9 @@ import {
   commentInsights,
   hotTopicCrawlLogs,
   userProfiles,
+  missions,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
@@ -109,6 +110,22 @@ export async function startTopicMission(
     throw new Error("Topic not found");
   }
 
+  // 已经追踪过：直接复用已有 mission，避免重复创建。
+  // 与 missions_source_dedup_uidx 唯一索引语义一致。
+  const existingMission = await db.query.missions.findFirst({
+    where: and(
+      eq(missions.organizationId, profile.organizationId),
+      eq(missions.sourceModule, "hot_topics"),
+      isNotNull(missions.sourceEntityId),
+      eq(missions.sourceEntityId, topicId),
+      ne(missions.status, "failed"),
+    ),
+    columns: { id: true },
+  });
+  if (existingMission) {
+    return { id: existingMission.id };
+  }
+
   // B.1/Phase 4B: 走默认热点模板，不再硬编码 scenario='breaking_news'。
   const template = await getDefaultHotTopicTemplate(profile.organizationId);
 
@@ -161,6 +178,26 @@ export async function startTopicMission(
       `启动热点追踪失败：${Object.values(res.errors).join("; ")}`,
     );
   }
+
+  // 回填 source 关联 + 用热点标题改写 mission.title。
+  // - title：默认从模板取（统一为"突发新闻"），UX 上无法区分各热点；改写为
+  //   "热点追踪：${topic.title}" 与历史 mission 标题保持一致。
+  // - sourceModule/sourceEntityId：DAL 反查这两个字段判断热点是否被追踪。
+  // missions_source_dedup_uidx 是 partial unique，并发重复点击会拒绝第二次写入；
+  // 此时 topic 已经有 mission，吞掉错误即可（前面的 existingMission 查重也会在
+  // router.refresh() 后挡住后续调用）。
+  await db
+    .update(missions)
+    .set({
+      title: `热点追踪：${topic.title}`,
+      sourceModule: "hot_topics",
+      sourceEntityId: topicId,
+      sourceEntityType: "hot_topic",
+    })
+    .where(eq(missions.id, res.missionId))
+    .catch((err) => {
+      console.warn("[hot-topics] backfill source link failed:", err);
+    });
 
   // Mark topic as P0 (being tracked)
   await db

@@ -67,7 +67,8 @@ describe("writeItems", () => {
       ],
       source: { targetModules: ["hot_topics"], defaultCategory: null, defaultTags: null },
     });
-    expect(result).toEqual({ inserted: 2, merged: 0, failed: 0 });
+    expect(result).toMatchObject({ inserted: 2, merged: 0, failed: 0 });
+    expect(result.insertedItemIds).toHaveLength(2);
     const rows = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
     expect(rows).toHaveLength(2);
     expect(inngest.send).toHaveBeenCalledTimes(2);
@@ -87,7 +88,8 @@ describe("writeItems", () => {
       items: [{ title: "Hello", url: "https://a.com/x", channel: "tophub/zhihu" }],
       source: { targetModules: [], defaultCategory: null, defaultTags: null },
     });
-    expect(result).toEqual({ inserted: 0, merged: 1, failed: 0 });
+    expect(result).toMatchObject({ inserted: 0, merged: 1, failed: 0 });
+    expect(result.insertedItemIds).toEqual([]);
     const [row] = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
     expect((row.sourceChannels as unknown as unknown[]).length).toBe(2);
     // merge should NOT emit event
@@ -116,7 +118,8 @@ describe("writeItems", () => {
       }],
       source: { targetModules: [], defaultCategory: null, defaultTags: null },
     });
-    expect(result).toEqual({ inserted: 0, merged: 1, failed: 0 });
+    expect(result).toMatchObject({ inserted: 0, merged: 1, failed: 0 });
+    expect(result.insertedItemIds).toEqual([]);
     const rows = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
     expect(rows).toHaveLength(1);
   });

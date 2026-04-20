@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -75,7 +76,6 @@ import {
   MessageSquare,
   Radio,
   ExternalLink,
-  Play,
 } from "lucide-react";
 import { startTopicMission, refreshInspirationData } from "@/app/actions/hot-topics";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
@@ -286,7 +286,15 @@ export function InspirationClient({
   useEffect(() => {
     setLocalTopics(topics);
     setLocalReadIds(new Set(topics.filter((t) => t.isRead).map((t) => t.id)));
-    setTrackedIds(new Set(topics.filter((t) => t.missionId).map((t) => t.id)));
+    // 合并而非覆盖：保留 router.refresh() 之前的乐观追踪状态（DAL 反查在
+    // mission 刚 INSERT 后、source 字段回填前的极短窗口可能查不到）。
+    setTrackedIds((prev) => {
+      const next = new Set(prev);
+      for (const t of topics) {
+        if (t.missionId) next.add(t.id);
+      }
+      return next;
+    });
   }, [topics]);
 
   // ========================
@@ -426,7 +434,14 @@ export function InspirationClient({
         try {
           await startTopicMission(topicId);
           setTrackedIds((prev) => new Set(prev).add(topicId));
+          toast.success("已启动追踪");
           router.refresh();
+        } catch (err) {
+          // 把 server action 抛的真实错误展示给用户，不要再静默吞掉。
+          console.error("[inspiration] startTopicMission failed:", err);
+          const msg =
+            err instanceof Error ? err.message : "启动追踪失败，请稍后重试";
+          toast.error(msg);
         } finally {
           setMissionPendingId(null);
         }
@@ -435,37 +450,37 @@ export function InspirationClient({
     [router, startTrackingTransition]
   );
 
-  // 一键生成稿件：直接基于热点启动默认的"热点追踪"工作流并跳转到任务详情。
-  // 工作流的精细化选择交给 /home 场景快捷启动 / 员工详情页场景 Tab，避免在
-  // 每篇热点文章上反复挑选模板（模板是"日常固化能力"，不是"按文章一次性挑选"）。
-  const handleGenerateArticle = useCallback(
-    async (topic: InspirationTopic) => {
-      setMissionPendingId(topic.id);
-      try {
-        const result = await startTopicMission(topic.id);
-        if (result?.id) {
-          router.push(`/missions/${result.id}`);
-        }
-      } catch (err) {
-        console.error("[inspiration] startTopicMission failed:", err);
-      } finally {
-        setMissionPendingId(null);
-      }
-    },
-    [router]
-  );
-
   const handleTrackAllP0 = useCallback(() => {
     startTrackingAllTransition(async () => {
-      const p0Ids = localTopics.filter((t) => t.priority === "P0").map((t) => t.id);
+      const p0Ids = localTopics
+        .filter((t) => t.priority === "P0")
+        .map((t) => t.id);
+      const succeeded: string[] = [];
+      const failed: { id: string; msg: string }[] = [];
       for (const id of p0Ids) {
-        await startTopicMission(id);
+        try {
+          await startTopicMission(id);
+          succeeded.push(id);
+        } catch (err) {
+          const msg =
+            err instanceof Error ? err.message : "未知错误";
+          failed.push({ id, msg });
+          console.error(`[inspiration] track P0 ${id} failed:`, err);
+        }
       }
-      setTrackedIds((prev) => {
-        const next = new Set(prev);
-        for (const id of p0Ids) next.add(id);
-        return next;
-      });
+      if (succeeded.length > 0) {
+        setTrackedIds((prev) => {
+          const next = new Set(prev);
+          for (const id of succeeded) next.add(id);
+          return next;
+        });
+        toast.success(`已启动 ${succeeded.length} 条追踪`);
+      }
+      if (failed.length > 0) {
+        toast.error(
+          `${failed.length} 条启动失败：${failed[0].msg}${failed.length > 1 ? "（详见控制台）" : ""}`,
+        );
+      }
       router.refresh();
     });
   }, [localTopics, router, startTrackingAllTransition]);
@@ -776,7 +791,6 @@ export function InspirationClient({
                   onStartMission={handleStartMission}
                   onMarkRead={handleMarkRead}
                   subscribedCategories={subscribedCategories}
-                  onGenerate={handleGenerateArticle}
                 />
               </div>
             </ScrollArea>
@@ -980,7 +994,6 @@ function TopicList({
   onStartMission,
   onMarkRead,
   subscribedCategories,
-  onGenerate,
 }: {
   topics: InspirationTopic[];
   readIds: Set<string>;
@@ -989,7 +1002,6 @@ function TopicList({
   onStartMission: (id: string) => void;
   onMarkRead: (id: string) => void;
   subscribedCategories: Set<string>;
-  onGenerate: (topic: InspirationTopic) => void;
 }) {
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -1163,23 +1175,12 @@ function TopicList({
                       <button
                         onClick={() => onStartMission(topic.id)}
                         disabled={isMissionPending}
-                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-0.5 transition-colors"
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 transition-colors"
                       >
                         <Rocket size={10} />
                         {isMissionPending ? "创建中..." : "启动追踪"}
                       </button>
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onGenerate(topic);
-                      }}
-                      disabled={isMissionPending}
-                      className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 ml-2 transition-colors"
-                    >
-                      <Play size={10} />
-                      {isMissionPending ? "生成中..." : "生成稿件"}
-                    </button>
                     <button
                       className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-0.5 ml-2 transition-colors"
                     >

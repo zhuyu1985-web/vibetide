@@ -15,11 +15,15 @@ export async function writeItems(args: WriteArgs): Promise<WriteResult> {
   let inserted = 0;
   let merged = 0;
   let failed = 0;
+  const insertedItemIds: string[] = [];
 
   for (const raw of args.items) {
     try {
       const outcome = await writeSingleItem(args, raw);
-      if (outcome.isNew) inserted++;
+      if (outcome.isNew) {
+        inserted++;
+        insertedItemIds.push(outcome.itemId);
+      }
       if (outcome.merged) merged++;
 
       if (outcome.isNew) {
@@ -45,7 +49,7 @@ export async function writeItems(args: WriteArgs): Promise<WriteResult> {
   }
 
   await updateRunCounters(args.runId, { inserted, merged, failed });
-  return { inserted, merged, failed };
+  return { inserted, merged, failed, insertedItemIds };
 }
 
 async function writeSingleItem(args: WriteArgs, raw: RawItem): Promise<WriteOutcome> {

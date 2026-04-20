@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { hotTopics, hotTopicCrawlLogs } from "@/db/schema";
-import { eq, desc, and, gt, sql } from "drizzle-orm";
+import { hotTopics, hotTopicCrawlLogs, missions } from "@/db/schema";
+import { eq, desc, and, gt, sql, inArray, isNotNull, ne } from "drizzle-orm";
 import type {
   InspirationTopic,
   InspirationDelta,
@@ -59,6 +59,30 @@ export async function getInspirationTopics(
     readTopicIds = new Set(readState.readTopicIds);
   }
 
+  // 反查与这些 topic 关联的 mission（按 sourceModule='hot_topics' + sourceEntityId）。
+  // 用于点亮"追踪中"状态，让乐观更新在 router.refresh() 后仍然保留。
+  const topicIds = rows.map((r) => r.id);
+  const missionByTopicId = new Map<string, string>();
+  if (topicIds.length > 0) {
+    const linked = await db
+      .select({ id: missions.id, topicId: missions.sourceEntityId })
+      .from(missions)
+      .where(
+        and(
+          eq(missions.organizationId, orgId),
+          eq(missions.sourceModule, "hot_topics"),
+          isNotNull(missions.sourceEntityId),
+          inArray(missions.sourceEntityId, topicIds),
+          ne(missions.status, "failed"),
+        ),
+      );
+    for (const m of linked) {
+      if (m.topicId && !missionByTopicId.has(m.topicId)) {
+        missionByTopicId.set(m.topicId, m.id);
+      }
+    }
+  }
+
   return rows.map((row) => {
     const insight = row.commentInsights[0];
     const dbAngles = row.angles.map((a) => a.angleText);
@@ -103,6 +127,7 @@ export async function getInspirationTopics(
       isRead: readTopicIds.has(row.id),
       enrichedOutlines: (row.enrichedOutlines as InspirationTopic["enrichedOutlines"]) ?? [],
       relatedMaterials: (row.relatedMaterials as InspirationTopic["relatedMaterials"]) ?? [],
+      missionId: missionByTopicId.get(row.id),
     };
   });
 }

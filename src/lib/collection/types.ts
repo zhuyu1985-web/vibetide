@@ -97,4 +97,6 @@ export interface WriteResult {
   inserted: number;
   merged: number;
   failed: number;
+  /** ID 列表：本次新增（isNew=true）的 collected_items。供同步 caller 立即桥接到下游模块（hot_topics 等），无需依赖 Inngest fanout。 */
+  insertedItemIds: string[];
 }
