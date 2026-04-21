@@ -11,7 +11,8 @@ export type MediaTier =
   | "central"
   | "provincial_municipal"
   | "industry"
-  | "district_media";
+  | "district_media"
+  | "self_media";
 
 export type MediaOutletSummary = {
   id: string;

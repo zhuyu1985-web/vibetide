@@ -17,6 +17,7 @@ import { ArrowLeft, ExternalLink, RefreshCw, XCircle } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { cancelResearchTask } from "@/app/actions/research/research-tasks";
+import { ResearchBreadcrumb } from "../../../research-breadcrumb";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "排队中",
@@ -41,6 +42,7 @@ const TIER_LABELS: Record<string, string> = {
   provincial_municipal: "省/市级",
   industry: "行业级",
   district_media: "区县融媒体",
+  self_media: "自媒体/热榜",
 };
 
 const TIER_BADGE_CLASS: Record<string, string> = {
@@ -48,6 +50,7 @@ const TIER_BADGE_CLASS: Record<string, string> = {
   provincial_municipal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30",
   industry: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30",
   district_media: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30",
+  self_media: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/30",
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -146,6 +149,9 @@ export function TaskDetailClient({
               </Button>
             )}
           </div>
+        </div>
+        <div className="mt-3">
+          <ResearchBreadcrumb />
         </div>
       </div>
 

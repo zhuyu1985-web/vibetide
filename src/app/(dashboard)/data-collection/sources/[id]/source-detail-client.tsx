@@ -12,10 +12,12 @@ import { toast } from "sonner";
 import {
   triggerCollectionSource,
   toggleCollectionSourceEnabled,
+  toggleResearchBridgeEnabled,
   deleteCollectionSource,
   getLatestRunForSource,
   type LatestRunStatus,
 } from "@/app/actions/collection";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 45;
@@ -31,6 +33,7 @@ export interface SourceDetail {
   defaultCategory: string | null;
   defaultTags: string[] | null;
   enabled: boolean;
+  researchBridgeEnabled: boolean;
   createdAt: string;
   lastRunAt: string | null;
   lastRunStatus: string | null;
@@ -239,6 +242,35 @@ export function SourceDetailClient({ source, runs, items }: SourceDetailClientPr
                 }
               />
               <KV label="最近状态" value={source.lastRunStatus ?? "—"} />
+            </div>
+            <div className="md:col-span-2 rounded-lg border bg-card p-5">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">研究工作台集成</h3>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <Checkbox
+                  checked={source.researchBridgeEnabled}
+                  onCheckedChange={async (v) => {
+                    setBusy(true);
+                    try {
+                      await toggleResearchBridgeEnabled(source.id, !!v);
+                      toast.success(
+                        v ? "已启用同步到研究工作台" : "已关闭同步到研究工作台",
+                      );
+                      router.refresh();
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "切换失败");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  disabled={busy}
+                />
+                <div className="space-y-1 select-none">
+                  <div className="text-sm">同步到研究工作台</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    勾选后，该源采集到的数据会自动进入新闻研究工作台，供全文检索和媒体层级分析使用。正文由 Jina Reader 异步拉取。
+                  </p>
+                </div>
+              </label>
             </div>
             <div className="md:col-span-2 rounded-lg border bg-muted/20 p-4">
               <h3 className="text-sm font-medium text-muted-foreground mb-2">配置</h3>

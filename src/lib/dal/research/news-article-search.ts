@@ -29,7 +29,17 @@ export type ArticleSearchResult = {
   districtName: string | null;
   sourceChannel: string;
   crawledAt: Date;
+  /** 兜底：outlet 未命中时从 rawMetadata.platforms[0] 取（"微博"/"知乎"等） */
+  platformFallback: string | null;
 };
+
+function extractPlatformFallback(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const platforms = (raw as { platforms?: unknown }).platforms;
+  if (!Array.isArray(platforms) || platforms.length === 0) return null;
+  const first = platforms[0];
+  return typeof first === "string" ? first : null;
+}
 
 export type ArticleSearchResponse = {
   articles: ArticleSearchResult[];
@@ -105,6 +115,7 @@ export async function searchNewsArticles(
       outletId: newsArticles.outletId,
       sourceChannel: newsArticles.sourceChannel,
       crawledAt: newsArticles.crawledAt,
+      rawMetadata: newsArticles.rawMetadata,
     })
     .from(newsArticles)
     .where(whereClause)
@@ -136,6 +147,7 @@ export async function searchNewsArticles(
     districtName: r.districtIdSnapshot ? (districtMap.get(r.districtIdSnapshot) ?? null) : null,
     sourceChannel: r.sourceChannel,
     crawledAt: r.crawledAt,
+    platformFallback: extractPlatformFallback(r.rawMetadata),
   }));
 
   return { articles, total, page, pageSize };
@@ -275,6 +287,7 @@ export async function advancedSearchNewsArticles(
       outletId: newsArticles.outletId,
       sourceChannel: newsArticles.sourceChannel,
       crawledAt: newsArticles.crawledAt,
+      rawMetadata: newsArticles.rawMetadata,
     })
     .from(newsArticles)
     .where(whereClause)
@@ -306,6 +319,7 @@ export async function advancedSearchNewsArticles(
     districtName: r.districtIdSnapshot ? (districtMap.get(r.districtIdSnapshot) ?? null) : null,
     sourceChannel: r.sourceChannel,
     crawledAt: r.crawledAt,
+    platformFallback: extractPlatformFallback(r.rawMetadata),
   }));
 
   return { articles, total, page, pageSize };

@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search,
   ExternalLink,
@@ -44,6 +45,7 @@ const TIER_OPTIONS = [
   { value: "provincial_municipal", label: "省/市级" },
   { value: "industry", label: "行业级" },
   { value: "district_media", label: "区县融媒体" },
+  { value: "self_media", label: "自媒体/热榜" },
 ];
 
 const TIER_BADGE_CLASS: Record<string, string> = {
@@ -51,6 +53,7 @@ const TIER_BADGE_CLASS: Record<string, string> = {
   provincial_municipal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   industry: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   district_media: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+  self_media: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
 };
 
 const TIER_LABELS: Record<string, string> = {
@@ -58,18 +61,21 @@ const TIER_LABELS: Record<string, string> = {
   provincial_municipal: "省/市级",
   industry: "行业级",
   district_media: "区县融媒体",
+  self_media: "自媒体/热榜",
 };
 
 const CHANNEL_OPTIONS = [
   { value: "tavily", label: "全网搜索" },
   { value: "whitelist_crawl", label: "白名单" },
   { value: "manual_url", label: "手工URL" },
+  { value: "hot_topic_crawler", label: "热榜采集" },
 ];
 
 const CHANNEL_LABELS: Record<string, string> = {
   tavily: "全网搜索",
   whitelist_crawl: "白名单",
   manual_url: "手工URL",
+  hot_topic_crawler: "热榜采集",
 };
 
 /* ─── Advanced search constants ─── */
@@ -144,9 +150,11 @@ function defaultCondition(): ConditionRow {
 export function SearchWorkbenchClient({
   districts,
   outlets,
+  initialResult,
 }: {
   districts: CqDistrict[];
   outlets: MediaOutletSummary[];
+  initialResult?: ArticleSearchResponse;
 }) {
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"simple" | "advanced">("simple");
@@ -163,8 +171,8 @@ export function SearchWorkbenchClient({
   // Advanced search conditions
   const [conditions, setConditions] = useState<ConditionRow[]>([defaultCondition()]);
 
-  // Results (shared)
-  const [result, setResult] = useState<ArticleSearchResponse | null>(null);
+  // Results (shared) — pre-hydrate with latest articles so 首屏 has data without manual search
+  const [result, setResult] = useState<ArticleSearchResponse | null>(initialResult ?? null);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Selection (shared)
@@ -395,33 +403,15 @@ export function SearchWorkbenchClient({
         </div>
 
         {/* Mode toggle */}
-        <div className="flex gap-1 mb-3">
-          <button
-            type="button"
-            onClick={() => setMode("simple")}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-              mode === "simple"
-                ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
-                : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
-            )}
-          >
-            快速搜索
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("advanced")}
-            className={cn(
-              "inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-              mode === "advanced"
-                ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
-                : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
-            )}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
-            高级检索
-          </button>
-        </div>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "simple" | "advanced")} className="mb-3">
+          <TabsList variant="line">
+            <TabsTrigger value="simple">快速搜索</TabsTrigger>
+            <TabsTrigger value="advanced">
+              <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
+              高级检索
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Simple mode */}
         {mode === "simple" && (
@@ -626,8 +616,19 @@ export function SearchWorkbenchClient({
           </GlassCard>
         ) : result.articles.length === 0 ? (
           <GlassCard variant="default" padding="lg">
-            <div className="text-center text-gray-500 dark:text-gray-400 py-10">
-              未找到匹配的新闻文章，请调整搜索条件
+            <div className="text-center text-gray-500 dark:text-gray-400 py-10 space-y-2">
+              <div>数据库中暂未检索到新闻文章</div>
+              <div className="text-xs">
+                研究工作台的数据来自「数据采集任务」（Tavily 全网搜索 / 白名单爬取 / 手工 URL），
+                请先到{" "}
+                <Link
+                  href="/research/admin/tasks/new"
+                  className="text-sky-600 dark:text-sky-400 hover:underline"
+                >
+                  新建采集任务
+                </Link>{" "}
+                跑一次采集
+              </div>
             </div>
           </GlassCard>
         ) : (
@@ -683,7 +684,9 @@ export function SearchWorkbenchClient({
                   header: "媒体名",
                   width: "w-28",
                   render: (a) => (
-                    <span className="text-muted-foreground truncate block">{a.outletName ?? "-"}</span>
+                    <span className="text-muted-foreground truncate block">
+                      {a.outletName ?? a.platformFallback ?? "-"}
+                    </span>
                   ),
                 },
                 {

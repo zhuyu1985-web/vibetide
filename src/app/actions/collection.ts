@@ -137,6 +137,22 @@ export async function toggleCollectionSourceEnabled(sourceId: string, enabled: b
 }
 
 // ──────────────────────────────────────────────────────
+// toggleResearchBridgeEnabled — 控制该源数据是否桥接到新闻研究工作台
+// ──────────────────────────────────────────────────────
+
+export async function toggleResearchBridgeEnabled(sourceId: string, enabled: boolean) {
+  const orgId = await requireOrg();
+  await assertSourceOwnership(sourceId, orgId);
+  await db
+    .update(collectionSources)
+    .set({ researchBridgeEnabled: enabled, updatedAt: new Date() })
+    .where(eq(collectionSources.id, sourceId));
+  revalidatePath("/data-collection/sources");
+  revalidatePath(`/data-collection/sources/${sourceId}`);
+  return { success: true };
+}
+
+// ──────────────────────────────────────────────────────
 // deleteCollectionSource (soft delete)
 // ──────────────────────────────────────────────────────
 

@@ -34,12 +34,14 @@ import {
   archiveMediaOutlet,
   unarchiveMediaOutlet,
 } from "@/app/actions/research/media-outlets";
+import { ResearchBreadcrumb } from "../../research-breadcrumb";
 
 const TIER_LABELS: Record<MediaTier, string> = {
   central: "中央级",
   provincial_municipal: "省/市级",
   industry: "行业级",
   district_media: "区县融媒体",
+  self_media: "自媒体/热榜",
 };
 
 const TIER_BADGE_CLASS: Record<MediaTier, string> = {
@@ -47,6 +49,7 @@ const TIER_BADGE_CLASS: Record<MediaTier, string> = {
   provincial_municipal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30",
   industry: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30",
   district_media: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30",
+  self_media: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/30",
 };
 
 type DialogMode =
@@ -54,10 +57,13 @@ type DialogMode =
   | { kind: "create" }
   | { kind: "edit"; outlet: MediaOutletSummary };
 
+// self_media 由桥接自动生成，不允许通过表单创建/编辑
+type FormalMediaTier = Exclude<MediaTier, "self_media">;
+
 type FormState = {
   id?: string;
   name: string;
-  tier: MediaTier;
+  tier: FormalMediaTier;
   province: string;
   districtId: string;
   industryTag: string;
@@ -110,10 +116,12 @@ export function MediaOutletsClient({
   }
 
   function openEdit(o: MediaOutletSummary) {
+    // self_media 不应出现在 outlets 表（桥接只填 tier_snapshot），但类型上不排除
+    const tier: FormalMediaTier = o.tier === "self_media" ? "central" : o.tier;
     setForm({
       id: o.id,
       name: o.name,
-      tier: o.tier,
+      tier,
       province: o.province ?? "",
       districtId:
         districts.find((d) => d.name === o.districtName)?.id ?? "",
@@ -211,10 +219,15 @@ export function MediaOutletsClient({
 
   return (
     <div className="max-w-[1400px] mx-auto w-full space-y-6">
-      <PageHeader
-        title="媒体源管理"
-        description="管理央、市、行业、区县四级媒体登记"
-      />
+      <div>
+        <PageHeader
+          title="媒体源管理"
+          description="管理央、市、行业、区县四级媒体登记"
+        />
+        <div className="mt-3">
+          <ResearchBreadcrumb />
+        </div>
+      </div>
 
       <div className="flex flex-wrap gap-3 items-center">
         <Input
@@ -385,7 +398,7 @@ export function MediaOutletsClient({
               <Select
                 value={form.tier}
                 onValueChange={(v) =>
-                  setForm({ ...form, tier: v as MediaTier })
+                  setForm({ ...form, tier: v as FormalMediaTier })
                 }
               >
                 <SelectTrigger>
