@@ -260,4 +260,21 @@ export type InngestEvents = {
       publicationId: string;
     };
   };
+
+  // ─── Research Bridge Events (2026-04-21) ───
+
+  /** 研究文章正文异步拉取事件（Jina Reader 消费） */
+  "research/article.content-fetch": {
+    data: {
+      articleId: string;
+    };
+  };
+
+  /** 一次性回溯触发：把存量 collected_items 桥接到 research_news_articles */
+  "research/bridge.backfill.trigger": {
+    data: {
+      organizationId?: string;
+      limit?: number;
+    };
+  };
 };

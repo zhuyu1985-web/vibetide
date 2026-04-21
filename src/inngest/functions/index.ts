@@ -30,6 +30,7 @@ import {
   collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
+  collectionResearchBridge,
 } from "./collection";
 import {
   cmsCatalogSyncDaily,
@@ -38,6 +39,7 @@ import {
 import { cmsStatusPoll } from "./cms-status-poll";
 import { cmsPublishRetry } from "./cms-publish-retry";
 import { skillConsistencyCheck } from "./skill-consistency-check";
+import { dailyHotBriefingCron } from "./daily-hot-briefing";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -76,6 +78,7 @@ export const functions = [
   collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
+  collectionResearchBridge,
   // CMS P1 (2026-04-18)
   cmsCatalogSyncDaily,
   cmsCatalogSyncOnDemand,
@@ -83,4 +86,6 @@ export const functions = [
   cmsPublishRetry,
   // Skill / Workflow MD ↔ DB consistency check (2026-04-20)
   skillConsistencyCheck,
+  // Daily Hot Briefing (2026-04-20) — 每日 8:00 自动生成简报 + 推 CMS
+  dailyHotBriefingCron,
 ];

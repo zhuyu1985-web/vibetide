@@ -7,9 +7,9 @@ import { eq } from "drizzle-orm";
 export type ArticleIngestInput = {
   url: string;
   title: string;
-  content?: string;
+  content?: string | null;
   publishedAt?: Date | null;
-  sourceChannel: "tavily" | "whitelist_crawl" | "manual_url";
+  sourceChannel: "tavily" | "whitelist_crawl" | "manual_url" | "hot_topic_crawler";
   organizationId: string;
   firstSeenResearchTaskId?: string;
   rawMetadata?: Record<string, unknown>;
@@ -26,13 +26,17 @@ export async function ingestArticle(
   const urlHash = hashUrl(input.url);
   const match = await matchOutletForUrl(input.url, input.organizationId);
 
+  // content_fetch_status: done when caller already provided content; pending
+  // when null (async bridge will populate via Jina Reader later).
+  const contentFetchStatus = input.content ? "done" : "pending";
+
   const [row] = await db
     .insert(newsArticles)
     .values({
       url: input.url,
       urlHash,
       title: input.title,
-      content: input.content,
+      content: input.content ?? null,
       publishedAt: input.publishedAt ?? null,
       outletId: match?.outletId ?? null,
       outletTierSnapshot: match?.tier ?? null,
@@ -40,6 +44,7 @@ export async function ingestArticle(
       sourceChannel: input.sourceChannel,
       firstSeenResearchTaskId: input.firstSeenResearchTaskId ?? null,
       rawMetadata: input.rawMetadata,
+      contentFetchStatus,
     })
     .onConflictDoNothing({ target: newsArticles.urlHash })
     .returning({ id: newsArticles.id });
