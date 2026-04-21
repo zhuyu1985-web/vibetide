@@ -31,6 +31,8 @@ export const newsArticles = pgTable(
     crawledAt: timestamp("crawled_at", { withTimezone: true }).defaultNow().notNull(),
     embedding: jsonb("embedding"),
     embeddingStatus: researchEmbeddingStatusEnum("embedding_status").notNull().default("pending"),
+    /** 正文异步拉取状态：pending | fetching | done | failed | skipped */
+    contentFetchStatus: text("content_fetch_status").notNull().default("pending"),
     rawMetadata: jsonb("raw_metadata"),
     firstSeenResearchTaskId: uuid("first_seen_research_task_id").references(
       () => researchTasks.id,

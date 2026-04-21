@@ -42,6 +42,9 @@ export const collectionSources = pgTable(
       .notNull()
       .default(0),
     totalRuns: bigint("total_runs", { mode: "number" }).notNull().default(0),
+    researchBridgeEnabled: boolean("research_bridge_enabled")
+      .notNull()
+      .default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({

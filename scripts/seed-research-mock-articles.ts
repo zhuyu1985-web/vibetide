@@ -122,7 +122,7 @@ async function main() {
     content: string;
     publishedAt: Date;
     outletId: string;
-    outletTierSnapshot: "central" | "provincial_municipal" | "industry" | "district_media";
+    outletTierSnapshot: "central" | "provincial_municipal" | "industry" | "district_media" | "self_media";
     districtIdSnapshot: string | null;
     sourceChannel: "tavily" | "whitelist_crawl" | "manual_url";
   };

@@ -7,7 +7,7 @@ import { eq, and } from "drizzle-orm";
 
 export type OutletMatch = {
   outletId: string;
-  tier: "central" | "provincial_municipal" | "industry" | "district_media";
+  tier: "central" | "provincial_municipal" | "industry" | "district_media" | "self_media";
   districtId: string | null;
 } | null;
 
