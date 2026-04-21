@@ -24,6 +24,7 @@ import {
   researchTavilyCrawl,
   researchWhitelistCrawl,
   researchManualUrlIngest,
+  researchArticleContentFetch,
 } from "./research";
 import {
   runCollectionSource,
@@ -73,6 +74,7 @@ export const functions = [
   researchTavilyCrawl,
   researchWhitelistCrawl,
   researchManualUrlIngest,
+  researchArticleContentFetch,
   // Collection Hub (2026-04-18)
   runCollectionSource,
   collectionSmokeConsumer,
