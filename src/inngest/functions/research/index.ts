@@ -3,3 +3,4 @@ export { researchWhitelistCrawl } from "./whitelist-crawl";
 export { researchManualUrlIngest } from "./manual-url-ingest";
 export { researchTaskStart } from "./task-start";
 export { researchArticleContentFetch } from "./article-content-fetch";
+export { researchBridgeBackfill } from "./bridge-backfill";

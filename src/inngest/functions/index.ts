@@ -25,6 +25,7 @@ import {
   researchWhitelistCrawl,
   researchManualUrlIngest,
   researchArticleContentFetch,
+  researchBridgeBackfill,
 } from "./research";
 import {
   runCollectionSource,
@@ -75,6 +76,7 @@ export const functions = [
   researchWhitelistCrawl,
   researchManualUrlIngest,
   researchArticleContentFetch,
+  researchBridgeBackfill,
   // Collection Hub (2026-04-18)
   runCollectionSource,
   collectionSmokeConsumer,
