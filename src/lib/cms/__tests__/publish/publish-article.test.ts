@@ -127,7 +127,6 @@ describe("publishArticleToCms", () => {
 
     const result = await publishArticleToCms({
       articleId: "art-1",
-      appChannelSlug: "app_news",
       operatorId: "xiaofa",
       triggerSource: "workflow",
     });
@@ -139,7 +138,6 @@ describe("publishArticleToCms", () => {
       expect.objectContaining({
         organizationId: "org-1",
         articleId: "art-1",
-        appChannelSlug: "app_news",
         cmsType: 1,
       }),
     );
@@ -162,7 +160,6 @@ describe("publishArticleToCms", () => {
 
     const result = await publishArticleToCms({
       articleId: "art-1",
-      appChannelSlug: "app_news",
       operatorId: "xiaofa",
       triggerSource: "workflow",
       allowUpdate: false,
@@ -201,7 +198,6 @@ describe("publishArticleToCms", () => {
     try {
       await publishArticleToCms({
         articleId: "art-1",
-        appChannelSlug: "app_news",
         operatorId: "xiaofa",
         triggerSource: "manual",
         allowUpdate: true,
@@ -218,7 +214,6 @@ describe("publishArticleToCms", () => {
     await expect(
       publishArticleToCms({
         articleId: "art-1",
-        appChannelSlug: "app_news",
         operatorId: "x",
         triggerSource: "workflow",
       }),
@@ -233,7 +228,6 @@ describe("publishArticleToCms", () => {
     await expect(
       publishArticleToCms({
         articleId: "art-1",
-        appChannelSlug: "app_news",
         operatorId: "x",
         triggerSource: "workflow",
       }),
@@ -250,7 +244,6 @@ describe("publishArticleToCms", () => {
     await expect(
       publishArticleToCms({
         articleId: "art-1",
-        appChannelSlug: "app_news",
         operatorId: "x",
         triggerSource: "workflow",
       }),
@@ -266,7 +259,6 @@ describe("publishArticleToCms", () => {
     await expect(
       publishArticleToCms({
         articleId: "missing",
-        appChannelSlug: "app_news",
         operatorId: "x",
         triggerSource: "workflow",
       }),
@@ -281,7 +273,6 @@ describe("publishArticleToCms", () => {
     await expect(
       publishArticleToCms({
         articleId: "art-1",
-        appChannelSlug: "app_news",
         operatorId: "x",
         triggerSource: "workflow",
       }),
@@ -289,13 +280,15 @@ describe("publishArticleToCms", () => {
   });
 
   it("throws CmsConfigError when app_channel not mapped", async () => {
-    (loadMapperContext as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("app_channel_not_mapped: app_news"),
-    );
+    // loadMapperContext is synchronous in real code (throws directly),
+    // so the mock must throw synchronously too; mockRejectedValue would
+    // return a Promise that the call site doesn't await, starving the error.
+    (loadMapperContext as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error("app_channel_not_mapped: app_news");
+    });
     await expect(
       publishArticleToCms({
         articleId: "art-1",
-        appChannelSlug: "app_news",
         operatorId: "x",
         triggerSource: "workflow",
       }),
