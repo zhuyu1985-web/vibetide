@@ -1,13 +1,19 @@
 import { db } from "@/db";
-import { workflowTemplates } from "@/db/schema/workflows";
-import { and, eq, asc, or, ilike, type SQL } from "drizzle-orm";
+import {
+  workflowTemplates,
+  workflowTemplateTabOrder,
+} from "@/db/schema/workflows";
+import { organizations } from "@/db/schema/users";
+import { and, eq, asc, or, ilike, sql, type SQL } from "drizzle-orm";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { EmployeeId } from "@/lib/constants";
 
 /**
  * Pure selector for the "default" 热点追踪 workflow template.
  *
- * 3-level priority:
+ * Priority (with `pinnedTemplateId` from org settings):
+ *   0. 若提供 pinnedTemplateId 且能在 candidates 中找到匹配模板（任意 owner /
+ *      builtin 状态都接受 — 允许 ops 选自定义模板），优先返回它
  *   1. `ownerEmployeeId === "xiaolei"` AND `legacyScenarioKey === "breaking_news"` AND `isBuiltin`
  *   2. `ownerEmployeeId === "xiaolei"` AND `category === "news"` AND `isBuiltin`
  *   3. `null` (no match — caller should treat as "needs reseed")
@@ -17,12 +23,20 @@ import type { EmployeeId } from "@/lib/constants";
  */
 export function pickDefaultHotTopicTemplate(
   candidates: WorkflowTemplateRow[],
+  pinnedTemplateId?: string | null,
 ): WorkflowTemplateRow | null {
   const byCreatedAtAsc = (a: WorkflowTemplateRow, b: WorkflowTemplateRow) => {
     const ta = new Date(a.createdAt).getTime();
     const tb = new Date(b.createdAt).getTime();
     return ta - tb;
   };
+
+  // P0：org 设置了 settings.defaultTemplates.hotTopic — 优先用它
+  if (pinnedTemplateId) {
+    const pinned = candidates.find((t) => t.id === pinnedTemplateId);
+    if (pinned) return pinned;
+    // pinned id 不在候选里（被删 / 跨 org / 拼写错）→ 落到下面的 fallback
+  }
 
   const p1 = candidates
     .filter(
@@ -50,22 +64,37 @@ export function pickDefaultHotTopicTemplate(
 /**
  * DB wrapper around `pickDefaultHotTopicTemplate`.
  *
- * Loads all builtin templates for the org and runs the 3-level selector.
- * 若两条规则都无命中，抛错提示需 reseed — 属于配置错误，不应返回 null。
+ * Loads org settings + all candidate templates for the org, then runs the
+ * 4-level selector (P0 pinned → P1 breaking_news → P2 news fallback → null).
+ *
+ * P0 候选放宽到所有 org 模板（包括自定义 / 非 isBuiltin），让 ops 能 pin 任何
+ * 自己创建的模板。后两级 fallback 仍只看 isBuiltin 模板。
+ *
+ * 若都无命中，抛错提示需 reseed — 属于配置错误，不应返回 null。
  */
 export async function getDefaultHotTopicTemplate(
   orgId: string,
 ): Promise<WorkflowTemplateRow> {
-  const rows = await db
-    .select()
-    .from(workflowTemplates)
-    .where(
-      and(
-        eq(workflowTemplates.organizationId, orgId),
-        eq(workflowTemplates.isBuiltin, true),
-      ),
-    );
-  const picked = pickDefaultHotTopicTemplate(rows as WorkflowTemplateRow[]);
+  const [orgRow, rows] = await Promise.all([
+    db
+      .select({ settings: organizations.settings })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1)
+      .then((r) => r[0]),
+    db
+      .select()
+      .from(workflowTemplates)
+      .where(eq(workflowTemplates.organizationId, orgId)),
+  ]);
+
+  const pinnedTemplateId =
+    orgRow?.settings?.defaultTemplates?.hotTopic ?? null;
+
+  const picked = pickDefaultHotTopicTemplate(
+    rows as WorkflowTemplateRow[],
+    pinnedTemplateId,
+  );
   if (!picked) {
     throw new Error(
       `default hot topic template missing for org ${orgId}; please reseed builtin templates`,
@@ -146,6 +175,20 @@ export async function listTemplatesForHomepageByTab(
 
   const conds: SQL[] = [eq(workflowTemplates.organizationId, orgId)];
 
+  // 排除"视觉上空"的模板（steps 为空 OR 所有 step 都没有效 skill）——
+  // 含遗留 ADVANCED_SCENARIO / 坏 seed。「我的自定义」tab 保留所有，允许用户
+  // 看到自己草稿。
+  if (tab !== "custom") {
+    conds.push(sql`${workflowTemplates.steps} IS NOT NULL
+      AND jsonb_typeof(${workflowTemplates.steps}) = 'array'
+      AND jsonb_array_length(${workflowTemplates.steps}) > 0
+      AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(${workflowTemplates.steps}) AS s
+        WHERE coalesce(s->'config'->>'skillSlug', '') <> ''
+           OR coalesce(s->'config'->>'skillName', '') <> ''
+      )`);
+  }
+
   if (tab === "featured") {
     conds.push(eq(workflowTemplates.isPublic, true));
     conds.push(eq(workflowTemplates.isFeatured, true));
@@ -159,12 +202,45 @@ export async function listTemplatesForHomepageByTab(
     conds.push(eq(workflowTemplates.ownerEmployeeId, tab));
   }
 
-  const rows = await db
-    .select()
+  if (tab === "custom") {
+    const rows = await db
+      .select()
+      .from(workflowTemplates)
+      .where(and(...conds))
+      .orderBy(asc(workflowTemplates.createdAt));
+    return rows as WorkflowTemplateRow[];
+  }
+
+  // 9 个共享 tab：LEFT JOIN 顺序表 + 应用层排序
+  const joinedRows = await db
+    .select({
+      tpl: workflowTemplates,
+      orderPinnedAt: workflowTemplateTabOrder.pinnedAt,
+      orderSortOrder: workflowTemplateTabOrder.sortOrder,
+    })
     .from(workflowTemplates)
-    .where(and(...conds))
-    .orderBy(asc(workflowTemplates.createdAt));
-  return rows as WorkflowTemplateRow[];
+    .leftJoin(
+      workflowTemplateTabOrder,
+      and(
+        eq(workflowTemplateTabOrder.templateId, workflowTemplates.id),
+        eq(workflowTemplateTabOrder.organizationId, orgId),
+        eq(workflowTemplateTabOrder.tabKey, tab),
+      ),
+    )
+    .where(and(...conds));
+
+  const withOrder: TemplateWithOrder[] = joinedRows.map((r) => ({
+    tpl: r.tpl as WorkflowTemplateRow,
+    order:
+      r.orderPinnedAt == null && r.orderSortOrder == null
+        ? null
+        : {
+            pinnedAt: r.orderPinnedAt,
+            sortOrder: r.orderSortOrder ?? 0,
+          },
+  }));
+
+  return sortTemplatesForHomepageTab(withOrder).map((r) => r.tpl);
 }
 
 /**
@@ -177,4 +253,52 @@ export async function listTemplatesForHomepageByEmployee(
   opts?: { userId?: string },
 ): Promise<WorkflowTemplateRow[]> {
   return listTemplatesForHomepageByTab(orgId, employeeId ?? "custom", opts);
+}
+
+export type TemplateWithOrder = {
+  tpl: WorkflowTemplateRow;
+  order: {
+    pinnedAt: Date | null;
+    sortOrder: number;
+  } | null;
+};
+
+/**
+ * 纯排序函数 —— 输入带 order 元数据的模板行，按首页 tab 排序规则排好序输出。
+ *
+ * 规则：
+ *   1. 置顶区（order.pinnedAt 非 null）优先
+ *   2. 置顶区内：pinnedAt DESC（最近置顶的在顶）
+ *   3. 非置顶区：sortOrder ASC
+ *   4. 未入 order 表（order === null）视为 sortOrder = +∞，落到非置顶区末尾
+ *   5. 所有前序相同 → createdAt ASC 兜底
+ */
+export function sortTemplatesForHomepageTab(
+  rows: TemplateWithOrder[],
+): TemplateWithOrder[] {
+  const isPinned = (r: TemplateWithOrder) => r.order?.pinnedAt != null;
+  const SENTINEL = Number.POSITIVE_INFINITY;
+  const effectiveSort = (r: TemplateWithOrder) =>
+    r.order?.pinnedAt != null
+      ? -Number.MAX_SAFE_INTEGER
+      : r.order?.sortOrder ?? SENTINEL;
+
+  return [...rows].sort((a, b) => {
+    const ap = isPinned(a);
+    const bp = isPinned(b);
+    if (ap !== bp) return ap ? -1 : 1;
+    if (ap && bp) {
+      const at = a.order!.pinnedAt!.getTime();
+      const bt = b.order!.pinnedAt!.getTime();
+      if (at !== bt) return bt - at;
+    } else {
+      const av = effectiveSort(a);
+      const bv = effectiveSort(b);
+      if (av !== bv) return av - bv;
+    }
+    return (
+      new Date(a.tpl.createdAt).getTime() -
+      new Date(b.tpl.createdAt).getTime()
+    );
+  });
 }
