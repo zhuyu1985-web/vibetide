@@ -17,6 +17,7 @@ import type {
   missionMessages,
   missionArtifacts,
   workflowTemplates,
+  workflowTemplateTabOrder,
   tasks,
   knowledgeBases,
   employeeKnowledgeBases,
@@ -54,11 +55,9 @@ import type {
   contentVersions,
   creationChatMessages,
   competitors,
-  benchmarkAnalyses,
   missedTopics,
   weeklyReports,
   monitoredPlatforms,
-  platformContent,
   benchmarkAlerts,
   batchJobs,
   batchItems,
@@ -185,22 +184,18 @@ export type NewCreationSession = InferInsertModel<typeof creationSessions>;
 export type NewContentVersion = InferInsertModel<typeof contentVersions>;
 export type NewCreationChatMessage = InferInsertModel<typeof creationChatMessages>;
 
-// Benchmarking (2.2)
+// Benchmarking (legacy tables — benchmark_analyses / platform_content drop 在 topic-compare v2 重构中)
 export type CompetitorRow = InferSelectModel<typeof competitors>;
-export type BenchmarkAnalysisRow = InferSelectModel<typeof benchmarkAnalyses>;
 export type MissedTopicRow = InferSelectModel<typeof missedTopics>;
 export type WeeklyReportRow = InferSelectModel<typeof weeklyReports>;
 export type NewCompetitor = InferInsertModel<typeof competitors>;
-export type NewBenchmarkAnalysis = InferInsertModel<typeof benchmarkAnalyses>;
 export type NewMissedTopic = InferInsertModel<typeof missedTopics>;
 export type NewWeeklyReport = InferInsertModel<typeof weeklyReports>;
 
 // Benchmarking Deep-Dive
 export type MonitoredPlatformRow = InferSelectModel<typeof monitoredPlatforms>;
-export type PlatformContentRow = InferSelectModel<typeof platformContent>;
 export type BenchmarkAlertRow = InferSelectModel<typeof benchmarkAlerts>;
 export type NewMonitoredPlatform = InferInsertModel<typeof monitoredPlatforms>;
-export type NewPlatformContent = InferInsertModel<typeof platformContent>;
 export type NewBenchmarkAlert = InferInsertModel<typeof benchmarkAlerts>;
 
 // Batch Production (2.4)
@@ -228,6 +223,14 @@ export type NewEmployeeMemory = InferInsertModel<typeof employeeMemories>;
 // Workflow Artifacts
 export type WorkflowArtifactRow = InferSelectModel<typeof workflowArtifacts>;
 export type NewWorkflowArtifact = InferInsertModel<typeof workflowArtifacts>;
+
+// Homepage Template Tab Order (per-tab drag / pin state for /home)
+export type WorkflowTemplateTabOrderRow = InferSelectModel<
+  typeof workflowTemplateTabOrder
+>;
+export type NewWorkflowTemplateTabOrder = InferInsertModel<
+  typeof workflowTemplateTabOrder
+>;
 
 // Skill Files
 export type SkillFileRow = InferSelectModel<typeof skillFiles>;

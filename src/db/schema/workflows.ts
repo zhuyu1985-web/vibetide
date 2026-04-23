@@ -72,7 +72,6 @@ export const workflowTemplates = pgTable("workflow_templates", {
   icon: text("icon"),
   inputFields: jsonb("input_fields").$type<InputFieldDef[]>().default([]),
   defaultTeam: jsonb("default_team").$type<string[]>().default([]),
-  appChannelSlug: text("app_channel_slug"),
   systemInstruction: text("system_instruction"),
   legacyScenarioKey: text("legacy_scenario_key"),
 
@@ -115,6 +114,41 @@ export const workflowTemplates = pgTable("workflow_templates", {
     .on(table.organizationId, table.isFeatured)
     .where(sql`${table.isFeatured} = true AND ${table.isPublic} = true`),
 }));
+
+// ─── Homepage Template Tab Order (per-tab drag / pin state for /home) ───
+
+export const workflowTemplateTabOrder = pgTable(
+  "workflow_template_tab_order",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    // tab_key: "featured" | EmployeeId (xiaolei|xiaoce|xiaozi|xiaowen|xiaojian|xiaoshen|xiaofa|xiaoshu)
+    // 不用 enum：保持字符串 + 应用层 guard，避免 enum 迁移扰动。
+    tabKey: text("tab_key").notNull(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => workflowTemplates.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    orgTabTemplateUidx: uniqueIndex(
+      "workflow_template_tab_order_org_tab_template_uidx",
+    ).on(table.organizationId, table.tabKey, table.templateId),
+    orgTabOrderIdx: index("idx_homepage_order_org_tab").on(
+      table.organizationId,
+      table.tabKey,
+    ),
+  }),
+);
 
 // ─── Workflow Artifacts (now linked to missions instead of workflow_instances) ───
 
