@@ -251,11 +251,37 @@ export function HomeClient({
   const handleScenarioFormSubmit = useCallback(
     (scenario: ScenarioCardData, inputs: Record<string, string>) => {
       setInlineScenario(null);
+      // 关键：select/multiselect 字段把英文 value（如 "national" / "urgent"）
+      // 映射回中文 label（"全国" / "紧急"）。否则发给 chat 的消息里混着英
+      // 文 enum，下游 web_search 拼出 query 带英文词会把 Tavily 偏向英文
+      // 结果。经验事故：每日时政热点场景里 region=national + urgency=urgent
+      // 导致搜索返回白宫 / Google / Gemini 等英文新闻。
+      const labelForValue = (
+        field: (typeof scenario.inputFields)[number] | undefined,
+        rawValue: string
+      ): string => {
+        if (!field || !Array.isArray(field.options)) return rawValue;
+        // multiselect 传来的是逗号串
+        const values = rawValue.split(",").map((v) => v.trim()).filter(Boolean);
+        const mapped = values.map((v) => {
+          const match = field.options?.find((opt) =>
+            typeof opt === "string" ? opt === v : opt.value === v
+          );
+          if (!match) return v;
+          return typeof match === "string" ? match : match.label;
+        });
+        return mapped.join("、");
+      };
+
       const summary = Object.entries(inputs)
         .filter(([, v]) => v)
         .map(([k, v]) => {
           const field = scenario.inputFields.find((f) => f.name === k);
-          return `${field?.label ?? k}: ${v}`;
+          const displayValue =
+            field?.type === "select" || field?.type === "multiselect"
+              ? labelForValue(field, v)
+              : v;
+          return `${field?.label ?? k}: ${displayValue}`;
         })
         .join("\n");
       chat.sendMessage(`场景：${scenario.name}\n${summary}`);
