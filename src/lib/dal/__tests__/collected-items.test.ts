@@ -438,10 +438,15 @@ describe("getCollectionTrend", () => {
   it("超出 days 范围的 runs 不出现", async () => {
     // 只查 1 天
     const trend1d = await getCollectionTrend(orgA, 1);
-    const today = new Date().toISOString().slice(0, 10);
+    // getCollectionTrend 用 `now - days*24h` 作为 since 下界，用 UTC
+    // to_char 做日期分桶。跨 UTC 零点时（08:00-09:00 CST），1h 前的 run
+    // 会落到"昨天"的桶里但仍在 since 窗口内。按 since 下界比较才是对齐
+    // 实现语义，按 today UTC 比较会误判。
+    const sinceDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
     for (const point of trend1d) {
-      // 所有日期应在最近 1 天内
-      expect(point.date >= today).toBe(true);
+      expect(point.date >= sinceDate).toBe(true);
     }
   });
 });
