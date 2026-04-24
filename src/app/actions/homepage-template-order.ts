@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, max, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { workflowTemplateTabOrder, workflowTemplates } from "@/db/schema/workflows";
+// 本文件使用 getCurrentUserProfile 而非 cms.ts 里的 getCurrentUserAndOrg——
+// 需要 role / isSuperAdmin 字段做管理员判定，后者只返回 userId+orgId。
 import { getCurrentUserProfile } from "@/lib/dal/auth";
 
 // ─── Shared constants / utils ────────────────────────────────────────
