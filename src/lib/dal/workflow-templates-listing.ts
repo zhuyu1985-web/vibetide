@@ -168,7 +168,7 @@ export async function listTemplatesForHomepageByTab(
   orgId: string,
   tab: HomepageTabKey,
   opts?: { userId?: string },
-): Promise<WorkflowTemplateRow[]> {
+): Promise<(WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[]> {
   if (tab === "custom" && !opts?.userId) {
     return [];
   }
@@ -240,7 +240,12 @@ export async function listTemplatesForHomepageByTab(
           },
   }));
 
-  return sortTemplatesForHomepageTab(withOrder).map((r) => r.tpl);
+  // Task 4 — 把非持久 `__homepagePinnedAt` 字段挂到每行，供客户端区分置顶卡。
+  // 只在 9 个共享 tab 分支做，custom tab 不参与置顶/排序。
+  return sortTemplatesForHomepageTab(withOrder).map((r) => ({
+    ...r.tpl,
+    __homepagePinnedAt: r.order?.pinnedAt ?? null,
+  })) as (WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[];
 }
 
 /**

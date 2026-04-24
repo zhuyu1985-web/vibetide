@@ -7,26 +7,11 @@ import { workflowTemplateTabOrder, workflowTemplates } from "@/db/schema/workflo
 // 本文件使用 getCurrentUserProfile 而非 cms.ts 里的 getCurrentUserAndOrg——
 // 需要 role / isSuperAdmin 字段做管理员判定，后者只返回 userId+orgId。
 import { getCurrentUserProfile } from "@/lib/dal/auth";
+// Task 4 — `ALLOWED_TAB_KEYS` / `isAllowedTabKey` 抽到 `src/lib/homepage-template-tabs.ts`，
+// 允许 client 组件复用同一份 tab 白名单（`"use server"` 文件只能 export async）。
+import { isAllowedTabKey } from "@/lib/homepage-template-tabs";
 
 // ─── Shared constants / utils ────────────────────────────────────────
-
-export const ALLOWED_TAB_KEYS = [
-  "featured",
-  "xiaolei",
-  "xiaoce",
-  "xiaozi",
-  "xiaowen",
-  "xiaojian",
-  "xiaoshen",
-  "xiaofa",
-  "xiaoshu",
-] as const;
-
-export type AllowedTabKey = (typeof ALLOWED_TAB_KEYS)[number];
-
-export function isAllowedTabKey(key: string): key is AllowedTabKey {
-  return (ALLOWED_TAB_KEYS as readonly string[]).includes(key);
-}
 
 export const SHARED_HOMEPAGE_ACTION_ERROR = {
   FORBIDDEN: "FORBIDDEN",

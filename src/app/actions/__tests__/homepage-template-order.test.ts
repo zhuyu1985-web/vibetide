@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+// Task 4 — `ALLOWED_TAB_KEYS` / `isAllowedTabKey` 抽到 `@/lib/homepage-template-tabs`
+// 以允许 client 组件复用（"use server" 模块不能 export 同步常量/函数）。
 import {
   ALLOWED_TAB_KEYS,
   isAllowedTabKey,
-  SHARED_HOMEPAGE_ACTION_ERROR,
-} from "@/app/actions/homepage-template-order";
+} from "@/lib/homepage-template-tabs";
+import { SHARED_HOMEPAGE_ACTION_ERROR } from "@/app/actions/homepage-template-order";
 
 describe("isAllowedTabKey", () => {
   it("包含 featured + 8 员工 slug", () => {

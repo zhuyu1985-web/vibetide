@@ -6,6 +6,7 @@ import { savedConversations } from "@/db/schema/saved-conversations";
 import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
 import { getEmployees } from "@/lib/dal/employees";
+import { getCurrentUserProfile } from "@/lib/dal/auth";
 import {
   listTemplatesForHomepageByTab,
   type HomepageTabKey,
@@ -47,7 +48,11 @@ export default async function HomePage() {
   }> = [];
   const scenarioMap: Record<string, ScenarioCardData[]> = {};
   let employeeDbIdMap: Record<string, string> = {};
-  let templatesByTab: Record<string, WorkflowTemplateRow[]> = {};
+  let templatesByTab: Record<
+    string,
+    (WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[]
+  > = {};
+  let canManageHomepage = false;
 
   try {
     const supabase = await createClient();
@@ -136,6 +141,20 @@ export default async function HomePage() {
     } catch {
       // Graceful degradation
     }
+
+    // Task 4 — 判定当前用户是否可管理首页（admin / owner / 超级管理员）。
+    // 失败时落到 false（普通用户视图），不阻断首页加载。
+    try {
+      const profile = await getCurrentUserProfile();
+      if (profile) {
+        canManageHomepage =
+          profile.isSuperAdmin ||
+          profile.role === "admin" ||
+          profile.role === "owner";
+      }
+    } catch {
+      // Graceful degrade to normal user
+    }
   } catch {
     // Graceful degradation — show empty data
   }
@@ -148,6 +167,7 @@ export default async function HomePage() {
         scenarioMap={scenarioMap}
         employeeDbIdMap={employeeDbIdMap}
         templatesByTab={templatesByTab}
+        canManageHomepage={canManageHomepage}
       />
     </Suspense>
   );

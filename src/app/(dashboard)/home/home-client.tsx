@@ -41,8 +41,18 @@ interface HomeClientProps {
    * Task 2.3 — Map of tab key → workflow templates for that tab. Keys are the
    * 8 employee slugs plus `"custom"` for user-defined workflows. Replaces the
    * former flat `workflows` prop and legacy scenario-detail-sheet plumbing.
+   *
+   * Task 4 — 9 个共享 tab 的行额外带 `__homepagePinnedAt`（由 DAL LEFT JOIN
+   * 填充），供客户端区分置顶卡；custom tab 无此字段。
    */
-  templatesByTab?: Record<string, WorkflowTemplateRow[]>;
+  templatesByTab?: Record<
+    string,
+    (WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[]
+  >;
+  /**
+   * Task 4 — admin / owner / super admin 可见"整理顺序"与 Pin/Unpin 控件。
+   */
+  canManageHomepage?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +65,7 @@ export function HomeClient({
   scenarioMap = {},
   employeeDbIdMap: _employeeDbIdMap = {},
   templatesByTab = {},
+  canManageHomepage = false,
 }: HomeClientProps) {
   const router = useRouter();
 
@@ -375,7 +386,10 @@ export function HomeClient({
             opens <WorkflowLaunchDialog> (template has input fields) or starts
             the mission directly via `startMissionFromTemplate`. */}
         <div className="px-4 mt-6">
-          <ScenarioGrid templatesByTab={templatesByTab} />
+          <ScenarioGrid
+            templatesByTab={templatesByTab}
+            canManageHomepage={canManageHomepage}
+          />
         </div>
 
         {/* Layer 4: Recent missions & conversations */}
