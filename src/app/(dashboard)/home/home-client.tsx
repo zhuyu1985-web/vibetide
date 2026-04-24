@@ -6,6 +6,7 @@ import { type EmployeeId } from "@/lib/constants";
 import { Mic, Paperclip, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatStream } from "@/hooks/use-chat-stream";
+import type { ChatMessage } from "@/lib/chat-utils";
 import { renderScenarioTemplate } from "@/lib/scenario-template";
 import { ParticleBackground } from "@/components/shared/particle-background";
 import { ModelSwitcher, DEFAULT_MODEL_ID } from "@/components/shared/model-switcher";
@@ -54,6 +55,10 @@ interface HomeClientProps {
    */
   canManageHomepage?: boolean;
 }
+
+// 嵌入式对话状态快照，详见 HomeClient 内的 useEffect。
+const HOME_CHAT_STATE_KEY = "home-embedded-chat-state";
+const HOME_CHAT_STATE_TTL_MS = 4 * 60 * 60 * 1000; // 4 小时
 
 // ---------------------------------------------------------------------------
 // Component
@@ -112,6 +117,68 @@ export function HomeClient({
 
   // ── Chat stream hook ──
   const chat = useChatStream({ employeeSlug: effectiveEmployee });
+
+  // 嵌入式对话状态持久化。chat 状态原本只存在于组件本地 useState，浏览器后台丢
+  // 弃 tab、RSC 重挂、Fast Refresh 等都会让对话整段消失、UI 退回首页视图。
+  // 用 sessionStorage 做轻量快照，挂载时自动还原，显式关闭/展开时清除。
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(HOME_CHAT_STATE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as {
+        chatOpen?: boolean;
+        activeEmployee?: EmployeeId | null;
+        messages?: ChatMessage[];
+        timestamp?: number;
+      };
+      if (!data || typeof data.timestamp !== "number") return;
+      if (Date.now() - data.timestamp > HOME_CHAT_STATE_TTL_MS) {
+        sessionStorage.removeItem(HOME_CHAT_STATE_KEY);
+        return;
+      }
+      if (data.activeEmployee) setActiveEmployee(data.activeEmployee);
+      if (Array.isArray(data.messages) && data.messages.length > 0) {
+        chat.setMessages(data.messages);
+      }
+      if (data.chatOpen) setChatOpen(true);
+    } catch {
+      // 快照损坏 — 清掉，从头开始
+      try {
+        sessionStorage.removeItem(HOME_CHAT_STATE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 仅在对话面板打开、且不在流式输出中时快照；跳过流式中途的半截消息，避免
+  // 还原时渲染出一条永远转圈的空 assistant 气泡。
+  useEffect(() => {
+    if (!chatOpen) return;
+    if (chat.isStreaming || chat.loading) return;
+    try {
+      const last = chat.messages[chat.messages.length - 1];
+      const trimmed =
+        last && last.role === "assistant" && !last.content
+          ? chat.messages.slice(0, -1)
+          : chat.messages;
+      sessionStorage.setItem(
+        HOME_CHAT_STATE_KEY,
+        JSON.stringify({
+          chatOpen,
+          activeEmployee,
+          messages: trimmed,
+          timestamp: Date.now(),
+        }),
+      );
+    } catch {
+      // 配额或序列化失败 — best-effort
+    }
+  }, [chatOpen, activeEmployee, chat.messages, chat.isStreaming, chat.loading]);
 
   // ── Handlers ──
 
@@ -203,7 +270,13 @@ export function HomeClient({
   const handleCloseChat = useCallback(() => {
     setChatOpen(false);
     setChatInput("");
-  }, []);
+    chat.clearMessages();
+    try {
+      sessionStorage.removeItem(HOME_CHAT_STATE_KEY);
+    } catch {
+      // ignore
+    }
+  }, [chat]);
 
   // Send message from chat-mode input box
   const handleChatSend = useCallback(() => {
