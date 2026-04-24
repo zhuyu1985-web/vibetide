@@ -1355,6 +1355,8 @@ function EditProfileDialog({
 // navigates to the created mission. 场景 = 工作流 — these ARE the employee's
 // daily-capability scenarios (不是"选文章再挑模板"的 picker).
 
+const WORKFLOWS_COLLAPSED_COUNT = 12;
+
 function EmployeeWorkflowsSection({
   workflows,
   employeeNickname,
@@ -1365,6 +1367,7 @@ function EmployeeWorkflowsSection({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const handleStart = (wf: WorkflowTemplateRow) => {
     if (isPending) return;
@@ -1394,18 +1397,38 @@ function EmployeeWorkflowsSection({
     return maybe ?? FileTextIcon;
   };
 
+  const hasMore = workflows.length > WORKFLOWS_COLLAPSED_COUNT;
+  const visibleWorkflows = expanded || !hasMore
+    ? workflows
+    : workflows.slice(0, WORKFLOWS_COLLAPSED_COUNT);
+
   return (
     <GlassCard className="mt-4">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          日常工作流
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          {employeeNickname}已固化的 {workflows.length} 个场景能力 — 点击立即启动
-        </p>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            日常工作流
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {employeeNickname}已固化的 {workflows.length} 个场景能力 — 点击立即启动
+          </p>
+        </div>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="shrink-0 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+          >
+            {expanded ? "收起" : `展开全部 (${workflows.length})`}
+            <LucideIcons.ChevronDown
+              size={14}
+              className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          </button>
+        )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {workflows.map((wf) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        {visibleWorkflows.map((wf) => {
           const Icon = resolveIcon(wf.icon);
           const loading = pendingId === wf.id;
           return (
@@ -1414,15 +1437,15 @@ function EmployeeWorkflowsSection({
               type="button"
               onClick={() => handleStart(wf)}
               disabled={isPending}
-              className="flex flex-col items-start gap-2 p-4 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+              className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed group"
             >
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20 flex items-center justify-center group-hover:from-indigo-500/20 group-hover:to-violet-500/20 transition-colors">
+              <div className="shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20 flex items-center justify-center group-hover:from-indigo-500/20 group-hover:to-violet-500/20 transition-colors">
                 <Icon
-                  size={20}
+                  size={18}
                   className="text-indigo-600 dark:text-indigo-400"
                 />
               </div>
-              <div className="w-full">
+              <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
                   {wf.name}
                 </p>

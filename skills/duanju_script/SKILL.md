@@ -3,7 +3,7 @@ name: duanju_script
 displayName: 短剧剧本生成
 description: 为 APP 短剧频道生成竖屏分集短剧剧本（本期只产剧本文本，不做视频渲染）。支持 6 大类型（甜宠/逆袭/悬疑/穿越/古装/都市）+ 12+ 子类型系列化编剧，含角色一致性管理、每集 3 秒钩子、反转节奏、cliffhanger 设计、广电/价值观合规。当用户提及"短剧""剧本""分集""系列剧""小短剧"时调用。
 version: 2.0.0
-category: generation
+category: av_script
 
 metadata:
   skill_kind: generation

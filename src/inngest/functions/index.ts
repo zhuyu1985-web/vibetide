@@ -11,11 +11,6 @@ import {
   onPlanStatusChanged,
   onAnomalyDetected,
 } from "./publishing-events";
-import {
-  benchmarkingCrawlScheduler,
-  benchmarkingPlatformCrawler,
-} from "./benchmarking-crawl";
-import { benchmarkingAnalysisPipeline } from "./benchmarking-analysis";
 import { hotTopicEnrichmentPipeline } from "./hot-topic-enrichment";
 import { employeeStatusGuard } from "./employee-status-guard";
 import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
@@ -60,11 +55,7 @@ export const functions = [
   onReviewCompleted,
   onPlanStatusChanged,
   onAnomalyDetected,
-  // Benchmarking
-  benchmarkingCrawlScheduler,
-  benchmarkingPlatformCrawler,
-  benchmarkingAnalysisPipeline,
-  // Hot Topics (enrichment; crawler migrated to Collection Hub — see below)
+  // Hot Topics (enrichment; crawler 在 Collection Hub 中)
   hotTopicEnrichmentPipeline,
   // Status guard
   employeeStatusGuard,
@@ -90,6 +81,6 @@ export const functions = [
   cmsPublishRetry,
   // Skill / Workflow MD ↔ DB consistency check (2026-04-20)
   skillConsistencyCheck,
-  // Daily Hot Briefing (2026-04-20) — 每日 8:00 自动生成简报 + 推 CMS
+  // Daily Hot Briefing (2026-04-20)
   dailyHotBriefingCron,
 ];

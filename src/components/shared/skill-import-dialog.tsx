@@ -26,12 +26,16 @@ import { importSkillPackage, importSkillMd } from "@/app/actions/skills";
 import type { SkillCategory } from "@/lib/types";
 
 const categoryOptions: { value: SkillCategory; label: string }[] = [
-  { value: "perception", label: "感知" },
-  { value: "analysis", label: "分析" },
-  { value: "generation", label: "生成" },
-  { value: "production", label: "制作" },
-  { value: "management", label: "管理" },
-  { value: "knowledge", label: "知识" },
+  { value: "web_search", label: "全网检索" },
+  { value: "data_collection", label: "数据采集" },
+  { value: "topic_planning", label: "选题策划" },
+  { value: "content_gen", label: "内容生成" },
+  { value: "av_script", label: "视音频脚本" },
+  { value: "quality_review", label: "质量审核" },
+  { value: "content_analysis", label: "内容分析" },
+  { value: "data_analysis", label: "数据分析" },
+  { value: "distribution", label: "渠道分发" },
+  { value: "other", label: "其他" },
 ];
 
 interface SkillImportDialogProps {
@@ -55,7 +59,7 @@ export function SkillImportDialog({
   // Editable fields
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<SkillCategory>("knowledge");
+  const [category, setCategory] = useState<SkillCategory>("other");
 
   const reset = () => {
     setParsing(false);
@@ -65,7 +69,7 @@ export function SkillImportDialog({
     setMdRawContent(null);
     setName("");
     setDescription("");
-    setCategory("knowledge");
+    setCategory("other");
   };
 
   const handleFile = useCallback(async (file: File) => {

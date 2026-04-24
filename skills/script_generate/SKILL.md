@@ -1,9 +1,9 @@
 ---
 name: script_generate
 displayName: 视频脚本生成（场景化重写版）
-description: 生成视频脚本的核心 skill。按 5 大视频场景分化子模板（新闻视频 / 时政解读 / 赛事解说 / 综艺看点 / 纪录片）。每子模板有独立分镜节奏、镜头语言、配音风格。与 duanju_script（分集短剧）、zhongcao_script / tandian_script（民生专用）、podcast_script（音频）形成互补：script_generate 专注"非系列化、非民生专用、非音频"的通用视频场景。
+description: 生成专业级视频脚本的核心写作能力，按 5 大视频场景分化子模板：新闻视频（事实优先 / 客观旁白 / 3-5 min）、时政解读（权威稳重 / 政策要点 / 5-8 min）、赛事解说（情绪推进 / 关键数据 / 5-10 min）、综艺看点（娱乐化 / 梗点 / 3-6 min）、纪录片（叙事性 / 多线 / 10-30 min）。每个子模板有独立的分镜节奏（每 X 秒一个镜头切换）、镜头语言清单（远景 / 中景 / 近景 / 特写 / 空镜）、配音风格（男声 / 女声 / 双声 / AI 合成的语气参数）、音乐节拍建议、字幕样式。输出含开场钩子（≤ 5s）、主体分镜表（场景 + 画面描述 + 旁白 + 配乐 + 时长）、结尾 CTA、封面提示词、B-roll 清单。与 `duanju_script`（分集短剧）、`zhongcao_script` / `tandian_script`（民生专用）、`podcast_script`（纯音频）互补 —— 本 skill 专注"非系列化、非民生专用、非音频"的通用视频场景。当用户提及"视频脚本""分镜""解说词""旁白""配音稿""短片脚本"等关键词时调用。
 version: 5.0.0
-category: generation
+category: av_script
 
 metadata:
   skill_kind: generation

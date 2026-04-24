@@ -3,7 +3,7 @@ name: tandian_script
 displayName: 探店视频脚本生成
 description: 为 APP 民生频道生成 30-300 秒本地美食/店铺探店视频脚本。输出含钩子、6 阶段探店 journey（店门外 → 环境 → 招牌菜 → 试吃反应 → 人均 → 结尾推荐）、必点菜清单、个人体验感描述、平台化 CTA。强调现场感 / 真实性 / 地域感，强制合作披露与广告法扫描。与 zhongcao_script（纯种草）、content_generate（图文探店攻略）互补。
 version: 5.0.0
-category: generation
+category: av_script
 
 metadata:
   skill_kind: generation

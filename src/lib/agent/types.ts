@@ -122,6 +122,13 @@ export interface AgentExecutionInput {
   topicTitle: string;
   previousSteps: StepOutput[];
   userInstructions?: string;
+  /**
+   * Body of the SKILL.md that this step must execute. When set, it's appended
+   * to the agent's system prompt as "必须遵守的当前步骤执行规范" so the LLM
+   * follows the skill's workflow checklist + output schema as a hard constraint
+   * rather than an "additional instruction" buried in the user message.
+   */
+  skillSpec?: string;
 }
 
 export interface AgentExecutionResult {

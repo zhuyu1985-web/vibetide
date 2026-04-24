@@ -51,7 +51,6 @@ describe("DAL cms-publications", () => {
     const id = await createPublication({
       organizationId: orgId,
       articleId,
-      appChannelSlug: "app_news",
       cmsType: 1,
       requestHash: "h1",
       requestPayload: { title: "Test" },
@@ -69,7 +68,6 @@ describe("DAL cms-publications", () => {
     const id = await createPublication({
       organizationId: orgId,
       articleId,
-      appChannelSlug: "app_news",
       cmsType: 1,
       requestHash: "h1",
       requestPayload: {},
@@ -96,7 +94,6 @@ describe("DAL cms-publications", () => {
     const id = await createPublication({
       organizationId: orgId,
       articleId,
-      appChannelSlug: "app_news",
       cmsType: 1,
       requestHash: "h1",
       requestPayload: {},
@@ -119,7 +116,6 @@ describe("DAL cms-publications", () => {
     const id = await createPublication({
       organizationId: orgId,
       articleId,
-      appChannelSlug: "app_news",
       cmsType: 1,
       requestHash: "h1",
       requestPayload: {},
@@ -138,7 +134,6 @@ describe("DAL cms-publications", () => {
     const id1 = await createPublication({
       organizationId: orgId,
       articleId,
-      appChannelSlug: "app_news",
       cmsType: 1,
       requestHash: "h1",
       requestPayload: {},
@@ -155,7 +150,6 @@ describe("DAL cms-publications", () => {
     await createPublication({
       organizationId: orgId,
       articleId,
-      appChannelSlug: "app_news",
       cmsType: 1,
       requestHash: "h1",
       requestPayload: {},

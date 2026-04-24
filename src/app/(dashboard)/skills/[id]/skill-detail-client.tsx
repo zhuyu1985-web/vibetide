@@ -61,27 +61,39 @@ import type { SkillCategory } from "@/lib/types";
 import type { SkillFileRow, SkillVersionRow } from "@/db/types";
 
 const categoryLabels: Record<SkillCategory, string> = {
-  perception: "感知",
-  analysis: "分析",
-  generation: "生成",
-  production: "制作",
-  management: "管理",
-  knowledge: "知识",
+  web_search: "全网检索",
+  data_collection: "数据采集",
+  topic_planning: "选题策划",
+  content_gen: "内容生成",
+  av_script: "视音频脚本",
+  quality_review: "质量审核",
+  content_analysis: "内容分析",
+  data_analysis: "数据分析",
+  distribution: "渠道分发",
+  other: "其他",
 };
 
 const categoryColors: Record<SkillCategory, string> = {
-  perception:
+  web_search:
+    "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+  data_collection:
     "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  analysis:
-    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  generation:
+  topic_planning:
+    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  content_gen:
     "bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400",
-  production:
+  av_script:
+    "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+  quality_review:
     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  management:
+  content_analysis:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  data_analysis:
+    "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  distribution:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  knowledge:
-    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  other:
+    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
 };
 
 const MODEL_OPTIONS = [
@@ -453,6 +465,34 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<SkillTestResult | null>(null);
   const [showTest, setShowTest] = useState(false);
+  const [testStageIdx, setTestStageIdx] = useState(0);
+  const testStartedAt = useRef<number>(0);
+  const [testElapsed, setTestElapsed] = useState(0);
+
+  const TEST_STAGES = [
+    "⚙️ 初始化模型连接",
+    "🔍 解析输入参数 & 检索上下文",
+    "✨ 调用 LLM 生成结果",
+    "📋 整理输出结构",
+  ];
+
+  // 测试中循环切换阶段文字 + 计时
+  useEffect(() => {
+    if (!testing) return;
+    setTestStageIdx(0);
+    setTestElapsed(0);
+    testStartedAt.current = Date.now();
+    const stageTimer = setInterval(() => {
+      setTestStageIdx((i) => (i + 1) % TEST_STAGES.length);
+    }, 2500);
+    const tickTimer = setInterval(() => {
+      setTestElapsed(Math.floor((Date.now() - testStartedAt.current) / 1000));
+    }, 1000);
+    return () => {
+      clearInterval(stageTimer);
+      clearInterval(tickTimer);
+    };
+  }, [testing]);
 
   const referenceFiles = skill.files.filter((f) => f.fileType === "reference");
   const scriptFiles = skill.files.filter((f) => f.fileType === "script");
@@ -628,11 +668,6 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
             </Badge>
           </div>
 
-          {/* Short description */}
-          <p className="text-sm font-mono text-gray-500 dark:text-gray-400 mt-1.5">
-            <span className="text-green-600 dark:text-green-400">//</span>{" "}
-            {shortDesc}
-          </p>
         </div>
 
         {/* Actions */}
@@ -718,6 +753,42 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
               )}
               {testing ? "分析中..." : "执行测试"}
             </Button>
+
+            {/* 分析中面板：阶段提示 + 流动进度条 + 骨架屏 */}
+            {testing && !testResult && (
+              <div className="mt-2 p-4 rounded-lg bg-purple-50/40 dark:bg-purple-950/20 border border-purple-100/60 dark:border-purple-800/30 space-y-3">
+                {/* 阶段文字 + spinner + 计时 */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Loader2 size={15} className="animate-spin text-purple-500 shrink-0" />
+                    <span className="text-sm font-medium text-purple-700 dark:text-purple-300 truncate">
+                      {TEST_STAGES[testStageIdx]}
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-gray-400 dark:text-gray-500 shrink-0 tabular-nums">
+                    {testElapsed}s
+                  </span>
+                </div>
+
+                {/* 流动进度条（indeterminate） */}
+                <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-purple-100 dark:bg-purple-900/40">
+                  <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-purple-400 to-transparent dark:via-purple-500 animate-[skillTestShimmer_1.6s_ease-in-out_infinite]" />
+                </div>
+
+                {/* 提示文字 */}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  AI 正在执行技能分析，通常需要 10-30 秒，请耐心等待。
+                </p>
+
+                {/* 结果区骨架屏 */}
+                <div className="space-y-2 pt-1">
+                  <div className="h-3 w-3/4 rounded bg-gray-200/70 dark:bg-gray-700/50 animate-pulse" />
+                  <div className="h-3 w-full rounded bg-gray-200/70 dark:bg-gray-700/50 animate-pulse" />
+                  <div className="h-3 w-5/6 rounded bg-gray-200/70 dark:bg-gray-700/50 animate-pulse" />
+                </div>
+
+              </div>
+            )}
 
             {testResult && (
               <div className="space-y-3 mt-2">
@@ -1186,7 +1257,7 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
             <div className="px-5 py-5">
               {mdEditing ? (
                 mdPreview ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-5 prose-headings:mb-2 prose-p:my-2.5 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:bg-gray-100 prose-pre:dark:bg-gray-800 prose-code:text-pink-600 prose-code:dark:text-pink-400 prose-blockquote:border-l-blue-400 prose-blockquote:dark:border-l-blue-500 prose-a:text-blue-600 prose-a:dark:text-blue-400">
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm prose-headings:mt-5 prose-headings:mb-2 prose-h1:text-base prose-h1:font-semibold prose-h2:text-[15px] prose-h2:font-semibold prose-h3:text-sm prose-h3:font-semibold prose-h4:text-sm prose-h4:font-medium prose-p:text-sm prose-p:my-2.5 prose-li:text-sm prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:bg-gray-100 prose-pre:dark:bg-gray-800 prose-code:text-pink-600 prose-code:dark:text-pink-400 prose-blockquote:border-l-blue-400 prose-blockquote:dark:border-l-blue-500 prose-a:text-blue-600 prose-a:dark:text-blue-400 prose-table:text-sm">
                     <ReactMarkdown>{mdDraft}</ReactMarkdown>
                   </div>
                 ) : (

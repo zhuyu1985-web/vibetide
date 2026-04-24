@@ -3,7 +3,7 @@ name: podcast_script
 displayName: 播客口播稿生成
 description: 为 APP 民生播客频道生成 TTS 友好的口播稿，适配"每日热点播客""本地民生播客"等场景。输出含开头/主体/结尾三段式结构、口语化节奏、呼吸标记、情绪提示、语速调控、BGM 建议的完整播客脚本（输出到 type=1 CMS 图文稿 + 推送 AIGC 生成音频）。当用户提及"播客""口播稿""音频节目""电台"时调用。
 version: 2.0.0
-category: generation
+category: av_script
 
 metadata:
   skill_kind: generation

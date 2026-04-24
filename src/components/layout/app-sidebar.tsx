@@ -63,8 +63,8 @@ import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
    ──────────────────────────────────────────────────────────── */
 const OPTICAL_ICON_SIZE: Record<string, number> = {
   智能体: 22,
-  审核中心: 22,
-  渠道集成: 22,
+  审核: 22,
+  渠道: 22,
   任务: 22,
   数据: 22,
 };
@@ -108,9 +108,9 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: "工作流", href: "/workflows", icon: Workflow },
   { label: "任务", href: "/missions", icon: ListTodo },
-  { label: "审核中心", href: "/audit-center", icon: ShieldCheck },
-  { label: "渠道集成", href: "/settings/channels", icon: Radio },
-  { label: "数据采集", href: "/data-collection", icon: Database },
+  { label: "审核", href: "/audit-center", icon: ShieldCheck },
+  { label: "渠道", href: "/settings/channels", icon: Radio },
+  { label: "采集", href: "/data-collection", icon: Database },
   {
     label: "创作", href: "#creation", icon: PenLine,
     children: [
@@ -500,7 +500,7 @@ export function AppSidebar({
               textShadow: "0 1px 2px rgba(255,255,255,0.15)",
             }}
           >
-            N
+            M
           </span>
         </Link>
         <div className={cn(

@@ -15,12 +15,16 @@ export const authorityLevelEnum = pgEnum("authority_level", [
 ]);
 
 export const skillCategoryEnum = pgEnum("skill_category", [
-  "perception",
-  "analysis",
-  "generation",
-  "production",
-  "management",
-  "knowledge",
+  "web_search",
+  "data_collection",
+  "topic_planning",
+  "content_gen",
+  "av_script",
+  "quality_review",
+  "content_analysis",
+  "data_analysis",
+  "distribution",
+  "other",
 ]);
 
 export const skillTypeEnum = pgEnum("skill_type", [
@@ -250,6 +254,38 @@ export const missedTopicSourceTypeEnum = pgEnum("missed_topic_source_type", [
   "social_hot",
   "sentiment_event",
   "benchmark_media",
+]);
+
+// ------- Topic-Compare v2 (2026-04-21) -------
+
+export const myAccountPlatformEnum = pgEnum("my_account_platform", [
+  "app",
+  "website",
+  "wechat",
+  "weibo",
+  "douyin",
+  "kuaishou",
+  "bilibili",
+  "xiaohongshu",
+  "tv",
+  "radio",
+  "other",
+]);
+
+export const benchmarkAccountLevelEnum = pgEnum("benchmark_account_level", [
+  "central",
+  "provincial",
+  "city",
+  "industry",
+  "self_media",
+]);
+
+export const topicMatchDecisionEnum = pgEnum("topic_match_decision", [
+  "covered",
+  "suspected",
+  "confirmed",
+  "excluded",
+  "pushed",
 ]);
 
 // Batch Production (2.4)

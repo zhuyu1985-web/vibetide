@@ -8,11 +8,38 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
+/**
+ * Organization-level settings stored as JSONB.
+ *
+ * `defaultTemplates` lets ops pin which workflow_template each module's
+ * "quick action" should launch. UNIVERSAL pattern — add new module keys
+ * (e.g. `deepReport`, `socialMedia`) here as the need arises.
+ *
+ * Currently supported:
+ *   - `hotTopic`: template id used by `getDefaultHotTopicTemplate` for the
+ *     灵感发现"启动追踪"按钮 / cron 自动追踪。
+ */
+export interface OrganizationSettings {
+  defaultTemplates?: {
+    hotTopic?: string;
+  };
+  /**
+   * 每日热点快讯发布配置：
+   *   - `cmsChannelSlug`: 推送到哪个 app_channel（默认 'app_home'）
+   *   - `enabled`: 是否启用 cron 自动推送（默认 true）
+   */
+  dailyHotBriefing?: {
+    cmsChannelSlug?: string;
+    enabled?: boolean;
+  };
+  [key: string]: unknown;
+}
+
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  settings: jsonb("settings").$type<Record<string, unknown>>().default({}),
+  settings: jsonb("settings").$type<OrganizationSettings>().default({}),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

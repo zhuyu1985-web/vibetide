@@ -3,7 +3,7 @@ name: cms_publish
 displayName: CMS 文稿入库发布
 description: 把 VibeTide 审核通过的稿件（图文/图集/外链/视频/音频）通过华栖云 CMS `/web/article/save` 接口入库到指定 APP 栏目。支持 type=1/2/4/5/11 五种稿件类型，含字段映射、状态机、幂等、重试、入库状态追踪。当用户提及"入库""发稿""发布到 CMS""推送到 APP""draft 转发布"时调用。
 version: 1.0.0
-category: management
+category: distribution
 
 metadata:
   skill_kind: action  # DB enum 只有 6 个 category，action 作为 management 下的细分 kind

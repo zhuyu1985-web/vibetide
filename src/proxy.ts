@@ -1,20 +1,13 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
-export function proxy(_request: NextRequest) {
-  // Pass through — auth is handled in dashboard layout with timeout.
-  // Supabase session refresh can be re-enabled once connectivity is stable.
-  return NextResponse.next();
+export async function proxy(request: NextRequest) {
+  return await updateSession(request);
 }
 
 export const config = {
+  // 排除 API（路由自带 requireAuth 鉴权；302 会破坏前端 fetch）与静态资源
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public assets (svg, png, jpg, etc.)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|api/inngest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
   ],
 };

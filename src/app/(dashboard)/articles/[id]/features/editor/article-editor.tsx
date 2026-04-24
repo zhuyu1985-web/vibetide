@@ -22,6 +22,7 @@ import { SlashCommand } from "./slash-command";
 import { BubbleMenuBar } from "./bubble-menu-bar";
 import { AIHighlight } from "./extensions/ai-highlight";
 import { updateArticle } from "@/app/actions/articles";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
 import type { ArticleDetail } from "@/lib/types";
@@ -63,6 +64,7 @@ export function ArticleEditor({
     "saved" | "saving" | "unsaved" | "error"
   >("saved");
   const [isDirty, setIsDirty] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const originalContent = useRef(article.body ?? "");
   const originalTitle = useRef(article.title);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -149,11 +151,7 @@ export function ArticleEditor({
     doSave(editor.getHTML(), title);
   }, [editor, doSave, title]);
 
-  const handleCancel = useCallback(() => {
-    if (isDirty) {
-      const confirmed = window.confirm("有未保存的更改，确定要放弃吗？");
-      if (!confirmed) return;
-    }
+  const doCancel = useCallback(() => {
     if (editor) {
       editor.commands.setContent(originalContent.current);
     }
@@ -161,7 +159,20 @@ export function ArticleEditor({
     setIsDirty(false);
     setSaveStatus("saved");
     onExitEdit();
-  }, [editor, isDirty, onExitEdit]);
+  }, [editor, onExitEdit]);
+
+  const handleCancel = useCallback(() => {
+    if (isDirty) {
+      setCancelConfirmOpen(true);
+      return;
+    }
+    doCancel();
+  }, [isDirty, doCancel]);
+
+  const confirmCancel = useCallback(() => {
+    setCancelConfirmOpen(false);
+    doCancel();
+  }, [doCancel]);
 
   // Cmd+S shortcut
   useEffect(() => {
@@ -263,6 +274,16 @@ export function ArticleEditor({
         characterCount={characterCount}
         wordCount={wordCount}
         saveStatus={saveStatus}
+      />
+
+      <ConfirmDialog
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+        title="放弃未保存的更改"
+        description="有未保存的更改，确定要放弃吗？"
+        confirmText="放弃"
+        variant="danger"
+        onConfirm={confirmCancel}
       />
     </div>
   );

@@ -50,50 +50,68 @@ interface SkillOption {
 }
 
 const SKILL_OPTIONS: SkillOption[] = [
-  // perception
-  { slug: "trend_monitor", name: "趋势监控", category: "perception" },
-  { slug: "news_aggregation", name: "新闻聚合", category: "perception" },
-  { slug: "social_listening", name: "社交聆听", category: "perception" },
-  { slug: "web_search", name: "网络搜索", category: "perception" },
-  // analysis
-  { slug: "topic_extraction", name: "选题提取", category: "analysis" },
-  { slug: "audience_analysis", name: "受众分析", category: "analysis" },
-  { slug: "competitor_analysis", name: "竞品分析", category: "analysis" },
-  { slug: "sentiment_analysis", name: "情感分析", category: "analysis" },
-  { slug: "heat_scoring", name: "热度评分", category: "analysis" },
-  { slug: "data_report", name: "数据报告", category: "analysis" },
-  // generation
-  { slug: "content_generate", name: "内容生成", category: "generation" },
-  { slug: "headline_generate", name: "标题生成", category: "generation" },
-  { slug: "summary_generate", name: "摘要生成", category: "generation" },
-  { slug: "script_generate", name: "脚本生成", category: "generation" },
-  { slug: "style_rewrite", name: "风格改写", category: "generation" },
-  { slug: "translation", name: "翻译", category: "generation" },
-  { slug: "angle_design", name: "角度设计", category: "generation" },
-  // production
-  { slug: "video_edit_plan", name: "视频剪辑方案", category: "production" },
-  { slug: "thumbnail_generate", name: "缩略图生成", category: "production" },
-  { slug: "layout_design", name: "版面设计", category: "production" },
-  { slug: "audio_plan", name: "音频方案", category: "production" },
-  // management
-  { slug: "quality_review", name: "质量审核", category: "management" },
-  { slug: "compliance_check", name: "合规检查", category: "management" },
-  { slug: "fact_check", name: "事实核查", category: "management" },
-  { slug: "publish_strategy", name: "发布策略", category: "management" },
-  { slug: "task_planning", name: "任务规划", category: "management" },
-  // knowledge
-  { slug: "knowledge_retrieval", name: "知识检索", category: "knowledge" },
-  { slug: "media_search", name: "媒资搜索", category: "knowledge" },
-  { slug: "case_reference", name: "案例参考", category: "knowledge" },
+  // web_search
+  { slug: "web_search", name: "全网搜索", category: "web_search" },
+  { slug: "web_deep_read", name: "网页深读", category: "web_search" },
+  // data_collection
+  { slug: "trend_monitor", name: "趋势监控", category: "data_collection" },
+  { slug: "news_aggregation", name: "新闻聚合", category: "data_collection" },
+  { slug: "social_listening", name: "社交聆听", category: "data_collection" },
+  { slug: "trending_topics", name: "热榜聚合", category: "data_collection" },
+  { slug: "media_search", name: "媒资检索", category: "data_collection" },
+  // topic_planning
+  { slug: "angle_design", name: "角度设计", category: "topic_planning" },
+  // content_gen
+  { slug: "content_generate", name: "内容生成", category: "content_gen" },
+  { slug: "headline_generate", name: "标题生成", category: "content_gen" },
+  { slug: "summary_generate", name: "摘要生成", category: "content_gen" },
+  { slug: "style_rewrite", name: "风格改写", category: "content_gen" },
+  { slug: "translation", name: "翻译", category: "content_gen" },
+  { slug: "layout_design", name: "排版设计", category: "content_gen" },
+  { slug: "thumbnail_generate", name: "封面生成", category: "content_gen" },
+  { slug: "zongyi_highlight", name: "综艺看点", category: "content_gen" },
+  // av_script
+  { slug: "script_generate", name: "视频脚本", category: "av_script" },
+  { slug: "duanju_script", name: "短剧剧本", category: "av_script" },
+  { slug: "podcast_script", name: "播客口播稿", category: "av_script" },
+  { slug: "tandian_script", name: "探店视频脚本", category: "av_script" },
+  { slug: "zhongcao_script", name: "种草视频脚本", category: "av_script" },
+  { slug: "audio_plan", name: "音频方案", category: "av_script" },
+  { slug: "video_edit_plan", name: "视频剪辑方案", category: "av_script" },
+  // quality_review
+  { slug: "quality_review", name: "质量审核", category: "quality_review" },
+  { slug: "compliance_check", name: "合规检查", category: "quality_review" },
+  { slug: "fact_check", name: "事实核查", category: "quality_review" },
+  // content_analysis
+  { slug: "topic_extraction", name: "主题提取", category: "content_analysis" },
+  { slug: "sentiment_analysis", name: "情感分析", category: "content_analysis" },
+  // data_analysis
+  { slug: "audience_analysis", name: "受众分析", category: "data_analysis" },
+  { slug: "competitor_analysis", name: "竞品分析", category: "data_analysis" },
+  { slug: "heat_scoring", name: "热度评分", category: "data_analysis" },
+  { slug: "data_report", name: "数据报告", category: "data_analysis" },
+  // distribution
+  { slug: "publish_strategy", name: "发布策略", category: "distribution" },
+  { slug: "cms_publish", name: "CMS 发布", category: "distribution" },
+  { slug: "cms_catalog_sync", name: "CMS 栏目同步", category: "distribution" },
+  { slug: "aigc_script_push", name: "AIGC 脚本推送", category: "distribution" },
+  // other
+  { slug: "task_planning", name: "任务规划", category: "other" },
+  { slug: "knowledge_retrieval", name: "知识检索", category: "other" },
+  { slug: "case_reference", name: "案例参考", category: "other" },
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {
-  perception: "感知",
-  analysis: "分析",
-  generation: "生成",
-  production: "制作",
-  management: "管理",
-  knowledge: "知识",
+  web_search: "全网检索",
+  data_collection: "数据采集",
+  topic_planning: "选题策划",
+  content_gen: "内容生成",
+  av_script: "视音频脚本",
+  quality_review: "质量审核",
+  content_analysis: "内容分析",
+  data_analysis: "数据分析",
+  distribution: "渠道分发",
+  other: "其他",
 };
 
 const STEP_TYPES = [

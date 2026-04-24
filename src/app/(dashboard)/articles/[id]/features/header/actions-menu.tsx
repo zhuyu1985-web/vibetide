@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 interface ActionsMenuProps {
   articleId: string;
@@ -50,8 +51,10 @@ function Separator() {
 
 export function ActionsMenu({ articleId: _articleId, articleUrl, onClose }: ActionsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
+    if (deleteConfirmOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         onClose();
@@ -66,7 +69,7 @@ export function ActionsMenu({ articleId: _articleId, articleUrl, onClose }: Acti
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, deleteConfirmOpen]);
 
   function showToast(msg: string) {
     // Lightweight inline toast — avoids a full toast dependency
@@ -118,9 +121,12 @@ export function ActionsMenu({ articleId: _articleId, articleUrl, onClose }: Acti
   }
 
   function handleDelete() {
-    if (window.confirm("确定要删除这篇稿件吗？此操作不可撤销。")) {
-      showToast("删除功能即将支持");
-    }
+    setDeleteConfirmOpen(true);
+  }
+
+  function confirmDelete() {
+    setDeleteConfirmOpen(false);
+    showToast("删除功能即将支持");
     onClose();
   }
 
@@ -157,6 +163,16 @@ export function ActionsMenu({ articleId: _articleId, articleUrl, onClose }: Acti
       <MenuItem label="编辑元信息" icon="✏️" onClick={() => handlePlaceholder("编辑元信息")} />
       <MenuItem label="归档" icon="📦" onClick={() => handlePlaceholder("归档")} />
       <MenuItem label="删除" icon="🗑️" onClick={handleDelete} danger />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="删除稿件"
+        description="确定要删除这篇稿件吗？此操作不可撤销。"
+        confirmText="删除"
+        variant="danger"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

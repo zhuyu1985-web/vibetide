@@ -26,7 +26,7 @@ export function HeroSection() {
 
       {/* Brand + Title — single line */}
       <h1 className="flex items-baseline justify-center gap-3 md:gap-4 text-4xl md:text-5xl font-bold tracking-tight text-center">
-        {/* NewsClaw — paint-on scale animation */}
+        {/* MClaw — paint-on scale animation */}
         <motion.span
           className="relative inline-block font-black leading-none"
           style={{
@@ -40,7 +40,7 @@ export function HeroSection() {
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           transition={{ duration: 0.9, ease: [0.22, 1.2, 0.36, 1] }}
         >
-          NewsClaw
+          MClaw
           {/* brushstroke underline */}
           <motion.span
             className="absolute left-1/2 -bottom-1 h-[3px] rounded-full"

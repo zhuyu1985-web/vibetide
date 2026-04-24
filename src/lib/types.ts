@@ -34,12 +34,16 @@ export interface Skill {
 }
 
 export type SkillCategory =
-  | "perception"
-  | "analysis"
-  | "generation"
-  | "production"
-  | "management"
-  | "knowledge";
+  | "web_search"
+  | "data_collection"
+  | "topic_planning"
+  | "content_gen"
+  | "av_script"
+  | "quality_review"
+  | "content_analysis"
+  | "data_analysis"
+  | "distribution"
+  | "other";
 
 export type TopicPriority = "P0" | "P1" | "P2";
 export type TopicTrend = "rising" | "surging" | "plateau" | "declining";
@@ -1325,6 +1329,10 @@ export interface TopicCompareArticle {
   shareCount: number;
   benchmarkCount: number;
   hasAnalysis: boolean;
+  /** 最近一次分析时间（ISO） */
+  lastAnalyzedAt?: string | null;
+  /** AI 总结缓存是否过期 */
+  summaryExpired?: boolean;
 }
 
 /** 同题对比 - 详情页全网报道概览 */
@@ -1381,6 +1389,8 @@ export interface CompetitorOutlet {
     /** Optional: platform_content.id — required for AI interpretation lookup.
      *  Absent when the row comes from demo/mock data. */
     contentId?: string;
+    /** Optional: precomputed interpretation for demo/mock rows. */
+    aiInterpretation?: ArticleAIInterpretation | null;
     title: string;
     subject: string;
     publishedAt: string;

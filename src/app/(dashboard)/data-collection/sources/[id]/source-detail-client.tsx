@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { toast } from "sonner";
 import {
   triggerCollectionSource,
@@ -73,6 +74,7 @@ interface SourceDetailClientProps {
 export function SourceDetailClient({ source, runs, items }: SourceDetailClientProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const baselineRunId = useRef<string | null>(null);
 
@@ -159,8 +161,12 @@ export function SourceDetailClient({ source, runs, items }: SourceDetailClientPr
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`确认删除源「${source.name}」?`)) return;
+  const handleDelete = () => {
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    setDeleteOpen(false);
     setBusy(true);
     try {
       await deleteCollectionSource(source.id);
@@ -403,6 +409,17 @@ export function SourceDetailClient({ source, runs, items }: SourceDetailClientPr
           />
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="删除采集源"
+        description={`确认删除源「${source.name}」？`}
+        confirmText="删除"
+        variant="danger"
+        loading={busy}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

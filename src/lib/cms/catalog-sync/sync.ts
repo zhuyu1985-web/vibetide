@@ -69,15 +69,6 @@ export async function syncCmsCatalogs(
     };
   }
 
-  const config = requireCmsConfig();
-  const client = new CmsClient({
-    host: config.host,
-    loginCmcId: config.loginCmcId,
-    loginCmcTid: config.loginCmcTid,
-    timeoutMs: config.timeoutMs,
-    maxRetries: config.maxRetries,
-  });
-
   const syncLogId = await startCmsSyncLog(organizationId, {
     triggerSource: options.triggerSource,
     operatorId: options.operatorId,
@@ -89,6 +80,19 @@ export async function syncCmsCatalogs(
   const deleteMissing = options.deleteMissing ?? true;
 
   try {
+    // -----------------------
+    // Step 0: 加载 CMS 配置 + 构建 client。放在 try 里，让缺 env / 构建失败
+    // 都能被 failCmsSyncLog 捕获并写入同步日志，避免 UI 上"同步日志"一直空白。
+    // -----------------------
+    const config = requireCmsConfig();
+    const client = new CmsClient({
+      host: config.host,
+      loginCmcId: config.loginCmcId,
+      loginCmcTid: config.loginCmcTid,
+      timeoutMs: config.timeoutMs,
+      maxRetries: config.maxRetries,
+    });
+
     // -----------------------
     // Step 1: getChannels
     // -----------------------

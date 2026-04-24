@@ -1,6 +1,13 @@
 import { useState, useCallback } from "react";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+import type { InputFieldDef } from "@/lib/types";
 import type { StepStatus } from "./workflow-canvas";
+
+export interface TestRunExtras {
+  userInputs?: Record<string, unknown>;
+  promptTemplate?: string;
+  inputFields?: InputFieldDef[];
+}
 
 // ---------------------------------------------------------------------------
 // Hook: SSE-based test-run execution for workflow editor
@@ -19,7 +26,8 @@ export function useTestRun() {
     async (
       steps: WorkflowStepDef[],
       triggerType: "manual" | "scheduled",
-      triggerConfig: { cron?: string; timezone?: string } | null
+      triggerConfig: { cron?: string; timezone?: string } | null,
+      extras?: TestRunExtras
     ) => {
       if (testRunning) return;
       setTestRunning(true);
@@ -30,7 +38,14 @@ export function useTestRun() {
         const res = await fetch("/api/workflows/test-run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ steps, triggerType, triggerConfig }),
+          body: JSON.stringify({
+            steps,
+            triggerType,
+            triggerConfig,
+            userInputs: extras?.userInputs,
+            promptTemplate: extras?.promptTemplate,
+            inputFields: extras?.inputFields,
+          }),
         });
 
         if (!res.ok || !res.body) {

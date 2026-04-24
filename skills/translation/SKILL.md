@@ -1,138 +1,187 @@
 ---
 name: translation
 displayName: 多语翻译
-description: 支持中英双语互译及本地化
-category: generation
+description: 专业级中英互译及文化本地化，不是机翻而是"改写级"翻译。支持中 → 英 / 英 → 中，双语平行输出，专门优化新闻 / 时政 / 科技 / 商务 / 娱乐五大领域术语库。能识别文化不对等点（如中文成语、谚语、网络梗）自动做文化转换注释，保留原文风格（正式 / 口语 / 调侃 / 严肃）不串味。输出含翻译正文 + 文化本地化说明 + 专有名词对照表 + 疑点标注（原文歧义需人工决策的点）+ 风格一致性评分。支持按目标读者（学者 / 大众 / 商务）调整译文深度。当用户提及"翻译""英译中""中译英""本地化""双语""跨文化表达""术语翻译"等关键词时调用；不用于仅做语言检测或单词查询。
 version: "1.5"
-inputSchema:
-  text: 待翻译文本
-  sourceLang: 源语言
-  targetLang: 目标语言
-  domain: 领域
-outputSchema:
-  translated: 翻译结果
-  notes: 翻译笔记
-  localization: 本地化说明
-runtimeConfig:
-  type: llm_generation
-  avgLatencyMs: 8000
-  maxConcurrency: 5
-  modelDependency: zhipu:glm-4-plus
-compatibleRoles:
-  - content_creator
-  - channel_operator
+category: content_gen
+
+metadata:
+  skill_kind: generation
+  scenario_tags: [translation, localization, bilingual, cross-culture]
+  compatibleEmployees: [xiaowen, xiaofa, xiaoshen]
+  modelDependency: deepseek:deepseek-chat
+  requires:
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases:
+      - 术语库（推荐，按领域）
+    dependencies: []
+  implementation:
+    scriptPath: src/lib/agent/execution.ts
+    testPath: src/lib/agent/__tests__/
+  openclaw:
+    referenceSpec: docs/superpowers/specs/2026-04-19-skill-md-baoyu-standardization.md
 ---
 
-# 多语翻译
+# 多语翻译（translation）
 
-你是专业翻译专家，擅长中英双语互译，确保语义准确和本地化适配。你不仅精通语言转换，更注重文化语境的传达，让译文在目标语言中读起来如同原创，而非生硬的逐字翻译。
+你是专业译员（中英互译 10 年经验），职责不是把字对字转换，而是"用目标语言读者听得懂、愿意读、没违和感"的表达把原意传达出来。核心信条：**读起来像母语者写的 > 字面忠实**——中文"画龙点睛"直译 "dot eyes on dragon" 就是灾难。
 
-## 输入规格
+## 使用条件
 
-| 参数 | 类型 | 必填 | 说明 |
+✅ **应调用场景**：
+- 海外新闻源（英文）翻译成中文稿
+- 本土爆款稿件翻译成英文做海外分发
+- 双语公告 / 新闻通稿（中英平行）
+- 学术 / 行业报告节选翻译
+- 需要本地化改写的外部通稿
+
+❌ **不应调用场景**：
+- 只要风格改写 → `style_rewrite`
+- 同语种内改 → `style_rewrite`
+- 机器级字面翻译（用通用机翻即可）
+- 口译 / 实时同传（本技能是文本翻译）
+
+**前置条件**：`text` 非空；`sourceLang` / `targetLang` 明确（支持 `auto` 检测）；有领域术语库时质量更高；单次翻译文本 ≤ 5000 字。
+
+## 输入 / 输出
+
+**输入简要表：**
+
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| text | string | 是 | 待翻译文本 |
-| sourceLang | string | 否 | 源语言，未指定则自动检测 |
-| targetLang | string | 是 | 目标语言：zh-CN/en-US |
-| domain | string | 否 | 领域：tech/finance/news/general，影响术语选择 |
-| glossary | Record | 否 | 自定义术语表，确保特定名词翻译一致 |
+| text | string | ✓ | 待翻译文本 |
+| sourceLang | enum | ✗ | `zh` / `en` / `auto`，默认 `auto` |
+| targetLang | enum | ✓ | `zh` / `en` |
+| domain | enum | ✗ | `news` / `politics` / `tech` / `business` / `entertainment` / `general` |
+| audience | enum | ✗ | `scholar` / `mass` / `business`，默认 `mass` |
+| preserveStyle | boolean | ✗ | 保留原文风格，默认 `true` |
+| returnBilingual | boolean | ✗ | 返回双语平行版，默认 `false` |
 
-## 执行流程
+**输出简要表：**
 
-1. **语言检测**：自动检测源语言和文本所属领域，确定翻译策略
-2. **术语查询**：查询领域术语库和自定义术语表，锁定专业名词的统一译法
-3. **翻译执行**：逐段翻译，保持原文结构和段落划分，优先意译而非直译
-4. **本地化处理**：调整日期格式（2026年3月 vs March 2026）、数字单位（亿 vs billion）、文化表达（成语/俗语的等效替换）
-5. **质量校验**：检查术语一致性、漏译、错译、译文流畅度
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| translated | string | 翻译正文 |
+| bilingual | `{src, tgt}[]` | 平行段（returnBilingual 开启） |
+| glossary | `{src, tgt, note?}[]` | 专有名词对照 |
+| localizationNotes | string[] | 文化本地化说明 |
+| ambiguities | `{original, options[], recommendation}[]` | 原文歧义点 |
+| styleScore | float | 风格一致性 0-1 |
+| warnings | string[] | 词量失衡 / 未识别术语 |
 
-## 输出规格
+## 工作流 Checklist
 
-### 输出结构
+- [ ] Step 0: 语种自动检测（`auto` 时）
+- [ ] Step 1: 领域识别 + 术语库注入
+- [ ] Step 2: 原文分段 + 结构识别（标题 / 导语 / 正文 / 引用 / 表格）
+- [ ] Step 3: 逐段翻译 + 术语一致性检查
+- [ ] Step 4: 文化不对等识别（成语 / 谚语 / 网络梗 / 历史典故）
+- [ ] Step 5: 本地化改写（直译不通时意译 + 加注）
+- [ ] Step 6: 风格一致性校验（与原文风格差异评分）
+- [ ] Step 7: 专有名词统一 + 对照表输出
+- [ ] Step 8: 歧义标注（原文有多解时列选项）
+- [ ] Step 9: 质量自检（见 §5）
+
+## 文化本地化策略
+
+| 原文类型 | 策略 | 举例 |
+|---------|-----|------|
+| 中文成语 | 意译 + 加注 | "画龙点睛" → "the finishing touch (lit. 'dotting eyes on dragon')" |
+| 英文俚语 | 中文相近表达 | "piece of cake" → "易如反掌" |
+| 网络梗 | 释义优先 | "内卷" → "involution" + 注释 "excessive competition" |
+| 政治 / 法律术语 | 官方译法优先 | "依法治国" → "law-based governance"（官方） |
+| 品牌 / 人名 | 保留 + 首次译名 | "Tim Cook" → "蒂姆·库克（Tim Cook）" 首次；后续只用"库克" |
+| 度量单位 | 按目标读者转换 | "1 miles" → "约 1.6 公里（1 mile）" |
+| 日期 / 时间 | 按目标格式 | "3/17/2026" → "2026 年 3 月 17 日" |
+
+## 质量把关
+
+**自检阈值表：**
+
+| # | 检查点 | 阈值 |
+|---|-------|-----|
+| 1 | 无漏译 | 段落数 = 原文段数 |
+| 2 | 专有名词一致 | 同名跨段统一 |
+| 3 | 风格一致性 | styleScore ≥ 0.8 |
+| 4 | 术语遵循库 | 术语库命中 100% 遵守 |
+| 5 | 文化不对等处理 | 直译不通时有加注 |
+| 6 | 数字 / 日期无误 | 100%（关键数据双重校验） |
+| 7 | 歧义显式标注 | 不默默选一个 |
+
+**Top-5 典型失败模式：**
+
+| 失败模式 | 表现 | 修正 hint |
+|---------|------|----------|
+| 字面翻译生硬 | "打酱油" → "buy soy sauce" | 检测惯用语；开 preserveStyle |
+| 风格漂移 | 正式通稿译成口语 | preserveStyle=true；风格标签强绑定 |
+| 术语不一致 | 同一机构前译"国务院"后译"State Council" | 首次建表；后续硬匹配 |
+| 漏译 / 多译 | 段落数 ≠ 原文 | Step 3 按段强对齐 |
+| 数字错 | "27 million" → "27 万" | 数字 + 单位白名单校验 |
+
+## 输出示例
 
 ```markdown
-## 翻译结果
-**方向**: {源语言} → {目标语言} | **领域**: {domain}
+## 原文（EN）
+"The State Council of China issued the Regulations on the Administration of Generative AI on March 17, 2026. The regulations, which consist of 8 chapters and 52 articles, will take effect on July 1, 2026."
 
----
+## 翻译（ZH）
+"中国国务院于 2026 年 3 月 17 日颁布《生成式人工智能管理条例》。该条例共 8 章 52 条，将于 2026 年 7 月 1 日起正式施行。"
 
-{翻译后全文}
+## 专有名词对照
+- The State Council of China → 中国国务院
+- Regulations on the Administration of Generative AI → 生成式人工智能管理条例
 
----
+## 本地化说明
+- "issued" → "颁布"（更符合中文政令发布语）
+- 日期格式从 MM/DD/YYYY 转为中文年月日
 
-### 翻译笔记
-| 原文 | 译文 | 说明 |
-|------|------|------|
-| {专业术语} | {对应译文} | {翻译选择理由} |
+## 疑点
+- 无
 
-### 本地化处理
-- {列出做了哪些本地化调整}
+## 风格一致性
+- styleScore: 0.95（原文正式政令 → 译文保持正式语调）
 ```
 
-### 输出示例
+## EXTEND.md 示例
 
-```markdown
-## 翻译结果
-**方向**: 中文 → English | **领域**: tech
+```yaml
+default_target_lang: "zh"
+default_domain: "general"
+default_audience: "mass"
+default_preserve_style: true
 
----
+# 领域术语库 KB 绑定
+domain_glossary_kbs:
+  politics: "glossary-politics"
+  tech: "glossary-tech"
+  business: "glossary-business"
 
-## AI Agent Wave in 2026: How Enterprises Can Seize the Next Growth Engine
+# 风格一致性阈值
+style_score_threshold: 0.8
 
-**Lede**: Following the large language model boom, AI Agents are becoming the core lever for enterprise digital transformation. According to IDC, China's AI Agent market is projected to exceed 80 billion yuan (approximately $11 billion) in 2026, growing at over 120% year-on-year.
-
-### From "Conversation" to "Action": The Fundamental Shift of AI Agents
-
-Unlike traditional chatbots, AI Agents possess autonomous decision-making and multi-step execution capabilities. Take a leading e-commerce platform as an example: its deployed customer service Agent can not only answer questions but also autonomously handle return approvals, coupon issuance, and logistics tracking — covering 12 operational tasks in total, boosting customer service efficiency by 340%.
-
-> "The core value of AI Agents lies not in replacing people, but in freeing them to do more creative work." — CTO of a leading AI company
-
-### Three Key Scenarios Accelerating Adoption
-
-**Scenario 1: Intelligent Content Production**
-After deploying an AI Agent team, a major media group increased daily content output from 50 to 300 articles, with only 15% requiring human review...
-
----
-
-### 翻译笔记
-| 原文 | 译文 | 说明 |
-|------|------|------|
-| AI Agent | AI Agent | 行业通用术语，保留英文不翻译 |
-| 大模型 | large language model | 技术领域标准译法 |
-| 头部电商平台 | leading e-commerce platform | "头部"意译为"leading"更自然 |
-| 日均内容产出 | daily content output | 省略"均"字，英文习惯表达 |
-| 800亿元 | 80 billion yuan (approximately $11 billion) | 补充美元等值便于国际读者理解 |
-| 编者按 | Lede | 新闻行业标准用语 |
-
-### 本地化处理
-- 货币：人民币金额后补充美元等值（按1:7.3汇率）
-- 数字：中文"亿"转换为英文"billion"
-- 引用：保留引号格式，调整为英文引号样式
-- 标点：中文句号/逗号替换为英文标点
+# 度量单位是否自动转换
+unit_conversion: true
 ```
 
-## 质量标准
+## 常见问题
 
-| 维度 | 要求 | 权重 |
+| 问题 | 原因 | 解决 |
 |------|------|------|
-| 语义准确 | 意思传达无误，无漏译、错译、多译 | 35% |
-| 术语一致 | 同一专业名词全文统一译法 | 25% |
-| 表达自然 | 译文流畅自然，无翻译腔，如同目标语言原创 | 25% |
-| 格式保持 | 保留原文Markdown结构、段落划分和排版层级 | 15% |
-
-## 边界情况
-
-- **源语言混合（中英夹杂）**：识别主体语言作为源语言，英文术语按领域判断是否翻译——通用词翻译，专业术语保留
-- **文化特色表达（成语/歇后语/网络梗）**：优先寻找目标语言中的等效表达，无等效时意译并加注释
-- **含代码或技术标记**：代码块、变量名、API名称原样保留不翻译，仅翻译注释和说明文字
-- **超长文本（>5000字）**：分段翻译，每段翻译完成后回顾术语一致性，最终输出统一校验
-- **自定义术语表与通用译法冲突**：优先使用客户提供的术语表，在翻译笔记中标注差异
+| 译文生硬 | 未开 preserveStyle | `preserveStyle=true` |
+| 术语混乱 | 无术语库 | 绑定 domain_glossary_kb |
+| 文化梗丢失 | 直译 | 开本地化加注 |
+| 长文漏段 | 分段错乱 | 按原文结构强对齐 |
+| 数字格式错 | 单位未转 | `unit_conversion=true` |
+| 歧义被默选 | 未开 ambiguities | Step 8 强制标注 |
 
 ## 上下游协作
 
-- **上游输入**：小文（内容写手）提供中文原始内容；小策（内容策划师）指定目标语言和领域
-- **下游输出**：小发（渠道运营）将译文发布至海外平台（Twitter/LinkedIn/Medium等）；小审（质量总监）进行译文质量审核和术语一致性检查
+- **上游**：海外稿件入库（`news_aggregation` 国际源）、公关通稿翻译需求、双语发布要求
+- **下游**：`style_rewrite` 做目标语二次润色、`compliance_check` 做译文合规检查、`cms_publish` 入双语稿
 
 ## 参考资料
 
-- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)
 - 历史版本：`git log --follow skills/translation/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)

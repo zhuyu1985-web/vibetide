@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,6 +12,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "npx tsx src/db/seed.ts",
+    "db:cleanup-empty-workflows": "npx tsx src/db/cleanup-empty-workflow-templates.ts",
+    "db:cleanup-workflow-dupes": "npx tsx src/db/cleanup-workflow-duplicates.ts",
+    "db:cleanup-skill-dupes": "npx tsx src/db/cleanup-legacy-skill-dupes.ts",
     "db:seed:research": "tsx scripts/seed-research.ts",
     "db:seed:mock-articles": "tsx scripts/seed-research-mock-articles.ts",
     "test": "vitest run",

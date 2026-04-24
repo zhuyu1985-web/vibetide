@@ -5,7 +5,8 @@ import { getPerformanceTrend } from "@/lib/dal/performance";
 import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectAttributions } from "@/lib/dal/evolution";
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
-import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
+import { listTemplatesForHomepageByTab } from "@/lib/dal/workflow-templates-listing";
+import type { EmployeeId } from "@/lib/constants";
 import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
 import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
@@ -75,16 +76,11 @@ export default async function EmployeeProfilePage({
     await Promise.all([
       getRecentMemories(employee.dbId, 20).catch(() => []),
       getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
-      // B.1: workflow_templates filtered by this employee's slug (via jsonb
-      // `default_team @> '["slug"]'`). These ARE the employee's "scenarios"
-      // in the unified model — 场景 = 工作流.
-      // Legacy `employee_scenarios` table has been DROPPED (commit a066cbb);
-      // scenarios/adminScenarios no longer loaded.
+      // 2026-04-20 realignment — "日常工作流" 严格按 ownerEmployeeId 垂类归属
+      // 过滤（之前用 defaultTeam 包含匹配，会把"协作成员"身份的场景也算进来，
+      // 导致质量审核官显示"深度报道""系列策划"等无关场景）。
       orgId
-        ? listWorkflowTemplatesByOrg(orgId, {
-            isEnabled: true,
-            employeeSlug: employee.id,
-          }).catch(() => [])
+        ? listTemplatesForHomepageByTab(orgId, employee.id as EmployeeId).catch(() => [])
         : Promise.resolve([]),
     ]);
 

@@ -12,6 +12,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 import { createResearchTask } from "@/app/actions/research/research-tasks";
+import { ResearchBreadcrumb } from "../../../research-breadcrumb";
 
 const TIERS = [
   { value: "central", label: "中央级" },
@@ -89,6 +90,9 @@ export function NewTaskClient({
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           选择主题、区县、媒体层级和时间范围，系统将自动采集全网与白名单媒体数据
         </p>
+        <div className="mt-3">
+          <ResearchBreadcrumb />
+        </div>
       </div>
 
       {error && (

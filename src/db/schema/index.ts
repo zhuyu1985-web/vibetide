@@ -16,6 +16,8 @@ export * from "./asset-revive";
 export * from "./hot-topics";
 export * from "./creation";
 export * from "./benchmarking";
+// Topic-Compare v2 (2026-04-21) — my_accounts / my_posts / benchmark_accounts / topic_matches
+export * from "./topic-compare-v2";
 export * from "./batch-production";
 export * from "./events";
 export * from "./publishing";
@@ -80,8 +82,7 @@ export * from "./collection";
 export * from "./cms-mapping";
 // CMS Adapter Phase 1 — Task 11：article → CMS 入稿流水
 export * from "./cms-publications";
-// CMS Adapter Phase 1 — Task 12：APP 栏目 ↔ CMS 栏目绑定（运营配置）
-export * from "./app-channels";
+// app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
 // (Task 0.3 of 2026-04-20-scenario-workflow-realignment). The table was

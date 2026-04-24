@@ -34,7 +34,6 @@ export const cmsPublications = pgTable(
     articleId: uuid("article_id")
       .references(() => articles.id)
       .notNull(),
-    appChannelSlug: text("app_channel_slug").notNull(),
 
     cmsArticleId: text("cms_article_id"),
     cmsCatalogId: text("cms_catalog_id"),
@@ -73,10 +72,6 @@ export const cmsPublications = pgTable(
     cmsArticleIdIdx: index("cms_pub_cms_article_idx").on(table.cmsArticleId),
     orgStateIdx: index("cms_pub_org_state_idx").on(
       table.organizationId,
-      table.cmsState,
-    ),
-    channelStateIdx: index("cms_pub_channel_state_idx").on(
-      table.appChannelSlug,
       table.cmsState,
     ),
   }),

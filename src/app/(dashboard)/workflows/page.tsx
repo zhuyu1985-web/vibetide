@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { getMyWorkflows, getBuiltinTemplates } from "@/lib/dal/workflow-templates";
 import { createClient } from "@/lib/supabase/server";
+import { isSuperAdmin } from "@/lib/rbac";
 import { WorkflowsClient } from "./workflows-client";
 import type { WorkflowTemplateRow } from "@/db/types";
 
@@ -15,6 +16,7 @@ function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 15000): Promise<T
 export default async function WorkflowsPage() {
   let myWorkflows: WorkflowTemplateRow[] = [];
   let builtinTemplates: WorkflowTemplateRow[] = [];
+  let isAdmin = false;
 
   try {
     const supabase = await createClient();
@@ -23,12 +25,14 @@ export default async function WorkflowsPage() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      const [mine, builtin] = await Promise.all([
+      const [mine, builtin, admin] = await Promise.all([
         withTimeout(getMyWorkflows(user.id), []),
         withTimeout(getBuiltinTemplates(), []),
+        withTimeout(isSuperAdmin(user.id), false),
       ]);
       myWorkflows = mine;
       builtinTemplates = builtin;
+      isAdmin = admin;
     }
   } catch {
     // Graceful degradation — render empty state
@@ -38,6 +42,7 @@ export default async function WorkflowsPage() {
     <WorkflowsClient
       myWorkflows={myWorkflows}
       builtinTemplates={builtinTemplates}
+      isAdmin={isAdmin}
     />
   );
 }

@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -113,11 +115,15 @@ export function TaskDetailClient({
     channelCounts[a.sourceChannel] = (channelCounts[a.sourceChannel] ?? 0) + 1;
   }
 
-  async function doCancel() {
-    if (!confirm("确认取消这个研究任务吗？")) return;
+  const [cancelOpen, setCancelOpen] = useState(false);
+  function doCancel() {
+    setCancelOpen(true);
+  }
+  function doCancelConfirmed() {
+    setCancelOpen(false);
     startTransition(async () => {
       const res = await cancelResearchTask(task.id);
-      if (!res.ok) alert(res.error);
+      if (!res.ok) toast.error(res.error);
       else router.refresh();
     });
   }

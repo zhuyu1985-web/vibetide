@@ -10,7 +10,6 @@ import {
 } from "@/lib/cms";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
-import { updateAppChannelBinding as dalUpdateAppChannelBinding } from "@/lib/dal/app-channels";
 
 // ---------------------------------------------------------------------------
 // Auth helpers (multi-tenant boundary)
@@ -49,25 +48,44 @@ export interface TriggerCatalogSyncInput {
  * 手动触发 CMS 栏目同步（供运营 UI / 其他 server action 调用）。
  *
  * - 仅登录用户可调用，组织边界由 user_profiles 决定
- * - 成功且非 dryRun 时 revalidate /settings/cms-mapping
+ * - 成功与失败都 revalidate /settings/cms-mapping，让新增的日志行立刻显示
+ * - 任何抛出（权限 / 配置 / 网络）都被收敛成 SyncResult，UI 能统一展示
  */
 export async function triggerCatalogSyncAction(
   input: TriggerCatalogSyncInput = {},
 ): Promise<SyncResult> {
-  const { userId, organizationId } = await requireUserAndOrg();
-
-  const result = await syncCmsCatalogs(organizationId, {
-    triggerSource: "manual",
-    operatorId: userId,
-    dryRun: input.dryRun,
-    deleteMissing: input.deleteMissing,
-  });
-
-  if (result.success && !input.dryRun) {
-    revalidatePath("/settings/cms-mapping");
+  try {
+    const { userId, organizationId } = await requireUserAndOrg();
+    const result = await syncCmsCatalogs(organizationId, {
+      triggerSource: "manual",
+      operatorId: userId,
+      dryRun: input.dryRun,
+      deleteMissing: input.deleteMissing,
+    });
+    if (!input.dryRun) {
+      revalidatePath("/settings/cms-mapping");
+    }
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!input.dryRun) {
+      revalidatePath("/settings/cms-mapping");
+    }
+    return {
+      success: false,
+      syncLogId: "",
+      stats: {
+        channelsFetched: 0, channelsUpserted: 0,
+        appsFetched: 0, appsUpserted: 0,
+        catalogsFetched: 0, catalogsInserted: 0,
+        catalogsUpdated: 0, catalogsSoftDeleted: 0,
+        unchangedCount: 0,
+        inserted: 0, updated: 0, softDeleted: 0, unchanged: 0,
+      },
+      warnings: [],
+      error: { code: "unknown", message, stage: "unknown" },
+    };
   }
-
-  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +94,6 @@ export async function triggerCatalogSyncAction(
 
 export interface PublishArticleToCmsActionInput {
   articleId: string;
-  appChannelSlug: PublishInput["appChannelSlug"];
   triggerSource?: PublishInput["triggerSource"];
   allowUpdate?: boolean;
 }
@@ -97,7 +114,6 @@ export async function publishArticleToCmsAction(
   try {
     const result = await publishArticleToCms({
       articleId: input.articleId,
-      appChannelSlug: input.appChannelSlug,
       operatorId: userId,
       triggerSource: input.triggerSource ?? "manual",
       allowUpdate: input.allowUpdate,
@@ -110,45 +126,5 @@ export async function publishArticleToCmsAction(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { error: message };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// APP 栏目绑定更新（运营 UI 调用）
-// ---------------------------------------------------------------------------
-
-export interface UpdateAppChannelBindingInput {
-  slug: string;
-  catalogId: string;
-  listStyleType?: string;
-}
-
-/**
- * 把某个 APP 栏目绑定到指定的 CMS catalog（UUID）。
- *
- * - 仅登录用户可调用；组织边界由 requireUserAndOrg 决定
- * - listStyleType 目前固定为 "0"（默认），Phase 2 再开放多样式选择
- * - 成功后 revalidate /settings/cms-mapping
- */
-export async function updateAppChannelBindingAction(
-  input: UpdateAppChannelBindingInput,
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const { organizationId } = await requireUserAndOrg();
-    await dalUpdateAppChannelBinding(organizationId, input.slug, {
-      defaultCatalogId: input.catalogId,
-      defaultListStyle: {
-        listStyleType: input.listStyleType ?? "0",
-        listStyleName: "默认",
-        imageUrlList: [],
-      },
-    });
-    revalidatePath("/settings/cms-mapping");
-    return { success: true };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
   }
 }

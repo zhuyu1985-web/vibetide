@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Building2, Plus, Pencil, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   createOrganization,
   updateOrganization,
@@ -35,6 +37,8 @@ export default function OrganizationsClient({
   const [slug, setSlug] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Org | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function openCreate() {
     setEditOrg(null);
@@ -70,12 +74,20 @@ export default function OrganizationsClient({
     }
   }
 
-  async function handleDelete(org: Org) {
-    if (!confirm(`确定删除组织「${org.name}」吗？`)) return;
+  function handleDelete(org: Org) {
+    setDeleteTarget(org);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteOrganization(org.id);
+      await deleteOrganization(deleteTarget.id);
+      setDeleteTarget(null);
     } catch (err: any) {
-      alert(err.message || "删除失败");
+      toast.error(err.message || "删除失败");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -190,6 +202,17 @@ export default function OrganizationsClient({
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="删除组织"
+        description={`确定删除组织「${deleteTarget?.name ?? ""}」吗？此操作不可恢复。`}
+        confirmText="删除"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

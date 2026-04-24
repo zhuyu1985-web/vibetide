@@ -49,7 +49,7 @@ export async function generateTopicAIReport(
     )
     .join("\n\n");
 
-  const config = resolveModelConfig(["analysis"]);
+  const config = resolveModelConfig(["content_analysis"]);
   const model = getLanguageModel(config);
 
   const { text } = await generateText({

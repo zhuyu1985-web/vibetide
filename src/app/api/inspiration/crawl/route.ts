@@ -4,9 +4,10 @@ import {
   collectionSources,
   collectionRuns,
   collectionLogs,
+  hotTopicCrawlLogs,
   userProfiles,
 } from "@/db/schema";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql, desc, gt } from "drizzle-orm";
 import { inngest } from "@/inngest/client";
 import { TOPHUB_DEFAULT_NODES, PLATFORM_ALIASES } from "@/lib/trending-api";
 import { getAdapter } from "@/lib/collection/registry";
@@ -28,6 +29,54 @@ const DEFAULT_PLATFORMS = buildDefaultPlatforms();
 
 function sseEvent(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
+}
+
+/**
+ * 写 legacy per-platform crawl log。
+ * getPlatformMonitors 只读 hot_topic_crawl_logs（右侧"编辑简报"的 generatedAt /
+ * activePlatforms / aiSummary 全靠它）。新 collection_runs 是 run 级、没有
+ * 按 tophub 平台聚合，所以这里主动补写一组 per-platform 行。
+ *
+ * - 成功路径：按 adapter 结果聚合每个平台的 count
+ * - 失败路径（items=null）：全部标 status=error，fallbackError 作为 errorMessage
+ * 无论哪条路径都会落盘，保证用户点"刷新数据"后 briefing 的时间戳会更新。
+ */
+async function writeLegacyCrawlLogs(
+  orgId: string,
+  items: { channel?: string }[] | null,
+  fallbackError?: string,
+): Promise<void> {
+  try {
+    const perPlatformCounts = new Map<string, number>();
+    for (const item of items ?? []) {
+      const ch = item.channel ?? "";
+      if (!ch.startsWith("tophub/")) continue;
+      const name = ch.slice("tophub/".length);
+      perPlatformCounts.set(name, (perPlatformCounts.get(name) ?? 0) + 1);
+    }
+    const crawledAt = new Date();
+    const logRows: (typeof hotTopicCrawlLogs.$inferInsert)[] = [];
+    for (const [platformName, nodeId] of Object.entries(TOPHUB_DEFAULT_NODES)) {
+      const count = perPlatformCounts.get(platformName) ?? 0;
+      logRows.push({
+        organizationId: orgId,
+        platformName,
+        platformNodeId: nodeId,
+        status: count > 0 ? "success" : "error",
+        topicsFound: count,
+        errorMessage:
+          count > 0
+            ? null
+            : fallbackError ?? "抓取返回 0 条或平台失败",
+        crawledAt,
+      });
+    }
+    if (logRows.length > 0) {
+      await db.insert(hotTopicCrawlLogs).values(logRows);
+    }
+  } catch (logErr) {
+    console.warn("[inspiration-crawl] legacy crawl log write failed:", logErr);
+  }
 }
 
 /**
@@ -103,6 +152,58 @@ export async function POST() {
     );
   }
 
+  // 进行中互斥锁：同一 source 同时只允许一个 manual run。
+  // 避免重复点击 / 多 tab / 浏览器刷新触发并行采集（浪费 tophub API 配额、堆 collection_runs 日志）。
+  // 数据层 dedup 已经够（writeItems 用 url/fingerprint，bridge 用 onConflictDoUpdate），但
+  // 并行 run 仍会 sourceChannels 里多塞一条无意义的 entry，且整体 IO 浪费。
+  // STALE_RUN_THRESHOLD_MS：超过 10 分钟还停在 running 的视为 stuck（dev server crash 留下的孤儿），
+  // 不阻塞新 run。
+  const STALE_RUN_THRESHOLD_MS = 10 * 60 * 1000;
+  const staleCutoff = new Date(Date.now() - STALE_RUN_THRESHOLD_MS);
+  const [activeRun] = await db
+    .select({ id: collectionRuns.id, startedAt: collectionRuns.startedAt })
+    .from(collectionRuns)
+    .where(
+      and(
+        eq(collectionRuns.sourceId, source.id),
+        eq(collectionRuns.status, "running"),
+        gt(collectionRuns.startedAt, staleCutoff),
+      ),
+    )
+    .orderBy(desc(collectionRuns.startedAt))
+    .limit(1);
+
+  if (activeRun) {
+    const elapsedSec = Math.floor(
+      (Date.now() - activeRun.startedAt.getTime()) / 1000,
+    );
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(
+          encoder.encode(
+            sseEvent({
+              type: "complete",
+              alreadyRunning: true,
+              newTopics: 0,
+              updatedTopics: 0,
+              total: 0,
+              message: `已有抓取正在进行中（${elapsedSec}s），请稍候`,
+            }),
+          ),
+        );
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  }
+
   const total = DEFAULT_PLATFORMS.length;
 
   const stream = new ReadableStream({
@@ -174,13 +275,26 @@ export async function POST() {
 
         enqueue({
           type: "progress",
-          current: Math.floor(total * 0.6),
+          current: Math.floor(total * 0.4),
           total,
-          platform: `采集到 ${adapterResult.items.length} 条`,
+          platform: `已采集 ${adapterResult.items.length} 条原材料，开始去重写入...`,
         });
 
-        // 4. 写入 collected_items（writeItems 仍会 fire-and-forget Inngest fanout，
-        //    无 Inngest 时事件丢失无影响——下面一步同步桥接）
+        await writeLegacyCrawlLogs(orgId, adapterResult.items);
+
+        // 4. 写入 collected_items（writeItems 内部对每条做 dedup/insert，单次
+        //    调用最多 30-50s）。期间用心跳 setInterval 持续 emit 进度，避免
+        //    SSE 长连接出现 60s+ 空窗让前端误判为卡死。
+        let writeHeartbeatTick = 0;
+        const writeHeartbeat = setInterval(() => {
+          writeHeartbeatTick++;
+          enqueue({
+            type: "progress",
+            current: Math.floor(total * 0.5),
+            total,
+            platform: `去重写入中 (${adapterResult.items.length} 条原材料处理中, ${writeHeartbeatTick * 3}s)`,
+          });
+        }, 3000);
         const writeResult = await writeItems({
           runId,
           sourceId: source.id,
@@ -191,30 +305,57 @@ export async function POST() {
             defaultCategory: source.defaultCategory,
             defaultTags: source.defaultTags,
           },
-        });
+        }).finally(() => clearInterval(writeHeartbeat));
 
+        const totalToBridge = writeResult.insertedItemIds.length;
         enqueue({
           type: "progress",
-          current: Math.floor(total * 0.8),
+          current: Math.floor(total * 0.6),
           total,
-          platform: `桥接 ${writeResult.insertedItemIds.length} 条到 hot_topics`,
+          platform: `已写入 ${writeResult.inserted} 新 / ${writeResult.merged} 合并，开始生成热点...`,
         });
 
-        // 5. 同步桥接每条新增 collected_item 到 hot_topics
+        // 5. 同步桥接每条新增 collected_item 到 hot_topics（分批并行）
+        //    bridge 内部已用 onConflictDoUpdate 原子 upsert，并行安全。
+        //    每批 BRIDGE_BATCH_SIZE 条 Promise.allSettled 并发，单批失败不影响其他。
+        //    每批结束后 emit progress，让前端实时看到桥接进度。
+        const BRIDGE_BATCH_SIZE = 20;
         let bridgedCount = 0;
         const enrichTopicIds: string[] = [];
-        if (source.targetModules.includes("hot_topics")) {
-          for (const itemId of writeResult.insertedItemIds) {
-            try {
-              const bridged = await bridgeCollectedItemToHotTopic(itemId, orgId);
-              bridgedCount++;
-              if (bridged.shouldEnrich) enrichTopicIds.push(bridged.hotTopicId);
-            } catch (err) {
-              console.error("[inspiration-crawl] bridge failed", {
-                itemId,
-                err: err instanceof Error ? err.message : String(err),
-              });
+        if (source.targetModules.includes("hot_topics") && totalToBridge > 0) {
+          for (let i = 0; i < totalToBridge; i += BRIDGE_BATCH_SIZE) {
+            const batch = writeResult.insertedItemIds.slice(
+              i,
+              i + BRIDGE_BATCH_SIZE,
+            );
+            const results = await Promise.allSettled(
+              batch.map((itemId) =>
+                bridgeCollectedItemToHotTopic(itemId, orgId),
+              ),
+            );
+            for (let j = 0; j < results.length; j++) {
+              const r = results[j];
+              if (r.status === "fulfilled") {
+                bridgedCount++;
+                if (r.value.shouldEnrich) enrichTopicIds.push(r.value.hotTopicId);
+              } else {
+                console.error("[inspiration-crawl] bridge failed", {
+                  itemId: batch[j],
+                  err:
+                    r.reason instanceof Error
+                      ? r.reason.message
+                      : String(r.reason),
+                });
+              }
             }
+            // current 在 0.6→0.95 之间线性映射 bridge 进度
+            const ratio = bridgedCount / totalToBridge;
+            enqueue({
+              type: "progress",
+              current: Math.floor(total * (0.6 + 0.35 * ratio)),
+              total,
+              platform: `生成热点中 ${bridgedCount}/${totalToBridge}`,
+            });
           }
         }
 
@@ -265,6 +406,11 @@ export async function POST() {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("[inspiration-crawl] failed:", err);
+
+        // 失败路径也写一组 error 日志，保证 briefing 时间戳会随每次刷新动起来。
+        // 否则 adapter 在 safeParse 或 execute 抛异常时，hot_topic_crawl_logs
+        // 会一直停在历史时刻，editorial briefing 就会一直显示"最后扫描：X天前"。
+        await writeLegacyCrawlLogs(orgId, null, message);
 
         await db
           .update(collectionRuns)

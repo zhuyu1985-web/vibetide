@@ -3,7 +3,7 @@ name: aigc_script_push
 displayName: AIGC 脚本推送
 description: 把 VibeTide 生成的视频/音频脚本通过统一 Provider 抽象推送到外部 AIGC 渲染平台（当前支持华栖云自研，未来可扩展 kie.ai / 可灵 / Runway / Sora）。包含脚本 schema 校验、provider 路由、幂等推送、状态机、回调监听、任务中心闭环展示。当用户提及"推送到 AIGC""提交渲染""生成视频""把脚本送去"时调用。
 version: 1.0.0
-category: management
+category: distribution
 
 metadata:
   skill_kind: action  # DB enum 只有 6 个 category，action 作为 management 下的细分 kind

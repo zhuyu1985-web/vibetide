@@ -39,8 +39,6 @@ export interface BuiltinWorkflowSeed {
   ownerEmployeeId: EmployeeId | null;
   /** 默认团队（第一个一般是 owner / 主执行员工） */
   defaultTeam: EmployeeId[];
-  /** Phase 1 九大 APP 栏目之一；null = 不绑定发布栏目 */
-  appChannelSlug: string | null;
   /** form = 需填输入字段；direct = 一键启动 */
   launchMode: "form" | "direct";
   inputFields: InputFieldDef[];
@@ -50,6 +48,10 @@ export interface BuiltinWorkflowSeed {
   promptTemplate?: string;
   /** 主流场景 tab 标记；默认 false。 */
   isFeatured?: boolean;
+  /** 触发方式：manual 人工启动；scheduled 需配 cron */
+  triggerType?: "manual" | "scheduled";
+  /** 定时触发配置（triggerType=scheduled 时生效） */
+  triggerConfig?: { cron?: string; timezone?: string };
 }
 
 // ─── Step builder helper ──────────────────────────────────────────────────
@@ -61,6 +63,7 @@ function step(
   skillName: string,
   skillCategory: string,
   key: string,
+  parameters: Record<string, unknown> = {},
 ): WorkflowStepDef {
   return {
     id: `step-${order}`,
@@ -72,7 +75,7 @@ function step(
       skillSlug,
       skillName,
       skillCategory,
-      parameters: {},
+      parameters,
     },
     key,
     label: name,
@@ -94,7 +97,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaowen", "xiaofa"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -128,11 +130,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "请针对「{{event_keywords}}」进行突发新闻追踪，紧急程度 {{urgency_level}}，产出可直发的简讯稿。",
     steps: [
-      step(1, "多源信息聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(2, "全网深度搜索", "web_search", "全网搜索", "perception", "search"),
-      step(3, "事实交叉核查", "fact_check", "事实核查", "management", "verify"),
-      step(4, "突发简讯撰写", "content_generate", "内容生成", "generation", "write"),
-      step(5, "合规快扫", "compliance_check", "合规审核", "management", "compliance"),
+      step(1, "多源信息聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(2, "全网深度搜索", "web_search", "全网搜索", "web_search", "search"),
+      step(3, "事实交叉核查", "fact_check", "事实核查", "quality_review", "verify"),
+      step(4, "突发简讯撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "合规快扫", "compliance_check", "合规审核", "quality_review", "compliance"),
     ],
   },
 
@@ -144,7 +146,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaoce"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -184,10 +185,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "对 {{platforms}} 做全网热点雷达扫描，聚焦 {{domain}}，输出 Top {{top_n}}。",
     steps: [
-      step(1, "多平台热榜抓取", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "热度趋势分析", "trend_monitor", "趋势监控", "perception", "trend"),
-      step(3, "热点价值评分", "heat_scoring", "热度评分", "analysis", "score"),
-      step(4, "雷达报告生成", "content_generate", "内容生成", "generation", "report"),
+      step(1, "多平台热榜抓取", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "热度趋势分析", "trend_monitor", "趋势监控", "data_collection", "trend"),
+      step(3, "热点价值评分", "heat_scoring", "热度评分", "data_analysis", "score"),
+      step(4, "雷达报告生成", "content_generate", "内容生成", "content_gen", "report"),
     ],
   },
 
@@ -199,7 +200,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -228,11 +228,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "追踪「{{conference_name}}」（{{conference_date}}），重点看 {{focus_angles}}。",
     steps: [
-      step(1, "发布会背景预研", "web_search", "全网搜索", "perception", "research"),
-      step(2, "同类发布会参考", "case_reference", "案例参考", "analysis", "case"),
-      step(3, "要点提取与结构化", "topic_extraction", "选题提取", "analysis", "extract"),
-      step(4, "追踪稿件撰写", "content_generate", "内容生成", "generation", "write"),
-      step(5, "事实核查", "fact_check", "事实核查", "management", "verify"),
+      step(1, "发布会背景预研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "同类发布会参考", "case_reference", "案例参考", "other", "case"),
+      step(3, "要点提取与结构化", "topic_extraction", "选题提取", "content_analysis", "extract"),
+      step(4, "追踪稿件撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "事实核查", "fact_check", "事实核查", "quality_review", "verify"),
     ],
   },
 
@@ -248,7 +248,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaolei"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -285,11 +284,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为主题「{{main_topic}}」打包 {{topic_count}} 个选题，形态含 {{target_formats}}。",
     steps: [
-      step(1, "主题背景调研", "web_search", "全网搜索", "perception", "research"),
-      step(2, "受众需求分析", "audience_analysis", "受众分析", "analysis", "audience"),
-      step(3, "多角度选题生成", "topic_extraction", "选题提取", "analysis", "extract"),
-      step(4, "选题价值评分", "heat_scoring", "热度评分", "analysis", "score"),
-      step(5, "选题清单输出", "content_generate", "内容生成", "generation", "output"),
+      step(1, "主题背景调研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "受众需求分析", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(3, "多角度选题生成", "topic_extraction", "选题提取", "content_analysis", "extract"),
+      step(4, "选题价值评分", "heat_scoring", "热度评分", "data_analysis", "score"),
+      step(5, "选题清单输出", "content_generate", "内容生成", "content_gen", "output"),
     ],
   },
 
@@ -301,7 +300,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaozi", "xiaowen"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -343,11 +341,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为系列「{{series_theme}}」规划 {{episode_count}} 期，周期 {{publish_range}}。",
     steps: [
-      step(1, "系列主题背景调研", "web_search", "全网搜索", "perception", "research"),
-      step(2, "同类系列参考对标", "case_reference", "案例参考", "analysis", "benchmark"),
-      step(3, "受众画像分析", "audience_analysis", "受众分析", "analysis", "audience"),
-      step(4, "系列大纲生成", "content_generate", "内容生成", "generation", "outline"),
-      step(5, "选题差异化校验", "topic_extraction", "选题提取", "analysis", "dedup"),
+      step(1, "系列主题背景调研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "同类系列参考对标", "case_reference", "案例参考", "other", "benchmark"),
+      step(3, "受众画像分析", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(4, "系列大纲生成", "content_generate", "内容生成", "content_gen", "outline"),
+      step(5, "选题差异化校验", "topic_extraction", "选题提取", "content_analysis", "dedup"),
     ],
   },
 
@@ -359,7 +357,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "livelihood",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaolei", "xiaowen"],
-    appChannelSlug: "app_livelihood_zhongcao",
     launchMode: "form",
     inputFields: [
       {
@@ -396,15 +393,15 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "汇编 {{city}} 在 {{brief_date}} 的民生线索，覆盖 {{topic_scope}}。",
     steps: [
-      step(1, "本地民生信源聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(2, "社交平台舆情扫描", "social_listening", "社交舆情", "perception", "listen"),
-      step(3, "线索筛选去重", "topic_extraction", "选题提取", "analysis", "filter"),
-      step(4, "民生线索汇编", "content_generate", "内容生成", "generation", "compile"),
+      step(1, "本地民生信源聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(2, "社交平台舆情扫描", "social_listening", "社交舆情", "data_collection", "listen"),
+      step(3, "线索筛选去重", "topic_extraction", "选题提取", "content_analysis", "filter"),
+      step(4, "民生线索汇编", "content_generate", "内容生成", "content_gen", "compile"),
     ],
   },
 
   // ════════════════════════════════════════════════════════════════════════
-  // xiaozi 素材研究员 · 3 条（写稿 / 素材研究）
+  // xiaowen 内容创作师 · 写作核心场景（从 xiaozi 重归属 2026-04-20）
   // ════════════════════════════════════════════════════════════════════════
 
   {
@@ -413,9 +410,8 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     description: "基于指定选题快速产出规范新闻稿，含多版本标题与分享摘要。",
     icon: "newspaper",
     category: "news",
-    ownerEmployeeId: "xiaozi",
-    defaultTeam: ["xiaozi", "xiaowen", "xiaofa"],
-    appChannelSlug: "app_news",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaozi", "xiaofa"],
     launchMode: "form",
     inputFields: [
       {
@@ -451,11 +447,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "就「{{topic}}」写 {{word_count}} 字新闻稿，风格 {{tone}}。",
     steps: [
-      step(1, "选题素材梳理", "topic_extraction", "选题提取", "analysis", "parse"),
-      step(2, "多源素材搜索", "web_search", "全网搜索", "perception", "search"),
-      step(3, "多风格标题生成", "headline_generate", "标题生成", "generation", "headline"),
-      step(4, "新闻稿正文撰写", "content_generate", "内容生成", "generation", "write"),
-      step(5, "分享摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
+      step(1, "选题素材梳理", "topic_extraction", "选题提取", "content_analysis", "parse"),
+      step(2, "多源素材搜索", "web_search", "全网搜索", "web_search", "search"),
+      step(3, "多风格标题生成", "headline_generate", "标题生成", "content_gen", "headline"),
+      step(4, "新闻稿正文撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "分享摘要生成", "summary_generate", "摘要生成", "content_gen", "summary"),
     ],
   },
 
@@ -465,9 +461,8 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     description: "针对重大选题产出 3000+ 字深度长文，含多方观点与数据支撑。",
     icon: "edit-3",
     category: "deep",
-    ownerEmployeeId: "xiaozi",
-    defaultTeam: ["xiaozi", "xiaoce", "xiaowen", "xiaoshen"],
-    appChannelSlug: "app_news",
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaoce", "xiaozi", "xiaoshen"],
     launchMode: "form",
     inputFields: [
       {
@@ -498,12 +493,12 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "就「{{topic}}」写 {{word_count}} 字深度报道，维度 {{angles}}。",
     steps: [
-      step(1, "多维度背景调研", "web_search", "全网搜索", "perception", "research"),
-      step(2, "网页深度抓取", "web_deep_read", "网页深读", "perception", "crawl"),
-      step(3, "核心观点萃取", "topic_extraction", "选题提取", "analysis", "extract"),
-      step(4, "数据支撑分析", "data_report", "数据报告", "analysis", "data"),
-      step(5, "多角度深度撰写", "content_generate", "内容生成", "generation", "write"),
-      step(6, "事实核查", "fact_check", "事实核查", "management", "verify"),
+      step(1, "多维度背景调研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "网页深度抓取", "web_deep_read", "网页深读", "web_search", "crawl"),
+      step(3, "核心观点萃取", "topic_extraction", "选题提取", "content_analysis", "extract"),
+      step(4, "数据支撑分析", "data_report", "数据报告", "data_analysis", "data"),
+      step(5, "多角度深度撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(6, "事实核查", "fact_check", "事实核查", "quality_review", "verify"),
     ],
   },
 
@@ -513,9 +508,8 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     description: "为社交平台产出适配化帖子，含平台差异化改写与话题标签建议。",
     icon: "share-2",
     category: "social",
-    ownerEmployeeId: "xiaozi",
-    defaultTeam: ["xiaozi", "xiaowen", "xiaofa"],
-    appChannelSlug: null,
+    ownerEmployeeId: "xiaowen",
+    defaultTeam: ["xiaowen", "xiaozi", "xiaofa"],
     launchMode: "form",
     inputFields: [
       {
@@ -557,15 +551,196 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "把「{{content_source}}」改写为 {{platforms}} 各平台的帖子，语气 {{post_tone}}。",
     steps: [
-      step(1, "素材结构分析", "topic_extraction", "选题提取", "analysis", "parse"),
-      step(2, "平台受众分析", "audience_analysis", "受众分析", "analysis", "audience"),
-      step(3, "平台差异化改写", "style_rewrite", "风格改写", "generation", "adapt"),
-      step(4, "话题标签推荐", "publish_strategy", "发布策略", "management", "tags"),
+      step(1, "素材结构分析", "topic_extraction", "选题提取", "content_analysis", "parse"),
+      step(2, "平台受众分析", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(3, "平台差异化改写", "style_rewrite", "风格改写", "content_gen", "adapt"),
+      step(4, "话题标签推荐", "publish_strategy", "发布策略", "distribution", "tags"),
     ],
   },
 
   // ════════════════════════════════════════════════════════════════════════
-  // xiaowen 文字深稿师 · 2 条（深度写作）
+  // xiaozi 素材研究员 · 4 条（素材整合 / 媒资库）2026-04-20 新增
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "hot_material_capture",
+    name: "热点素材抓取",
+    description: "围绕热点关键词批量抓取全网图文/视频/音频素材，自动去重归档。",
+    icon: "radar",
+    category: "news",
+    ownerEmployeeId: "xiaozi",
+    defaultTeam: ["xiaozi", "xiaolei"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "keywords",
+        label: "关键词",
+        type: "text",
+        required: true,
+        placeholder: "多个关键词用逗号分隔",
+      },
+      {
+        name: "media_types",
+        label: "素材类型",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "text", label: "图文" },
+          { value: "image", label: "图片" },
+          { value: "video", label: "视频" },
+          { value: "audio", label: "音频" },
+        ],
+      },
+      {
+        name: "time_range",
+        label: "时间范围",
+        type: "select",
+        required: false,
+        placeholder: "24h",
+        options: [
+          { value: "24h", label: "近 24 小时" },
+          { value: "7d", label: "近 7 天" },
+          { value: "30d", label: "近 30 天" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕「{{keywords}}」在 {{time_range}} 内抓取 {{media_types}} 类型素材。输出：1) 素材清单（含标题/来源/时间/URL）2) 相似度去重标记 3) 素材质量打分 4) 建议入库的 Top 列表。",
+    promptTemplate:
+      "抓取「{{keywords}}」在 {{time_range}} 内的 {{media_types}} 素材。",
+    steps: [
+      step(1, "多源全网搜索", "web_search", "全网搜索", "web_search", "search"),
+      step(2, "素材深度爬取", "web_deep_read", "网页深读", "web_search", "crawl"),
+      step(3, "素材去重与打分", "topic_extraction", "素材整合", "content_analysis", "dedupe"),
+    ],
+  },
+
+  {
+    slug: "media_library_build",
+    name: "媒资库构建",
+    description: "对批量素材做结构化标注（主题/标签/实体），入库形成可检索知识库。",
+    icon: "folder-open",
+    category: "news",
+    ownerEmployeeId: "xiaozi",
+    defaultTeam: ["xiaozi"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "source_batch",
+        label: "素材批次",
+        type: "textarea",
+        required: true,
+        placeholder: "粘贴素材 URL 列表或批次 ID",
+      },
+      {
+        name: "tag_strategy",
+        label: "标注策略",
+        type: "select",
+        required: false,
+        placeholder: "auto",
+        options: [
+          { value: "auto", label: "自动标注（主题+实体）" },
+          { value: "hybrid", label: "自动+人工复核" },
+          { value: "manual", label: "仅人工" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "对素材批次「{{source_batch}}」按 {{tag_strategy}} 策略做结构化标注。输出：1) 每条素材的标签（主题/实体/情感/版权） 2) 入库结构化 JSON 3) 可能的重复与冲突提示。",
+    promptTemplate:
+      "对「{{source_batch}}」按 {{tag_strategy}} 做结构化标注入库。",
+    steps: [
+      step(1, "素材主题识别", "topic_extraction", "选题提取", "content_analysis", "extract"),
+      step(2, "实体与标签生成", "summary_generate", "摘要生成", "content_gen", "tag"),
+      step(3, "入库结构化", "data_report", "数据报告", "data_analysis", "index"),
+    ],
+  },
+
+  {
+    slug: "material_copyright_check",
+    name: "素材版权核验",
+    description: "核验素材来源授权状态，输出版权风险评级与替代建议。",
+    icon: "shield",
+    category: "news",
+    ownerEmployeeId: "xiaozi",
+    defaultTeam: ["xiaozi", "xiaoshen"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "material_urls",
+        label: "素材 URL 列表",
+        type: "textarea",
+        required: true,
+        placeholder: "每行一个 URL",
+      },
+      {
+        name: "usage_scene",
+        label: "使用场景",
+        type: "select",
+        required: false,
+        placeholder: "commercial",
+        options: [
+          { value: "commercial", label: "商业发布" },
+          { value: "editorial", label: "新闻编辑" },
+          { value: "internal", label: "内部研究" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "核验「{{material_urls}}」的版权情况，使用场景 {{usage_scene}}。输出：1) 每条素材的版权状态（CC/商用/需授权/禁用） 2) 风险评级 3) 替代无版权风险的素材建议。",
+    promptTemplate:
+      "核验「{{material_urls}}」在 {{usage_scene}} 下的版权风险。",
+    steps: [
+      step(1, "素材来源溯源", "web_deep_read", "网页深读", "web_search", "trace"),
+      step(2, "版权规则匹配", "compliance_check", "合规审核", "quality_review", "copyright"),
+      step(3, "替代素材推荐", "web_search", "全网搜索", "web_search", "alternative"),
+    ],
+  },
+
+  {
+    slug: "topic_material_pack",
+    name: "选题素材包",
+    description: "围绕指定选题快速打包配套素材（背景/数据/图片/引语），直接交付给写作环节。",
+    icon: "package",
+    category: "news",
+    ownerEmployeeId: "xiaozi",
+    defaultTeam: ["xiaozi", "xiaoce", "xiaowen"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "topic",
+        label: "选题",
+        type: "text",
+        required: true,
+        placeholder: "如：AI 眼镜新品发布",
+      },
+      {
+        name: "pack_contents",
+        label: "素材构成",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "background", label: "背景资料" },
+          { value: "data", label: "关键数据" },
+          { value: "quotes", label: "引语" },
+          { value: "images", label: "配图" },
+          { value: "timeline", label: "时间线" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕「{{topic}}」打包 {{pack_contents}} 素材。输出：1) 分类归档的素材清单 2) 每项含来源与可信度 3) 即用型引语与数据表 4) 可直接交付给 xiaowen 写作的素材包摘要。",
+    promptTemplate:
+      "就「{{topic}}」打包 {{pack_contents}} 素材，交付写作环节。",
+    steps: [
+      step(1, "选题背景调研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "关键数据提取", "data_report", "数据报告", "data_analysis", "data"),
+      step(3, "素材包整理", "topic_extraction", "素材整合", "content_analysis", "pack"),
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // xiaowen 内容创作师 · 深度写作
   // ════════════════════════════════════════════════════════════════════════
 
   {
@@ -576,7 +751,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoce", "xiaoshen"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -611,10 +785,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "就「{{topic}}」从 {{angle}} 做深度分析稿,{{deadline}} 前交稿。",
     steps: [
-      step(1, "多源网页深读", "web_deep_read", "网页深读", "perception", "read"),
-      step(2, "情感倾向分析", "sentiment_analysis", "情感分析", "analysis", "sentiment"),
-      step(3, "深度分析稿撰写", "content_generate", "内容生成", "generation", "write"),
-      step(4, "成稿质量复核", "quality_review", "质量审核", "management", "review"),
+      step(1, "多源网页深读", "web_deep_read", "网页深读", "web_search", "read"),
+      step(2, "情感倾向分析", "sentiment_analysis", "情感分析", "content_analysis", "sentiment"),
+      step(3, "深度分析稿撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(4, "成稿质量复核", "quality_review", "质量审核", "quality_review", "review"),
     ],
   },
 
@@ -626,7 +800,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoshu", "xiaozi"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -660,10 +833,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "基于「{{data_topic}}」({{data_source_url}}) 产出数据新闻,呈现 {{presentation_forms}}。",
     steps: [
-      step(1, "数据源背景搜索", "web_search", "全网搜索", "perception", "search"),
-      step(2, "数据报告生成", "data_report", "数据报告", "analysis", "data"),
-      step(3, "排版布局设计", "layout_design", "排版设计", "generation", "layout"),
-      step(4, "数据新闻撰写", "content_generate", "内容生成", "generation", "write"),
+      step(1, "数据源背景搜索", "web_search", "全网搜索", "web_search", "search"),
+      step(2, "数据报告生成", "data_report", "数据报告", "data_analysis", "data"),
+      step(3, "排版布局设计", "layout_design", "排版设计", "content_gen", "layout"),
+      step(4, "数据新闻撰写", "content_generate", "内容生成", "content_gen", "write"),
     ],
   },
 
@@ -679,7 +852,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaozi"],
-    appChannelSlug: "app_variety",
     launchMode: "form",
     inputFields: [
       {
@@ -715,9 +887,9 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为 Vlog「{{topic}}」出 {{duration_sec}} 秒 {{pace_style}} 剪辑方案。",
     steps: [
-      step(1, "视频剪辑分镜规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
-      step(2, "配乐与音效规划", "audio_plan", "音频规划", "generation", "audio"),
-      step(3, "封面生成方案", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+      step(1, "视频剪辑分镜规划", "video_edit_plan", "视频剪辑规划", "av_script", "plan"),
+      step(2, "配乐与音效规划", "audio_plan", "音频规划", "av_script", "audio"),
+      step(3, "封面生成方案", "thumbnail_generate", "封面生成", "content_gen", "thumbnail"),
     ],
   },
 
@@ -729,7 +901,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaozi", "xiaofa"],
-    appChannelSlug: "app_variety",
     launchMode: "form",
     inputFields: [
       {
@@ -765,9 +936,9 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为短视频「{{topic}}」出 {{duration_sec}} 秒竖屏方案,配乐 {{music_style}}。",
     steps: [
-      step(1, "分镜与钩子规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
-      step(2, "配乐规划", "audio_plan", "音频规划", "generation", "audio"),
-      step(3, "竖屏封面生成", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+      step(1, "分镜与钩子规划", "video_edit_plan", "视频剪辑规划", "av_script", "plan"),
+      step(2, "配乐规划", "audio_plan", "音频规划", "av_script", "audio"),
+      step(3, "竖屏封面生成", "thumbnail_generate", "封面生成", "content_gen", "thumbnail"),
     ],
   },
 
@@ -779,7 +950,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaowen", "xiaozi"],
-    appChannelSlug: "app_variety",
     launchMode: "form",
     inputFields: [
       {
@@ -815,15 +985,15 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为纪录片「{{topic}}」出 {{duration_sec}} 秒 {{narrative_style}} 方案。",
     steps: [
-      step(1, "章节与分镜规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
-      step(2, "分层配乐规划", "audio_plan", "音频规划", "generation", "audio"),
-      step(3, "代表画面封面", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
-      step(4, "成片质量复核", "quality_review", "质量审核", "management", "review"),
+      step(1, "章节与分镜规划", "video_edit_plan", "视频剪辑规划", "av_script", "plan"),
+      step(2, "分层配乐规划", "audio_plan", "音频规划", "av_script", "audio"),
+      step(3, "代表画面封面", "thumbnail_generate", "封面生成", "content_gen", "thumbnail"),
+      step(4, "成片质量复核", "quality_review", "质量审核", "quality_review", "review"),
     ],
   },
 
   // ════════════════════════════════════════════════════════════════════════
-  // xiaoshen 审核员 · 2 条(审)
+  // xiaoshen 质量审核官 · 7 条（审核 / 合规 / 风控）2026-04-20 扩充
   // ════════════════════════════════════════════════════════════════════════
 
   {
@@ -834,7 +1004,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaolei"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -862,9 +1031,9 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "对下述文本做 {{check_depth}} 核查:\n\n{{text_to_check}}",
     steps: [
-      step(1, "多源网络搜索取证", "web_search", "全网搜索", "perception", "search"),
-      step(2, "事实逐条核查", "fact_check", "事实核查", "management", "verify"),
-      step(3, "核查报告摘要", "summary_generate", "摘要生成", "generation", "summary"),
+      step(1, "多源网络搜索取证", "web_search", "全网搜索", "web_search", "search"),
+      step(2, "事实逐条核查", "fact_check", "事实核查", "quality_review", "verify"),
+      step(3, "核查报告摘要", "summary_generate", "摘要生成", "content_gen", "summary"),
     ],
   },
 
@@ -876,7 +1045,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaofa"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -903,13 +1071,230 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "对下述内容做 {{review_dimensions}} 合规审查:\n\n{{content_to_review}}",
     steps: [
-      step(1, "合规多维扫描", "compliance_check", "合规审核", "management", "compliance"),
-      step(2, "整改建议复核", "quality_review", "质量审核", "management", "review"),
+      step(1, "合规多维扫描", "compliance_check", "合规审核", "quality_review", "compliance"),
+      step(2, "整改建议复核", "quality_review", "质量审核", "quality_review", "review"),
+    ],
+  },
+
+  {
+    slug: "sensitive_word_scan",
+    name: "敏感词扫描",
+    description: "对文本批量扫描敏感词/违禁词/负面词，输出命中位置与替换建议。",
+    icon: "shield-alert",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "content",
+        label: "待扫描文本",
+        type: "textarea",
+        required: true,
+        placeholder: "粘贴待扫描的文本",
+      },
+      {
+        name: "dict_level",
+        label: "词库等级",
+        type: "select",
+        required: false,
+        placeholder: "standard",
+        options: [
+          { value: "strict", label: "严格（政策+违禁+负面）" },
+          { value: "standard", label: "标准（政策+违禁）" },
+          { value: "loose", label: "宽松（仅违禁）" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "按 {{dict_level}} 词库扫描「{{content}}」。输出：1) 命中词清单（含所属分类/风险等级/位置索引） 2) 每处替换建议 3) 整体通过率评分。",
+    promptTemplate:
+      "以 {{dict_level}} 词库扫描「{{content}}」。",
+    steps: [
+      step(1, "敏感词匹配", "compliance_check", "合规审核", "quality_review", "scan"),
+      step(2, "替换建议生成", "summary_generate", "摘要生成", "content_gen", "replace"),
+    ],
+  },
+
+  {
+    slug: "political_stance_review",
+    name: "政治立场审核",
+    description: "针对时政/涉外稿件做政治导向审核，关注口径、立场与表述规范。",
+    icon: "shield-check",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen", "xiaowen"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "content",
+        label: "待审稿件",
+        type: "textarea",
+        required: true,
+        placeholder: "粘贴涉政稿件全文",
+      },
+      {
+        name: "topic_domain",
+        label: "议题域",
+        type: "select",
+        required: false,
+        placeholder: "domestic",
+        options: [
+          { value: "domestic", label: "国内时政" },
+          { value: "diplomatic", label: "外交/国际" },
+          { value: "taiwan", label: "涉台" },
+          { value: "hongkong", label: "涉港澳" },
+          { value: "ethnic", label: "民族宗教" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "对 {{topic_domain}} 议题稿件「{{content}}」做政治立场审核。输出：1) 立场合规评级 2) 口径问题清单（含官方标准表述对照） 3) 高风险段落整改建议 4) 需上报的争议点。",
+    promptTemplate:
+      "对「{{content}}」做 {{topic_domain}} 政治立场审核。",
+    steps: [
+      step(1, "政治敏感识别", "compliance_check", "合规审核", "quality_review", "politics"),
+      step(2, "口径核对", "fact_check", "事实核查", "quality_review", "verify"),
+      step(3, "审核报告生成", "summary_generate", "摘要生成", "content_gen", "report"),
+    ],
+  },
+
+  {
+    slug: "legal_compliance_review",
+    name: "法律合规审查",
+    description: "针对广告法/著作权法/未成年人保护等法律维度审查内容合规性。",
+    icon: "shield",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen", "xiaofa"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "content",
+        label: "待审内容",
+        type: "textarea",
+        required: true,
+      },
+      {
+        name: "legal_dimensions",
+        label: "法律维度",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "advertising", label: "广告法（极限词/虚假宣传）" },
+          { value: "copyright", label: "著作权法（引用/转载）" },
+          { value: "minor", label: "未成年人保护" },
+          { value: "privacy", label: "个人信息保护" },
+          { value: "food_drug", label: "药品/食品宣传" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "按 {{legal_dimensions}} 法律维度审查「{{content}}」。输出：1) 每条违规命中（引用法条+原文位置+风险等级） 2) 整改建议（保留商业表达力的前提下） 3) 需法务会签的重大风险点。",
+    promptTemplate:
+      "按 {{legal_dimensions}} 审查「{{content}}」的法律合规性。",
+    steps: [
+      step(1, "法律条款匹配", "compliance_check", "合规审核", "quality_review", "legal"),
+      step(2, "风险分级", "quality_review", "质量审核", "quality_review", "risk"),
+      step(3, "整改方案生成", "summary_generate", "摘要生成", "content_gen", "fix"),
+    ],
+  },
+
+  {
+    slug: "source_credibility_rating",
+    name: "信源可信度评级",
+    description: "对稿件引用的信源做权威性/偏向性/时效性评级，输出引用建议。",
+    icon: "book-open",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen", "xiaolei"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "sources",
+        label: "信源列表",
+        type: "textarea",
+        required: true,
+        placeholder: "每行一个信源（URL 或媒体名）",
+      },
+      {
+        name: "topic_type",
+        label: "选题类型",
+        type: "select",
+        required: false,
+        placeholder: "news",
+        options: [
+          { value: "news", label: "时政新闻" },
+          { value: "tech", label: "科技" },
+          { value: "finance", label: "财经" },
+          { value: "health", label: "医疗健康" },
+          { value: "social", label: "社会民生" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "对 {{topic_type}} 选题下的信源「{{sources}}」做可信度评级。输出：1) 每条信源的权威等级（央级/省级/行业/自媒体）+ 偏向性（中立/倾向性/争议） 2) 在该选题下的可引用建议 3) 推荐补充的高可信信源。",
+    promptTemplate:
+      "对 {{topic_type}} 下「{{sources}}」做可信度评级。",
+    steps: [
+      step(1, "信源背景调研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "权威性打分", "data_report", "数据报告", "data_analysis", "rate"),
+      step(3, "引用建议生成", "summary_generate", "摘要生成", "content_gen", "advice"),
+    ],
+  },
+
+  {
+    slug: "final_review",
+    name: "稿件终审把关",
+    description: "发稿前全维度终审：事实+合规+语法+风格+SEO，出具一次性质检报告。",
+    icon: "check-circle",
+    category: "news",
+    ownerEmployeeId: "xiaoshen",
+    defaultTeam: ["xiaoshen", "xiaowen", "xiaofa"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "article_id",
+        label: "稿件 ID",
+        type: "text",
+        required: false,
+        placeholder: "可选：粘贴稿件 ID 直接拉取",
+      },
+      {
+        name: "content",
+        label: "稿件全文",
+        type: "textarea",
+        required: false,
+        placeholder: "或直接粘贴全文",
+      },
+      {
+        name: "publish_channel",
+        label: "目标发布渠道",
+        type: "select",
+        required: false,
+        placeholder: "app_news",
+        options: [
+          { value: "app_news", label: "APP 新闻" },
+          { value: "app_politics", label: "APP 时政" },
+          { value: "wechat", label: "微信公众号" },
+          { value: "weibo", label: "微博" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "对稿件 {{article_id}}（或正文「{{content}}」）发布到 {{publish_channel}} 前做一次性终审。输出统一报告：1) 事实核查结果 2) 合规审查结果 3) 语法/错别字 4) 风格一致性 5) 标题/SEO 建议 6) 总体评级（直接发布/轻改/重改/退稿）。",
+    promptTemplate:
+      "对稿件 {{article_id}} 发布到 {{publish_channel}} 前做终审，输出一次性质检报告。",
+    steps: [
+      step(1, "事实核查", "fact_check", "事实核查", "quality_review", "facts"),
+      step(2, "合规扫描", "compliance_check", "合规审核", "quality_review", "compliance"),
+      step(3, "语法错别字", "quality_review", "质量审核", "quality_review", "grammar"),
+      step(4, "终审报告汇总", "summary_generate", "摘要生成", "content_gen", "final_report"),
     ],
   },
 
   // ════════════════════════════════════════════════════════════════════════
-  // xiaofa 分发员 · 2 条(发)
+  // xiaofa 渠道运营师 · 4 条（分发 / 适配 / 策略）2026-04-20 扩充
   // ════════════════════════════════════════════════════════════════════════
 
   {
@@ -920,7 +1305,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "distribution",
     ownerEmployeeId: "xiaofa",
     defaultTeam: ["xiaofa", "xiaozi"],
-    appChannelSlug: "app_home",
     launchMode: "direct",
     inputFields: [],
     systemInstruction:
@@ -928,8 +1312,8 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "把当前稿件按各平台规则自动改写并生成分发策略。",
     steps: [
-      step(1, "多平台差异化改写", "style_rewrite", "风格改写", "generation", "rewrite"),
-      step(2, "发布策略生成", "publish_strategy", "发布策略", "management", "strategy"),
+      step(1, "多平台差异化改写", "style_rewrite", "风格改写", "content_gen", "rewrite"),
+      step(2, "发布策略生成", "publish_strategy", "发布策略", "distribution", "strategy"),
     ],
   },
 
@@ -941,7 +1325,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "distribution",
     ownerEmployeeId: "xiaofa",
     defaultTeam: ["xiaofa", "xiaozi"],
-    appChannelSlug: "app_home",
     launchMode: "form",
     inputFields: [
       {
@@ -970,9 +1353,113 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "把稿件 {{source_article_id}} 深度适配为 {{target_platform}} 版本。",
     steps: [
-      step(1, "平台风格改写", "style_rewrite", "风格改写", "generation", "rewrite"),
-      step(2, "平台化标题生成", "headline_generate", "标题生成", "generation", "headline"),
-      step(3, "发布策略生成", "publish_strategy", "发布策略", "management", "strategy"),
+      step(1, "平台风格改写", "style_rewrite", "风格改写", "content_gen", "rewrite"),
+      step(2, "平台化标题生成", "headline_generate", "标题生成", "content_gen", "headline"),
+      step(3, "发布策略生成", "publish_strategy", "发布策略", "distribution", "strategy"),
+    ],
+  },
+
+  {
+    slug: "multi_platform_headlines",
+    name: "多平台标题优化",
+    description: "为同一内容生成各平台最优标题（微博短、公众号深、抖音钩子、小红书种草）。",
+    icon: "type",
+    category: "distribution",
+    ownerEmployeeId: "xiaofa",
+    defaultTeam: ["xiaofa", "xiaowen"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "core_message",
+        label: "核心信息",
+        type: "textarea",
+        required: true,
+        placeholder: "粘贴稿件摘要或核心卖点",
+      },
+      {
+        name: "target_platforms",
+        label: "目标平台",
+        type: "multiselect",
+        required: true,
+        options: [
+          { value: "weibo", label: "微博" },
+          { value: "wechat", label: "微信公众号" },
+          { value: "xiaohongshu", label: "小红书" },
+          { value: "douyin", label: "抖音" },
+          { value: "video_channel", label: "视频号" },
+          { value: "toutiao", label: "今日头条" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "针对核心信息「{{core_message}}」为 {{target_platforms}} 各平台生成 3 组候选标题。每组含：标题正文 + 命中要点（情绪/悬念/数字/痛点）+ 预估点击率特征。不同平台风格差异化（微博短钩/公众号深度/抖音口语/小红书种草）。",
+    promptTemplate:
+      "为「{{core_message}}」生成 {{target_platforms}} 的平台化标题各 3 组。",
+    steps: [
+      step(1, "平台受众分析", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(2, "平台化标题生成", "headline_generate", "标题生成", "content_gen", "headline"),
+    ],
+  },
+
+  {
+    slug: "publish_timing_advisor",
+    name: "发布时机推荐",
+    description: "根据平台活跃时段+受众画像+内容类型推荐最佳发布时段与频率。",
+    icon: "calendar-days",
+    category: "distribution",
+    ownerEmployeeId: "xiaofa",
+    defaultTeam: ["xiaofa", "xiaoshu"],
+    launchMode: "form",
+    inputFields: [
+      {
+        name: "content_type",
+        label: "内容类型",
+        type: "select",
+        required: true,
+        placeholder: "选择类型",
+        options: [
+          { value: "breaking", label: "突发新闻" },
+          { value: "deep", label: "深度长文" },
+          { value: "video", label: "短视频" },
+          { value: "lifestyle", label: "生活/种草" },
+          { value: "tech", label: "科技" },
+        ],
+      },
+      {
+        name: "target_platforms",
+        label: "目标平台",
+        type: "multiselect",
+        required: true,
+        options: [
+          { value: "weibo", label: "微博" },
+          { value: "wechat", label: "微信公众号" },
+          { value: "xiaohongshu", label: "小红书" },
+          { value: "douyin", label: "抖音" },
+          { value: "app", label: "APP 推送" },
+        ],
+      },
+      {
+        name: "audience_region",
+        label: "受众地域",
+        type: "select",
+        required: false,
+        placeholder: "nationwide",
+        options: [
+          { value: "nationwide", label: "全国" },
+          { value: "north", label: "北方" },
+          { value: "south", label: "南方" },
+          { value: "tier1", label: "一线城市" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "针对 {{content_type}} 内容在 {{target_platforms}} 面向 {{audience_region}} 受众，推荐最佳发布时段与频率。输出：1) 每平台的 Top3 时段（含预估触达） 2) 本周发布日历 3) 错峰策略（避免同类内容堆叠） 4) 推送频率建议。",
+    promptTemplate:
+      "为 {{content_type}} 在 {{target_platforms}} ({{audience_region}}) 推荐最佳发布时机。",
+    steps: [
+      step(1, "平台活跃数据拉取", "data_report", "数据报告", "data_analysis", "data"),
+      step(2, "受众画像匹配", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(3, "时机策略生成", "publish_strategy", "发布策略", "distribution", "timing"),
     ],
   },
 
@@ -988,7 +1475,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "daily_brief",
     ownerEmployeeId: "xiaoshu",
     defaultTeam: ["xiaoshu", "xiaowen"],
-    appChannelSlug: null,
     launchMode: "direct",
     inputFields: [],
     systemInstruction:
@@ -996,9 +1482,9 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "生成今日数据日报,覆盖核心指标与舆情速览。",
     steps: [
-      step(1, "数据指标拉取", "data_report", "数据报告", "analysis", "data"),
-      step(2, "日报摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
-      step(3, "日报排版设计", "layout_design", "排版设计", "generation", "layout"),
+      step(1, "数据指标拉取", "data_report", "数据报告", "data_analysis", "data"),
+      step(2, "日报摘要生成", "summary_generate", "摘要生成", "content_gen", "summary"),
+      step(3, "日报排版设计", "layout_design", "排版设计", "content_gen", "layout"),
     ],
   },
 
@@ -1010,7 +1496,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "daily_brief",
     ownerEmployeeId: "xiaoshu",
     defaultTeam: ["xiaoshu", "xiaowen", "xiaoce"],
-    appChannelSlug: null,
     launchMode: "form",
     inputFields: [
       {
@@ -1037,10 +1522,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "针对 {{period}} 产出周报,关注 {{metrics}}。",
     steps: [
-      step(1, "周度数据拉取", "data_report", "数据报告", "analysis", "data"),
-      step(2, "受众画像分析", "audience_analysis", "受众分析", "analysis", "audience"),
-      step(3, "周报摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
-      step(4, "周报排版设计", "layout_design", "排版设计", "generation", "layout"),
+      step(1, "周度数据拉取", "data_report", "数据报告", "data_analysis", "data"),
+      step(2, "受众画像分析", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(3, "周报摘要生成", "summary_generate", "摘要生成", "content_gen", "summary"),
+      step(4, "周报排版设计", "layout_design", "排版设计", "content_gen", "layout"),
     ],
   },
 
@@ -1052,7 +1537,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "analytics",
     ownerEmployeeId: "xiaoshu",
     defaultTeam: ["xiaoshu", "xiaolei", "xiaoce"],
-    appChannelSlug: null,
     launchMode: "form",
     inputFields: [
       {
@@ -1087,10 +1571,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "就「{{analysis_topic}}」对标 {{competitor_accounts}},分析 {{dimensions}}。",
     steps: [
-      step(1, "竞品媒资搜索", "media_search", "媒资搜索", "perception", "search"),
-      step(2, "受众对比分析", "audience_analysis", "受众分析", "analysis", "audience"),
-      step(3, "热度评分对比", "heat_scoring", "热度评分", "analysis", "score"),
-      step(4, "对标报告摘要", "summary_generate", "摘要生成", "generation", "summary"),
+      step(1, "竞品媒资搜索", "media_search", "媒资搜索", "data_collection", "search"),
+      step(2, "受众对比分析", "audience_analysis", "受众分析", "data_analysis", "audience"),
+      step(3, "热度评分对比", "heat_scoring", "热度评分", "data_analysis", "score"),
+      step(4, "对标报告摘要", "summary_generate", "摘要生成", "content_gen", "summary"),
     ],
   },
 
@@ -1106,7 +1590,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: null,
     defaultTeam: ["xiaolei", "xiaozi", "xiaofa"],
-    appChannelSlug: "app_news",
     launchMode: "direct",
     inputFields: [],
     systemInstruction:
@@ -1114,10 +1597,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "生成今日要闻推送包，包含 Top 热点 + 摘要 + 发布策略。",
     steps: [
-      step(1, "热榜扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "要闻聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(3, "推送稿撰写", "content_generate", "内容生成", "generation", "write"),
-      step(4, "发布策略规划", "publish_strategy", "发布策略", "management", "strategy"),
+      step(1, "热榜扫描", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "要闻聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(3, "推送稿撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(4, "发布策略规划", "publish_strategy", "发布策略", "distribution", "strategy"),
     ],
   },
 
@@ -1129,7 +1612,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: null,
     defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaojian", "xiaofa"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -1163,11 +1645,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为「{{conference_name}}」（{{go_live_at}}）做直播联动，产出 {{deliverables}}。",
     steps: [
-      step(1, "发布会背景预研", "web_search", "全网搜索", "perception", "research"),
-      step(2, "联动文案撰写", "content_generate", "内容生成", "generation", "write"),
-      step(3, "短视频分镜规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
-      step(4, "海报排版设计", "layout_design", "排版设计", "generation", "layout"),
-      step(5, "多平台发布策略", "publish_strategy", "发布策略", "management", "strategy"),
+      step(1, "发布会背景预研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "联动文案撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(3, "短视频分镜规划", "video_edit_plan", "视频剪辑规划", "av_script", "plan"),
+      step(4, "海报排版设计", "layout_design", "排版设计", "content_gen", "layout"),
+      step(5, "多平台发布策略", "publish_strategy", "发布策略", "distribution", "strategy"),
     ],
   },
 
@@ -1179,7 +1661,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: null,
     defaultTeam: ["xiaoce", "xiaozi", "xiaojian"],
-    appChannelSlug: "app_variety",
     launchMode: "form",
     inputFields: [
       {
@@ -1210,10 +1691,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为「{{topic}}」生产 {{duration_sec}} 秒爆款短视频，参考 {{reference_accounts}}。",
     steps: [
-      step(1, "热点趋势抓取", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "种草脚本生成", "zhongcao_script", "种草脚本", "generation", "script"),
-      step(3, "分镜与钩子规划", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
-      step(4, "爆款封面生成", "thumbnail_generate", "封面生成", "generation", "thumbnail"),
+      step(1, "热点趋势抓取", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "种草脚本生成", "zhongcao_script", "种草脚本", "av_script", "script"),
+      step(3, "分镜与钩子规划", "video_edit_plan", "视频剪辑规划", "av_script", "plan"),
+      step(4, "爆款封面生成", "thumbnail_generate", "封面生成", "content_gen", "thumbnail"),
     ],
   },
 
@@ -1225,7 +1706,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaolei", "xiaoce", "xiaozi", "xiaoshen", "xiaofa"],
-    appChannelSlug: "app_home",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1267,11 +1747,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为「{{feature_topic}}」产出 {{depth_level}} 特稿，{{deadline}} 前完成。",
     steps: [
-      step(1, "多源网页深读", "web_deep_read", "网页深读", "perception", "read"),
-      step(2, "情感倾向分析", "sentiment_analysis", "情感分析", "analysis", "sentiment"),
-      step(3, "特稿正文撰写", "content_generate", "内容生成", "generation", "write"),
-      step(4, "事实核查", "fact_check", "事实核查", "management", "verify"),
-      step(5, "合规审核", "compliance_check", "合规审核", "management", "compliance"),
+      step(1, "多源网页深读", "web_deep_read", "网页深读", "web_search", "read"),
+      step(2, "情感倾向分析", "sentiment_analysis", "情感分析", "content_analysis", "sentiment"),
+      step(3, "特稿正文撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(4, "事实核查", "fact_check", "事实核查", "quality_review", "verify"),
+      step(5, "合规审核", "compliance_check", "合规审核", "quality_review", "compliance"),
     ],
   },
 
@@ -1283,7 +1763,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: null,
     defaultTeam: ["xiaolei", "xiaozi", "xiaoshen", "xiaofa"],
-    appChannelSlug: "app_news",
     launchMode: "form",
     inputFields: [
       {
@@ -1323,11 +1802,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "响应 {{incident_location}} 的 {{incident_type}}，产出 {{urgent_deliverables}}。",
     steps: [
-      step(1, "多源快速搜索", "web_search", "全网搜索", "perception", "search"),
-      step(2, "关键事实核查", "fact_check", "事实核查", "management", "verify"),
-      step(3, "应急稿件撰写", "content_generate", "内容生成", "generation", "write"),
-      step(4, "合规快扫", "compliance_check", "合规审核", "management", "compliance"),
-      step(5, "多平台紧急分发", "publish_strategy", "发布策略", "management", "strategy"),
+      step(1, "多源快速搜索", "web_search", "全网搜索", "web_search", "search"),
+      step(2, "关键事实核查", "fact_check", "事实核查", "quality_review", "verify"),
+      step(3, "应急稿件撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(4, "合规快扫", "compliance_check", "合规审核", "quality_review", "compliance"),
+      step(5, "多平台紧急分发", "publish_strategy", "发布策略", "distribution", "strategy"),
     ],
   },
 
@@ -1339,14 +1818,16 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
   {
     slug: "daily_ai_news",
     name: "每日 AI 资讯",
-    description: "从热点发现匹配今日 AI 资讯，聚合多源、逐条摘要，合并成稿，发布到 APP 每日 AI 资讯栏目。",
+    description:
+      "每日 08:30 自动从热点发现线索模块匹配今日 AI 相关资讯，逐条生成新闻概要后合并成稿，并定时发布到 CMS-APP「每日 AI 资讯」栏目。",
     icon: "sparkles",
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaofa"],
-    appChannelSlug: "app_news",
     isFeatured: true,
     launchMode: "form",
+    triggerType: "scheduled",
+    triggerConfig: { cron: "30 8 * * *", timezone: "Asia/Shanghai" },
     inputFields: [
       {
         name: "focus_subdomain",
@@ -1370,17 +1851,32 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
         defaultValue: 8,
         validation: { min: 3, max: 20 },
       },
+      {
+        name: "publish_channel_slug",
+        label: "发布栏目",
+        type: "select",
+        required: false,
+        defaultValue: "app_news",
+        options: [
+          { value: "app_news", label: "APP - 新闻（每日 AI 资讯）" },
+          { value: "app_home", label: "APP - 首页" },
+        ],
+      },
     ],
     systemInstruction:
-      "聚焦今日 AI（{{focus_subdomain}}）资讯，挑选 Top {{item_count}} 条代表性新闻，每条产出 80-120 字概要（事实 + 影响），最后合并为一篇《每日 AI 资讯》稿件，含导语 / 分条目列表 / 收尾观察。",
+      "聚焦今日 AI（{{focus_subdomain}}）资讯：① 从热点发现线索模块匹配 AI 相关线索；② 筛选/去重得 Top {{item_count}} 条代表性新闻；③ 每条产出 80-120 字概要（事实 + 影响）；④ 合并为一篇《每日 AI 资讯》稿件（导语 / 分条目列表 / 收尾观察）；⑤ 审核通过后定时发布到 CMS APP 的 {{publish_channel_slug}} 栏目。",
     promptTemplate:
-      "检索并聚合今日 AI 资讯（聚焦 {{focus_subdomain}}），挑选 Top {{item_count}} 条，每条 80-120 字摘要，合并为可直发稿件。",
+      "从热点线索匹配今日 AI 资讯（聚焦 {{focus_subdomain}}），Top {{item_count}} 条逐条摘要后合并成稿，并定时发布到 {{publish_channel_slug}}。",
     steps: [
-      step(1, "AI 热榜扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "多源 AI 资讯聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(3, "全网深度搜索", "web_search", "全网搜索", "perception", "search"),
-      step(4, "逐条摘要生成", "summary_generate", "摘要生成", "generation", "summary"),
-      step(5, "合并成稿", "content_generate", "内容生成", "generation", "write"),
+      step(1, "AI 热点线索匹配", "trending_topics", "热榜聚合", "data_collection", "match"),
+      step(2, "AI 话题筛选去重", "topic_extraction", "选题提取", "data_analysis", "filter"),
+      step(3, "多源资讯补全", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(4, "逐条摘要生成", "summary_generate", "摘要生成", "content_gen", "summary"),
+      step(5, "合并成稿", "content_generate", "内容生成", "content_gen", "write"),
+      step(6, "定时发布到 APP", "cms_publish", "CMS 文稿入库发布", "distribution", "publish", {
+        appChannelSlug: "{{publish_channel_slug}}",
+        triggerSource: "scheduled",
+      }),
     ],
   },
 
@@ -1392,7 +1888,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoce", "xiaozi"],
-    appChannelSlug: "app_news",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1435,11 +1930,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "写一篇「{{topic_scope}}」科技周报深度长文（{{week_range}}，{{word_count}} 字，{{depth_level}}）。",
     steps: [
-      step(1, "主题背景调研", "web_search", "全网搜索", "perception", "research"),
-      step(2, "周度热点聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(3, "同业对标参考", "case_reference", "案例参考", "analysis", "case"),
-      step(4, "深度周报撰写", "content_generate", "内容生成", "generation", "write"),
-      step(5, "成稿质量复核", "quality_review", "质量审核", "management", "review"),
+      step(1, "主题背景调研", "web_search", "全网搜索", "web_search", "research"),
+      step(2, "周度热点聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(3, "同业对标参考", "case_reference", "案例参考", "other", "case"),
+      step(4, "深度周报撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "成稿质量复核", "quality_review", "质量审核", "quality_review", "review"),
     ],
   },
 
@@ -1451,7 +1946,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaowen", "xiaoshen"],
-    appChannelSlug: "app_politics",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1493,11 +1987,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为 {{region}} 产出 {{item_count}} 条每日时政热点（{{urgency_level}}），含核查与合规。",
     steps: [
-      step(1, "时政信源聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(2, "多源全网搜索", "web_search", "全网搜索", "perception", "search"),
-      step(3, "事实核查", "fact_check", "事实核查", "management", "verify"),
-      step(4, "时政稿件撰写", "content_generate", "内容生成", "generation", "write"),
-      step(5, "合规审查", "compliance_check", "合规审核", "management", "compliance"),
+      step(1, "时政信源聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(2, "多源全网搜索", "web_search", "全网搜索", "web_search", "search"),
+      step(3, "事实核查", "fact_check", "事实核查", "quality_review", "verify"),
+      step(4, "时政稿件撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "合规审查", "compliance_check", "合规审核", "quality_review", "compliance"),
     ],
   },
 
@@ -1509,7 +2003,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "podcast",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaolei", "xiaojian"],
-    appChannelSlug: "app_livelihood_podcast",
     isFeatured: true,
     launchMode: "direct",
     inputFields: [],
@@ -1518,10 +2011,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "基于今日热榜生成 1-3 集每日热点播客脚本，含 4 段结构与音频节奏建议。",
     steps: [
-      step(1, "今日热榜扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "选题价值评分", "heat_scoring", "热度评分", "analysis", "score"),
-      step(3, "播客脚本撰写", "content_generate", "内容生成", "generation", "write"),
-      step(4, "音频节奏规划", "audio_plan", "音频规划", "generation", "audio"),
+      step(1, "今日热榜扫描", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "选题价值评分", "heat_scoring", "热度评分", "data_analysis", "score"),
+      step(3, "播客脚本撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(4, "音频节奏规划", "audio_plan", "音频规划", "av_script", "audio"),
     ],
   },
 
@@ -1533,7 +2026,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "livelihood",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaowen", "xiaoshen"],
-    appChannelSlug: "app_livelihood_tandian",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1566,11 +2058,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为 {{city}} 的 {{shop_type}}（{{shop_name}}）产出 6 阶段探店脚本 + 图文 + 合规扫描。",
     steps: [
-      step(1, "门店信息检索", "web_search", "全网搜索", "perception", "search"),
-      step(2, "本地口碑聚合", "social_listening", "社交舆情", "perception", "listen"),
-      step(3, "探店脚本生成（6 阶段）", "video_edit_plan", "视频剪辑规划", "generation", "plan"),
-      step(4, "图文稿撰写", "content_generate", "内容生成", "generation", "write"),
-      step(5, "广告法合规扫描", "compliance_check", "合规审核", "management", "compliance"),
+      step(1, "门店信息检索", "web_search", "全网搜索", "web_search", "search"),
+      step(2, "本地口碑聚合", "social_listening", "社交舆情", "data_collection", "listen"),
+      step(3, "探店脚本生成（6 阶段）", "video_edit_plan", "视频剪辑规划", "av_script", "plan"),
+      step(4, "图文稿撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "广告法合规扫描", "compliance_check", "合规审核", "quality_review", "compliance"),
     ],
   },
 
@@ -1582,7 +2074,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
-    appChannelSlug: "app_sports",
     isFeatured: true,
     launchMode: "direct",
     inputFields: [],
@@ -1591,10 +2082,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "检索近期川超热门比赛，产出每日川超战报（4 段结构图文）。",
     steps: [
-      step(1, "川超赛事热点扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "赛事信息深读", "web_deep_read", "网页深读", "perception", "crawl"),
-      step(3, "同类赛事案例参考", "case_reference", "案例参考", "analysis", "case"),
-      step(4, "战报图文撰写", "content_generate", "内容生成", "generation", "write"),
+      step(1, "川超赛事热点扫描", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "赛事信息深读", "web_deep_read", "网页深读", "web_search", "crawl"),
+      step(3, "同类赛事案例参考", "case_reference", "案例参考", "other", "case"),
+      step(4, "战报图文撰写", "content_generate", "内容生成", "content_gen", "write"),
     ],
   },
 
@@ -1606,7 +2097,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "social",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoshen", "xiaofa"],
-    appChannelSlug: "app_livelihood_zhongcao",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1644,10 +2134,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为 {{platform}} 产出 {{post_count}} 条「{{product_type}}」种草，含合规扫描与发布策略。",
     steps: [
-      step(1, "平台趋势扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "种草脚本生成", "zhongcao_script", "种草脚本", "generation", "script"),
-      step(3, "广告法合规扫描", "compliance_check", "合规审核", "management", "compliance"),
-      step(4, "发布策略生成", "publish_strategy", "发布策略", "management", "strategy"),
+      step(1, "平台趋势扫描", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "种草脚本生成", "zhongcao_script", "种草脚本", "av_script", "script"),
+      step(3, "广告法合规扫描", "compliance_check", "合规审核", "quality_review", "compliance"),
+      step(4, "发布策略生成", "publish_strategy", "发布策略", "distribution", "strategy"),
     ],
   },
 
@@ -1659,7 +2149,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaolei", "xiaowen"],
-    appChannelSlug: "app_news",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1698,10 +2187,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为 {{region}} 产出 {{article_count}} 篇 {{topic_scope}} 范围的本地新闻改写稿。",
     steps: [
-      step(1, "本地新闻聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(2, "全网搜索补充", "web_search", "全网搜索", "perception", "search"),
-      step(3, "多源素材改写", "style_rewrite", "风格改写", "generation", "rewrite"),
-      step(4, "本地新闻成稿", "content_generate", "内容生成", "generation", "write"),
+      step(1, "本地新闻聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(2, "全网搜索补充", "web_search", "全网搜索", "web_search", "search"),
+      step(3, "多源素材改写", "style_rewrite", "风格改写", "content_gen", "rewrite"),
+      step(4, "本地新闻成稿", "content_generate", "内容生成", "content_gen", "write"),
     ],
   },
 
@@ -1713,7 +2202,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
-    appChannelSlug: "app_news",
     isFeatured: true,
     launchMode: "form",
     inputFields: [
@@ -1750,10 +2238,10 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     promptTemplate:
       "为「{{topic_range}}」产出 {{article_count}} 篇全国热点图文（{{rewrite_tone}}）。",
     steps: [
-      step(1, "全网热点扫描", "trending_topics", "热榜聚合", "perception", "fetch"),
-      step(2, "多源新闻聚合", "news_aggregation", "新闻聚合", "perception", "aggregate"),
-      step(3, "多篇素材改写", "style_rewrite", "风格改写", "generation", "rewrite"),
-      step(4, "热点图文成稿", "content_generate", "内容生成", "generation", "write"),
+      step(1, "全网热点扫描", "trending_topics", "热榜聚合", "data_collection", "fetch"),
+      step(2, "多源新闻聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(3, "多篇素材改写", "style_rewrite", "风格改写", "content_gen", "rewrite"),
+      step(4, "热点图文成稿", "content_generate", "内容生成", "content_gen", "write"),
     ],
   },
 ];
@@ -1775,10 +2263,11 @@ function toBuiltinSeedInput(w: BuiltinWorkflowSeed): BuiltinSeedInput {
     icon: w.icon,
     inputFields: w.inputFields,
     defaultTeam: w.defaultTeam,
-    appChannelSlug: w.appChannelSlug,
     systemInstruction: w.systemInstruction ?? null,
     legacyScenarioKey: w.slug,
     steps: w.steps,
+    triggerType: w.triggerType ?? "manual",
+    triggerConfig: w.triggerConfig ?? {},
     // 2026-04-20 realignment — 新 4 列
     isPublic: true,
     ownerEmployeeId: w.ownerEmployeeId,

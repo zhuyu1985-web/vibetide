@@ -6,7 +6,6 @@ import {
   missionMessages,
   aiEmployees,
   articles,
-  workflowTemplates,
 } from "@/db/schema";
 import { eq, sql, and, notInArray } from "drizzle-orm";
 import { assembleAgent, executeAgent } from "@/lib/agent";
@@ -22,7 +21,6 @@ import {
   type PublishResult,
 } from "@/lib/cms";
 import { insertWorkflowArtifact } from "@/lib/dal/workflow-artifacts";
-import type { AppChannelSlug } from "@/lib/dal/app-channels";
 
 /**
  * Leader Consolidate — triggered when all tasks in a mission are done.
@@ -107,13 +105,25 @@ export const leaderConsolidate = inngest.createFunction(
       async () => {
         const agent = await assembleAgent(mission.leaderEmployeeId);
 
+        // 合并阶段要产出完整正文（潜在 2500+ 汉字），默认 4096 token 会被截。
+        // 将 consolidation 的 maxTokens 提到 8192（与 content_gen 桶对齐）。
+        agent.modelConfig = {
+          ...agent.modelConfig,
+          maxTokens: Math.max(agent.modelConfig.maxTokens ?? 4096, 8192),
+        };
+
         // Build messages summary
         const messagesText = messages
           .map((m) => `[${m.messageType}] ${m.content}`)
           .join("\n");
 
         const prompt = buildConsolidatePrompt(
-          mission,
+          {
+            title: mission.title,
+            scenario: mission.scenario,
+            userInstruction: mission.userInstruction,
+            inputParams: mission.inputParams as Record<string, unknown> | null,
+          },
           completedTasks,
           { messagesText: messagesText || undefined }
         );
@@ -149,10 +159,8 @@ export const leaderConsolidate = inngest.createFunction(
         .where(eq(missions.id, missionId));
     });
 
-    // 5.5 Demo Phase 3 (2026-04-19): Auto-publish to CMS if workflow has appChannelSlug
-    //
-    // Flow: mission.workflowTemplateId → workflow_templates.appChannelSlug
-    //   → create article row from consolidation output → publishArticleToCms
+    // 5.5 Auto-publish to CMS. 推送目标（siteId/appId/catalogId）在 article-mapper
+    // 里硬编码；是否推送完全由 VIBETIDE_CMS_PUBLISH_ENABLED 控制。
     //
     // 容错：CMS 不通/凭证失效 → 仅写 warning artifact，不影响 mission 终态 completed
     await step.run("auto-publish-to-cms", async () => {
@@ -161,16 +169,6 @@ export const leaderConsolidate = inngest.createFunction(
       }
       if (!isCmsPublishEnabled()) {
         return { skipped: true, reason: "feature_flag_disabled" };
-      }
-
-      const [template] = await db
-        .select()
-        .from(workflowTemplates)
-        .where(eq(workflowTemplates.id, mission.workflowTemplateId))
-        .limit(1);
-
-      if (!template?.appChannelSlug) {
-        return { skipped: true, reason: "no_app_channel" };
       }
 
       const output = (consolidationResult.output ?? {}) as {
@@ -213,7 +211,7 @@ export const leaderConsolidate = inngest.createFunction(
         missionId,
         fromEmployeeId: mission.leaderEmployeeId,
         messageType: "result",
-        content: `📝 已生成稿件「${articleTitle}」，正在推送到华栖云 CMS（${template.appChannelSlug}）...`,
+        content: `📝 已生成稿件「${articleTitle}」，正在推送到华栖云 CMS...`,
       });
 
       // Try real publish to Huaxiyun CMS
@@ -222,7 +220,6 @@ export const leaderConsolidate = inngest.createFunction(
       try {
         publishResult = await publishArticleToCms({
           articleId: article.id,
-          appChannelSlug: template.appChannelSlug as AppChannelSlug,
           operatorId: mission.leaderEmployeeId,
           triggerSource: "workflow",
           allowUpdate: true,
@@ -243,7 +240,6 @@ export const leaderConsolidate = inngest.createFunction(
         title: `CMS 入库：${articleTitle}`,
         content: {
           articleId: article.id,
-          appChannelSlug: template.appChannelSlug,
           success: !!publishResult?.success,
           cmsArticleId: publishResult?.cmsArticleId ?? null,
           cmsState: publishResult?.cmsState ?? (publishError ? "failed" : "unknown"),

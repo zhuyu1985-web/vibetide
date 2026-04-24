@@ -1,13 +1,14 @@
 "use server";
 
 import { db } from "@/db";
-import { workflowTemplates } from "@/db/schema";
+import { workflowTemplates, skills } from "@/db/schema";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { InputFieldDef } from "@/lib/types";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { isSuperAdmin } from "@/lib/rbac";
 import { startMission } from "@/app/actions/missions";
 import {
   BUILTIN_TEMPLATES,
@@ -38,6 +39,69 @@ async function requireAuth() {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
   return user;
+}
+
+/**
+ * Validate that every `type:"skill"` step references a real skill (by slug)
+ * and overwrite the step's cached `skillName` / `skillCategory` with the
+ * authoritative values from the skills table. Keeps the workflow list UI and
+ * runtime dispatcher in agreement with the skills library.
+ *
+ * Throws if any skill step has a missing or unknown slug so bad data cannot
+ * be saved via a crafted API call.
+ */
+async function normalizeSkillSteps(
+  steps: WorkflowStepDef[],
+): Promise<WorkflowStepDef[]> {
+  const skillSteps = steps.filter((s) => s.type === "skill");
+  if (skillSteps.length === 0) return steps;
+
+  const slugs = Array.from(
+    new Set(
+      skillSteps
+        .map((s) => s.config?.skillSlug)
+        .filter((x): x is string => !!x && x.length > 0),
+    ),
+  );
+  if (slugs.length === 0) {
+    throw new Error("工作流步骤必须绑定技能库中的技能");
+  }
+
+  const rows = slugs.length
+    ? await db
+        .select({ slug: skills.slug, name: skills.name, category: skills.category })
+        .from(skills)
+        .where(inArray(skills.slug, slugs))
+    : [];
+
+  const bySlug = new Map(rows.map((r) => [r.slug!, r]));
+  const missing = skillSteps
+    .filter((s) => {
+      const slug = s.config?.skillSlug;
+      return !slug || !bySlug.has(slug);
+    })
+    .map((s) => s.config?.skillSlug || "(空)");
+  if (missing.length > 0) {
+    throw new Error(
+      `工作流步骤技能不存在于技能库：${[...new Set(missing)].join("、")}`,
+    );
+  }
+
+  return steps.map((step) => {
+    if (step.type !== "skill") return step;
+    const slug = step.config?.skillSlug;
+    const canonical = slug ? bySlug.get(slug) : undefined;
+    if (!canonical) return step;
+    return {
+      ...step,
+      config: {
+        ...step.config,
+        skillSlug: canonical.slug!,
+        skillName: canonical.name,
+        skillCategory: canonical.category as string,
+      },
+    };
+  });
 }
 
 // ─── Legacy CRUD (kept for backward compatibility) ───
@@ -139,6 +203,9 @@ export async function createWorkflowFromTemplate(templateId: string) {
   // static BUILTIN_TEMPLATES constant instead of the workflow_templates table.
   const virtual = findBuiltinTemplateById(templateId);
   if (virtual) {
+    if (!Array.isArray(virtual.steps) || virtual.steps.length === 0) {
+      throw new Error("该模板未配置步骤，暂不可用");
+    }
     const [newWorkflow] = await db
       .insert(workflowTemplates)
       .values({
@@ -163,6 +230,11 @@ export async function createWorkflowFromTemplate(templateId: string) {
     where: eq(workflowTemplates.id, templateId),
   });
   if (!template) throw new Error("模板不存在");
+
+  const templateSteps = (template.steps ?? []) as WorkflowStepDef[];
+  if (templateSteps.length === 0) {
+    throw new Error("该模板未配置步骤，暂不可用");
+  }
 
   const [newWorkflow] = await db
     .insert(workflowTemplates)
@@ -202,13 +274,15 @@ export async function saveWorkflow(data: {
   const orgId = await getCurrentUserOrg();
   if (!orgId) throw new Error("用户未关联组织");
 
+  const normalizedSteps = await normalizeSkillSteps(data.steps);
+
   const [workflow] = await db
     .insert(workflowTemplates)
     .values({
       organizationId: orgId,
       name: data.name,
       description: data.description,
-      steps: data.steps,
+      steps: normalizedSteps,
       category: data.category ?? "custom",
       triggerType: data.triggerType ?? "manual",
       triggerConfig: data.triggerConfig ?? null,
@@ -248,34 +322,47 @@ export async function updateWorkflow(
     promptTemplate?: string;
   }
 ) {
-  await requireAuth();
+  const user = await requireAuth();
 
-  // Verify the workflow exists and is not builtin
+  // Verify the workflow exists. Builtin templates are normally read-only, but
+  // super admins can still edit them so product operators can hotfix shipped
+  // templates without a code release.
   const existing = await db.query.workflowTemplates.findFirst({
     where: eq(workflowTemplates.id, id),
   });
   if (!existing) throw new Error("工作流不存在");
-  if (existing.isBuiltin) throw new Error("内置工作流不可修改");
+  if (existing.isBuiltin && !(await isSuperAdmin(user.id))) {
+    throw new Error("内置工作流仅管理员可修改");
+  }
+
+  const patch = { ...data };
+  if (data.steps) {
+    patch.steps = await normalizeSkillSteps(data.steps);
+  }
 
   await db
     .update(workflowTemplates)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...patch, updatedAt: new Date() })
     .where(eq(workflowTemplates.id, id));
 
   revalidatePath("/workflows");
+  revalidatePath(`/workflows/${id}`);
 }
 
 /**
- * Delete a non-builtin workflow.
+ * Delete a workflow. Custom workflows are deletable by any authenticated
+ * user; builtin templates are deletable only by super admins.
  */
 export async function deleteWorkflow(id: string) {
-  await requireAuth();
+  const user = await requireAuth();
 
   const existing = await db.query.workflowTemplates.findFirst({
     where: eq(workflowTemplates.id, id),
   });
   if (!existing) throw new Error("工作流不存在");
-  if (existing.isBuiltin) throw new Error("内置工作流不可删除");
+  if (existing.isBuiltin && !(await isSuperAdmin(user.id))) {
+    throw new Error("内置工作流仅管理员可删除");
+  }
 
   await db.delete(workflowTemplates).where(eq(workflowTemplates.id, id));
 
@@ -319,7 +406,10 @@ export async function executeWorkflow(id: string) {
   if (!workflow) throw new Error("工作流不存在");
 
   // 2. Build structured instruction from skill-based steps
-  const steps = workflow.steps as WorkflowStepDef[];
+  const steps = (workflow.steps ?? []) as WorkflowStepDef[];
+  if (steps.length === 0) {
+    throw new Error("该工作流未配置步骤，请编辑补全后再运行");
+  }
 
   // 3. Build structured instruction
   const stepDescriptions = steps

@@ -85,6 +85,63 @@ export async function loadAvailableEmployees(
 }
 
 // ---------------------------------------------------------------------------
+// 1.5. pickEmployeeForStep — fast-path step → employee assignment
+//
+// Used by the workflow-template fast path in BOTH `mission-executor.ts` and
+// `inngest/functions/leader-plan.ts`. Without this, both call-sites silently
+// fell back to `mission.leaderEmployeeId` whenever a step did not carry an
+// explicit `employeeSlug` — and since builtin templates' `step()` factory
+// never sets that field, every step in a builtin workflow ended up assigned
+// to the same single leader employee (e.g. "科技周报" 5 steps all on xiaowen
+// instead of being split across the defaultTeam of 3).
+//
+// Resolution order:
+//   1) Explicit `step.config.employeeSlug` / `step.employeeSlug`
+//   2) Within `defaultTeam`, the member whose skills include `step.config.skillName`
+//   3) Within `defaultTeam`, round-robin by step order
+//   4) `null` (caller decides whether to fall back to leader)
+// ---------------------------------------------------------------------------
+
+export function pickEmployeeForStep(
+  step: {
+    order?: number;
+    employeeSlug?: string;
+    config?: { employeeSlug?: string; skillName?: string; skillSlug?: string };
+  },
+  defaultTeamSlugs: string[],
+  employees: EmployeeWithSkills[],
+): EmployeeWithSkills | null {
+  // 1) Explicit assignment wins.
+  const explicit = step.config?.employeeSlug ?? step.employeeSlug;
+  if (explicit) {
+    const e = employees.find((x) => x.slug === explicit);
+    if (e) return e;
+  }
+
+  // 2/3) Restrict candidate pool to defaultTeam members. If the template did
+  // not specify a defaultTeam, fall through to caller (returns null).
+  if (defaultTeamSlugs.length === 0) return null;
+  const teamMembers = defaultTeamSlugs
+    .map((slug) => employees.find((e) => e.slug === slug))
+    .filter((e): e is EmployeeWithSkills => Boolean(e));
+  if (teamMembers.length === 0) return null;
+
+  // 2) Skill-name match: the step declares a skill name; pick the team member
+  // who actually has that skill bound. employee_skills stores the human-
+  // readable name (`skills.name`), which is what `step.config.skillName` holds.
+  const skillName = step.config?.skillName;
+  if (skillName) {
+    const skilled = teamMembers.find((e) => e.skills.includes(skillName));
+    if (skilled) return skilled;
+  }
+
+  // 3) Round-robin by step order so consecutive steps spread across the team.
+  // step.order is 1-based in the seed, but defensively handle 0/undefined.
+  const order = Math.max(1, step.order ?? 1);
+  return teamMembers[(order - 1) % teamMembers.length] ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // 2. buildLeaderDecomposePrompt — build the prompt the leader uses to
 //    decompose a mission into sub-tasks (content identical to both files)
 // ---------------------------------------------------------------------------
@@ -339,11 +396,36 @@ export async function loadEmployeeMessages(
 // 7. buildConsolidatePrompt — build the consolidation prompt for the leader
 // ---------------------------------------------------------------------------
 
+// depth_level → 目标正文字数（精品内容/深度大稿类场景）
+const DEPTH_LEVEL_WORD_COUNT: Record<string, number> = {
+  standard: 2500,
+  deep: 3500,
+  investigative: 5000,
+};
+
+/**
+ * 从 mission.inputParams 推断目标字数。
+ * 优先级：显式 targetWordCount > depth_level 映射 > undefined（由 LLM 自定）
+ */
+function inferTargetWordCount(
+  inputParams: Record<string, unknown> | null | undefined,
+): number | undefined {
+  if (!inputParams) return undefined;
+  const explicit = inputParams.targetWordCount ?? inputParams.target_word_count;
+  if (typeof explicit === "number" && explicit > 0) return explicit;
+  const depth = inputParams.depth_level ?? inputParams.depthLevel;
+  if (typeof depth === "string" && DEPTH_LEVEL_WORD_COUNT[depth]) {
+    return DEPTH_LEVEL_WORD_COUNT[depth];
+  }
+  return undefined;
+}
+
 export function buildConsolidatePrompt(
   mission: {
     title: string;
     scenario: string;
     userInstruction: string;
+    inputParams?: Record<string, unknown> | null;
   },
   completedTasks: Array<{
     title: string;
@@ -374,6 +456,15 @@ export function buildConsolidatePrompt(
     ? `\n## 任务过程中的沟通记录\n${options.messagesText}\n`
     : "";
 
+  const targetWords = inferTargetWordCount(mission.inputParams);
+  const wordCountSection = targetWords
+    ? `\n## 字数要求（强制）
+最终稿件正文不少于 ${targetWords} 字（当前目标：${targetWords} 字左右，允许 ±10%）。
+- 不要只输出 bullet 摘要
+- 不要写"详见各子任务"这种占位
+- 正文放到 artifact 的 content 字段，并在 body / content 字段同步一份完整稿件，便于入库\n`
+    : "";
+
   return `你是任务总监，所有子任务已经完成。请汇总所有成果，生成最终的交付物。
 
 ## 任务信息
@@ -383,7 +474,7 @@ export function buildConsolidatePrompt(
 
 ## 各子任务执行结果
 ${taskOutputsText}
-${messagesSection}
+${messagesSection}${wordCountSection}
 ## 要求
 1. 综合所有子任务的产出，整合为一份完整、连贯的最终交付物
 2. 确保内容质量和一致性

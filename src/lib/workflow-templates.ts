@@ -124,20 +124,6 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     ],
   },
   {
-    name: "金融科技监管日报",
-    description: "工作日定时抓取金融监管政策，分析影响后生成日报并合规审核发布",
-    category: "news",
-    triggerType: "scheduled",
-    triggerConfig: { cron: "0 9 * * 1-5", timezone: "Asia/Shanghai" },
-    steps: [
-      step(1, "监管政策抓取", "fintech_regulation_monitor", "金融监管监控", "perception"),
-      step(2, "政策影响分析", "data_report", "数据报告", "analysis"),
-      step(3, "日报稿件撰写", "content_generate", "内容生成", "generation"),
-      step(4, "合规审核", "quality_review", "质量审核", "management"),
-      step(5, "多渠道发布", "publish_strategy", "发布策略", "management"),
-    ],
-  },
-  {
     name: "每周竞争对手情报报告",
     description: "每周一自动抓取竞品动态，对比分析差异与机会后生成情报报告推送管理层",
     category: "analytics",
@@ -149,18 +135,6 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
       step(3, "差异与机会分析", "topic_extraction", "选题提取", "analysis"),
       step(4, "情报报告生成", "content_generate", "内容生成", "generation"),
       step(5, "报告推送至管理层", "publish_strategy", "发布策略", "management"),
-    ],
-  },
-  {
-    name: "客户投诉邮件分类",
-    description: "手动触发客户投诉邮件分类流程，自动识别情感与紧急度后派发到对应部门",
-    category: "distribution",
-    triggerType: "manual",
-    steps: [
-      step(1, "邮件拉取与预处理", "email_classifier", "邮件分类", "perception"),
-      step(2, "情感与紧急度分析", "data_report", "数据报告", "analysis"),
-      step(3, "自动分类与打标", "topic_extraction", "选题提取", "analysis"),
-      step(4, "派发至对应部门", "publish_strategy", "发布策略", "management"),
     ],
   },
 ];

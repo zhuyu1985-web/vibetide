@@ -24,11 +24,20 @@ import {
   Zap,
   Lock,
   BarChart3,
+  Package,
+  Newspaper,
+  Video,
+  ClipboardCheck,
+  TrendingUp,
+  Lightbulb,
+  Send,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,6 +54,7 @@ import {
   type EmployeeMeta,
 } from "@/lib/constants";
 import { cancelMission, retryMission, deleteMission, archiveMission } from "@/app/actions/missions";
+import { DraftComparisonPanel } from "@/components/missions/draft-comparison-panel";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import type {
   MissionWithDetails,
@@ -131,14 +141,89 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [selectedTask, setSelectedTask] = useState<MissionTask | null>(null);
-  // Default to output tab if mission is completed and has final output
-  const [activeTab, setActiveTab] = useState(
-    mission.status === "completed" && mission.finalOutput != null ? "output" : "kanban"
-  );
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Default tab: 完成后优先展示核心产出，其次执行摘要，否则任务看板。
+  // "核心产出有内容"与下方 productionArtifacts 判定保持一致（按 DAG 深度取 top 2）。
+  const [activeTab, setActiveTab] = useState(() => {
+    if (mission.status !== "completed") return "kanban";
+    const PLANNING_RE = /分解|分配|汇总|总结|综述|概述|摘要/;
+    const candidates = mission.tasks.filter((t) => !PLANNING_RE.test(t.title));
+    const hasCoreArtifacts = candidates.some((t) => {
+      const out = t.outputData as { artifacts?: Array<{ content?: string }> } | null;
+      return out?.artifacts?.some((a) => a.content?.trim());
+    });
+    if (hasCoreArtifacts) return "production";
+    if (mission.finalOutput != null) return "output";
+    return "kanban";
+  });
 
   const isTerminated = ["completed", "failed", "cancelled"].includes(mission.status);
   const isActive = ["queued", "planning", "executing", "consolidating"].includes(mission.status);
   const hasFinalOutput = mission.finalOutput != null;
+
+  // 核心产出：按依赖深度取 DAG 最深的 2 个任务的 artifact（通常是主生产步 + 复核/质检），
+  // 并过滤掉计划/汇总类任务（分解 / 分配）。中间步骤（资料搜集、选题、对标等）在看板看。
+  // "执行摘要"（mission.finalOutput）天然不在 missionTasks 里，不会进入此 Tab。
+  const productionArtifacts = useMemo(() => {
+    const PLANNING_KEYWORDS = /分解|分配|汇总|总结|综述|概述|摘要/;
+
+    // 计算每个任务的 DAG 深度：无依赖 => 0，否则 1 + max(上游)
+    const taskById = new Map(mission.tasks.map((t) => [t.id, t]));
+    const depthCache = new Map<string, number>();
+    const computeDepth = (taskId: string, visiting = new Set<string>()): number => {
+      if (depthCache.has(taskId)) return depthCache.get(taskId)!;
+      if (visiting.has(taskId)) return 0; // 防环
+      visiting.add(taskId);
+      const t = taskById.get(taskId);
+      if (!t) return 0;
+      const deps = t.dependencies ?? [];
+      const d =
+        deps.length === 0
+          ? 0
+          : 1 + Math.max(...deps.map((dep) => computeDepth(dep, visiting)));
+      depthCache.set(taskId, d);
+      return d;
+    };
+
+    const candidates = mission.tasks
+      .filter((t) => !PLANNING_KEYWORDS.test(t.title))
+      .map((t) => ({ task: t, depth: computeDepth(t.id) }))
+      .sort((a, b) => b.depth - a.depth)
+      .slice(0, 2); // 最深的 2 个
+
+    const collected: Array<{
+      id: string;
+      type: string;
+      title: string;
+      content: string;
+      employeeSlug?: string;
+      qualityScore?: number;
+      taskTitle: string;
+    }> = [];
+    for (const { task } of candidates) {
+      const out = task.outputData as {
+        artifacts?: Array<{ id: string; type: string; title: string; content: string }>;
+        employeeSlug?: string;
+        metrics?: { qualityScore?: number };
+      } | null;
+      if (!out?.artifacts) continue;
+      for (const a of out.artifacts) {
+        if (!a.content?.trim()) continue;
+        collected.push({
+          id: a.id,
+          type: a.type,
+          title: a.title,
+          content: a.content,
+          employeeSlug: out.employeeSlug,
+          qualityScore: out.metrics?.qualityScore,
+          taskTitle: task.title,
+        });
+      }
+    }
+    return collected;
+  }, [mission.tasks]);
+  const hasProductionOutput = productionArtifacts.length > 0;
 
   const completedCount = mission.tasks.filter((t) => t.status === "completed").length;
   const inProgressCount = mission.tasks.filter((t) => ["in_progress", "claimed", "in_review"].includes(t.status)).length;
@@ -193,22 +278,15 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
     return map;
   }, [mission.tasks]);
 
+  // Task board keeps the template step order stable throughout execution —
+  // sort by priority (== step.order from the template) ascending, with task id
+  // as a deterministic tiebreaker. Previously this re-sorted by status (putting
+  // `completed` on top), so each task that finished visibly jumped to the
+  // front — disorienting when watching the mission progress top-to-bottom.
   const sortedTasks = useMemo(() => {
-    const statusOrder: Record<string, number> = {
-      completed: 0,
-      in_progress: 1,
-      claimed: 1,
-      ready: 2,
-      pending: 3,
-      blocked: 4,
-      failed: 5,
-      cancelled: 5,
-    };
     return [...mission.tasks].sort((a, b) => {
-      const sa = statusOrder[a.status] ?? 9;
-      const sb = statusOrder[b.status] ?? 9;
-      if (sa !== sb) return sa - sb;
-      return b.priority - a.priority;
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.id.localeCompare(b.id);
     });
   }, [mission.tasks]);
 
@@ -225,9 +303,18 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
   async function handleCancel() { await cancelMission(mission.id); router.refresh(); }
   async function handleRetry() { const m = await retryMission(mission.id); router.push(`/missions/${m.id}`); }
   async function handleArchive() { await archiveMission(mission.id); router.push("/missions"); }
-  async function handleDelete() {
-    if (!confirm("确定要永久删除此任务？此操作不可恢复。")) return;
-    await deleteMission(mission.id); router.push("/missions");
+  function handleDelete() {
+    setDeleteOpen(true);
+  }
+  async function confirmDelete() {
+    setDeleting(true);
+    try {
+      await deleteMission(mission.id);
+      router.push("/missions");
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
+    }
   }
   async function handleCopyOutput() {
     const text = extractReadableOutput(mission.finalOutput);
@@ -351,10 +438,19 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
                   </Badge>
                 )}
               </TabsTrigger>
+              {hasProductionOutput && (
+                <TabsTrigger value="production" className="gap-1.5">
+                  <Package size={13} className="text-cyan-500" />
+                  核心产出
+                  <Badge variant="secondary" className="ml-1 h-4.5 min-w-5 px-1.5 text-xs font-bold">
+                    {productionArtifacts.length}
+                  </Badge>
+                </TabsTrigger>
+              )}
               {hasFinalOutput && (
                 <TabsTrigger value="output" className="gap-1.5">
                   <Crown size={13} className="text-rose-400" />
-                  最终输出
+                  执行摘要
                   <span className="ml-1 w-2 h-2 rounded-full bg-emerald-400" />
                 </TabsTrigger>
               )}
@@ -374,10 +470,67 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
                 </GlassCard>
               ) : (
                 <>
-                  <div className="space-y-2.5">
-                    {sortedTasks.map((task) => (
-                      <TaskCard key={task.id} task={task} taskTitleMap={taskTitleMap} missionDone={isTerminated} onClick={() => setSelectedTask(task)} />
-                    ))}
+                  <div className="relative pl-14">
+                    <div className="flex flex-col">
+                      {sortedTasks.map((task, idx) => {
+                        const effStatus: MissionTaskStatus =
+                          isTerminated && ["pending", "blocked", "ready"].includes(task.status) ? "cancelled" : task.status;
+                        const running = effStatus === "in_progress" || effStatus === "claimed";
+                        const done = effStatus === "completed";
+                        const isFirst = idx === 0;
+                        const isLast = idx === sortedTasks.length - 1;
+                        return (
+                          <div key={task.id} className="relative py-1.5 first:pt-0 last:pb-0">
+                            {/* 时间轴底层灰线（row 高度内连续，相邻 row 首尾相接） */}
+                            <span
+                              className={cn(
+                                "pointer-events-none absolute left-[-28px] w-px -translate-x-1/2 bg-gray-200/70 dark:bg-white/[0.08]",
+                                isFirst ? "top-1/2" : "top-0",
+                                isLast ? "bottom-1/2" : "bottom-0"
+                              )}
+                              aria-hidden
+                            />
+                            {/* 已到达段彩色覆盖（已完成整条；进行中覆盖上半） */}
+                            {(done || running) && (
+                              <span
+                                className={cn(
+                                  "pointer-events-none absolute left-[-28px] w-px -translate-x-1/2 bg-primary/45",
+                                  isFirst ? "top-1/2" : "top-0",
+                                  done ? (isLast ? "bottom-1/2" : "bottom-0") : "bottom-1/2"
+                                )}
+                                aria-hidden
+                              />
+                            )}
+                            {/* 时间轴圆点：双环（外圈 ring + 中心小实心点） */}
+                            <span
+                              className="absolute left-[-28px] top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5"
+                              aria-hidden
+                            >
+                              {running && (
+                                <>
+                                  <span className="absolute inset-0 rounded-full border-2 border-primary/50 animate-ping" />
+                                  <span className="absolute inset-[-4px] rounded-full border border-primary/30 animate-ping [animation-delay:300ms]" />
+                                </>
+                              )}
+                              <span
+                                className={cn(
+                                  "relative flex items-center justify-center rounded-full border-2",
+                                  running
+                                    ? "w-4 h-4 border-primary bg-primary/10 shadow-[0_0_14px_2px_rgba(56,189,248,0.55)]"
+                                    : done
+                                      ? "w-3.5 h-3.5 border-primary/70 bg-transparent"
+                                      : "w-3.5 h-3.5 border-gray-300 dark:border-white/20 bg-transparent"
+                                )}
+                              >
+                                {running && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                {done && <span className="w-1.5 h-1.5 rounded-full bg-primary/70" />}
+                              </span>
+                            </span>
+                            <TaskCard task={task} taskTitleMap={taskTitleMap} missionDone={isTerminated} onClick={() => setSelectedTask(task)} />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   {/* Status legend */}
                   <div className="flex items-center justify-center gap-5 mt-4 py-2">
@@ -439,14 +592,39 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
               )}
             </TabsContent>
 
+            {/* Production Output — 核心产出物（稿件/脚本/分析/数据报告） */}
+            <TabsContent value="production" className="mt-0 space-y-4">
+              <ProductionOutputRenderer
+                artifacts={productionArtifacts}
+                scenarioCategory={mission.scenarioCategory ?? null}
+                scenario={mission.scenario}
+              />
+            </TabsContent>
+
             {/* Output */}
-            <TabsContent value="output" className="mt-0">
+            <TabsContent value="output" className="mt-0 space-y-4">
+              {/* 深度追踪 mission：草稿对比 + 入库面板（出现在最终输出上方） */}
+              {mission.scenario === "深度追踪" && (
+                <DraftComparisonPanel missionId={mission.id} tasks={mission.tasks} />
+              )}
               {hasFinalOutput && (
                 <GlassCard>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold flex items-center gap-2">
-                      <Crown size={14} className="text-rose-400" /> 最终输出
-                    </h2>
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold flex items-center gap-2">
+                        <Crown size={14} className="text-rose-400" />
+                        {mission.scenario === "深度追踪" ? "Leader 任务总结" : "执行摘要"}
+                      </h2>
+                      {mission.scenario === "深度追踪" ? (
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                          这是 Leader 对整个任务的二次概述。完整稿件请到上方"多维度草稿对比"卡片查看 / 入库。
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                          这是 Leader 对整个任务的汇总概述。完整稿件 / 产出详情请查看下方各子任务的产出卡片。
+                        </p>
+                      )}
+                    </div>
                     <Button variant="ghost" size="sm" onClick={handleCopyOutput} className="gap-1.5 h-7 text-xs">
                       {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                       {copied ? "已复制" : "复制"}
@@ -460,7 +638,7 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
         </div>
 
         {/* ── Right: Activity + Stats ── */}
-        <div className="w-[280px] shrink-0 space-y-4">
+        <div className="w-[340px] shrink-0 space-y-4">
           {/* Activity Feed */}
           <GlassCard padding="none" className="overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-white/5">
@@ -525,6 +703,17 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
       </div>
 
       <TaskDetailSheet task={selectedTask} onClose={() => setSelectedTask(null)} />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="删除任务"
+        description="确定要永久删除此任务？此操作不可恢复。"
+        confirmText="删除"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
@@ -767,9 +956,37 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
   const config = TASK_STATUS[task.status];
   const StatusIcon = config.icon;
   const empMeta = task.assignedEmployee ? EMPLOYEE_META[task.assignedEmployee.id as EmployeeId] : null;
-  const fullSummary = task.outputData && typeof task.outputData === "object" && task.outputData !== null && "summary" in task.outputData
-    ? String((task.outputData as { summary: string }).summary) : null;
-  const fullOutputText = task.outputData != null ? (typeof task.outputData === "string" ? task.outputData : JSON.stringify(task.outputData, null, 2)) : null;
+  // Prefer the artifact's full `content` (LLM's complete output, structured
+  // per the SKILL.md) over the one-line `summary` (which is just the first
+  // paragraph by parseStepOutput). Without this fall-through, even when the
+  // LLM produced 【执行摘要】/【执行过程】/【产出结果】, the UI showed only
+  // a single line like "周度热点聚合结果".
+  type OutputShape = {
+    summary?: string;
+    artifacts?: Array<{ content?: string; title?: string }>;
+  };
+  const outputObj =
+    task.outputData && typeof task.outputData === "object" && !Array.isArray(task.outputData)
+      ? (task.outputData as OutputShape)
+      : null;
+  const artifactContent = outputObj?.artifacts?.[0]?.content ?? null;
+  const fullSummary = outputObj?.summary ? String(outputObj.summary) : null;
+  // Fall back to JSON stringify only if neither artifact nor summary exists.
+  const fullOutputText = artifactContent
+    ? null
+    : task.outputData != null
+      ? typeof task.outputData === "string"
+        ? task.outputData
+        : JSON.stringify(task.outputData, null, 2)
+      : null;
+
+  // inputContext is written by check-task-dependencies / mission-executor as
+  // `[{ taskId, taskTitle, output }, ...]` — upstream task outputs that became
+  // this task's input when its dependencies resolved.
+  const upstreamInputs =
+    Array.isArray(task.inputContext)
+      ? (task.inputContext as Array<{ taskId?: string; taskTitle?: string; output?: unknown }>)
+      : [];
 
   return (
     <Sheet open={!!task} onOpenChange={(open) => !open && onClose()}>
@@ -799,7 +1016,49 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
           {task.expectedOutput && <DetailSection label="期望输出" text={task.expectedOutput} />}
           {task.acceptanceCriteria && <DetailSection label="验收标准" text={task.acceptanceCriteria} />}
 
-          {fullSummary && (
+          {upstreamInputs.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-sky-600 dark:text-sky-400 mb-2">上游输入</h3>
+              <div className="space-y-2">
+                {upstreamInputs.map((item, idx) => {
+                  const title = item.taskTitle ?? `上游任务 ${idx + 1}`;
+                  const outputText =
+                    item.output == null
+                      ? "（无输出）"
+                      : typeof item.output === "string"
+                        ? item.output
+                        : (() => {
+                            const obj = item.output as Record<string, unknown>;
+                            if (obj && typeof obj === "object" && "summary" in obj && typeof obj.summary === "string") {
+                              return obj.summary;
+                            }
+                            return JSON.stringify(item.output, null, 2);
+                          })();
+                  return (
+                    <div
+                      key={item.taskId ?? idx}
+                      className="rounded-xl bg-sky-50/50 dark:bg-sky-500/5 border border-sky-100 dark:border-sky-500/10 p-3"
+                    >
+                      <div className="text-xs font-medium text-sky-700 dark:text-sky-300 mb-1.5">{title}</div>
+                      <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-mono leading-relaxed max-h-60 overflow-y-auto">
+                        {outputText}
+                      </pre>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {artifactContent && (
+            <div>
+              <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
+              <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
+                <CollapsibleMessageContent markdown={artifactContent} />
+              </div>
+            </div>
+          )}
+          {!artifactContent && fullSummary && (
             <div>
               <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
               <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
@@ -807,7 +1066,7 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
               </div>
             </div>
           )}
-          {fullOutputText && !fullSummary && (
+          {fullOutputText && (
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground mb-2">输出数据</h3>
               <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 p-4 rounded-xl overflow-x-auto leading-relaxed">{fullOutputText}</pre>
@@ -1036,5 +1295,376 @@ function FinalOutputRenderer({ output }: { output: unknown }) {
         );
       })}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProductionOutputRenderer — 核心产出物渲染（按 artifact.type 分派）
+// ---------------------------------------------------------------------------
+
+interface ProductionArtifact {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  employeeSlug?: string;
+  qualityScore?: number;
+  taskTitle: string;
+}
+
+const ARTIFACT_META: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
+  article_draft: { label: "稿件", icon: Newspaper, tone: "text-blue-500" },
+  video_script: { label: "脚本", icon: Video, tone: "text-purple-500" },
+  review_report: { label: "审核报告", icon: ClipboardCheck, tone: "text-amber-500" },
+  analytics_report: { label: "数据报告", icon: BarChart3, tone: "text-emerald-500" },
+  hot_topic_list: { label: "热点榜单", icon: TrendingUp, tone: "text-rose-500" },
+  topic_angles: { label: "选题角度", icon: Lightbulb, tone: "text-yellow-500" },
+  material_brief: { label: "素材简报", icon: FileText, tone: "text-sky-500" },
+  publish_plan: { label: "发布计划", icon: Send, tone: "text-indigo-500" },
+  generic: { label: "产出", icon: Package, tone: "text-gray-500" },
+};
+
+function getArtifactMeta(type: string) {
+  return ARTIFACT_META[type] ?? ARTIFACT_META.generic;
+}
+
+function tryParseJson<T = unknown>(content: string): T | null {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    return null;
+  }
+}
+
+function ProductionOutputRenderer({
+  artifacts,
+  scenarioCategory,
+  scenario,
+}: {
+  artifacts: ProductionArtifact[];
+  scenarioCategory: string | null;
+  scenario: string;
+}) {
+  if (artifacts.length === 0) {
+    return (
+      <GlassCard className="p-16 text-center">
+        <Package size={32} className="mx-auto mb-3 text-gray-400" />
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          暂无核心产出物
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+          任务完成后，稿件 / 脚本 / 分析报告会在此处展示
+        </p>
+      </GlassCard>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
+        共 {artifacts.length} 项产出 · 场景：{scenario}
+        {scenarioCategory && ` · 分类：${scenarioCategory}`}
+      </div>
+      {artifacts.map((artifact) => (
+        <ArtifactCard key={artifact.id} artifact={artifact} />
+      ))}
+    </div>
+  );
+}
+
+function ArtifactCard({ artifact }: { artifact: ProductionArtifact }) {
+  const meta = getArtifactMeta(artifact.type);
+  const Icon = meta.icon;
+  const fromMeta = artifact.employeeSlug
+    ? EMPLOYEE_META[artifact.employeeSlug as EmployeeId]
+    : null;
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(artifact.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const toggleExpanded = () => setExpanded((v) => !v);
+  const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleExpanded();
+    }
+  };
+
+  return (
+    <GlassCard padding="none" className="overflow-hidden">
+      {/* 外层不能是 <button>：复制按钮是 <Button>（本身就是 button），嵌套会触发
+          "button cannot be descendant of button" hydration error。改用带 role 的 div。*/}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={toggleExpanded}
+        onKeyDown={handleHeaderKeyDown}
+        className="w-full flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-200 dark:border-white/5 hover:bg-gray-50/60 dark:hover:bg-white/[0.03] transition-colors text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChevronDown
+            size={14}
+            className={cn(
+              "text-gray-400 transition-transform shrink-0",
+              !expanded && "-rotate-90"
+            )}
+          />
+          <Icon size={16} className={cn(meta.tone, "shrink-0")} />
+          <span className="text-sm font-semibold truncate">{artifact.title}</span>
+          <Badge variant="secondary" className="text-[10px] h-4.5 px-1.5 shrink-0">
+            {meta.label}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {fromMeta && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              by{" "}
+              <span style={{ color: fromMeta.color }} className="font-medium">
+                {fromMeta.nickname}
+              </span>
+            </span>
+          )}
+          {typeof artifact.qualityScore === "number" && (
+            <Badge
+              variant="secondary"
+              className={cn(
+                "text-[10px] h-4.5 px-1.5",
+                artifact.qualityScore >= 80
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : artifact.qualityScore >= 60
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-red-600 dark:text-red-400"
+              )}
+            >
+              质量 {artifact.qualityScore}
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopy}
+            className="gap-1 h-6 text-xs px-2"
+          >
+            {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            {copied ? "已复制" : "复制"}
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <>
+          <div className="px-5 py-4">
+            <ArtifactBody artifact={artifact} />
+          </div>
+          <div className="px-5 py-2 border-t border-gray-200 dark:border-white/5 bg-gray-50/40 dark:bg-white/[0.02]">
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              来自子任务：{artifact.taskTitle}
+            </span>
+          </div>
+        </>
+      )}
+    </GlassCard>
+  );
+}
+
+function ArtifactBody({ artifact }: { artifact: ProductionArtifact }) {
+  // review_report / analytics_report：若是 JSON 结构，走结构化渲染
+  if (artifact.type === "review_report") {
+    const parsed = tryParseJson<{
+      overallScore?: number;
+      issues?: Array<{ claim?: string; issue?: string; severity?: string }>;
+      summary?: string;
+    }>(artifact.content);
+    if (parsed) return <ReviewReportBody data={parsed} />;
+  }
+  if (artifact.type === "analytics_report") {
+    const parsed = tryParseJson<{
+      metrics?: Record<string, number | string>;
+      summary?: string;
+      insights?: string[];
+    }>(artifact.content);
+    if (parsed) return <AnalyticsReportBody data={parsed} />;
+  }
+  if (artifact.type === "hot_topic_list") {
+    const parsed = tryParseJson<{
+      topics?: Array<{ topic?: string; title?: string; url?: string; mentions?: number; source?: string }>;
+    }>(artifact.content);
+    if (parsed?.topics?.length) return <HotTopicListBody topics={parsed.topics} />;
+  }
+
+  // 稿件正文：长文阅读样式
+  if (artifact.type === "article_draft") {
+    return <ArticleBody content={artifact.content} />;
+  }
+
+  // 默认：复用 markdown-ish 渲染
+  return <FinalOutputRenderer output={{ artifacts: [{ content: artifact.content }] }} />;
+}
+
+function ArticleBody({ content }: { content: string }) {
+  const wordCount = content.length;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 pb-2 border-b border-gray-100 dark:border-white/5">
+        <span>字数：{wordCount}</span>
+      </div>
+      <article className="prose-article">
+        <FinalOutputRenderer output={{ artifacts: [{ content }] }} />
+      </article>
+    </div>
+  );
+}
+
+function ReviewReportBody({
+  data,
+}: {
+  data: {
+    overallScore?: number;
+    issues?: Array<{ claim?: string; issue?: string; severity?: string }>;
+    summary?: string;
+  };
+}) {
+  const score = data.overallScore ?? 0;
+  const issues = data.issues ?? [];
+  const severityClass = (s?: string) =>
+    s === "high"
+      ? "text-red-500 bg-red-50 dark:bg-red-500/10"
+      : s === "medium"
+        ? "text-amber-500 bg-amber-50 dark:bg-amber-500/10"
+        : "text-gray-500 bg-gray-50 dark:bg-white/5";
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "text-2xl font-bold",
+            score >= 80 ? "text-emerald-500" : score >= 60 ? "text-amber-500" : "text-red-500"
+          )}
+        >
+          {score}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-gray-500 dark:text-gray-400">综合评分</div>
+          {data.summary && (
+            <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5 line-clamp-2">
+              {data.summary}
+            </p>
+          )}
+        </div>
+      </div>
+      {issues.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+            发现 {issues.length} 条问题
+          </div>
+          <ul className="space-y-2">
+            {issues.map((issue, i) => (
+              <li key={i} className={cn("rounded-md px-3 py-2 text-xs", severityClass(issue.severity))}>
+                <span className="font-semibold">[{issue.severity || "info"}] </span>
+                {issue.claim && <span className="font-medium">{issue.claim}：</span>}
+                <span>{issue.issue}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnalyticsReportBody({
+  data,
+}: {
+  data: {
+    metrics?: Record<string, number | string>;
+    summary?: string;
+    insights?: string[];
+  };
+}) {
+  const metrics = data.metrics ?? {};
+  const metricEntries = Object.entries(metrics);
+  return (
+    <div className="space-y-4">
+      {data.summary && (
+        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{data.summary}</p>
+      )}
+      {metricEntries.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {metricEntries.map(([key, value]) => (
+            <div
+              key={key}
+              className="rounded-lg bg-gray-50 dark:bg-white/[0.03] px-3 py-2.5"
+            >
+              <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">
+                {key}
+              </div>
+              <div className="text-base font-bold font-mono tabular-nums text-gray-800 dark:text-gray-100">
+                {String(value)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {data.insights && data.insights.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+            关键洞察
+          </div>
+          <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300">
+            {data.insights.map((ins, i) => (
+              <li key={i}>{ins}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HotTopicListBody({
+  topics,
+}: {
+  topics: Array<{ topic?: string; title?: string; url?: string; mentions?: number; source?: string }>;
+}) {
+  return (
+    <ol className="space-y-2">
+      {topics.map((t, i) => (
+        <li
+          key={i}
+          className="flex items-start gap-3 rounded-md hover:bg-gray-50 dark:hover:bg-white/[0.03] px-2 py-1.5"
+        >
+          <span className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold font-mono bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400">
+            {i + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+              {t.topic || t.title || "（未命名）"}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+              {t.source && <span>{t.source}</span>}
+              {typeof t.mentions === "number" && <span>· 提及 {t.mentions}</span>}
+              {t.url && (
+                <a
+                  href={t.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan-500 hover:underline truncate"
+                >
+                  原文
+                </a>
+              )}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }

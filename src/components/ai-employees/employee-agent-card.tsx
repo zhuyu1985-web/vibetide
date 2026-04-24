@@ -7,6 +7,7 @@ import type { HotTask } from "@/lib/employee-tasks";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Plus, UserCog } from "lucide-react";
 import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
+import { GlassCard } from "@/components/shared/glass-card";
 
 const STATUS_CONFIG = {
   working: { label: "工作中", dotColor: "bg-emerald-400", textColor: "text-emerald-400/80" },
@@ -43,11 +44,13 @@ export function EmployeeAgentCard({
   const description = meta?.description ?? employee.title;
 
   return (
-    <div
-      className={`relative bg-card border rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-200 ${
+    <GlassCard
+      variant="interactive"
+      padding="none"
+      className={`relative p-4 ${
         isWorking
-          ? "border-emerald-400/50 hover:border-emerald-400/70 shadow-emerald-400/10 employee-card-working"
-          : "border-border hover:border-border/80"
+          ? "ring-2 ring-emerald-400/40 shadow-emerald-400/10 employee-card-working"
+          : ""
       }`}
     >
       {/* Header: icon + name + status — clickable to detail */}
@@ -124,7 +127,7 @@ export function EmployeeAgentCard({
       )}
 
       {/* Dispatch button — subtle bottom link */}
-      <div className="mt-2 pt-2 border-t border-border/50 flex justify-center">
+      <div className="mt-2 pt-2 border-t border-white/40 dark:border-white/5 flex justify-center">
         <button
           className="text-[12px] text-muted-foreground hover:text-primary transition-colors border-0 bg-transparent cursor-pointer flex items-center gap-1"
           onClick={() => onDispatchTask(employee.id)}
@@ -133,6 +136,6 @@ export function EmployeeAgentCard({
           派发任务
         </button>
       </div>
-    </div>
+    </GlassCard>
   );
 }

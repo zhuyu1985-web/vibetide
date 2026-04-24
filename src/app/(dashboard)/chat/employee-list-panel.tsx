@@ -150,7 +150,7 @@ export function EmployeeListPanel({
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
         {activeTab === "employees" ? (
           /* Employee list */
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {filteredEmployees.map((emp) => {
               const meta = EMPLOYEE_META[emp.id as EmployeeId];
               const isSelected = emp.id === selectedSlug;
@@ -160,19 +160,21 @@ export function EmployeeListPanel({
                 <button
                   key={emp.id}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 border-0",
+                    "group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-300 ease-out border-0",
                     isSelected
-                      ? "bg-blue-50/80 dark:bg-blue-900/20"
-                      : "bg-transparent hover:bg-white/50 dark:hover:bg-gray-800/40"
+                      ? "bg-blue-50/80 dark:bg-blue-900/20 shadow-[0_2px_12px_rgba(59,130,246,0.12)]"
+                      : "bg-transparent hover:bg-white/60 dark:hover:bg-gray-800/50 hover:translate-x-1 hover:shadow-[0_2px_10px_rgba(59,130,246,0.08)]"
                   )}
                   onClick={() => onSelectEmployee(emp.id)}
                 >
-                  <EmployeeAvatar
-                    employeeId={emp.id}
-                    size="sm"
-                    showStatus
-                    status={emp.status}
-                  />
+                  <div className="transition-transform duration-300 ease-out group-hover:scale-110 group-hover:rotate-[-4deg]">
+                    <EmployeeAvatar
+                      employeeId={emp.id}
+                      size="sm"
+                      showStatus
+                      status={emp.status}
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span
@@ -220,11 +222,11 @@ export function EmployeeListPanel({
           </div>
         ) : (
           /* Saved conversations list */
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {filteredSaved.map((conv) => (
               <div
                 key={conv.id}
-                className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-white/50 dark:hover:bg-gray-800/40 transition-all duration-200"
+                className="group flex items-center gap-2.5 px-3 py-3 rounded-xl cursor-pointer hover:bg-white/60 dark:hover:bg-gray-800/50 hover:translate-x-1 hover:shadow-[0_2px_10px_rgba(59,130,246,0.08)] transition-all duration-300 ease-out"
                 onClick={() => onSelectSaved(conv)}
               >
                 <EmployeeAvatar

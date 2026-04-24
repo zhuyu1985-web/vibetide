@@ -65,7 +65,7 @@ export function useWorkflowSteps(initialSteps: WorkflowStepDef[] = []) {
         config: {
           skillSlug: "ai_custom",
           skillName: "AI 自定义",
-          skillCategory: "generation",
+          skillCategory: "content_gen",
           description: aiDescription,
           parameters: {},
         },

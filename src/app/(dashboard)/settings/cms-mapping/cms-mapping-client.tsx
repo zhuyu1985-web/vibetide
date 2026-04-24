@@ -2,37 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GlassCard } from "@/components/shared/glass-card";
 import { PageHeader } from "@/components/shared/page-header";
-import {
-  triggerCatalogSyncAction,
-  updateAppChannelBindingAction,
-} from "@/app/actions/cms";
+import { triggerCatalogSyncAction } from "@/app/actions/cms";
 
 // ---------------------------------------------------------------------------
-// View-model contracts（Server Component 传入的序列化数据）
+// View-model contracts
 // ---------------------------------------------------------------------------
-
-interface AppChannelVm {
-  id: string;
-  slug: string;
-  displayName: string;
-  reviewTier: "strict" | "relaxed";
-  icon: string | null;
-  sortOrder: number;
-  isEnabled: boolean;
-  defaultCatalogId: string | null;
-  defaultCatalogName: string | null;
-  defaultCoverUrl: string | null;
-}
 
 interface CmsCatalogVm {
   id: string;
@@ -56,20 +33,18 @@ interface SyncLogVm {
 }
 
 interface Props {
-  appChannels: AppChannelVm[];
   cmsCatalogs: CmsCatalogVm[];
   recentLogs: SyncLogVm[];
 }
 
-type TabKey = "bindings" | "catalogs" | "logs";
+type TabKey = "catalogs" | "logs";
 
-// ---------------------------------------------------------------------------
-// Root
-// ---------------------------------------------------------------------------
+// 当前阶段硬编码的推送目标，见 src/lib/cms/article-mapper/index.ts
+const HARDCODED_TARGET = { siteId: 81, appId: 1768, catalogId: 10210 };
 
-export function CmsMappingClient({ appChannels, cmsCatalogs, recentLogs }: Props) {
+export function CmsMappingClient({ cmsCatalogs, recentLogs }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState<TabKey>("bindings");
+  const [activeTab, setActiveTab] = useState<TabKey>("catalogs");
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const handleSync = () => {
@@ -91,7 +66,7 @@ export function CmsMappingClient({ appChannels, cmsCatalogs, recentLogs }: Props
     <div>
       <PageHeader
         title="CMS 栏目映射"
-        description="把 APP 的 9 个栏目绑定到华栖云 CMS 的对应栏目，决定 cms_publish 将稿件落到哪里。"
+        description="查看本地同步的华栖云 CMS 栏目树与同步日志。"
         actions={
           <div className="flex items-center gap-3">
             {syncMsg && (
@@ -104,130 +79,41 @@ export function CmsMappingClient({ appChannels, cmsCatalogs, recentLogs }: Props
         }
       />
 
+      <GlassCard variant="secondary" padding="sm" className="mb-4">
+        <div className="text-xs text-muted-foreground">
+          当前阶段：CMS 推送目标在 article-mapper 中硬编码 —
+          <span className="font-mono text-foreground">
+            {" "}
+            siteId={HARDCODED_TARGET.siteId} · appId={HARDCODED_TARGET.appId} · catalogId=
+            {HARDCODED_TARGET.catalogId}
+          </span>
+          。所有稿件统一推送到此目标，不走 app_channels / categories 绑定。
+        </div>
+      </GlassCard>
+
       <Tabs
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as TabKey)}
         className="mb-4"
       >
         <TabsList variant="line">
-          <TabsTrigger value="bindings">APP 栏目映射</TabsTrigger>
           <TabsTrigger value="catalogs">CMS 栏目树</TabsTrigger>
           <TabsTrigger value="logs">同步日志</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {activeTab === "bindings" && (
-        <BindingsTab appChannels={appChannels} cmsCatalogs={cmsCatalogs} />
-      )}
       {activeTab === "catalogs" && <CatalogsTab cmsCatalogs={cmsCatalogs} />}
       {activeTab === "logs" && <LogsTab recentLogs={recentLogs} />}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Bindings Tab
-// ---------------------------------------------------------------------------
-
-function BindingsTab({
-  appChannels,
-  cmsCatalogs,
-}: {
-  appChannels: AppChannelVm[];
-  cmsCatalogs: CmsCatalogVm[];
-}) {
-  const [isPending, startTransition] = useTransition();
-  const [rowMsg, setRowMsg] = useState<Record<string, string>>({});
-
-  const handleBind = (slug: string, catalogId: string) => {
-    startTransition(async () => {
-      const res = await updateAppChannelBindingAction({ slug, catalogId });
-      setRowMsg((m) => ({
-        ...m,
-        [slug]: res.success ? "✓ 绑定成功" : `✗ ${res.error ?? "绑定失败"}`,
-      }));
-    });
-  };
-
-  if (appChannels.length === 0) {
-    return (
-      <GlassCard variant="secondary" padding="md">
-        <p className="text-sm text-muted-foreground">
-          当前组织还未初始化 9 个 APP 栏目。请先运行种子脚本或联系管理员。
-        </p>
-      </GlassCard>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {appChannels
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((ch) => (
-          <GlassCard key={ch.slug} variant="secondary" padding="sm">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {ch.icon && <span className="text-2xl">{ch.icon}</span>}
-                <div>
-                  <div className="font-medium">{ch.displayName}</div>
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {ch.slug} · 审核档位：
-                    {ch.reviewTier === "strict" ? "严" : "松"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Select
-                  value={ch.defaultCatalogId ?? ""}
-                  onValueChange={(v) => {
-                    if (v) handleBind(ch.slug, v);
-                  }}
-                  disabled={isPending || cmsCatalogs.length === 0}
-                >
-                  <SelectTrigger className="min-w-[260px]">
-                    <SelectValue
-                      placeholder={
-                        cmsCatalogs.length === 0
-                          ? "暂无 CMS 栏目，请先同步"
-                          : "— 选择 CMS 栏目 —"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cmsCatalogs.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {"—".repeat(Math.max(0, (c.treeLevel ?? 1) - 1))}
-                        {(c.treeLevel ?? 1) > 1 ? " " : ""}
-                        {c.name} (id {c.cmsCatalogId})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {rowMsg[ch.slug] && (
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {rowMsg[ch.slug]}
-                  </span>
-                )}
-              </div>
-            </div>
-          </GlassCard>
-        ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Catalogs Tab — 本地已同步 CMS 栏目的扁平化只读视图
-// ---------------------------------------------------------------------------
-
 function CatalogsTab({ cmsCatalogs }: { cmsCatalogs: CmsCatalogVm[] }) {
   if (cmsCatalogs.length === 0) {
     return (
       <GlassCard variant="secondary" padding="md">
         <p className="text-sm text-muted-foreground">
-          本地未同步到任何 CMS 栏目。请先点“立即同步”。
+          本地未同步到任何 CMS 栏目。请先点"立即同步"。
         </p>
       </GlassCard>
     );
@@ -254,10 +140,6 @@ function CatalogsTab({ cmsCatalogs }: { cmsCatalogs: CmsCatalogVm[] }) {
     </GlassCard>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Logs Tab — 最近 5 条同步日志
-// ---------------------------------------------------------------------------
 
 function LogsTab({ recentLogs }: { recentLogs: SyncLogVm[] }) {
   if (recentLogs.length === 0) {

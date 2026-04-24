@@ -1,30 +1,28 @@
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { getTopicCompareArticles } from "@/lib/dal/topic-compare";
-import { topicCompareArticles as mockArticles } from "@/data/benchmarking-data";
-import type { TopicCompareArticle } from "@/lib/types";
+import {
+  listTopicCompareItems,
+  listTopicComparePlatformOptions,
+  type TopicCompareListRow,
+} from "@/lib/dal/topic-compare";
 import { TopicCompareClient } from "./topic-compare-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function TopicComparePage() {
-  let articles: TopicCompareArticle[] = [];
-  let usingMock = false;
+  let items: TopicCompareListRow[] = [];
+  let platformOptions: Awaited<ReturnType<typeof listTopicComparePlatformOptions>> = [];
 
   try {
     const orgId = await getCurrentUserOrg();
     if (orgId) {
-      articles = await getTopicCompareArticles(orgId);
-    }
-    // If no org or no real articles, fall back to mock so the page is still demo-able
-    if (articles.length === 0) {
-      articles = mockArticles;
-      usingMock = true;
+      [items, platformOptions] = await Promise.all([
+        listTopicCompareItems(orgId, { limit: 100 }),
+        listTopicComparePlatformOptions(orgId),
+      ]);
     }
   } catch (err) {
-    console.error("[topic-compare] failed to load real data, using mock:", err);
-    articles = mockArticles;
-    usingMock = true;
+    console.error("[topic-compare] 加载失败:", err);
   }
 
-  return <TopicCompareClient articles={articles} usingMock={usingMock} />;
+  return <TopicCompareClient items={items} platformOptions={platformOptions} />;
 }

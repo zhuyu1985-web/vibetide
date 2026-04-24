@@ -6,6 +6,7 @@ import { listMyResearchTasks } from "@/lib/dal/research/research-tasks";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Plus } from "lucide-react";
+import { ResearchBreadcrumb } from "../../research-breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -37,18 +38,23 @@ export default async function TasksAdminPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto w-full space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">数据采集任务</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">管理后台采集任务，向数据库补充新闻数据</p>
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">数据采集任务</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">管理后台采集任务，向数据库补充新闻数据</p>
+          </div>
+          <Link
+            href="/research/admin/tasks/new"
+            className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            新建采集任务
+          </Link>
         </div>
-        <Link
-          href="/research/admin/tasks/new"
-          className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          新建采集任务
-        </Link>
+        <div className="mt-3">
+          <ResearchBreadcrumb />
+        </div>
       </div>
       {tasks.length === 0 ? (
         <GlassCard variant="default" padding="lg">

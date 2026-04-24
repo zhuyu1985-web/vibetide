@@ -56,6 +56,13 @@ export type DataTableProps<T> = {
   /** Optional footer rendered inside the panel below all rows */
   footer?: ReactNode;
 
+  /**
+   * 外层是否显示透明玻璃边框（默认 true）。
+   * 内置一层 `glass-card` frame 包住核心 panel，所有 DataTable 视觉统一。
+   * 在已经外包了 GlassCard 的调用方或嵌入 Tab 面板内想省空间时，可 framed={false}。
+   */
+  framed?: boolean;
+
   className?: string;
 };
 
@@ -85,6 +92,7 @@ export function DataTable<T>({
   onExpandChange,
   renderExpanded,
   footer,
+  framed = true,
   className,
 }: DataTableProps<T>) {
   // Row expansion is controlled by `renderExpanded` + `expandedKeys`.
@@ -136,8 +144,8 @@ export function DataTable<T>({
     onSortChange(col.key, nextDir);
   }
 
-  return (
-    <GlassCard variant="panel" padding="none" className={className}>
+  const panel = (
+    <GlassCard variant="panel" padding="none" className={framed ? undefined : className}>
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-200/60 dark:border-gray-700/40">
         {chevronEnabled && <div className="w-4 shrink-0" />}
@@ -279,6 +287,13 @@ export function DataTable<T>({
         </div>
       )}
     </GlassCard>
+  );
+
+  if (!framed) return panel;
+
+  // 统一玻璃边框外层（与 /topic-compare 原视觉一致）
+  return (
+    <div className={cn("glass-card p-5", className)}>{panel}</div>
   );
 }
 

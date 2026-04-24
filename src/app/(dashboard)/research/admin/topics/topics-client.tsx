@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/tabs";
 import { Plus, X, Star, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import {
   createTopic,
@@ -40,6 +41,7 @@ import {
   removeSample,
   getTopicDetail,
 } from "@/app/actions/research/research-topics";
+import { ResearchBreadcrumb } from "../../research-breadcrumb";
 
 type KeywordItem = {
   id: string;
@@ -99,6 +101,7 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [deleteTopicOpen, setDeleteTopicOpen] = useState(false);
 
   // inline add inputs
   const [newKeyword, setNewKeyword] = useState("");
@@ -291,13 +294,12 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
 
   function handleDeleteTopic() {
     if (!detail.id) return;
-    if (
-      !window.confirm(
-        "确定删除该主题吗？此操作将级联删除相关关键词与样本，不可恢复。",
-      )
-    ) {
-      return;
-    }
+    setDeleteTopicOpen(true);
+  }
+
+  function confirmDeleteTopic() {
+    if (!detail.id) return;
+    setDeleteTopicOpen(false);
     startTransition(async () => {
       const res = await deleteTopic(detail.id!);
       if (!res.ok) {
@@ -314,17 +316,22 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
 
   return (
     <div className="max-w-[1400px] mx-auto w-full space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">主题词库管理</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            管理研究主题、共词别名与语义样本
-          </p>
+      <div>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">主题词库管理</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              管理研究主题、共词别名与语义样本
+            </p>
+          </div>
+          <Button variant="ghost" onClick={openCreate}>
+            <Plus className="mr-1 h-4 w-4" />
+            新增主题
+          </Button>
         </div>
-        <Button variant="ghost" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          新增主题
-        </Button>
+        <div className="mt-3">
+          <ResearchBreadcrumb />
+        </div>
       </div>
 
       {topics.length === 0 ? (
@@ -625,6 +632,16 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTopicOpen}
+        onOpenChange={setDeleteTopicOpen}
+        title="删除主题"
+        description="确定删除该主题吗？此操作将级联删除相关关键词与样本，不可恢复。"
+        confirmText="删除"
+        variant="danger"
+        onConfirm={confirmDeleteTopic}
+      />
     </div>
   );
 }

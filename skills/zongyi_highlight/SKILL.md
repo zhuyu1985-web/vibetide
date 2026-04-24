@@ -3,7 +3,7 @@ name: zongyi_highlight
 displayName: 综艺看点盘点生成
 description: 为 APP 综艺频道生成晚会/综艺节目的看点盘点内容，支持图文稿（CMS type=1）和视频脚本（推 AIGC）双形态。输出含看点榜单、金句集锦、高光时刻、网友热议、艺人贡献、节目评价。娱乐化风格、网感强、避免剧透关键环节。当用户提及"综艺盘点""晚会看点""综艺看点""节目盘点"时调用。
 version: 2.0.0
-category: generation
+category: content_gen
 
 metadata:
   skill_kind: generation

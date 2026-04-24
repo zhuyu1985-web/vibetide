@@ -290,6 +290,9 @@ export function EmbeddedChatPanel({
           timestamp: Date.now(),
         })
       );
+      // 搬到 /chat 之后，home 端的自动还原快照也要清掉，否则下次回到首页
+      // 会看到已经被搬走的对话残留。
+      sessionStorage.removeItem("home-embedded-chat-state");
     } catch {
       // Quota / serialization errors — best-effort only
     }

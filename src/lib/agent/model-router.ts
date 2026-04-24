@@ -33,14 +33,20 @@ function getDefaultModel() {
   return process.env.OPENAI_MODEL || "deepseek-chat";
 }
 
-// Default model per skill category — all use DeepSeek
+// Default model per skill category — all use DeepSeek. Temperature tuned per
+// scenario: creative/generative categories get higher temps, analytic/review
+// categories stay low for determinism.
 const CATEGORY_DEFAULTS: Record<SkillCategory, () => ModelConfig> = {
-  perception: () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
-  analysis:   () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.4, maxTokens: 4096 }),
-  generation: () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.7, maxTokens: 8192 }),
-  production: () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
-  management: () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
-  knowledge:  () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.2, maxTokens: 4096 }),
+  web_search:       () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
+  data_collection:  () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
+  topic_planning:   () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.6, maxTokens: 4096 }),
+  content_gen:      () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.7, maxTokens: 8192 }),
+  av_script:        () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.7, maxTokens: 8192 }),
+  quality_review:   () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.2, maxTokens: 4096 }),
+  content_analysis: () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.4, maxTokens: 4096 }),
+  data_analysis:    () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
+  distribution:     () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
+  other:            () => ({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 4096 }),
 };
 
 /**
@@ -52,8 +58,9 @@ export function resolveModelConfig(
   skillCategories: SkillCategory[],
   override?: Partial<ModelConfig>
 ): ModelConfig {
-  const primaryCategory = skillCategories[0] ?? "generation";
-  const base = CATEGORY_DEFAULTS[primaryCategory]();
+  const primaryCategory = skillCategories[0] ?? "content_gen";
+  const factory = CATEGORY_DEFAULTS[primaryCategory] ?? CATEGORY_DEFAULTS.other;
+  const base = factory();
   return { ...base, ...override };
 }
 

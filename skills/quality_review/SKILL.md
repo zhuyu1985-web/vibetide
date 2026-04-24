@@ -2,7 +2,7 @@
 name: quality_review
 displayName: 质量审核（媒体行业专业版）
 description: 对内容做媒体行业专业级质量审核 —— 8 维评分 + 3 档审核 + 9 场景分化 rubric + 合规红线扫描。输出质量分、违规命中、位置精确的修改建议、发布档位判定。supports strict / standard / relaxed 三档；strict 档可拒绝 95 分以下，标记强制人工复核。对接《广告法》《网络信息内容生态治理规定》《新华社发稿规范》等国家法规。
-category: management
+category: quality_review
 version: "5.0"
 
 metadata:

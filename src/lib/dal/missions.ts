@@ -100,7 +100,12 @@ export async function getMissionById(
       priority: missionTasks.priority,
       phase: missionTasks.phase,
       progress: missionTasks.progress,
-      // Skip heavy outputData/inputContext — load on demand in task detail sheet
+      // Previously skipped for perf ("load on demand"), but the on-demand path
+      // was never wired up — TaskDetailSheet just read null. A mission has
+      // ~5-10 tasks and jsonb payloads are already compressed; loading them
+      // here is cheap and restores step input/output visibility.
+      inputContext: missionTasks.inputContext,
+      outputData: missionTasks.outputData,
       outputSummary: missionTasks.outputSummary,
       errorMessage: missionTasks.errorMessage,
       errorRecoverable: missionTasks.errorRecoverable,
@@ -138,8 +143,8 @@ export async function getMissionById(
     priority: t.priority,
     phase: t.phase ?? undefined,
     progress: t.progress,
-    inputContext: null, // Loaded on demand
-    outputData: null,   // Loaded on demand in task detail sheet
+    inputContext: t.inputContext,
+    outputData: t.outputData,
     outputSummary: t.outputSummary ?? undefined,
     errorMessage: t.errorMessage,
     errorRecoverable: !!t.errorRecoverable,

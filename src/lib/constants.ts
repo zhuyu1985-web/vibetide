@@ -164,6 +164,52 @@ export const EMPLOYEE_SHORT_DESC: Record<EmployeeId, string> = {
   leader: "智能项目管理，多员工协同调度",
 };
 
+/**
+ * 热点深度追踪：可选行业改写维度库（24 个）。
+ *
+ * 用户在灵感池"深度追踪"按钮上选 1~5 个行业，系统对每个行业并行生成一份
+ * 行业视角的稿件草稿，用户最终挑选 1 份入 articles 表 status=draft。
+ *
+ * 当前为代码常量；如果将来需要 admin 后台管理（增删行业），再迁到 DB 表。
+ */
+export const INDUSTRY_DIMENSIONS = [
+  { key: "tech", label: "科技数码", angle: "技术突破解读、产业链冲击、用户体验视角" },
+  { key: "society", label: "社会", angle: "民生影响、社会心态、群体诉求与制度反思" },
+  { key: "education", label: "教育", angle: "对学生家长教育者的影响、教育公平与改革" },
+  { key: "auto", label: "汽车", angle: "汽车产业链、消费者购车决策、新能源转型视角" },
+  { key: "real_estate", label: "房产", angle: "楼市政策影响、刚需改善购房者视角、行业格局" },
+  { key: "gaming", label: "游戏", angle: "玩家社区反应、游戏产业生态、版号与监管视角" },
+  { key: "entertainment", label: "娱乐", angle: "舆论场分析、明星 IP 商业逻辑、行业生态" },
+  { key: "travel", label: "旅游摄影", angle: "目的地营销、出行决策、文旅产业链视角" },
+  { key: "career", label: "职场", angle: "打工人视角、企业管理启示、职业发展机会" },
+  { key: "finance", label: "财经", angle: "数据深度解读、市场影响、投资者机会与风险" },
+  { key: "science", label: "科学", angle: "权威专家解读、科学原理普及、前沿研究意义" },
+  { key: "emotion", label: "情感", angle: "情感共鸣、人际关系启示、心理学视角" },
+  { key: "parenting", label: "育儿", angle: "家长指南、孩子成长影响、亲子关系视角" },
+  { key: "food", label: "美食", angle: "饮食文化、消费趋势、餐饮行业视角" },
+  { key: "fashion", label: "时装美尚", angle: "流行趋势、品牌动态、消费者审美变化" },
+  { key: "pet", label: "宠物", angle: "宠物经济、宠主关切、动物福利视角" },
+  { key: "health", label: "健康医疗", angle: "权威医学解读、公众健康指南、医疗行业影响" },
+  { key: "sports", label: "体育健身", angle: "赛事技术分析、运动员故事、体育产业商业视角" },
+  { key: "rural", label: "三农", angle: "农民视角、乡村振兴政策、农业产业链" },
+  { key: "history_culture", label: "历史与文化", angle: "历史镜鉴、文化传承、人文价值反思" },
+  { key: "law", label: "法律司法", angle: "法律解读、司法实务、合规建议视角" },
+  { key: "anime", label: "动漫", angle: "二次元社区反应、IP 商业化、亚文化趋势" },
+  { key: "home_decor", label: "家居家装", angle: "家居消费、装修决策、生活方式视角" },
+  { key: "other", label: "其他", angle: "综合视角，跨行业横向解读" },
+] as const;
+
+export type IndustryKey = (typeof INDUSTRY_DIMENSIONS)[number]["key"];
+
+export const INDUSTRY_DIMENSION_MAP: Record<
+  IndustryKey,
+  (typeof INDUSTRY_DIMENSIONS)[number]
+> = Object.fromEntries(
+  INDUSTRY_DIMENSIONS.map((d) => [d.key, d]),
+) as Record<IndustryKey, (typeof INDUSTRY_DIMENSIONS)[number]>;
+
+export const MAX_INDUSTRIES_PER_TRACKING = 5;
+
 export const WORKFLOW_STEPS = [
   { key: "monitor", label: "热点监控", employeeId: "xiaolei" as EmployeeId },
   { key: "plan", label: "选题策划", employeeId: "xiaoce" as EmployeeId },

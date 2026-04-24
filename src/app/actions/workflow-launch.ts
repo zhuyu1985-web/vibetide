@@ -4,13 +4,14 @@ import { db } from "@/db";
 import { workflowTemplates } from "@/db/schema/workflows";
 import { missions } from "@/db/schema/missions";
 import { aiEmployees } from "@/db/schema/ai-employees";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { validateInputs } from "@/lib/input-fields-validation";
 import type { InputFieldDef } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 import { executeMissionDirect } from "@/lib/mission-executor";
+import { getOrProvisionLeader } from "@/app/actions/missions";
 
 /**
  * Private auth guard — mirrors the inline `requireAuth` pattern used in
@@ -118,27 +119,34 @@ export async function startMissionFromTemplate(
     return { ok: false, errors };
   }
 
-  // Leader resolution: owner_employee_id → defaultTeam[0] → 'xiaolei'.
-  const leaderSlug: string =
-    template.ownerEmployeeId ??
-    (Array.isArray(template.defaultTeam) && template.defaultTeam.length > 0
-      ? (template.defaultTeam[0] as string)
-      : "xiaolei");
+  // Leader is ALWAYS the dedicated "任务总监" employee (slug="leader"),
+  // auto-provisioned per-org. Previously this function picked the template's
+  // `ownerEmployeeId` (falling back to defaultTeam[0] or xiaolei), which made
+  // the leader badge land on whichever employee was first up to do work —
+  // reported by the user as "每次都是排在第一个要做事情的员工". That's
+  // wrong: owner/defaultTeam describe team composition, not coordination.
+  const leader = await getOrProvisionLeader(orgId);
 
-  const leader = await db.query.aiEmployees.findFirst({
-    where: and(
-      eq(aiEmployees.organizationId, orgId),
-      eq(aiEmployees.slug, leaderSlug),
-    ),
-  });
-  if (!leader) {
-    return {
-      ok: false,
-      errors: {
-        _global: `找不到员工 ${leaderSlug}，请确认组织已 seed 员工`,
-      },
-    };
-  }
+  // Team composition stays template-driven: resolve defaultTeam slugs to
+  // employee ids for the mission's teamMembers column (jsonb string[] of uuid).
+  // Previously this wrote the slugs directly — leaking slug strings into a
+  // uuid-typed column and breaking downstream joins.
+  const defaultTeamSlugs = (Array.isArray(template.defaultTeam)
+    ? (template.defaultTeam as string[])
+    : []);
+  const teamEmployeeIds: string[] = defaultTeamSlugs.length
+    ? (
+        await db
+          .select({ id: aiEmployees.id, slug: aiEmployees.slug })
+          .from(aiEmployees)
+          .where(
+            and(
+              eq(aiEmployees.organizationId, orgId),
+              inArray(aiEmployees.slug, defaultTeamSlugs),
+            ),
+          )
+      ).map((r) => r.id)
+    : [];
 
   const userInstruction = buildUserInstruction(
     template.name,
@@ -162,9 +170,21 @@ export async function startMissionFromTemplate(
       workflowTemplateId: template.id,
       inputParams: cleaned,
       status: "queued",
-      teamMembers: (template.defaultTeam ?? []) as string[],
+      teamMembers: teamEmployeeIds,
     })
     .returning({ id: missions.id });
+
+  // Bump workflow_templates run stats so the "我的工作流" card reflects the
+  // latest activity. Keeps parity with the legacy executeWorkflow() path.
+  await db
+    .update(workflowTemplates)
+    .set({
+      lastRunAt: new Date(),
+      runCount: sql`${workflowTemplates.runCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(workflowTemplates.id, template.id))
+    .catch(() => {});
 
   // Fire-and-forget inline execution（对齐 src/app/actions/missions.ts:170 的 startMission 老路径）：
   // dev 环境下不依赖 Inngest dev server 也能推进 mission；production 同样走 executeMissionDirect。
@@ -189,5 +209,6 @@ export async function startMissionFromTemplate(
     });
 
   revalidatePath("/missions");
+  revalidatePath("/workflows");
   return { ok: true, missionId: created.id };
 }

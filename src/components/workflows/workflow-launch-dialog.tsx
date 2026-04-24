@@ -47,7 +47,7 @@ function normalizeOptions(
   return (opts ?? []).map((o: InputFieldOption) => normalizeFieldOption(o));
 }
 
-function buildInitialValues(
+export function buildInitialValues(
   fields: InputFieldDef[],
 ): Record<string, unknown> {
   const init: Record<string, unknown> = {};
@@ -90,14 +90,14 @@ function isDateRangeValue(v: unknown): v is DateRangeValue {
 
 // ─────────────────────── field renderer ───────────────────────
 
-interface FieldRendererProps {
+export interface FieldRendererProps {
   field: InputFieldDef;
   value: unknown;
   error?: string;
   onChange: (v: unknown) => void;
 }
 
-function FieldRenderer({ field, value, error, onChange }: FieldRendererProps) {
+export function FieldRenderer({ field, value, error, onChange }: FieldRendererProps) {
   const labelNode = (
     <div className="mb-1.5 flex items-baseline gap-1">
       <label className="text-sm font-medium">{field.label}</label>
@@ -296,6 +296,17 @@ export interface WorkflowLaunchDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Build positional initial values. See the long comment in TestRunInputsDialog
+ * for why we index state by position — short version: users routinely save
+ * workflows where multiple fields share the same `name` (often empty), and
+ * name-keyed state makes those fields share a single slot, so typing in one
+ * overwrites every other. Positional keying eliminates the problem entirely.
+ */
+function buildInitialValuesByIdx(fields: InputFieldDef[]): unknown[] {
+  return fields.map((f) => (f.defaultValue !== undefined ? f.defaultValue : undefined));
+}
+
 export function WorkflowLaunchDialog({
   template,
   open,
@@ -307,16 +318,19 @@ export function WorkflowLaunchDialog({
     [template.inputFields],
   );
 
-  const [values, setValues] = React.useState<Record<string, unknown>>(() =>
-    buildInitialValues(fields),
+  // Positional (index-keyed) values — see `buildInitialValuesByIdx` rationale.
+  const [values, setValues] = React.useState<unknown[]>(() =>
+    buildInitialValuesByIdx(fields),
   );
+  // Errors track two shapes: positional (from local validation / per-row from
+  // the server mapped by name→first-matching-idx) plus `_global` for banner.
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
 
   // Reset form whenever the dialog opens (or the template switches).
   React.useEffect(() => {
     if (open) {
-      setValues(buildInitialValues(fields));
+      setValues(buildInitialValuesByIdx(fields));
       setErrors({});
     }
   }, [open, template.id, fields]);
@@ -324,8 +338,14 @@ export function WorkflowLaunchDialog({
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      const res = await startMissionFromTemplate(template.id, values);
+      // 映射 idx-keyed → name-keyed，交给后端（validateInputs / promptTemplate 都按 name 找值）。
+      const nameKeyed: Record<string, unknown> = {};
+      fields.forEach((f, idx) => {
+        if (values[idx] !== undefined) nameKeyed[f.name] = values[idx];
+      });
+      const res = await startMissionFromTemplate(template.id, nameKeyed);
       if (!res.ok) {
+        // server 返回 name-keyed errors，直接存；渲染时按 name 查。
         setErrors(res.errors);
         return;
       }
@@ -356,14 +376,18 @@ export function WorkflowLaunchDialog({
               此场景无需填写参数，点击"启动"直接开始。
             </p>
           ) : (
-            fields.map((f) => (
+            fields.map((f, idx) => (
               <FieldRenderer
-                key={f.name}
+                key={idx}
                 field={f}
-                value={values[f.name]}
+                value={values[idx]}
                 error={errors[f.name]}
                 onChange={(v) =>
-                  setValues((s) => ({ ...s, [f.name]: v }))
+                  setValues((prev) => {
+                    const next = prev.slice();
+                    next[idx] = v;
+                    return next;
+                  })
                 }
               />
             ))

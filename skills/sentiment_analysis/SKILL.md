@@ -1,121 +1,173 @@
 ---
 name: sentiment_analysis
 displayName: 情感分析
-description: 分析文本情感倾向（正面/负面/中性）
-category: analysis
+description: 对文本、评论、舆情数据做细粒度情感倾向分析，输出正 / 负 / 中 / 混合四极主情感 + 情感强度（0-100）+ 8 类情绪标签（愤怒 / 喜悦 / 悲伤 / 惊讶 / 恐惧 / 厌恶 / 赞赏 / 质疑）+ 关键情感触发词 + 反讽识别 + 方面级细分（如产品 / 服务 / 价格 / 态度各自的情感分）。支持单文本、批量文档、舆情聚合三种模式。专门优化中文特有的双重否定、反讽、阴阳怪气、字面褒实为贬等表达，反讽识别目标命中率 ≥ 75%。当用户提及"看看评论情感""舆情倾向""用户怎么说""正面负面""情绪分布""观众反馈"等关键词时调用；不用于主题归类或热度评分。
 version: "2.5"
-inputSchema:
-  text: 待分析文本
-  granularity: 分析粒度
-  aspects: 方面维度列表
-outputSchema:
-  sentiment: 情感倾向
-  confidence: 置信度
-  intensity: 情绪强度
-  sentences: 句子级分析
-runtimeConfig:
-  type: llm_analysis
-  avgLatencyMs: 5000
-  maxConcurrency: 5
-  modelDependency: zhipu:glm-4-plus
-compatibleRoles:
-  - trending_scout
-  - quality_reviewer
-  - data_analyst
+category: content_analysis
+
+metadata:
+  skill_kind: analysis
+  scenario_tags: [sentiment, opinion, public-opinion, review-analysis]
+  compatibleEmployees: [xiaoshu, xiaozi, xiaoshen]
+  modelDependency: deepseek:deepseek-chat
+  requires:
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases: []
+    dependencies: []
+  implementation:
+    scriptPath: src/lib/agent/execution.ts
+    testPath: src/lib/agent/__tests__/
+  openclaw:
+    referenceSpec: docs/superpowers/specs/2026-04-19-skill-md-baoyu-standardization.md
 ---
 
-# 情感分析
+# 情感分析（sentiment_analysis）
 
-你是文本情感分析专家，能够精确识别文本中的情感倾向、情绪强度和情感触发因素。在内容生产链路中负责对已发布和待发布内容进行情感维度的深度解读，为内容优化和舆情预警提供数据支撑。
+你是中文情感分析专家，能从字面、语境、文化三个层面识别文本真实情感倾向。核心信条：**反讽 > 字面**——看到"真牛"不一定是夸，阴阳怪气要识破才算合格。
 
-## 输入规格
+## 使用条件
 
-| 参数 | 类型 | 必填 | 说明 |
+✅ **应调用场景**：
+- 文章 / 视频 / 帖子发布后的评论区舆情扫描
+- 危机公关：突发事件下用户态度分布
+- 新品发布：用户反馈正负面聚合统计
+- 稿件发布前自测（用户看了会是什么感觉）
+- 竞品舆情对比：同事件下不同媒体评论情感分布差异
+
+❌ **不应调用场景**：
+- 只要主题 / 关键词 → `topic_extraction`
+- 要热度趋势 → `heat_scoring`
+- 纯事实判断（谣言核查）→ `fact_check`
+- 社交平台全链路聆听 → `social_listening`（含情感但范围更广）
+
+**前置条件**：输入文本中文或中英混合；单次分析文本 ≤ 10000 字；LLM 可用；批量上限 200 条 / 次。
+
+## 输入 / 输出
+
+**输入简要表：**
+
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| text | string | 是 | 待分析文本，支持文章、评论、弹幕等多种文本形态 |
-| granularity | string | 否 | 分析粒度：document(整篇)/paragraph(段落)/sentence(句子)，默认 document |
-| aspects | string[] | 否 | 指定分析的方面维度（如：产品/服务/价格/体验） |
+| text | string / string[] | ✓ | 单条或批量 |
+| mode | enum | ✗ | `single` / `batch` / `aggregate`，默认 `single` |
+| granularity | enum | ✗ | `overall` / `sentence` / `aspect`，默认 `overall` |
+| aspects | string[] | ✗ | 方面级清单（`["产品","服务","价格"]`） |
+| returnTriggers | boolean | ✗ | 返回情感触发词，默认 `true` |
+| detectIrony | boolean | ✗ | 识别反讽，默认 `true` |
 
-## 执行流程
+**输出简要表：**
 
-1. **整体情感判定**：对全文进行正面/负面/中性三分类，输出置信度(0-100%)
-2. **句子级拆解**：逐句分析情感倾向，标注情感触发词和情感强度(1-5)
-3. **方面级分析**：如指定 aspects，按方面维度分别评估情感倾向和强度
-4. **情感摘要**：总结主要情感特征、情绪变化趋势，并给出内容优化建议
-
-## 输出规格
-
-### 输出结构
-
-```markdown
-## 情感分析报告
-
-### 整体判定
-- **情感倾向**: {正面/负面/中性} | **置信度**: {X}%
-- **情绪强度**: {1-5}/5 | **主导情绪**: {喜悦/愤怒/悲伤/恐惧/惊讶/厌恶}
-
-### 句子级分析
-| 序号 | 文本片段 | 情感 | 强度 | 触发词 |
-|------|----------|------|------|--------|
-
-### 情感关键发现
-- 正面因素：{列举}
-- 负面因素：{列举}
-- 情感建议：{对内容创作的建议}
-```
-
-### 输出示例
-
-```markdown
-## 情感分析报告
-
-### 整体判定
-- **情感倾向**: 正面 | **置信度**: 87%
-- **情绪强度**: 4/5 | **主导情绪**: 喜悦
-
-### 句子级分析
-| 序号 | 文本片段 | 情感 | 强度 | 触发词 |
-|------|----------|------|------|--------|
-| 1 | 这款国产新能源车的续航表现远超预期 | 正面 | 4 | 远超预期 |
-| 2 | 座椅舒适度和隔音做得相当出色 | 正面 | 4 | 相当出色 |
-| 3 | 但中控屏的响应速度偶尔会卡顿 | 负面 | 2 | 卡顿 |
-| 4 | 整体来说性价比非常高，值得推荐 | 正面 | 5 | 非常高、值得推荐 |
-
-### 情感关键发现
-- 正面因素：续航能力、座椅舒适度、隔音效果、性价比
-- 负面因素：中控屏响应速度
-- 情感建议：文章正面基调明确，可在标题中强化"超预期"关键词；负面提及占比低且语气温和，建议保留以增加可信度
-```
-
-## 质量标准
-
-| 维度 | 要求 | 权重 |
+| 字段 | 类型 | 说明 |
 |------|------|------|
-| 分类准确性 | 情感方向判断准确，置信度校准合理 | 35% |
-| 粒度覆盖 | 句子级分析完整，不遗漏关键情感句 | 25% |
-| 触发词定位 | 情感触发词标注精确，涵盖隐性情感表达 | 20% |
-| 洞察价值 | 分析结论对内容优化有实际指导意义 | 20% |
+| polarity | enum | `positive` / `negative` / `neutral` / `mixed` |
+| score | int | 0-100 情感强度 |
+| emotions | `{emotion, intensity}[]` | 8 类情绪 + 强度 |
+| triggers | `{word, type}[]` | 情感触发词（正 / 负 / 反讽标） |
+| ironyDetected | boolean | 是否识别到反讽 |
+| aspectBreakdown | `{aspect, polarity, score}[]` | 方面级细分 |
+| distribution | `{positive, negative, neutral}` | 批量 / 聚合占比 |
+| confidence | float | 置信度 0-1 |
 
-## 边界情况
+## 工作流 Checklist
 
-1. **反讽与反语文本**：当检测到"真是厉害了""好一个XX"等反讽句式时，需结合上下文判断真实情感，不能仅按字面词义分类
-2. **中性长文本**：纯新闻通稿或政策解读类文本可能无明显情感倾向，此时应标注为中性并说明原因，而非强行归类
-3. **混合情感文本**：同一篇文章中正面和负面交织（如测评类），需拆分段落分别评估，整体判定取加权结果
-4. **网络用语和缩写**：识别"绝绝子""YYDS""下头"等网络情感表达，映射到标准情感维度
-5. **多语言混杂**：中英文混合文本中英文感叹词（如 OMG、WTF）需纳入情感判断
+- [ ] Step 0: 文本清洗（去 emoji 噪声 / 保留情感表情 / 繁简统一）
+- [ ] Step 1: 语种识别 + 分段
+- [ ] Step 2: 主情感判断（词典 + LLM 双通道，分歧以 LLM 为准）
+- [ ] Step 3: 情感强度评分（0-100）
+- [ ] Step 4: 8 类情绪识别
+- [ ] Step 5: 反讽识别（"真牛 / 高级黑 / 阴阳怪气"）
+- [ ] Step 6: 方面级分析（granularity=aspect）
+- [ ] Step 7: 触发词抽取（标注正 / 负 / 反讽）
+- [ ] Step 8: 置信度评估
+- [ ] Step 9: 质量自检（见 §5）
+
+## 反讽识别规则（中文特有）
+
+| 模式 | 举例 | 判定 |
+|------|------|------|
+| 夸张正面 + 负面语境 | "真牛啊这服务" | 反讽 → negative |
+| 双重否定含贬 | "不是一般的差" | negative |
+| "呵呵 / 哈哈" 正面后缀 | "呵呵，真棒" | 反讽 → negative |
+| 反问句 | "这能算好？" | negative |
+| 名人梗反用 | "老师傅一眼丁真" | 按语境 |
+| 借祝福说恶言 | "恭喜发财"（被坑后） | 反讽 → negative |
+
+## 质量把关
+
+**自检阈值表：**
+
+| # | 检查点 | 阈值 |
+|---|-------|-----|
+| 1 | polarity 非空 | 100% |
+| 2 | 反讽命中率 | ≥ 75%（标注集抽检） |
+| 3 | confidence 透明 | 100% 返回 |
+| 4 | 方面级完整 | aspect 指定时全覆盖 |
+| 5 | 批量 distribution 合计 | = 100% |
+| 6 | 触发词去重 | 同义合并 |
+| 7 | 低置信 flag | confidence < 0.6 加 warning |
+
+**Top-5 典型失败模式：**
+
+| 失败模式 | 表现 | 修正 hint |
+|---------|------|----------|
+| 反讽误判 | "真厉害" 判 positive | 开 `detectIrony`；上下文 ≥ 30 字 |
+| 中性判负 | 客观陈述判 negative | 无情感词不评负 |
+| 强度虚高 | 小抱怨 95 分 | 按情感词强度 + 感叹 + 语气打分 |
+| 方面级丢项 | aspects 未全覆盖 | 每项强制输出（可 neutral） |
+| 多情绪冲突 | 既赞又贬只给一极 | 允许 `polarity=mixed` |
+
+## 输出示例
+
+```json
+{
+  "polarity": "negative",
+  "score": 82,
+  "emotions": [
+    { "emotion": "愤怒", "intensity": 78 },
+    { "emotion": "厌恶", "intensity": 65 }
+  ],
+  "triggers": [
+    { "word": "真牛", "type": "ironic_positive" },
+    { "word": "呵呵", "type": "ironic_marker" }
+  ],
+  "ironyDetected": true,
+  "confidence": 0.88
+}
+```
+
+## EXTEND.md 示例
+
+```yaml
+default_granularity: "overall"
+default_detect_irony: true
+default_return_triggers: true
+
+batch_max_texts: 200
+batch_chunk_size: 50
+min_confidence: 0.6
+
+emotions: [愤怒, 喜悦, 悲伤, 惊讶, 恐惧, 厌恶, 赞赏, 质疑]
+```
+
+## 常见问题
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| 反讽误判 | LLM 字面理解 | 开 `detectIrony` + 少样本反讽示例 |
+| 中英混合乱 | 语言切分错 | 按语种分段；polarity 取主段 |
+| 长文稀释 | 2000 字只给一分 | 切 ≤ 500 字段落再聚合 |
+| aspect 漏项 | 结构未闭环 | 强制结构输出，缺项 neutral |
+| 情绪冲突 | 既爱又恨 | `polarity=mixed`；情绪多标签 |
+| 批量慢 | 串行 | chunk_size=50 并发 + 重试 |
 
 ## 上下游协作
 
-| 方向 | 员工 | 协作内容 |
-|------|------|----------|
-| **上游输入** | 小雷（热点猎手） | 提供热点舆情文本，触发情感分析以判断话题情绪走向 |
-| **上游输入** | 小文（内容创作师） | 提交成稿后触发情感检测，确保文章情绪基调与策划意图一致 |
-| **下游输出** | 小审（质量审核官） | 情感分析结果作为审核维度之一，负面情绪过强时触发人工复核 |
-| **下游输出** | 小数（数据分析师） | 将情感数据纳入内容表现分析，追踪不同情感基调与互动率的关联 |
-| **下游输出** | 小策（选题策划师） | 基于受众评论的情感分析结果优化后续选题方向 |
+- **上游**：`social_listening` 拉回的评论、`news_aggregation` 聚合结果、文章 / 视频评论区抓取
+- **下游**：`data_report` 做舆情日报；`heat_scoring` 计算负面热度；`content_generate` 回应型稿件按情感分布定调
 
 ## 参考资料
 
-- **情感维度与中立判定**：[./references/sentiment-dimensions-extended.md](./references/sentiment-dimensions-extended.md)
-- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)
 - 历史版本：`git log --follow skills/sentiment_analysis/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)

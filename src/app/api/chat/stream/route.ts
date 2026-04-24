@@ -130,9 +130,27 @@ export async function POST(req: Request) {
     // Free chat: use agent's own tools (no scenario-specific toolsHint)
     const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
 
+    // Anti-hallucination addendum: intent-execute 路径已用 invokeToolDirectly
+    // server 端预执行保护；free-chat 路径 LLM 自由度更高，这里至少把"禁止凭
+    // 训练数据编造事实"的红线写进 system prompt。
+    // 事故参考：tool-registry.ts:1073-1083（输入 "CCBN" 产出 2023 年训练数据
+    // 里的虚构新闻）。
+    const hasWebSearch = agent.tools.some(
+      (t) => t.name === "web_search" || t.name === "trending_topics"
+    );
+    const antiHallucinationAddendum = hasWebSearch
+      ? `
+
+【事实性内容硬约束】
+- 凡涉及具体事件、日期、数据、人物发言、会议/展会/产品名等**事实性信息**，必须先调用 \`web_search\`（或 \`trending_topics\`）检索最新资料，然后引用工具返回的真实结果作答
+- **禁止**凭训练记忆回答事实问题（你的训练数据可能已过期 1-2 年以上）
+- 真实结果为空时：如实告知"未检索到相关最新内容"并建议用户补充关键词或调整时间范围，**不得**从训练数据里补填任何文章/日期/数据/引用
+- 若用户明确说"不需要搜，你知道就直说"之类，遵从；否则默认走工具检索`
+      : "";
+
     const result = streamText({
       model,
-      system: agent.systemPrompt,
+      system: agent.systemPrompt + antiHallucinationAddendum,
       messages,
       tools: vercelTools,
       stopWhen: stepCountIs(10),

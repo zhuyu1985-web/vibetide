@@ -14,6 +14,7 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 
 export interface SkillWithBindCount extends Skill {
   bindCount: number;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -170,6 +171,57 @@ async function findSkillRecord(
   }
 }
 
+/**
+ * Shape returned by `listSkillsForWorkflowPicker`. Kept minimal so the
+ * workflow editor's right-panel can render chips without pulling content/
+ * schema payloads it doesn't need.
+ */
+export interface WorkflowPickerSkill {
+  slug: string;
+  name: string;
+  category: SkillCategory;
+  type: "builtin" | "custom" | "plugin";
+  description: string;
+  version: string;
+}
+
+/**
+ * Skills available to pick as workflow steps for the given org. Includes
+ * org-scoped skills *and* global builtins; custom skills without a slug
+ * (legacy rows) are excluded because steps need a slug to execute.
+ */
+export async function listSkillsForWorkflowPicker(): Promise<WorkflowPickerSkill[]> {
+  const orgId = await getCurrentUserOrg();
+  const skillScope = buildSkillScopeCondition(orgId);
+
+  const rows = await db
+    .select({
+      organizationId: skills.organizationId,
+      slug: skills.slug,
+      name: skills.name,
+      category: skills.category,
+      type: skills.type,
+      description: skills.description,
+      version: skills.version,
+    })
+    .from(skills)
+    .where(skillScope ?? sql`true`)
+    .orderBy(skills.category, skills.name);
+
+  // Drop legacy rows without a slug — not pickable.
+  const withSlug = rows.filter((r) => !!r.slug);
+  const scoped = preferScopedSkillRows(withSlug, orgId);
+
+  return scoped.map((r) => ({
+    slug: r.slug!,
+    name: r.name,
+    category: r.category as SkillCategory,
+    type: r.type as "builtin" | "custom" | "plugin",
+    description: r.description,
+    version: r.version,
+  }));
+}
+
 export async function getSkills(category?: SkillCategory): Promise<Skill[]> {
   const orgId = await getCurrentUserOrg();
   const skillScope = buildSkillScopeCondition(orgId);
@@ -205,6 +257,7 @@ export async function getSkillsWithBindCount(): Promise<SkillWithBindCount[]> {
       version: skills.version,
       description: skills.description,
       compatibleRoles: skills.compatibleRoles,
+      createdAt: skills.createdAt,
       updatedAt: skills.updatedAt,
       bindCount: count(aiEmployees.id),
     })
@@ -221,12 +274,13 @@ export async function getSkillsWithBindCount(): Promise<SkillWithBindCount[]> {
     )
     .where(skillScope)
     .groupBy(skills.id)
-    .orderBy(skills.category, skills.name, skills.updatedAt);
+    .orderBy(desc(skills.createdAt));
 
   return preferScopedSkillRows(rows, orgId).map((s) => ({
     ...mapSkillSummary(s),
     compatibleRoles: (s.compatibleRoles ?? []) as string[],
     bindCount: Number(s.bindCount),
+    createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
   }));
 }

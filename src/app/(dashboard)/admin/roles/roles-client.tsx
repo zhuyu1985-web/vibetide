@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Plus,
   Shield,
@@ -19,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { createRole, updateRole, deleteRole } from "@/app/actions/admin";
 import { PERMISSION_GROUPS } from "@/lib/rbac-constants";
 
@@ -47,6 +49,8 @@ export default function RolesClient({
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function getPerms(role: Role): string[] {
     return (role.permissions as string[]) || [];
@@ -106,12 +110,20 @@ export default function RolesClient({
     }
   }
 
-  async function handleDelete(role: Role) {
-    if (!confirm(`确定删除角色「${role.name}」吗？`)) return;
+  function handleDelete(role: Role) {
+    setDeleteTarget(role);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteRole(role.id);
+      await deleteRole(deleteTarget.id);
+      setDeleteTarget(null);
     } catch (err: any) {
-      alert(err.message || "删除失败");
+      toast.error(err.message || "删除失败");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -295,6 +307,17 @@ export default function RolesClient({
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="删除角色"
+        description={`确定删除角色「${deleteTarget?.name ?? ""}」吗？此操作不可恢复。`}
+        confirmText="删除"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

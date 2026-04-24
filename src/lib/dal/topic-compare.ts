@@ -1,404 +1,406 @@
 import { db } from "@/db";
 import {
-  articles,
-  benchmarkAnalyses,
-  monitoredPlatforms,
-  platformContent,
+  myPosts,
+  myAccounts,
+  myPostDistributions,
+  topicMatches,
+  benchmarkPosts,
+  benchmarkAccounts,
 } from "@/db/schema";
-import { eq, desc, and, inArray, or, sql } from "drizzle-orm";
-import type {
-  TopicCompareArticle,
-  TopicCompareDetail,
-  NetworkReport,
-  CompetitorGroup,
-  BenchmarkAISummary,
-} from "@/lib/types";
+import { and, eq, desc, sql, inArray } from "drizzle-orm";
+import type { TenDimensionAnalysis } from "@/lib/topic-matching/dimension-analyzer";
 
-/* ─── Helpers ─── */
-
-/**
- * Extract keywords from a title for fuzzy matching against crawled platform content.
- * Strategy: remove common punctuation, split by whitespace and delimiters,
- * keep tokens with 2+ chars (Chinese phrases mostly).
- */
-function extractKeywords(title: string): string[] {
-  if (!title) return [];
-  const cleaned = title
-    .replace(/[，。、：；！？（）【】《》""''—\-—,.!?()\[\]<>:"]/g, " ")
-    .trim();
-  const tokens = cleaned
-    .split(/\s+/)
-    .filter((t) => t.length >= 2);
-  // Also add 2-gram windows for Chinese titles (since Chinese doesn't tokenize on space)
-  const grams: string[] = [];
-  for (const tk of tokens) {
-    if (tk.length >= 4) {
-      grams.push(tk.slice(0, 4));
-    }
-  }
-  return Array.from(new Set([...tokens, ...grams])).slice(0, 6);
-}
-
-function mapMediaType(raw: string): TopicCompareArticle["contentType"] {
-  if (!raw) return "text";
-  const v = raw.toLowerCase();
-  if (v.includes("video") || v === "视频") return "video";
-  if (v.includes("live") || v === "直播") return "live";
-  if (v.includes("short") || v === "短视频") return "short_video";
-  return "text";
-}
-
-function mapPlatformCategoryToMediaLevel(
-  cat: string | null
-): NetworkReport["mediaLevel"] {
-  switch (cat) {
-    case "central":
-      return "central";
-    case "provincial":
-      return "provincial";
-    case "municipal":
-      return "city";
-    case "industry":
-      return "industry";
-    default:
-      return "self_media";
-  }
-}
-
-function mapCategoryToCompetitorLevel(
-  cat: string | null
-): CompetitorGroup["level"] {
-  switch (cat) {
-    case "central":
-      return "central";
-    case "provincial":
-      return "provincial";
-    case "municipal":
-      return "city";
-    default:
-      return "other";
-  }
-}
-
-const LEVEL_LABEL: Record<CompetitorGroup["level"], string> = {
-  central: "央级媒体",
-  provincial: "省级媒体",
-  city: "市级媒体",
-  other: "其他媒体",
-};
-
-const LEVEL_COLOR: Record<CompetitorGroup["level"], string> = {
-  central:
-    "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/30",
-  provincial:
-    "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800/30",
-  city:
-    "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800/30",
-  other:
-    "bg-gray-50 border-gray-200 dark:bg-gray-900/40 dark:border-gray-700/40",
-};
-
-/* ─── List page ─── */
-
-interface ArticleRow {
+export interface TopicCompareListRow {
   id: string;
   title: string;
-  publishedAt: Date | null;
-  mediaType: string;
-  publishChannels: string[] | null;
-  spreadData: {
-    views?: number;
-    likes?: number;
-    shares?: number;
-    comments?: number;
-  } | null;
+  summary: string | null;
+  topic: string | null;
+  publishedAt: string | null;
+
+  // 聚合数据
+  totalViews: number;
+  totalLikes: number;
+  totalShares: number;
+  totalComments: number;
+
+  // 多渠道发布
+  distributionCount: number;
+  distributions: Array<{
+    accountId: string;
+    accountName: string;
+    accountPlatform: string;
+    publishedUrl: string | null;
+    publishedAt: string | null;
+    views: number;
+  }>;
+
+  // 同题对标情况
+  matchCount: number;
+  hasAnalysis: boolean;
+  lastAnalyzedAt: string | null;
+  summaryExpired: boolean;
 }
 
-/**
- * Get published articles for the topic-compare list page.
- * Cross-references benchmarkAnalyses (by sourceArticleId or topicTitle)
- * to determine hasAnalysis flag and benchmark count.
- */
-export async function getTopicCompareArticles(
+export async function listTopicCompareItems(
   orgId: string,
-  limit = 50
-): Promise<TopicCompareArticle[]> {
-  const rows = (await db
-    .select({
-      id: articles.id,
-      title: articles.title,
-      publishedAt: articles.publishedAt,
-      mediaType: articles.mediaType,
-      publishChannels: articles.publishChannels,
-      spreadData: articles.spreadData,
-    })
-    .from(articles)
-    .where(
-      and(
-        eq(articles.organizationId, orgId),
-        inArray(articles.status, ["published", "reviewing"])
-      )
-    )
-    .orderBy(desc(articles.publishedAt))
-    .limit(limit)) as ArticleRow[];
+  filters: {
+    platform?: string;
+    accountId?: string;
+    limit?: number;
+  } = {}
+): Promise<TopicCompareListRow[]> {
+  const { platform, accountId, limit = 100 } = filters;
 
-  if (rows.length === 0) return [];
+  // Step 1: 先按 filter 找到目标 my_post_ids（通过 distributions 过滤）
+  let postIdCandidates: string[] | null = null;
+  if (platform || accountId) {
+    const distConditions = [];
+    if (accountId) distConditions.push(eq(myPostDistributions.myAccountId, accountId));
+    if (platform && !accountId)
+      distConditions.push(eq(myAccounts.platform, platform as never));
 
-  // Load analyses for this org, build a lookup map by articleId AND by topicTitle
-  const analyses = await db
-    .select({
-      id: benchmarkAnalyses.id,
-      topicTitle: benchmarkAnalyses.topicTitle,
-      sourceArticleId: benchmarkAnalyses.sourceArticleId,
-      mediaScores: benchmarkAnalyses.mediaScores,
-      analyzedAt: benchmarkAnalyses.analyzedAt,
-    })
-    .from(benchmarkAnalyses)
-    .where(eq(benchmarkAnalyses.organizationId, orgId));
+    const rows = await db
+      .select({ myPostId: myPostDistributions.myPostId })
+      .from(myPostDistributions)
+      .innerJoin(myAccounts, eq(myPostDistributions.myAccountId, myAccounts.id))
+      .where(and(eq(myAccounts.organizationId, orgId), ...distConditions));
 
-  const byArticleId = new Map<string, (typeof analyses)[number]>();
-  const byTitle = new Map<string, (typeof analyses)[number]>();
-  for (const a of analyses) {
-    if (a.sourceArticleId) byArticleId.set(a.sourceArticleId, a);
-    byTitle.set(a.topicTitle, a);
+    postIdCandidates = Array.from(new Set(rows.map((r) => r.myPostId)));
+    if (postIdCandidates.length === 0) return [];
   }
 
-  return rows.map((row) => {
-    const analysis = byArticleId.get(row.id) ?? byTitle.get(row.title);
-    const scores = (analysis?.mediaScores as unknown[]) ?? [];
-    // mediaScores includes our own row; subtract it for competitor count
-    const benchmarkCount = Array.isArray(scores)
-      ? Math.max(0, scores.length - 1)
-      : 0;
+  // Step 2: 查 my_posts
+  const postConditions = [eq(myPosts.organizationId, orgId)];
+  if (postIdCandidates) postConditions.push(inArray(myPosts.id, postIdCandidates));
+
+  const posts = await db
+    .select({
+      id: myPosts.id,
+      title: myPosts.title,
+      summary: myPosts.summary,
+      topic: myPosts.topic,
+      publishedAt: myPosts.publishedAt,
+      totalViews: myPosts.totalViews,
+      totalLikes: myPosts.totalLikes,
+      totalShares: myPosts.totalShares,
+      totalComments: myPosts.totalComments,
+    })
+    .from(myPosts)
+    .where(and(...postConditions))
+    .orderBy(desc(myPosts.publishedAt))
+    .limit(limit);
+
+  if (posts.length === 0) return [];
+
+  const postIds = posts.map((p) => p.id);
+
+  // Step 3: 批量查 distributions
+  const distRows = await db
+    .select({
+      myPostId: myPostDistributions.myPostId,
+      accountId: myAccounts.id,
+      accountName: myAccounts.name,
+      accountPlatform: myAccounts.platform,
+      publishedUrl: myPostDistributions.publishedUrl,
+      publishedAt: myPostDistributions.publishedAt,
+      views: myPostDistributions.views,
+    })
+    .from(myPostDistributions)
+    .innerJoin(myAccounts, eq(myPostDistributions.myAccountId, myAccounts.id))
+    .where(inArray(myPostDistributions.myPostId, postIds));
+
+  const distByPost = new Map<string, typeof distRows>();
+  for (const d of distRows) {
+    if (!distByPost.has(d.myPostId)) distByPost.set(d.myPostId, []);
+    distByPost.get(d.myPostId)!.push(d);
+  }
+
+  // Step 4: 批量查 topic_matches
+  const matchRows = await db
+    .select({
+      myPostId: topicMatches.myPostId,
+      matchCount: topicMatches.matchCount,
+      aiAnalysis: topicMatches.aiAnalysis,
+      aiAnalysisAt: topicMatches.aiAnalysisAt,
+      expiresAt: topicMatches.expiresAt,
+    })
+    .from(topicMatches)
+    .where(and(eq(topicMatches.organizationId, orgId), inArray(topicMatches.myPostId, postIds)));
+
+  const matchByPost = new Map<string, (typeof matchRows)[number]>();
+  for (const m of matchRows) matchByPost.set(m.myPostId, m);
+
+  // Step 5: 组装
+  const now = Date.now();
+  return posts.map((p) => {
+    const match = matchByPost.get(p.id);
+    const hasAnalysis = !!(
+      match?.aiAnalysis &&
+      (match.aiAnalysis as { overallVerdict?: string }).overallVerdict
+    );
+    const summaryExpired =
+      (match?.expiresAt && match.expiresAt.getTime() < now) ?? false;
+    const dists = distByPost.get(p.id) ?? [];
 
     return {
-      id: row.id,
-      title: row.title,
-      publishedAt: row.publishedAt?.toISOString() ?? "",
-      channels: (row.publishChannels as string[]) ?? [],
-      contentType: mapMediaType(row.mediaType),
-      readCount: row.spreadData?.views ?? 0,
-      likeCount: row.spreadData?.likes ?? 0,
-      commentCount: row.spreadData?.comments ?? 0,
-      shareCount: row.spreadData?.shares ?? 0,
-      benchmarkCount,
-      hasAnalysis: !!analysis,
+      id: p.id,
+      title: p.title,
+      summary: p.summary,
+      topic: p.topic,
+      publishedAt: p.publishedAt?.toISOString() ?? null,
+      totalViews: p.totalViews ?? 0,
+      totalLikes: p.totalLikes ?? 0,
+      totalShares: p.totalShares ?? 0,
+      totalComments: p.totalComments ?? 0,
+      distributionCount: dists.length,
+      distributions: dists.map((d) => ({
+        accountId: d.accountId,
+        accountName: d.accountName,
+        accountPlatform: d.accountPlatform,
+        publishedUrl: d.publishedUrl,
+        publishedAt: d.publishedAt?.toISOString() ?? null,
+        views: d.views ?? 0,
+      })),
+      matchCount: match?.matchCount ?? 0,
+      hasAnalysis,
+      lastAnalyzedAt: match?.aiAnalysisAt?.toISOString() ?? null,
+      summaryExpired,
     };
   });
 }
 
-/* ─── Detail page ─── */
+// ---------------------------------------------------------------------------
+// 详情页
+// ---------------------------------------------------------------------------
 
-/**
- * Find platform content records that match an article's topic
- * via keyword fuzzy search on title/summary/topics.
- */
-async function findMatchingPlatformContent(orgId: string, title: string) {
-  const keywords = extractKeywords(title);
-  if (keywords.length === 0) return [];
-
-  // Build OR conditions for each keyword against title / summary
-  const keywordConds = keywords.map((kw) =>
-    or(
-      sql`${platformContent.title} ILIKE ${"%" + kw + "%"}`,
-      sql`${platformContent.summary} ILIKE ${"%" + kw + "%"}`
-    )
-  );
-
-  const rows = await db
-    .select({
-      content: platformContent,
-      platformName: monitoredPlatforms.name,
-      platformCategory: monitoredPlatforms.category,
-    })
-    .from(platformContent)
-    .leftJoin(
-      monitoredPlatforms,
-      eq(platformContent.platformId, monitoredPlatforms.id)
-    )
-    .where(
-      and(
-        eq(platformContent.organizationId, orgId),
-        or(...keywordConds)
-      )
-    )
-    .orderBy(desc(platformContent.publishedAt))
-    .limit(100);
-
-  return rows;
+export interface TopicCompareDetail {
+  myPost: {
+    id: string;
+    title: string;
+    summary: string | null;
+    body: string | null;
+    topic: string | null;
+    publishedAt: string | null;
+    originalSourceUrl: string | null;
+    totalViews: number;
+    totalLikes: number;
+    totalShares: number;
+    totalComments: number;
+  };
+  distributions: Array<{
+    id: string;
+    accountId: string;
+    accountName: string;
+    accountPlatform: string;
+    publishedUrl: string | null;
+    publishedAt: string | null;
+    views: number;
+    likes: number;
+    shares: number;
+    comments: number;
+  }>;
+  match: {
+    matchCount: number;
+    similarityScore: number | null;
+    overallTopic: string;
+    benchmarkPostIds: string[];
+    aiAnalysis: TenDimensionAnalysis | null;
+    radarData: Array<{ dimension: string; score: number }> | null;
+    lastAnalyzedAt: string | null;
+    summaryExpired: boolean;
+  } | null;
+  benchmarkReports: Array<{
+    id: string;
+    title: string;
+    summary: string | null;
+    body: string | null;
+    sourceUrl: string | null;
+    publishedAt: string | null;
+    accountId: string;
+    accountName: string;
+    accountLevel: string;
+    accountPlatform: string;
+    views: number;
+    likes: number;
+    similarityScore: number;
+    reason: string;
+  }>;
 }
 
-/**
- * Get a single article's full topic-compare detail:
- * - article header
- * - stats (total / central / provincial / other / time range)
- * - aiSummary (from benchmark_analyses.ai_summary, null if not generated yet)
- * - reports list (network reports from platform_content)
- * - competitor groups (grouped by monitored_platforms.category)
- */
 export async function getTopicCompareDetail(
   orgId: string,
-  articleId: string
-): Promise<{
-  detail: TopicCompareDetail;
-  reports: NetworkReport[];
-  competitorGroups: CompetitorGroup[];
-} | null> {
-  // 1) Load the article
-  const articleRows = (await db
-    .select({
-      id: articles.id,
-      title: articles.title,
-      publishedAt: articles.publishedAt,
-      mediaType: articles.mediaType,
-      publishChannels: articles.publishChannels,
-      spreadData: articles.spreadData,
-    })
-    .from(articles)
-    .where(
-      and(eq(articles.id, articleId), eq(articles.organizationId, orgId))
-    )
-    .limit(1)) as ArticleRow[];
-
-  if (articleRows.length === 0) return null;
-  const article = articleRows[0];
-
-  // 2) Find matching benchmark analysis (by sourceArticleId OR by topicTitle)
-  const analysisRows = await db
+  myPostId: string
+): Promise<TopicCompareDetail | null> {
+  const [post] = await db
     .select()
-    .from(benchmarkAnalyses)
-    .where(
-      and(
-        eq(benchmarkAnalyses.organizationId, orgId),
-        or(
-          eq(benchmarkAnalyses.sourceArticleId, article.id),
-          eq(benchmarkAnalyses.topicTitle, article.title)
-        )
-      )
-    )
-    .orderBy(desc(benchmarkAnalyses.analyzedAt))
+    .from(myPosts)
+    .where(and(eq(myPosts.id, myPostId), eq(myPosts.organizationId, orgId)))
+    .limit(1);
+  if (!post) return null;
+
+  // distributions
+  const dists = await db
+    .select({
+      id: myPostDistributions.id,
+      accountId: myAccounts.id,
+      accountName: myAccounts.name,
+      accountPlatform: myAccounts.platform,
+      publishedUrl: myPostDistributions.publishedUrl,
+      publishedAt: myPostDistributions.publishedAt,
+      views: myPostDistributions.views,
+      likes: myPostDistributions.likes,
+      shares: myPostDistributions.shares,
+      comments: myPostDistributions.comments,
+    })
+    .from(myPostDistributions)
+    .innerJoin(myAccounts, eq(myPostDistributions.myAccountId, myAccounts.id))
+    .where(eq(myPostDistributions.myPostId, myPostId));
+
+  // topic_match
+  const [match] = await db
+    .select()
+    .from(topicMatches)
+    .where(eq(topicMatches.myPostId, myPostId))
     .limit(1);
 
-  const analysis = analysisRows[0];
+  // benchmark reports
+  const benchmarkReports: TopicCompareDetail["benchmarkReports"] = [];
+  if (match) {
+    const ids = (match.benchmarkPostIds as string[]) ?? [];
+    const reasons =
+      (match.matchedReasons as Array<{
+        benchmarkPostId: string;
+        similarityScore: number;
+        reason: string;
+      }>) ?? [];
+    const reasonMap = new Map(reasons.map((r) => [r.benchmarkPostId, r]));
 
-  // 3) Find matching platform content
-  const matched = await findMatchingPlatformContent(orgId, article.title);
+    if (ids.length > 0) {
+      const benchRows = await db
+        .select({
+          id: benchmarkPosts.id,
+          title: benchmarkPosts.title,
+          summary: benchmarkPosts.summary,
+          body: benchmarkPosts.body,
+          sourceUrl: benchmarkPosts.sourceUrl,
+          publishedAt: benchmarkPosts.publishedAt,
+          views: benchmarkPosts.views,
+          likes: benchmarkPosts.likes,
+          accountId: benchmarkAccounts.id,
+          accountName: benchmarkAccounts.name,
+          accountLevel: benchmarkAccounts.level,
+          accountPlatform: benchmarkAccounts.platform,
+        })
+        .from(benchmarkPosts)
+        .innerJoin(
+          benchmarkAccounts,
+          eq(benchmarkPosts.benchmarkAccountId, benchmarkAccounts.id)
+        )
+        .where(inArray(benchmarkPosts.id, ids))
+        .orderBy(desc(benchmarkPosts.publishedAt));
 
-  // 4) Compute stats
-  let earliestTime = "";
-  let latestTime = "";
-  let centralCount = 0;
-  let provincialCount = 0;
-  let otherCount = 0;
-  const times: number[] = [];
-
-  for (const row of matched) {
-    const cat = row.platformCategory;
-    if (cat === "central") centralCount++;
-    else if (cat === "provincial") provincialCount++;
-    else otherCount++;
-    if (row.content.publishedAt) {
-      times.push(new Date(row.content.publishedAt).getTime());
+      for (const row of benchRows) {
+        const reasonEntry = reasonMap.get(row.id);
+        benchmarkReports.push({
+          id: row.id,
+          title: row.title,
+          summary: row.summary,
+          body: row.body,
+          sourceUrl: row.sourceUrl,
+          publishedAt: row.publishedAt?.toISOString() ?? null,
+          accountId: row.accountId,
+          accountName: row.accountName,
+          accountLevel: row.accountLevel,
+          accountPlatform: row.accountPlatform,
+          views: row.views ?? 0,
+          likes: row.likes ?? 0,
+          similarityScore: reasonEntry?.similarityScore ?? 0.85,
+          reason: reasonEntry?.reason ?? "",
+        });
+      }
     }
   }
 
-  if (times.length > 0) {
-    earliestTime = new Date(Math.min(...times)).toISOString();
-    latestTime = new Date(Math.max(...times)).toISOString();
-  }
-
-  // 5) Build reports list
-  const reports: NetworkReport[] = matched.map((row) => ({
-    id: row.content.id,
-    title: row.content.title,
-    sourceOutlet: row.platformName ?? "未知来源",
-    mediaLevel: mapPlatformCategoryToMediaLevel(row.platformCategory),
-    publishedAt: row.content.publishedAt?.toISOString() ?? "",
-    author: row.content.author ?? "",
-    summary: row.content.summary ?? "",
-    sourceUrl: row.content.sourceUrl,
-    contentType: row.content.category ?? "text",
-    aiInterpretation: null, // Stored as text in DB; full structured interpretation is a future enhancement
-  }));
-
-  // 6) Build competitor groups grouped by media level → outlet
-  const levelMap = new Map<
-    CompetitorGroup["level"],
-    Map<string, CompetitorGroup["outlets"][number]["articles"]>
-  >();
-
-  for (const row of matched) {
-    const level = mapCategoryToCompetitorLevel(row.platformCategory);
-    const outletName = row.platformName ?? "未知来源";
-    if (!levelMap.has(level)) levelMap.set(level, new Map());
-    const outlets = levelMap.get(level)!;
-    if (!outlets.has(outletName)) outlets.set(outletName, []);
-    outlets.get(outletName)!.push({
-      contentId: row.content.id,
-      title: row.content.title,
-      subject: row.content.category ?? "综合",
-      publishedAt: row.content.publishedAt
-        ? new Date(row.content.publishedAt).toLocaleString("zh-CN", {
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "",
-      channel: row.platformName ?? "",
-      sourceUrl: row.content.sourceUrl,
-    });
-  }
-
-  const competitorGroups: CompetitorGroup[] = Array.from(levelMap.entries())
-    .map(([level, outletsMap]) => ({
-      level,
-      levelLabel: LEVEL_LABEL[level],
-      levelColor: LEVEL_COLOR[level],
-      outlets: Array.from(outletsMap.entries()).map(([outletName, arts]) => ({
-        outletName,
-        articles: arts,
-      })),
-    }))
-    .sort((a, b) => {
-      const order: CompetitorGroup["level"][] = [
-        "central",
-        "provincial",
-        "city",
-        "other",
-      ];
-      return order.indexOf(a.level) - order.indexOf(b.level);
-    });
-
-  // 7) Build TopicCompareArticle from article row
-  const topicCompareArticle: TopicCompareArticle = {
-    id: article.id,
-    title: article.title,
-    publishedAt: article.publishedAt?.toISOString() ?? "",
-    channels: (article.publishChannels as string[]) ?? [],
-    contentType: mapMediaType(article.mediaType),
-    readCount: article.spreadData?.views ?? 0,
-    likeCount: article.spreadData?.likes ?? 0,
-    commentCount: article.spreadData?.comments ?? 0,
-    shareCount: article.spreadData?.shares ?? 0,
-    benchmarkCount: matched.length,
-    hasAnalysis: !!analysis,
-  };
-
-  const detail: TopicCompareDetail = {
-    article: topicCompareArticle,
-    stats: {
-      totalReports: matched.length,
-      centralCount,
-      provincialCount,
-      otherCount,
-      earliestTime,
-      latestTime,
-      trendDelta: 0,
+  return {
+    myPost: {
+      id: post.id,
+      title: post.title,
+      summary: post.summary,
+      body: post.body,
+      topic: post.topic,
+      publishedAt: post.publishedAt?.toISOString() ?? null,
+      originalSourceUrl: post.originalSourceUrl,
+      totalViews: post.totalViews ?? 0,
+      totalLikes: post.totalLikes ?? 0,
+      totalShares: post.totalShares ?? 0,
+      totalComments: post.totalComments ?? 0,
     },
-    aiSummary: (analysis?.aiSummary as BenchmarkAISummary | null) ?? null,
-    lastAnalyzedAt: analysis?.analyzedAt?.toISOString() ?? null,
+    distributions: dists.map((d) => ({
+      id: d.id,
+      accountId: d.accountId,
+      accountName: d.accountName,
+      accountPlatform: d.accountPlatform,
+      publishedUrl: d.publishedUrl,
+      publishedAt: d.publishedAt?.toISOString() ?? null,
+      views: d.views ?? 0,
+      likes: d.likes ?? 0,
+      shares: d.shares ?? 0,
+      comments: d.comments ?? 0,
+    })),
+    match: match
+      ? {
+          matchCount: match.matchCount,
+          similarityScore: match.similarityScore,
+          overallTopic:
+            (match.aiAnalysis as { overallTopic?: string } | null)?.overallTopic ?? "",
+          benchmarkPostIds: (match.benchmarkPostIds as string[]) ?? [],
+          aiAnalysis:
+            (match.aiAnalysis as TenDimensionAnalysis & { overallTopic?: string } | null) &&
+            (match.aiAnalysis as TenDimensionAnalysis).overallVerdict
+              ? (match.aiAnalysis as TenDimensionAnalysis)
+              : null,
+          radarData:
+            (match.radarData as Array<{ dimension: string; score: number }> | null) ?? null,
+          lastAnalyzedAt: match.aiAnalysisAt?.toISOString() ?? null,
+          summaryExpired:
+            (match.expiresAt && match.expiresAt.getTime() < Date.now()) ?? false,
+        }
+      : null,
+    benchmarkReports,
   };
+}
 
-  return { detail, reports, competitorGroups };
+/**
+ * 供列表顶部渠道/账号筛选器用
+ */
+export async function listTopicComparePlatformOptions(
+  orgId: string
+): Promise<Array<{
+  platform: string;
+  accounts: Array<{ id: string; name: string; handle: string; postCount: number }>;
+}>> {
+  const rows = await db
+    .select({
+      platform: myAccounts.platform,
+      id: myAccounts.id,
+      name: myAccounts.name,
+      handle: myAccounts.handle,
+      postCount: sql<number>`count(${myPostDistributions.id})::int`,
+    })
+    .from(myAccounts)
+    .leftJoin(myPostDistributions, eq(myPostDistributions.myAccountId, myAccounts.id))
+    .where(and(eq(myAccounts.organizationId, orgId), eq(myAccounts.isEnabled, true)))
+    .groupBy(myAccounts.id, myAccounts.platform, myAccounts.name, myAccounts.handle);
+
+  const byPlatform = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (!byPlatform.has(r.platform)) byPlatform.set(r.platform, []);
+    byPlatform.get(r.platform)!.push(r);
+  }
+  return Array.from(byPlatform.entries()).map(([platform, accounts]) => ({
+    platform,
+    accounts: accounts
+      .filter((a) => a.postCount > 0)
+      .map((a) => ({ id: a.id, name: a.name, handle: a.handle, postCount: a.postCount })),
+  }));
 }

@@ -278,6 +278,7 @@ export function ChatPanel({
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
+  const [scenariosExpanded, setScenariosExpanded] = useState(false);
 
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -535,7 +536,7 @@ export function ChatPanel({
 
       {/* ── Header ── fixed at top of the chat panel; sticky + z-index acts
           as a safety net if any ancestor ever regains scrollability. */}
-      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-6 pt-[1px] pb-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
+      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-gray-300/50 dark:border-gray-600/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
         <EmployeeAvatar
           employeeId={employee.id}
           size="md"
@@ -1112,29 +1113,57 @@ export function ChatPanel({
       {/* ── Bottom input bar (pinned) ── */}
       {!viewingSaved && (
         <div className="relative flex-shrink-0">
-          {/* Scenario quick-action chips — wrap to multiple rows instead
-              of horizontal scroll, matching the /home embedded panel. */}
-          {scenarios.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-5 pt-2.5 pb-1">
-              {scenarios.map((s) => {
-                const Icon = ICON_MAP[s.icon] || Sparkles;
-                return (
+          {/* Scenario quick-action chips — 默认只露一行（6 个），超过则收起
+              并提供"展开"按钮。单行用 overflow-hidden + 固定 max-h 防换行。*/}
+          {scenarios.length > 0 && (() => {
+            const COLLAPSED_COUNT = 6;
+            const hasMore = scenarios.length > COLLAPSED_COUNT;
+            const visible = scenariosExpanded || !hasMore
+              ? scenarios
+              : scenarios.slice(0, COLLAPSED_COUNT);
+            return (
+              <div className="flex flex-wrap gap-1.5 px-5 pt-2.5 pb-1">
+                {visible.map((s) => {
+                  const Icon = ICON_MAP[s.icon] || Sparkles;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/[0.03] dark:bg-blue-400/[0.06] text-[11px] font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-500/[0.08] dark:hover:bg-blue-400/[0.12] hover:text-blue-800 dark:hover:text-blue-200 transition-all duration-200 border-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onSelectScenario(s);
+                      }}
+                    >
+                      <Icon size={12} />
+                      {s.name}
+                    </button>
+                  );
+                })}
+                {hasMore && (
                   <button
-                    key={s.id}
                     type="button"
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 dark:bg-gray-800/60 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 border-0"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/[0.03] dark:bg-blue-400/[0.06] text-[11px] font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-500/[0.08] dark:hover:bg-blue-400/[0.12] transition-all duration-200 border-0"
                     onClick={(e) => {
                       e.preventDefault();
-                      onSelectScenario(s);
+                      setScenariosExpanded((v) => !v);
                     }}
                   >
-                    <Icon size={12} />
-                    {s.name}
+                    <ChevronDown
+                      size={12}
+                      className={cn(
+                        "transition-transform duration-200",
+                        scenariosExpanded && "rotate-180",
+                      )}
+                    />
+                    {scenariosExpanded
+                      ? "收起"
+                      : `展开 +${scenarios.length - COLLAPSED_COUNT}`}
                   </button>
-                );
-              })}
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })()}
 
           <div className="px-5 pt-1.5 pb-3">
             <div

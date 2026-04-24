@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,9 +20,12 @@ import { ChatPanel } from "./chat-panel";
 import { InputFieldsEditor } from "./input-fields-editor";
 import { useWorkflowSteps } from "./use-workflow-steps";
 import { useTestRun } from "./use-test-run";
+import { TestRunInputsDialog } from "./test-run-inputs-dialog";
 import { saveWorkflow, updateWorkflow } from "@/app/actions/workflow-engine";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { InputFieldDef } from "@/lib/types";
+import type { WorkflowPickerSkill } from "@/lib/dal/skills";
+import type { ToolParamSpec } from "./step-detail-panel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +45,15 @@ interface WorkflowEditorProps {
     promptTemplate?: string;
   };
   mode: "create" | "edit";
+  /** Live skills pool loaded server-side; drives the add-step picker. */
+  skills: WorkflowPickerSkill[];
+  /**
+   * Server-pre-computed tool parameter specs (skillSlug → spec list) for the
+   * step detail panel's "参数名" dropdown. Pre-computed on the server because
+   * `tool-registry.ts` (where specs live) pulls in server-only deps (db,
+   * drizzle) that can't reach the client bundle.
+   */
+  toolParamSpecs?: Record<string, ToolParamSpec[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +74,12 @@ type Category = "news" | "video" | "analytics" | "distribution" | "custom";
 // Component
 // ---------------------------------------------------------------------------
 
-export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
+export function WorkflowEditor({
+  initialData,
+  mode,
+  skills,
+  toolParamSpecs,
+}: WorkflowEditorProps) {
   const router = useRouter();
 
   // ── Workflow metadata ──
@@ -159,7 +177,10 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
   // ── Workflow actions ──
 
   const handleSave = useCallback(async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      toast.error("请先填写工作流名称");
+      return;
+    }
     setSaving(true);
     try {
       if (mode === "edit" && initialData?.id) {
@@ -174,8 +195,11 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           launchMode,
           promptTemplate: promptTemplate.trim() || undefined,
         });
+        // 保存后停留在当前页 —— 清掉"未保存改动"标记，给一个 toast 反馈。
+        stepsHook.setHasChanges(false);
+        toast.success("保存成功");
       } else {
-        await saveWorkflow({
+        const created = await saveWorkflow({
           name: name.trim(),
           description: description.trim() || undefined,
           category,
@@ -186,10 +210,18 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           launchMode,
           promptTemplate: promptTemplate.trim() || undefined,
         });
+        // 创建成功 → 跳到该工作流的 edit 页（mode=edit），用户继续在同一个工作流上
+        // 调整不会产生副本；同时让 toast 在新页面上展示（sonner 是全局 Toaster）。
+        toast.success("保存成功");
+        if (created?.id) {
+          router.push(`/workflows/${created.id}/edit`);
+        }
       }
-      router.push("/workflows");
     } catch (err) {
       console.error("Failed to save workflow:", err);
+      toast.error(
+        err instanceof Error ? `保存失败：${err.message}` : "保存失败",
+      );
     } finally {
       setSaving(false);
     }
@@ -208,13 +240,45 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
     router,
   ]);
 
+  const [testInputsOpen, setTestInputsOpen] = useState(false);
+
+  const runTestWithInputs = useCallback(
+    async (userInputs: Record<string, unknown>) => {
+      setTestResultStepId(null);
+      if (rightPanelMode === "testResult") {
+        setRightPanelMode("add");
+      }
+      await testRun.startTestRun(
+        stepsHook.steps,
+        triggerType,
+        triggerConfig,
+        {
+          userInputs,
+          promptTemplate,
+          inputFields,
+        },
+      );
+    },
+    [
+      testRun,
+      stepsHook.steps,
+      triggerType,
+      triggerConfig,
+      rightPanelMode,
+      promptTemplate,
+      inputFields,
+    ],
+  );
+
   const handleTestRun = useCallback(async () => {
-    setTestResultStepId(null);
-    if (rightPanelMode === "testResult") {
-      setRightPanelMode("add");
+    // If the workflow declares input fields, collect them first so the
+    // simulated run has concrete context. Otherwise kick off immediately.
+    if (inputFields.length > 0) {
+      setTestInputsOpen(true);
+      return;
     }
-    await testRun.startTestRun(stepsHook.steps, triggerType, triggerConfig);
-  }, [testRun, stepsHook.steps, triggerType, triggerConfig, rightPanelMode]);
+    await runTestWithInputs({});
+  }, [inputFields, runTestWithInputs]);
 
   const handleToggleEnabled = useCallback(() => {
     setIsEnabled((prev) => !prev);
@@ -386,9 +450,12 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
         </div>
 
         {/* ── Right: Add/Detail Panel ── */}
-        <div className="w-[380px] border-l border-border shrink-0 overflow-y-auto bg-background">
+        <div className="w-[440px] border-l border-border shrink-0 overflow-y-auto bg-background">
           <RightPanel
             mode={rightPanelMode}
+            skills={skills}
+            inputFields={inputFields}
+            toolParamSpecs={toolParamSpecs}
             onAddSkillStep={stepsHook.addSkillStep}
             onAddOutputStep={stepsHook.addOutputStep}
             onAddAIStep={stepsHook.addAIStep}
@@ -402,6 +469,15 @@ export function WorkflowEditor({ initialData, mode }: WorkflowEditorProps) {
           />
         </div>
       </div>
+
+      <TestRunInputsDialog
+        open={testInputsOpen}
+        onOpenChange={setTestInputsOpen}
+        fields={inputFields}
+        onConfirm={(values) => {
+          void runTestWithInputs(values);
+        }}
+      />
     </div>
   );
 }

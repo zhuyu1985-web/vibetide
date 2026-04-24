@@ -2,7 +2,7 @@
 name: trending_topics
 displayName: 热榜聚合（多平台实时版）
 description: 聚合微博/百度/抖音/知乎/36Kr/哔哩哔哩/小红书/头条/微信等 10+ 主流平台实时热榜数据。识别跨平台同话题、去重合并、按综合热度排序。支持按平台过滤、时间窗口回溯、话题分类聚合。是热点发现 / 选题策划 / 种草文案的上游原料源。
-category: perception
+category: data_collection
 version: "3.0"
 
 metadata:

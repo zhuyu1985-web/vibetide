@@ -4,25 +4,45 @@ import { useState, useMemo, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { WorkflowTemplateCard } from "@/components/workflows/workflow-template-card";
 import { MyWorkflowCard } from "@/components/workflows/my-workflow-card";
+import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   createWorkflowFromTemplate,
-  executeWorkflow,
   deleteWorkflow,
 } from "@/app/actions/workflow-engine";
+import { startMissionFromTemplate } from "@/app/actions/workflow-launch";
 import { Plus, GitBranch, Inbox } from "lucide-react";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+import type { InputFieldDef } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const CATEGORY_FILTERS = [
-  { value: "all", label: "全部" },
-  { value: "news", label: "新闻报道" },
-  { value: "video", label: "视频生产" },
-  { value: "analytics", label: "数据分析" },
-  { value: "distribution", label: "渠道运营" },
+/**
+ * 一级大类 → DB `category` 的映射（一个一级可覆盖多个 DB category）。
+ * "新闻报道" 涵盖 news / deep / livelihood / daily_brief；
+ * "视频 & 短剧" 涵盖 video / drama；
+ * "社交 & 播客" 涵盖 social / podcast。
+ */
+const CATEGORY_GROUPS = [
+  { value: "all", label: "全部", match: null },
+  { value: "news", label: "新闻报道", match: ["news", "deep", "livelihood", "daily_brief"] },
+  { value: "video", label: "视频 & 短剧", match: ["video", "drama"] },
+  { value: "social", label: "社交 & 播客", match: ["social", "podcast"] },
+  { value: "analytics", label: "数据分析", match: ["analytics"] },
+  { value: "distribution", label: "渠道运营", match: ["distribution"] },
+  { value: "advanced", label: "高级 / 自定义", match: ["advanced", "custom"] },
+] as const;
+
+/** "新闻报道" 二级场景过滤 —— 对应 DB `category` 精确值。 */
+const NEWS_SCENE_FILTERS = [
+  { value: "all", label: "全部新闻" },
+  { value: "news", label: "突发快讯" },
+  { value: "deep", label: "深度报道" },
+  { value: "livelihood", label: "民生服务" },
+  { value: "daily_brief", label: "每日简报" },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -32,6 +52,8 @@ const CATEGORY_FILTERS = [
 interface WorkflowsClientProps {
   myWorkflows: WorkflowTemplateRow[];
   builtinTemplates: WorkflowTemplateRow[];
+  /** Super-admin bypass — allows editing/deleting builtin templates. */
+  isAdmin?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,20 +63,38 @@ interface WorkflowsClientProps {
 export function WorkflowsClient({
   myWorkflows,
   builtinTemplates,
+  isAdmin = false,
 }: WorkflowsClientProps) {
   const router = useRouter();
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [newsScene, setNewsScene] = useState<string>("all"); // 新闻报道二级场景
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+  // 运行我的工作流时的参数采集 dialog —— inputFields/promptTemplate 靠它生效
+  const [launchTemplate, setLaunchTemplate] =
+    useState<WorkflowTemplateRow | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   // ── Filtered templates ──
   const filteredTemplates = useMemo(() => {
-    if (categoryFilter === "all") return builtinTemplates;
-    return builtinTemplates.filter((t) => t.category === categoryFilter);
-  }, [builtinTemplates, categoryFilter]);
+    const group = CATEGORY_GROUPS.find((g) => g.value === categoryFilter);
+    // 一级 "全部" 或未命中 → 返回全部
+    if (!group || group.match === null) return builtinTemplates;
+
+    // 一级 "新闻报道" + 二级场景（非 all）→ 精确过滤到具体 category
+    if (categoryFilter === "news" && newsScene !== "all") {
+      return builtinTemplates.filter((t) => t.category === newsScene);
+    }
+
+    // 其余：按一级大类映射的 DB category 集合过滤
+    const allowed = new Set(group.match);
+    return builtinTemplates.filter(
+      (t) => t.category && allowed.has(t.category),
+    );
+  }, [builtinTemplates, categoryFilter, newsScene]);
 
   // ── Show temporary feedback ──
   const showFeedback = useCallback(
@@ -87,20 +127,40 @@ export function WorkflowsClient({
 
   const handleRun = useCallback(
     (id: string) => {
-      startTransition(async () => {
-        try {
-          const missionId = await executeWorkflow(id);
-          showFeedback("success", "工作流已开始运行");
-          router.push(`/missions/${missionId}`);
-        } catch (err) {
-          showFeedback(
-            "error",
-            err instanceof Error ? err.message : "运行失败"
-          );
-        }
-      });
+      const wf = myWorkflows.find((w) => w.id === id);
+      if (!wf) {
+        showFeedback("error", "工作流不存在");
+        return;
+      }
+      const fields = (wf.inputFields ?? []) as InputFieldDef[];
+      const hasPrompt = (wf.promptTemplate ?? "").trim().length > 0;
+      // "direct" + 无字段 + 无 prompt 模板 → 允许一键启动，不弹 dialog
+      if (wf.launchMode === "direct" && fields.length === 0 && !hasPrompt) {
+        startTransition(async () => {
+          try {
+            const res = await startMissionFromTemplate(id, {});
+            if (!res.ok) {
+              showFeedback(
+                "error",
+                res.errors._global ?? "运行失败"
+              );
+              return;
+            }
+            showFeedback("success", "工作流已开始运行");
+            router.push(`/missions/${res.missionId}`);
+          } catch (err) {
+            showFeedback(
+              "error",
+              err instanceof Error ? err.message : "运行失败"
+            );
+          }
+        });
+        return;
+      }
+      // 有字段 / promptTemplate / launchMode=form → 弹 dialog 让用户填参数
+      setLaunchTemplate(wf);
     },
-    [router, showFeedback]
+    [myWorkflows, router, showFeedback]
   );
 
   const handleEdit = useCallback(
@@ -112,8 +172,16 @@ export function WorkflowsClient({
 
   const handleDelete = useCallback(
     (id: string) => {
-      if (!window.confirm("确定要删除该工作流吗？此操作不可恢复。")) return;
+      setDeleteTargetId(id);
+    },
+    [],
+  );
 
+  const confirmDelete = useCallback(
+    () => {
+      const id = deleteTargetId;
+      if (!id) return;
+      setDeleteTargetId(null);
       startTransition(async () => {
         try {
           await deleteWorkflow(id);
@@ -127,7 +195,7 @@ export function WorkflowsClient({
         }
       });
     },
-    [router, showFeedback]
+    [deleteTargetId, router, showFeedback]
   );
 
   return (
@@ -214,12 +282,15 @@ export function WorkflowsClient({
           从模板开始
         </h2>
 
-        {/* Category filter pills */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          {CATEGORY_FILTERS.map((cat) => (
+        {/* 一级大类 filter pills */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {CATEGORY_GROUPS.map((cat) => (
             <button
               key={cat.value}
-              onClick={() => setCategoryFilter(cat.value)}
+              onClick={() => {
+                setCategoryFilter(cat.value);
+                setNewsScene("all"); // 切一级时重置二级
+              }}
               className={`px-3.5 py-1.5 rounded-xl text-sm border-0 cursor-pointer transition-all ${
                 categoryFilter === cat.value
                   ? "bg-black/[0.08] dark:bg-white/[0.12] text-gray-900 dark:text-white/90"
@@ -230,6 +301,28 @@ export function WorkflowsClient({
             </button>
           ))}
         </div>
+
+        {/* 新闻报道 二级场景 pills */}
+        {categoryFilter === "news" && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-6 pl-2 border-l-2 border-blue-200/60 dark:border-blue-500/30">
+            {NEWS_SCENE_FILTERS.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => setNewsScene(s.value)}
+                className={`px-3 py-1 rounded-lg text-xs border-0 cursor-pointer transition-all ${
+                  newsScene === s.value
+                    ? "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300"
+                    : "bg-transparent text-gray-500 dark:text-white/45 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-gray-700 dark:hover:text-white/70"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 非 news 时补回底部间距 */}
+        {categoryFilter !== "news" && <div className="mb-3" />}
 
         {/* Template grid */}
         {filteredTemplates.length === 0 ? (
@@ -253,6 +346,7 @@ export function WorkflowsClient({
                   steps: (tpl.steps ?? []) as WorkflowStepDef[],
                 }}
                 onUseTemplate={handleUseTemplate}
+                onEdit={isAdmin ? handleEdit : undefined}
               />
             ))}
           </div>
@@ -267,6 +361,28 @@ export function WorkflowsClient({
           </div>
         </div>
       )}
+
+      {/* 运行参数采集 dialog —— 使 inputFields + promptTemplate 生效 */}
+      {launchTemplate && (
+        <WorkflowLaunchDialog
+          template={launchTemplate}
+          open={!!launchTemplate}
+          onOpenChange={(o) => {
+            if (!o) setLaunchTemplate(null);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTargetId}
+        onOpenChange={(o) => !o && setDeleteTargetId(null)}
+        title="删除工作流"
+        description="确定要删除该工作流吗？此操作不可恢复。"
+        confirmText="删除"
+        variant="danger"
+        loading={isPending}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

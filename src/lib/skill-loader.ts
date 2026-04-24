@@ -15,12 +15,16 @@ import { parse as parseYaml } from "yaml";
 // ---------------------------------------------------------------------------
 
 export type SkillCategory =
-  | "perception"
-  | "analysis"
-  | "generation"
-  | "production"
-  | "management"
-  | "knowledge";
+  | "web_search"
+  | "data_collection"
+  | "topic_planning"
+  | "content_gen"
+  | "av_script"
+  | "quality_review"
+  | "content_analysis"
+  | "data_analysis"
+  | "distribution"
+  | "other";
 
 export interface BuiltinSkillDef {
   slug: string;
@@ -211,12 +215,16 @@ export function getBuiltinSkillCatalog(): string {
   }
 
   const categoryNames: Record<string, string> = {
-    perception: "感知",
-    analysis: "分析",
-    generation: "生成",
-    production: "制作",
-    management: "管理",
-    knowledge: "知识",
+    web_search: "全网检索",
+    data_collection: "数据采集",
+    topic_planning: "选题策划",
+    content_gen: "内容生成",
+    av_script: "视音频脚本",
+    quality_review: "质量审核",
+    content_analysis: "内容分析",
+    data_analysis: "数据分析",
+    distribution: "渠道分发",
+    other: "其他",
   };
 
   const lines: string[] = [];

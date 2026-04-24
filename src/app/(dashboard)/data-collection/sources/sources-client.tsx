@@ -33,6 +33,7 @@ import {
   type LatestRunStatus,
 } from "@/app/actions/collection";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { formatRelativeTime, formatAbsoluteTime, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,7 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
   const [typeFilter, setTypeFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const baselineRunIds = useRef<Map<string, string | null>>(new Map());
 
@@ -167,9 +169,15 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`确认删除源「${name}」?此操作不可撤销(已采集的数据保留)。`)) return;
+  const handleDelete = (id: string, name: string) => {
+    setDeleteTarget({ id, name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
     setBusyId(id);
+    setDeleteTarget(null);
     try {
       await deleteCollectionSource(id);
       toast.success("已删除");
@@ -399,6 +407,17 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
           })
         )}
       </GlassCard>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="删除采集源"
+        description={`确认删除源「${deleteTarget?.name ?? ""}」？此操作不可撤销（已采集的数据保留）。`}
+        confirmText="删除"
+        variant="danger"
+        loading={busyId === deleteTarget?.id}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

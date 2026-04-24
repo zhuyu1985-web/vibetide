@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -210,7 +211,7 @@ export function MediaOutletsClient({
           ? await unarchiveMediaOutlet(o.id)
           : await archiveMediaOutlet(o.id);
       if (!res.ok) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
         router.refresh();
       }

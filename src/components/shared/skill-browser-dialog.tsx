@@ -16,21 +16,29 @@ import type { Skill, SkillCategory } from "@/lib/types";
 import type { SkillRecommendation } from "@/lib/dal/skills";
 
 const categoryLabels: Record<SkillCategory, string> = {
-  perception: "感知",
-  analysis: "分析",
-  generation: "生成",
-  production: "制作",
-  management: "管理",
-  knowledge: "知识",
+  web_search: "全网检索",
+  data_collection: "数据采集",
+  topic_planning: "选题策划",
+  content_gen: "内容生成",
+  av_script: "视音频脚本",
+  quality_review: "质量审核",
+  content_analysis: "内容分析",
+  data_analysis: "数据分析",
+  distribution: "渠道分发",
+  other: "其他",
 };
 
 const categoryColors: Record<SkillCategory, string> = {
-  perception: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  analysis: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  generation: "bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400",
-  production: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  management: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  knowledge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  web_search: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+  data_collection: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  topic_planning: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  content_gen: "bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400",
+  av_script: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+  quality_review: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  content_analysis: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  data_analysis: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  distribution: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  other: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
 };
 
 interface SkillBrowserDialogProps {

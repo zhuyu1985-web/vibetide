@@ -13,7 +13,6 @@ export type CmsPublicationState =
 export interface CreatePublicationInput {
   organizationId: string;
   articleId: string;
-  appChannelSlug: string;
   cmsType: number;
   requestHash: string;
   requestPayload: unknown;
@@ -29,7 +28,6 @@ export async function createPublication(
     .values({
       organizationId: input.organizationId,
       articleId: input.articleId,
-      appChannelSlug: input.appChannelSlug,
       cmsType: input.cmsType,
       cmsState: "submitting",
       requestHash: input.requestHash,

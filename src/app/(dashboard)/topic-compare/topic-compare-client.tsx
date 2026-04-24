@@ -2,383 +2,274 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import {
-  Search,
-  FileText,
-  Video,
-  Radio,
-  Clapperboard,
-  Newspaper,
-  BarChart3,
-  TrendingUp,
-  Target,
-} from "lucide-react";
+import { ExternalLink, Settings, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
-import { StatCard } from "@/components/shared/stat-card";
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
-import { SearchInput } from "@/components/shared/search-input";
+import { DataTable } from "@/components/shared/data-table";
 import { Button } from "@/components/ui/button";
-import type { TopicCompareArticle } from "@/lib/types";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import type { TopicCompareListRow } from "@/lib/dal/topic-compare";
 
-/* ─── Helpers ─── */
+const PLATFORM_LABELS: Record<string, string> = {
+  all: "全部",
+  app: "APP",
+  website: "网站",
+  wechat: "微信",
+  weibo: "微博",
+  douyin: "抖音",
+  kuaishou: "快手",
+  bilibili: "B 站",
+  xiaohongshu: "小红书",
+  tv: "电视",
+  radio: "广播",
+  other: "其他",
+};
+
+function platformLabel(p: string): string {
+  return PLATFORM_LABELS[p] ?? p;
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 function formatNumber(n: number): string {
-  if (n >= 10000) {
-    const v = n / 10000;
-    return v % 1 === 0 ? `${v}万` : `${v.toFixed(1)}万`;
-  }
-  return n.toLocaleString("zh-CN");
+  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
 }
-
-function isWithin24h(dateStr: string): boolean {
-  return Date.now() - new Date(dateStr).getTime() < 24 * 60 * 60 * 1000;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${m}-${day} ${h}:${min}`;
-}
-
-const channelColor: Record<string, string> = {
-  APP: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  微信: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  微博: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  抖音: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-};
-
-function benchmarkBadgeColor(count: number): string {
-  if (count > 30) return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
-  if (count >= 10) return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
-  if (count > 0) return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
-  return "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400";
-}
-
-function heatColor(score: number): string {
-  if (score >= 80) return "bg-red-500";
-  if (score >= 50) return "bg-amber-500";
-  return "bg-gray-400";
-}
-
-function heatTextColor(score: number): string {
-  if (score >= 80) return "text-red-600 dark:text-red-400";
-  if (score >= 50) return "text-amber-600 dark:text-amber-400";
-  return "text-gray-500 dark:text-gray-400";
-}
-
-const contentTypeIcon: Record<string, React.ReactNode> = {
-  text: <FileText className="h-3.5 w-3.5" />,
-  video: <Video className="h-3.5 w-3.5" />,
-  live: <Radio className="h-3.5 w-3.5" />,
-  short_video: <Clapperboard className="h-3.5 w-3.5" />,
-};
-
-const contentTypeLabel: Record<string, string> = {
-  text: "图文",
-  video: "视频",
-  live: "直播",
-  short_video: "短视频",
-};
-
-/* ─── Filter Tabs ─── */
-
-type StatusFilter = "all" | "analyzed" | "not_analyzed";
-
-const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: "all", label: "全部" },
-  { key: "analyzed", label: "已分析" },
-  { key: "not_analyzed", label: "未分析" },
-];
-
-/* ─── Sort ─── */
-
-type SortField = "publishedAt" | "readCount";
-
-/* ─── Component ─── */
 
 interface Props {
-  articles: TopicCompareArticle[];
-  usingMock?: boolean;
+  items: TopicCompareListRow[];
+  platformOptions: Array<{
+    platform: string;
+    accounts: Array<{ id: string; name: string; handle: string; postCount: number }>;
+  }>;
 }
 
-export function TopicCompareClient({ articles, usingMock }: Props) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [keyword, setKeyword] = useState("");
-  const [sortField, setSortField] = useState<SortField>("publishedAt");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+export function TopicCompareClient({ items, platformOptions }: Props) {
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [accountFilter, setAccountFilter] = useState<string>("all");
 
-  /* ─── KPI 计算 ─── */
-  const kpis = useMemo(() => {
-    const total = articles.length;
-    const analyzed = articles.filter((a) => a.hasAnalysis).length;
-    const totalBenchmarks = articles.reduce((s, a) => s + a.benchmarkCount, 0);
-    const avgBenchmarks = total > 0 ? Math.round(totalBenchmarks / total) : 0;
-    const totalReads = articles.reduce((s, a) => s + a.readCount, 0);
-    const maxBenchmark = articles.reduce((max, a) => Math.max(max, a.benchmarkCount), 0);
-    const hotArticle = articles.find((a) => a.benchmarkCount === maxBenchmark);
-    return { total, analyzed, totalBenchmarks, avgBenchmarks, totalReads, hotArticle };
-  }, [articles]);
+  const availableAccounts = useMemo(() => {
+    if (platformFilter === "all") return [];
+    const opt = platformOptions.find((p) => p.platform === platformFilter);
+    return opt?.accounts ?? [];
+  }, [platformFilter, platformOptions]);
 
   const filtered = useMemo(() => {
-    let list = articles;
-
-    if (statusFilter === "analyzed") list = list.filter((a) => a.hasAnalysis);
-    if (statusFilter === "not_analyzed") list = list.filter((a) => !a.hasAnalysis);
-
-    if (keyword.trim()) {
-      const kw = keyword.trim().toLowerCase();
-      list = list.filter((a) => a.title.toLowerCase().includes(kw));
-    }
-
-    const sorted = [...list].sort((a, b) => {
-      const va = sortField === "publishedAt" ? new Date(a.publishedAt).getTime() : a.readCount;
-      const vb = sortField === "publishedAt" ? new Date(b.publishedAt).getTime() : b.readCount;
-      return sortDir === "asc" ? va - vb : vb - va;
+    if (platformFilter === "all") return items;
+    return items.filter((item) => {
+      if (accountFilter !== "all") {
+        return item.distributions.some((d) => d.accountId === accountFilter);
+      }
+      return item.distributions.some((d) => d.accountPlatform === platformFilter);
     });
-
-    return sorted;
-  }, [articles, statusFilter, keyword, sortField, sortDir]);
+  }, [items, platformFilter, accountFilter]);
 
   return (
     <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="同题对比"
-        description="以我方已发布作品为起点，对比全网媒体对同一话题的报道情况"
+        description="以我方账号发布作品为锚点，对比央级/省级/地市/行业/自媒体的同题报道，找到叙事差异与改进方向"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/topic-compare/accounts">
+              <Button variant="ghost" size="sm">
+                <Settings className="w-4 h-4 mr-1.5" />
+                我方账号
+              </Button>
+            </Link>
+            <Link href="/benchmark-accounts">
+              <Button variant="ghost" size="sm">
+                <Users className="w-4 h-4 mr-1.5" />
+                对标账号库
+              </Button>
+            </Link>
+          </div>
+        }
       />
 
-      {usingMock && (
-        <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2">
-          当前展示为演示数据。组织内尚无已发布作品，或数据库尚未同步。发布稿件后将自动替换为真实数据。
+      {/* 渠道切换 */}
+      <div className="mb-3">
+        <Tabs
+          value={platformFilter}
+          onValueChange={(v) => {
+            setPlatformFilter(v);
+            setAccountFilter("all");
+          }}
+        >
+          <TabsList variant="line">
+            <TabsTrigger value="all">全部</TabsTrigger>
+            {platformOptions.map((p) => (
+              <TabsTrigger key={p.platform} value={p.platform}>
+                {platformLabel(p.platform)}
+                <span className="ml-1 text-xs opacity-70">({p.accounts.length})</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* 账号二级筛选 */}
+      {availableAccounts.length > 0 && (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm text-gray-500">账号：</span>
+          <Select value={accountFilter} onValueChange={setAccountFilter}>
+            <SelectTrigger className="w-60">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部账号</SelectItem>
+              {availableAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name} ({a.postCount})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
-      {/* ── KPI 统计概览 ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatCard
-          label="本周发稿"
-          value={kpis.total}
-          suffix="篇"
-          icon={<Newspaper size={18} />}
-        />
-        <StatCard
-          label="已对标分析"
-          value={kpis.analyzed}
-          suffix="篇"
-          icon={<Target size={18} />}
-          change={kpis.total > 0 ? Math.round((kpis.analyzed / kpis.total) * 100) : 0}
-        />
-        <StatCard
-          label="全网同题报道"
-          value={kpis.totalBenchmarks}
-          suffix="篇"
-          icon={<BarChart3 size={18} />}
-        />
-        <StatCard
-          label="篇均同题数"
-          value={kpis.avgBenchmarks}
-          suffix="篇"
-          icon={<TrendingUp size={18} />}
-        />
-      </div>
-
-      {/* ── 最热选题提示 ── */}
-      {kpis.hotArticle && kpis.hotArticle.benchmarkCount > 0 && (
-        <GlassCard padding="sm" className="mb-5 bg-gradient-to-r from-orange-50/60 to-amber-50/60 dark:from-orange-950/20 dark:to-amber-950/20">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center shrink-0">
-              <TrendingUp size={16} className="text-orange-600 dark:text-orange-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-xs text-gray-500 dark:text-gray-400">全网关注度最高</span>
-              <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{kpis.hotArticle.title}</p>
-            </div>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${benchmarkBadgeColor(kpis.hotArticle.benchmarkCount)}`}>
-              {kpis.hotArticle.benchmarkCount} 篇同题报道
-            </span>
-            {kpis.hotArticle.hasAnalysis && (
-              <Link
-                href={`/topic-compare/${kpis.hotArticle.id}`}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 shrink-0"
-              >
-                查看详情 →
-              </Link>
-            )}
+      {filtered.length === 0 ? (
+        <GlassCard padding="lg">
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <p className="text-sm">{items.length === 0 ? "暂无作品数据" : "当前筛选无数据"}</p>
+            <p className="text-xs mt-2">
+              请先在{" "}
+              <Link href="/topic-compare/accounts" className="text-sky-600 hover:underline">
+                我方账号
+              </Link>{" "}
+              绑定账号并导入作品
+            </p>
           </div>
         </GlassCard>
-      )}
-
-      {/* ── Filter Bar ── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="flex gap-1">
-          {statusFilters.map((f) => (
-            <Button
-              key={f.key}
-              variant={statusFilter === f.key ? "default" : "ghost"}
-              size="sm"
-              className="border-0"
-              onClick={() => setStatusFilter(f.key)}
-            >
-              {f.label}
-            </Button>
-          ))}
-        </div>
-
-        <SearchInput
-          className="ml-auto w-[260px]"
-          placeholder="搜索作品标题..."
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-        />
-      </div>
-
-      {/* ── Table ── */}
-      <DataTable
-        rows={filtered}
-        rowKey={(a) => a.id}
-        sortKey={sortField}
-        sortDirection={sortDir}
-        onSortChange={(key, dir) => {
-          setSortField(key as SortField);
-          setSortDir(dir);
-        }}
-        emptyMessage={
-          <div className="flex flex-col items-center gap-2">
-            <Search className="h-10 w-10 opacity-40" />
-            <p>{articles.length === 0 ? "暂无已发布作品" : "没有找到匹配的作品，请调整筛选条件"}</p>
-            {articles.length === 0 && <p className="text-xs">作品数据将从发布系统自动同步</p>}
-          </div>
-        }
-        footer={
-          filtered.length > 0 ? (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">共 {filtered.length} 篇作品</span>
-              <span className="text-xs text-gray-400">
-                累计阅读 {formatNumber(filtered.reduce((s, a) => s + a.readCount, 0))}
-              </span>
-            </div>
-          ) : undefined
-        }
-        columns={[
-          {
-            key: "title",
-            header: "作品标题",
-            render: (article) => (
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="truncate">{article.title}</span>
-                {isWithin24h(article.publishedAt) && (
-                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0 leading-4 rounded shrink-0">
-                    新
-                  </span>
-                )}
-              </div>
-            ),
-          },
-          {
-            key: "publishedAt",
-            header: "发布时间",
-            width: "100px",
-            sortable: true,
-            render: (article) => (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {formatDate(article.publishedAt)}
-              </span>
-            ),
-          },
-          {
-            key: "channels",
-            header: "发布渠道",
-            width: "120px",
-            render: (article) => (
-              <div className="flex items-center gap-1 flex-wrap">
-                {article.channels.map((ch) => (
-                  <span
-                    key={ch}
-                    className={`text-[10px] px-1.5 py-0.5 rounded ${channelColor[ch] ?? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}
-                  >
-                    {ch}
-                  </span>
-                ))}
-              </div>
-            ),
-          },
-          {
-            key: "contentType",
-            header: "类型",
-            width: "70px",
-            render: (article) => (
-              <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                {contentTypeIcon[article.contentType]}
-                <span className="text-xs">{contentTypeLabel[article.contentType]}</span>
-              </div>
-            ),
-          },
-          {
-            key: "readCount",
-            header: "阅读量",
-            width: "80px",
-            sortable: true,
-            render: (article) => (
-              <span className="text-xs text-gray-700 dark:text-gray-300">
-                {formatNumber(article.readCount)}
-              </span>
-            ),
-          },
-          {
-            key: "heat",
-            header: "热度",
-            width: "70px",
-            render: (article) => {
-              const heat = Math.min(
-                99,
-                Math.round((article.benchmarkCount / 50) * 60 + (article.readCount / 150000) * 40),
-              );
-              return (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-8 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${heatColor(heat)}`}
-                      style={{ width: `${heat}%` }}
-                    />
+      ) : (
+        <DataTable
+          rows={filtered}
+          rowKey={(r) => r.id}
+          columns={[
+              {
+                key: "title",
+                header: "作品标题",
+                render: (r) => (
+                  <div className="min-w-0">
+                    <Link
+                      href={`/topic-compare/${r.id}`}
+                      className="text-sm text-gray-900 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 truncate block"
+                    >
+                      {r.title}
+                    </Link>
+                    {r.topic && (
+                      <div className="text-xs text-gray-500 mt-0.5 truncate">
+                        主题：{r.topic}
+                      </div>
+                    )}
                   </div>
-                  <span className={`text-[11px] font-medium ${heatTextColor(heat)}`}>{heat}</span>
-                </div>
-              );
-            },
-          },
-          {
-            key: "benchmark",
-            header: "同题报道",
-            width: "90px",
-            render: (article) => (
-              <span
-                className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${benchmarkBadgeColor(article.benchmarkCount)}`}
-              >
-                {article.benchmarkCount} 篇
-              </span>
-            ),
-          },
-          {
-            key: "action",
-            header: "操作",
-            width: "110px",
-            render: (article) =>
-              article.hasAnalysis ? (
-                <Link
-                  href={`/topic-compare/${article.id}`}
-                  className="text-xs text-sky-600 hover:text-sky-700 transition"
-                >
-                  查看同题对比 →
-                </Link>
-              ) : (
-                <span className="text-xs text-gray-400 dark:text-gray-500">未生成分析</span>
-              ),
-          },
-        ] satisfies DataTableColumn<TopicCompareArticle>[]}
-      />
+                ),
+              },
+              {
+                key: "distributions",
+                header: "发布渠道",
+                width: "200px",
+                render: (r) => (
+                  <div className="flex flex-wrap gap-1">
+                    {r.distributions.slice(0, 4).map((d) => (
+                      <a
+                        key={d.accountId}
+                        href={d.publishedUrl ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/40 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-100"
+                        onClick={(e) => {
+                          if (!d.publishedUrl) e.preventDefault();
+                        }}
+                      >
+                        {d.accountName}
+                        {d.publishedUrl && <ExternalLink className="w-2.5 h-2.5" />}
+                      </a>
+                    ))}
+                    {r.distributions.length > 4 && (
+                      <span className="text-xs text-gray-500">+{r.distributions.length - 4}</span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: "publishedAt",
+                header: "发布时间",
+                width: "110px",
+                render: (r) => (
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    {formatDate(r.publishedAt)}
+                  </span>
+                ),
+              },
+              {
+                key: "totalViews",
+                header: "阅读",
+                align: "right",
+                width: "80px",
+                render: (r) => <span className="text-xs">{formatNumber(r.totalViews)}</span>,
+              },
+              {
+                key: "totalLikes",
+                header: "点赞",
+                align: "right",
+                width: "80px",
+                render: (r) => <span className="text-xs">{formatNumber(r.totalLikes)}</span>,
+              },
+              {
+                key: "totalComments",
+                header: "评论",
+                align: "right",
+                width: "80px",
+                render: (r) => <span className="text-xs">{formatNumber(r.totalComments)}</span>,
+              },
+              {
+                key: "matchCount",
+                header: "同题数",
+                align: "center",
+                width: "80px",
+                render: (r) =>
+                  r.matchCount > 0 ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-50 dark:bg-green-950/40 text-xs text-green-700 dark:text-green-300">
+                      {r.matchCount}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">0</span>
+                  ),
+              },
+              {
+                key: "status",
+                header: "分析状态",
+                width: "120px",
+                render: (r) => (
+                  <Link href={`/topic-compare/${r.id}`}>
+                    {r.hasAnalysis ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700">
+                        {r.summaryExpired ? "已分析（可刷新）" : "查看分析"}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700">
+                        生成分析
+                      </span>
+                    )}
+                  </Link>
+                ),
+              },
+          ]}
+        />
+      )}
     </div>
   );
 }

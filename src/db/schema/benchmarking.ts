@@ -10,10 +10,6 @@ import {
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import {
-  missedTopicPriorityEnum,
-  missedTopicTypeEnum,
-  missedTopicStatusEnum,
-  missedTopicSourceTypeEnum,
   platformCategoryEnum,
   crawlStatusEnum,
   benchmarkAlertPriorityEnum,
@@ -21,7 +17,6 @@ import {
   benchmarkAlertStatusEnum,
 } from "./enums";
 import { aiEmployees } from "./ai-employees";
-import { articles } from "./articles";
 
 export const competitors = pgTable("competitors", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -40,61 +35,9 @@ export const competitors = pgTable("competitors", {
     .notNull(),
 });
 
-export const benchmarkAnalyses = pgTable("benchmark_analyses", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id").references(() => organizations.id),
-
-  topicTitle: text("topic_title").notNull(),
-  category: text("category"),
-  mediaScores: jsonb("media_scores")
-    .$type<
-      {
-        media: string;
-        isUs: boolean;
-        scores: { dimension: string; score: number }[];
-        total: number;
-        publishTime: string;
-      }[]
-    >()
-    .default([]),
-  radarData: jsonb("radar_data")
-    .$type<{ dimension: string; us: number; best: number }[]>()
-    .default([]),
-  improvements: jsonb("improvements").$type<string[]>().default([]),
-  aiSummary: jsonb("ai_summary"),
-  sourceArticleId: uuid("source_article_id").references(() => articles.id),
-
-  analyzedAt: timestamp("analyzed_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
-
-export const missedTopics = pgTable("missed_topics", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id").references(() => organizations.id),
-
-  title: text("title").notNull(),
-  priority: missedTopicPriorityEnum("priority").notNull().default("medium"),
-  discoveredAt: timestamp("discovered_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  competitors: jsonb("competitors").$type<string[]>().default([]),
-  heatScore: real("heat_score").default(0),
-  category: text("category"),
-  type: missedTopicTypeEnum("type").notNull().default("trending"),
-  status: missedTopicStatusEnum("status").notNull().default("missed"),
-  sourceType: missedTopicSourceTypeEnum("source_type").default("social_hot"),
-  sourceUrl: text("source_url"),
-  sourcePlatform: text("source_platform"),
-  matchedArticleId: uuid("matched_article_id").references(() => articles.id),
-  aiSummary: jsonb("ai_summary"),
-  pushedAt: timestamp("pushed_at", { withTimezone: true }),
-  pushedToSystem: text("pushed_to_system"),
-
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+// NOTE (2026-04-21): benchmarkAnalyses / missedTopics / platformContent 已在
+// topic-compare v2 重构中 drop 并由 src/db/schema/topic-compare-v2.ts 的新表取代。
+// 新的 missedTopics 定义见 topic-compare-v2.ts。
 
 export const weeklyReports = pgTable("weekly_reports", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -121,23 +64,6 @@ export const weeklyReports = pgTable("weekly_reports", {
 export const competitorsRelations = relations(competitors, ({ one }) => ({
   organization: one(organizations, {
     fields: [competitors.organizationId],
-    references: [organizations.id],
-  }),
-}));
-
-export const benchmarkAnalysesRelations = relations(
-  benchmarkAnalyses,
-  ({ one }) => ({
-    organization: one(organizations, {
-      fields: [benchmarkAnalyses.organizationId],
-      references: [organizations.id],
-    }),
-  })
-);
-
-export const missedTopicsRelations = relations(missedTopics, ({ one }) => ({
-  organization: one(organizations, {
-    fields: [missedTopics.organizationId],
     references: [organizations.id],
   }),
 }));
@@ -183,33 +109,7 @@ export const monitoredPlatforms = pgTable("monitored_platforms", {
     .notNull(),
 });
 
-export const platformContent = pgTable("platform_content", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id").references(() => organizations.id),
-  platformId: uuid("platform_id")
-    .references(() => monitoredPlatforms.id, { onDelete: "cascade" })
-    .notNull(),
-
-  title: text("title").notNull(),
-  summary: text("summary"),
-  body: text("body"),
-  sourceUrl: text("source_url").notNull(),
-  author: text("author"),
-  publishedAt: timestamp("published_at", { withTimezone: true }),
-  topics: jsonb("topics").$type<string[]>().default([]),
-  category: text("category"),
-  sentiment: text("sentiment"),
-  importance: real("importance").default(0),
-  contentHash: text("content_hash"),
-  coverageStatus: text("coverage_status"),
-  gapAnalysis: text("gap_analysis"),
-  aiInterpretation: text("ai_interpretation"),
-
-  crawledAt: timestamp("crawled_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
-});
+// platformContent 已在 topic-compare v2 重构中 drop。新的账号维度见 benchmark_posts。
 
 export const benchmarkAlerts = pgTable("benchmark_alerts", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -220,9 +120,9 @@ export const benchmarkAlerts = pgTable("benchmark_alerts", {
   priority: benchmarkAlertPriorityEnum("priority").notNull().default("medium"),
   type: benchmarkAlertTypeEnum("type").notNull(),
   status: benchmarkAlertStatusEnum("status").notNull().default("new"),
-  platformContentIds: jsonb("platform_content_ids")
-    .$type<string[]>()
-    .default([]),
+  // 原 platformContentIds 已废弃（platform_content 表 drop）。
+  // 保留列名以防其他消费者引用；未来可移除。
+  platformContentIds: jsonb("platform_content_ids").$type<string[]>().default([]),
   relatedPlatforms: jsonb("related_platforms").$type<string[]>().default([]),
   relatedTopics: jsonb("related_topics").$type<string[]>().default([]),
   analysisData: jsonb("analysis_data")
@@ -249,28 +149,13 @@ export const benchmarkAlerts = pgTable("benchmark_alerts", {
     .notNull(),
 });
 
-// Relations for new tables
+// Relations for remaining tables
 export const monitoredPlatformsRelations = relations(
   monitoredPlatforms,
-  ({ one, many }) => ({
+  ({ one }) => ({
     organization: one(organizations, {
       fields: [monitoredPlatforms.organizationId],
       references: [organizations.id],
-    }),
-    content: many(platformContent),
-  })
-);
-
-export const platformContentRelations = relations(
-  platformContent,
-  ({ one }) => ({
-    organization: one(organizations, {
-      fields: [platformContent.organizationId],
-      references: [organizations.id],
-    }),
-    platform: one(monitoredPlatforms, {
-      fields: [platformContent.platformId],
-      references: [monitoredPlatforms.id],
     }),
   })
 );

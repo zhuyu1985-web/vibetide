@@ -145,7 +145,7 @@ export function ChatCenterClient({
     // inner-main (main.flex-1): flex container, no scroll, min-h-0 for proper flex sizing
     patch(innerMain, { overflow: "hidden", display: "flex", flexDirection: "column", minHeight: "0" });
     // div.p-6 wrapper: fill remaining space, keep minimal top padding for header clearance
-    patch(wrapper, { padding: "4px 0 0 0", flex: "1", minHeight: "0", display: "flex", flexDirection: "column" });
+    patch(wrapper, { padding: "1px 0 0 0", flex: "1", minHeight: "0", display: "flex", flexDirection: "column" });
 
     return () => {
       for (const p of patches) p.el.style.cssText = p.saved;

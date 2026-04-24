@@ -2,7 +2,7 @@
 name: fact_check
 displayName: 事实核查（媒体行业专业版）
 description: 对稿件做多源交叉事实验证 —— 4 大核查类型（数字/人名/时间/地点 + 引言） × 3 源交叉验证 × 信源 S/A/B/C/D 分级。识别 AI 幻觉编造、时效失效、统计口径差异、翻译失真等真实错误。守护品牌公信力的最后一道关卡。对接新华社译名表、官方政府数据库、学术论文库等权威源。
-category: analysis
+category: quality_review
 version: "5.0"
 
 metadata:

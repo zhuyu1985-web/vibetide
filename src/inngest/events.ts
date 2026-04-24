@@ -77,33 +77,6 @@ export type InngestEvents = {
     };
   };
 
-  // ─── Benchmarking Events ───
-
-  "benchmarking/crawl-triggered": {
-    data: {
-      organizationId: string;
-      platformId?: string;
-      triggeredBy: "cron" | "manual";
-    };
-  };
-  "benchmarking/content-detected": {
-    data: {
-      organizationId: string;
-      platformContentIds: string[];
-      platformId: string;
-      contentCount: number;
-    };
-  };
-  "benchmarking/alert-generated": {
-    data: {
-      organizationId: string;
-      alertId: string;
-      alertType: string;
-      priority: string;
-      title: string;
-    };
-  };
-
   // ─── M4: Employee Learning ───
 
   "employee/learn": {
@@ -277,4 +250,5 @@ export type InngestEvents = {
       limit?: number;
     };
   };
+
 };

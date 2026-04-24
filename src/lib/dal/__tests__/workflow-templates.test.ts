@@ -227,7 +227,6 @@ describe("createWorkflowTemplate / updateWorkflowTemplate / softDisableWorkflowT
       icon: "FileText",
       inputFields: [{ name: "topic", label: "话题", type: "text", required: true }],
       defaultTeam: ["xiaolei", "xiaowen"],
-      appChannelSlug: "app_news",
       systemInstruction: "测试指令",
       legacyScenarioKey: "test_legacy_key",
       isBuiltin: true,
@@ -235,7 +234,6 @@ describe("createWorkflowTemplate / updateWorkflowTemplate / softDisableWorkflowT
     expect(created.icon).toBe("FileText");
     expect(created.inputFields).toEqual([{ name: "topic", label: "话题", type: "text", required: true }]);
     expect(created.defaultTeam).toEqual(["xiaolei", "xiaowen"]);
-    expect(created.appChannelSlug).toBe("app_news");
     expect(created.systemInstruction).toBe("测试指令");
     expect(created.legacyScenarioKey).toBe("test_legacy_key");
     expect(created.isBuiltin).toBe(true);

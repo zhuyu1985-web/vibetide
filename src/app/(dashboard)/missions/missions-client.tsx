@@ -60,7 +60,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { startMission, deleteMissions } from "@/app/actions/missions";
+import { startMission, deleteMissions, findActiveMissionByTemplate } from "@/app/actions/missions";
 import {
   ORDERED_CATEGORIES,
   CATEGORY_LABELS,
@@ -207,6 +207,12 @@ export function MissionsClient({
   const [scenarioCategory, setScenarioCategory] = useState<OrderedCategory>("news");
   const [title, setTitle] = useState("");
   const [instruction, setInstruction] = useState("");
+  // Active-mission preflight: when the chosen template already has a queued/
+  // planning/executing run, surface it so the user can choose between viewing
+  // the existing one or intentionally launching a parallel run.
+  const [activeConflict, setActiveConflict] = useState<
+    { id: string; title: string; status: string; createdAt: string } | null
+  >(null);
 
   // Keep the active tab in sync with available categories — if "news" has no
   // workflows for this org, snap to the first tab that does.
@@ -352,8 +358,13 @@ export function MissionsClient({
     return () => observer.disconnect();
   }, [hasMore]);
 
-  // Create — B.1 dual-write scenario slug + workflowTemplateId
-  async function handleCreate() {
+  // Create — B.1 dual-write scenario slug + workflowTemplateId.
+  // Two-step flow:
+  //   1) handleCreate(): preflight against active-mission conflicts. If found,
+  //      stash conflict info and let the AlertDialog drive the next step.
+  //   2) doCreateMission(): the actual insert + redirect, called either
+  //      directly (no conflict) or via the dialog's "仍要新建" button.
+  async function doCreateMission() {
     if (!title.trim() || !instruction.trim() || !selectedWorkflow) return;
     setCreating(true);
     try {
@@ -370,7 +381,25 @@ export function MissionsClient({
       /* noop */
     } finally {
       setCreating(false);
+      setActiveConflict(null);
     }
+  }
+  async function handleCreate() {
+    if (!title.trim() || !instruction.trim() || !selectedWorkflow) return;
+    setCreating(true);
+    let existing: Awaited<ReturnType<typeof findActiveMissionByTemplate>> = null;
+    try {
+      existing = await findActiveMissionByTemplate(selectedWorkflow.id);
+    } catch {
+      // Preflight is best-effort; if it fails, fall through to direct create
+      // so a transient DB blip doesn't block legitimate user actions.
+    }
+    if (existing) {
+      setActiveConflict(existing);
+      setCreating(false);
+      return;
+    }
+    await doCreateMission();
   }
   function resetForm() {
     setSelectedWorkflow(null);
@@ -720,6 +749,60 @@ export function MissionsClient({
           document.body,
         )}
 
+      {/* Active-mission conflict warning */}
+      <AlertDialog
+        open={!!activeConflict}
+        onOpenChange={(open) => { if (!open) setActiveConflict(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>该场景已有进行中的任务</AlertDialogTitle>
+            <AlertDialogDescription>
+              {activeConflict ? (
+                <>
+                  「{selectedWorkflow?.name ?? "该场景"}」已有一条「{activeConflict.title}」
+                  正在执行（创建于{" "}
+                  {new Date(activeConflict.createdAt).toLocaleString("zh-CN")}）。
+                  仍要新建吗？同时跑多条同模板的任务可能浪费 token 与员工算力。
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creating}>取消</AlertDialogCancel>
+            <Button
+              variant="ghost"
+              disabled={creating || !activeConflict}
+              onClick={() => {
+                if (!activeConflict) return;
+                const id = activeConflict.id;
+                setActiveConflict(null);
+                setSheetOpen(false);
+                router.push(`/missions/${id}`);
+              }}
+            >
+              查看现有任务
+            </Button>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                doCreateMission();
+              }}
+              disabled={creating}
+            >
+              {creating ? (
+                <>
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                  创建中...
+                </>
+              ) : (
+                "仍要新建"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete confirmation */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
@@ -808,7 +891,7 @@ function MissionRow({
       {/* Row — split into two sibling elements so the checkbox lives outside
           the expand-toggle <button>. Nested interactive elements are invalid
           HTML and break clicks. */}
-      <div className="flex items-stretch">
+      <div className="flex items-stretch min-w-0">
         {/* Checkbox cell — <label> wraps Checkbox so the whole cell is a
             large click target that Radix auto-forwards to the Checkbox
             primitive. */}
@@ -829,7 +912,7 @@ function MissionRow({
         {/* Clickable row body */}
         <button
           onClick={onToggle}
-          className="flex-1 flex items-center gap-2 pl-2 pr-5 py-3.5 text-left hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors"
+          className="flex-1 min-w-0 flex items-center gap-2 pl-2 pr-5 py-3.5 text-left hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors"
         >
           {/* Chevron */}
           <div className="w-4 shrink-0 flex items-center justify-center">
@@ -852,8 +935,13 @@ function MissionRow({
 
         {/* Title */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{m.title}</p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p
+              className="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate"
+              title={m.title}
+            >
+              {m.title}
+            </p>
             {m.sourceModule && SOURCE_MODULE_LABEL[m.sourceModule] && (
               <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0", SOURCE_MODULE_LABEL[m.sourceModule].cls)}>
                 {SOURCE_MODULE_LABEL[m.sourceModule].label}

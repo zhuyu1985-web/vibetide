@@ -18,7 +18,7 @@ export async function signIn(formData: FormData) {
     return { error: error.message };
   }
 
-  redirect("/missions");
+  redirect("/home");
 }
 
 export async function signUp(formData: FormData) {
@@ -42,7 +42,7 @@ export async function signUp(formData: FormData) {
     return { error: error.message };
   }
 
-  redirect("/missions");
+  redirect("/home");
 }
 
 export async function signOut() {

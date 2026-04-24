@@ -76,8 +76,17 @@ import {
   MessageSquare,
   Radio,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
-import { startTopicMission, refreshInspirationData } from "@/app/actions/hot-topics";
+import {
+  startTopicMission,
+  startTopicMissionMulti,
+  summarizeTopicKeyPoints,
+  refreshInspirationData,
+  generateDailyHotBriefing,
+} from "@/app/actions/hot-topics";
+import type { IndustryKey } from "@/lib/constants";
+import { IndustrySelectionDialog } from "@/components/inspiration/industry-selection-dialog";
 import { markAsReadAction, markAllAsReadAction } from "@/app/actions/topic-reads";
 import { updateSubscriptionsAction } from "@/app/actions/topic-subscriptions";
 import {
@@ -266,6 +275,13 @@ export function InspirationClient({
   );
   const [isTrackingAll, startTrackingAllTransition] = useTransition();
 
+  // 深度追踪：行业选择对话框
+  const [deepDialogTopic, setDeepDialogTopic] = useState<InspirationTopic | null>(null);
+  const [isDeepPending, setIsDeepPending] = useState(false);
+
+  // 每日简报：手动触发
+  const [isBriefingPending, startBriefingTransition] = useTransition();
+
   // Subscription state (local copy for editing)
   const [localSubCategories, setLocalSubCategories] = useState<Set<string>>(
     new Set(subscriptions?.subscribedCategories ?? [])
@@ -450,6 +466,50 @@ export function InspirationClient({
     [router, startTrackingTransition]
   );
 
+  // 深度追踪：用户在对话框点确认 → 调 server action → 跳到 mission 详情页
+  const handleConfirmDeepTracking = useCallback(
+    async (industries: IndustryKey[]) => {
+      if (!deepDialogTopic) return;
+      setIsDeepPending(true);
+      try {
+        const res = await startTopicMissionMulti(deepDialogTopic.id, industries);
+        toast.success(
+          `已启动「${deepDialogTopic.title}」的 ${industries.length} 维度深度追踪`,
+        );
+        setTrackedIds((prev) => new Set(prev).add(deepDialogTopic.id));
+        setDeepDialogTopic(null);
+        if (res?.id) router.push(`/missions/${res.id}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "启动失败";
+        toast.error(msg);
+      } finally {
+        setIsDeepPending(false);
+      }
+    },
+    [deepDialogTopic, router],
+  );
+
+  // 手动触发每日简报：调 server action 同步生成 + 推 CMS，跳到 article 详情
+  const handleGenerateBriefing = useCallback(() => {
+    startBriefingTransition(async () => {
+      try {
+        const res = await generateDailyHotBriefing({ trigger: "manual" });
+        const cms = res.cmsResult;
+        if (cms?.success) {
+          toast.success(`已生成每日简报（${res.topicCount} 条热点）并推送到 CMS`);
+        } else if (cms?.error) {
+          toast.warning(`简报已生成但 CMS 推送失败：${cms.error}`);
+        } else {
+          toast.success(`已生成每日简报（${res.topicCount} 条热点）`);
+        }
+        router.push(`/articles/${res.articleId}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "简报生成失败";
+        toast.error(msg);
+      }
+    });
+  }, [router]);
+
   const handleTrackAllP0 = useCallback(() => {
     startTrackingAllTransition(async () => {
       const p0Ids = localTopics
@@ -514,6 +574,8 @@ export function InspirationClient({
               newTopics?: number;
               updatedTopics?: number;
               message?: string;
+              alreadyRunning?: boolean;
+              error?: string;
             };
             if (event.type === "progress" && typeof event.current === "number" && typeof event.total === "number") {
               setCrawlProgress({
@@ -523,6 +585,16 @@ export function InspirationClient({
               });
             } else if (event.type === "complete" || event.type === "error") {
               setCrawlProgress(null);
+              if (event.alreadyRunning) {
+                // server 端互斥锁挡住了——已有 run 在跑，告知用户等
+                toast.info(event.message ?? "已有抓取正在进行，请稍候");
+              } else if (event.error) {
+                toast.error(`抓取失败：${event.error}`);
+              } else if ((event.newTopics ?? 0) > 0 || (event.updatedTopics ?? 0) > 0) {
+                toast.success(
+                  `已抓取完成：${event.newTopics ?? 0} 条新热点，${event.updatedTopics ?? 0} 条已更新`,
+                );
+              }
               router.refresh();
             }
           } catch {
@@ -666,6 +738,20 @@ export function InspirationClient({
                   {crawlProgress !== null ? "抓取中..." : "刷新数据"}
                 </span>
               </button>
+              <button
+                onClick={handleGenerateBriefing}
+                disabled={isBriefingPending}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
+              >
+                {isBriefingPending ? (
+                  <Loader2 size={14} className="animate-spin text-gray-400 dark:text-gray-500 shrink-0" />
+                ) : (
+                  <Newspaper size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                )}
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {isBriefingPending ? "生成简报中..." : "今日简报"}
+                </span>
+              </button>
             </div>
           </ScrollArea>
         </div>
@@ -688,48 +774,18 @@ export function InspirationClient({
               </div>
             </div>
           )}
-          {/* AI Summary Bar (thin, collapsible) */}
+          {/* 顶部合并行：日期 tabs + 距上次提示 + 一键已读 + 搜索框（详见 AISummaryBar） */}
           <AISummaryBar
             delta={meeting.delta}
             collapsed={summaryCollapsed}
             onToggle={() => setSummaryCollapsed(!summaryCollapsed)}
             onMarkAllRead={handleMarkAllRead}
             lastViewedAt={lastViewedAt}
+            dateFilter={dateFilter}
+            onDateFilterChange={setDateFilter}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
           />
-
-          {/* Top bar: Date filter + Search */}
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 dark:border-white/5">
-            <div className="flex items-center gap-1">
-              {(
-                [
-                  { key: "all", label: "全部" },
-                  { key: "today", label: "今日" },
-                  { key: "yesterday", label: "昨日" },
-                  { key: "3days", label: "近3天" },
-                ] as const
-              ).map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => setDateFilter(item.key)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                    dateFilter === item.key
-                      ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
-                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <SearchInput
-              className="ml-auto w-48"
-              inputClassName="h-8 text-xs"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索热点..."
-            />
-          </div>
 
           {/* Priority filter row */}
           <div className="border-b border-gray-200 dark:border-white/5">
@@ -791,6 +847,7 @@ export function InspirationClient({
                   onStartMission={handleStartMission}
                   onMarkRead={handleMarkRead}
                   subscribedCategories={subscribedCategories}
+                  onStartDeepTracking={(topic) => setDeepDialogTopic(topic)}
                 />
               </div>
             </ScrollArea>
@@ -884,6 +941,18 @@ export function InspirationClient({
         }}
       />
 
+      {/* 深度追踪：两步 wizard（行业选择 → 概要预览 → 启动 mission） */}
+      <IndustrySelectionDialog
+        open={deepDialogTopic !== null}
+        onOpenChange={(o) => {
+          if (!o && !isDeepPending) setDeepDialogTopic(null);
+        }}
+        onConfirm={handleConfirmDeepTracking}
+        isPending={isDeepPending}
+        topicId={deepDialogTopic?.id ?? null}
+        topicTitle={deepDialogTopic?.title}
+      />
+
     </div>
   );
 }
@@ -892,29 +961,67 @@ export function InspirationClient({
 // AI Summary Bar (thin collapsible bar)
 // ========================
 
+type DateFilterKey = "all" | "today" | "yesterday" | "3days";
+
+const DATE_FILTER_OPTIONS: { key: DateFilterKey; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "today", label: "今日" },
+  { key: "yesterday", label: "昨日" },
+  { key: "3days", label: "近3天" },
+];
+
 function AISummaryBar({
   delta,
   collapsed,
   onToggle,
   onMarkAllRead,
   lastViewedAt,
+  dateFilter,
+  onDateFilterChange,
+  searchQuery,
+  onSearchQueryChange,
 }: {
   delta?: EditorialMeeting["delta"];
   collapsed: boolean;
   onToggle: () => void;
   onMarkAllRead: () => void;
   lastViewedAt?: string;
+  dateFilter: DateFilterKey;
+  onDateFilterChange: (key: DateFilterKey) => void;
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
 }) {
   const timeSince = delta?.timeSinceLastView ?? (lastViewedAt ? timeAgo(lastViewedAt) : "");
   const newCount = delta?.newTopicsCount ?? 0;
 
   return (
     <div className="border-b border-gray-200 dark:border-white/5">
-      <div
-        className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
-        onClick={onToggle}
-      >
-        <div className="flex items-center gap-2 min-w-0">
+      {/* 顶部一行：日期 tabs · 距上次提示 · 一键已读 · chevron · 搜索框 */}
+      <div className="flex items-center gap-2 px-4 py-2.5">
+        {/* 日期筛选 tabs（左） */}
+        <div className="flex items-center gap-1 shrink-0">
+          {DATE_FILTER_OPTIONS.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => onDateFilterChange(item.key)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                dateFilter === item.key
+                  ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 距上次 + 新热点提示（中，可点击展开 AI 简报） */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex items-center gap-1.5 min-w-0 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+        >
           <Zap size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
           <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
             {timeSince ? `距上次 ${timeSince}` : "欢迎回来"}
@@ -927,19 +1034,25 @@ function AISummaryBar({
               </span>
             )}
           </span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+          {collapsed ? <ChevronDown size={12} className="text-gray-400 dark:text-gray-500 shrink-0" /> : <ChevronUp size={12} className="text-gray-400 dark:text-gray-500 shrink-0" />}
+        </button>
+
+        {/* 一键全部已读 + 搜索框（右） */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkAllRead();
-            }}
+            onClick={onMarkAllRead}
             className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors px-2 py-0.5 rounded"
           >
             <EyeOff size={10} className="inline mr-1" />
             一键全部已读
           </button>
-          {collapsed ? <ChevronDown size={12} className="text-gray-400 dark:text-gray-500" /> : <ChevronUp size={12} className="text-gray-400 dark:text-gray-500" />}
+          <SearchInput
+            className="w-48"
+            inputClassName="h-8 text-xs"
+            value={searchQuery}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            placeholder="搜索热点..."
+          />
         </div>
       </div>
 
@@ -981,6 +1094,222 @@ function AISummaryBar({
 }
 
 // ========================
+// AI 要点提炼 block — 每条 topic 卡片里的"AI 要点"区域
+// ========================
+//
+// 默认行为：组件 mount 后**自动**触发 summarizeTopicKeyPoints（如果 topic
+// 没真要点）。多卡片同时挂载时通过模块级 concurrency limiter 限制最多 3 路
+// 并发，超过的进入排队队列；in-flight Map 去重，同一 topic 不会重复提交。
+//
+// 状态展示：
+//   - 真要点 → 一句话精炼 + 编号要点列表（可点"重新提炼"）
+//   - 排队中 → "AI 排队解读中..."（灰色 spinner）
+//   - 解读中 → "AI 正在解读..."（蓝色 spinner）
+//   - 失败  → "解读失败 [重试]"
+
+const SUMMARIZE_CONCURRENCY = 3;
+let activeSummarizeCount = 0;
+const summarizeWaiters: (() => void)[] = [];
+const summarizeInFlight = new Map<
+  string,
+  Promise<Awaited<ReturnType<typeof summarizeTopicKeyPoints>>>
+>();
+
+function acquireSummarizeSlot(): Promise<void> {
+  if (activeSummarizeCount < SUMMARIZE_CONCURRENCY) {
+    activeSummarizeCount++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => summarizeWaiters.push(resolve));
+}
+
+function releaseSummarizeSlot(): void {
+  const next = summarizeWaiters.shift();
+  if (next) {
+    // 转交配额给下一个等待者，count 不动
+    next();
+  } else {
+    activeSummarizeCount--;
+  }
+}
+
+async function dedupedSummarize(
+  topicId: string,
+): Promise<Awaited<ReturnType<typeof summarizeTopicKeyPoints>>> {
+  const existing = summarizeInFlight.get(topicId);
+  if (existing) return existing;
+  const promise = (async () => {
+    await acquireSummarizeSlot();
+    try {
+      return await summarizeTopicKeyPoints(topicId);
+    } finally {
+      releaseSummarizeSlot();
+      summarizeInFlight.delete(topicId);
+    }
+  })();
+  summarizeInFlight.set(topicId, promise);
+  return promise;
+}
+
+type AIKeyPointsState =
+  | { kind: "ready"; angle: string; points: string[] }
+  | { kind: "queued" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string };
+
+function AIKeyPointsBlock({ topic }: { topic: InspirationTopic }) {
+  const router = useRouter();
+
+  // 初始状态：根据 topic.enrichedOutlines 判定
+  const initialReady = useMemo<AIKeyPointsState | null>(() => {
+    const first = topic.enrichedOutlines[0];
+    if (first && Array.isArray(first.points) && first.points.length > 0) {
+      return { kind: "ready", angle: first.angle, points: first.points };
+    }
+    return null;
+  }, [topic.enrichedOutlines]);
+
+  const [state, setState] = useState<AIKeyPointsState>(
+    initialReady ?? { kind: "queued" },
+  );
+
+  // 当 props 中 enrichedOutlines 变化（router.refresh 后），同步本地状态
+  useEffect(() => {
+    if (initialReady) setState(initialReady);
+  }, [initialReady]);
+
+  const triggerSummarize = useCallback(
+    async (manual = false) => {
+      // 已经有结果且不是 manual 触发 → 跳过
+      if (state.kind === "ready" && !manual) return;
+
+      const isInFlight = summarizeInFlight.has(topic.id);
+      setState(isInFlight ? { kind: "loading" } : { kind: "queued" });
+
+      // 进入 in-flight 后切到 loading 状态
+      // 用一个轻量 polling 检测，从 queued → loading
+      const pollHandle = setInterval(() => {
+        if (summarizeInFlight.has(topic.id)) {
+          // 已经在跑（自己或别的组件触发的同 id 请求）
+          setState((s) => (s.kind === "queued" ? { kind: "loading" } : s));
+        }
+      }, 200);
+
+      try {
+        const res = await dedupedSummarize(topic.id);
+        setState({
+          kind: "ready",
+          angle: res.oneLineSummary,
+          points: res.keyPoints,
+        });
+        if (manual) router.refresh();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "提炼失败";
+        setState({ kind: "error", message: msg });
+        if (manual) toast.error(msg);
+      } finally {
+        clearInterval(pollHandle);
+      }
+    },
+    [topic.id, router, state.kind],
+  );
+
+  // 自动触发：mount 时如果没真要点就自动提交
+  useEffect(() => {
+    if (initialReady) return;
+    let cancelled = false;
+    void (async () => {
+      // 微小延迟避免一瞬间 N 个组件同时 mount 时全部挤进 effect
+      await new Promise((r) => setTimeout(r, 50));
+      if (cancelled) return;
+      triggerSummarize(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic.id]);
+
+  if (state.kind === "ready") {
+    return (
+      <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-3 mb-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">
+          <Sparkles size={12} />
+          AI 要点提炼
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              triggerSummarize(true);
+            }}
+            className="ml-auto text-[10px] text-gray-400 hover:text-blue-600 dark:hover:text-blue-300 flex items-center gap-0.5"
+            title="重新提炼"
+          >
+            <RefreshCw size={10} />
+            重新提炼
+          </button>
+        </div>
+        <p className="text-xs text-gray-700 dark:text-gray-200 font-medium mb-1.5 leading-snug">
+          {state.angle}
+        </p>
+        <ul className="space-y-1">
+          {state.points.map((p, i) => (
+            <li
+              key={i}
+              className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 leading-relaxed"
+            >
+              <span className="text-blue-500 dark:text-blue-400 font-semibold shrink-0 mt-px">
+                {i + 1}.
+              </span>
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  if (state.kind === "error") {
+    return (
+      <div className="bg-red-50/40 dark:bg-red-950/10 rounded-lg p-3 mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 min-w-0">
+          <Sparkles size={12} className="text-red-400 shrink-0" />
+          <span className="truncate">解读失败：{state.message}</span>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            triggerSummarize(true);
+          }}
+          className="text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 flex items-center gap-1 px-2 py-0.5 rounded transition-colors shrink-0"
+        >
+          <RefreshCw size={11} />
+          重试
+        </button>
+      </div>
+    );
+  }
+
+  // queued / loading：占位提示
+  const isLoading = state.kind === "loading";
+  return (
+    <div className="bg-blue-50/30 dark:bg-blue-950/10 rounded-lg p-3 mb-2.5 flex items-center gap-2">
+      <Loader2
+        size={12}
+        className={cn(
+          "animate-spin shrink-0",
+          isLoading ? "text-blue-500" : "text-gray-400",
+        )}
+      />
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {isLoading ? "AI 正在解读..." : "AI 排队解读中..."}
+      </span>
+    </div>
+  );
+}
+
+// ========================
 // Column 2: Topic List (clean numbered list, no expand/collapse)
 // ========================
 
@@ -994,6 +1323,7 @@ function TopicList({
   onStartMission,
   onMarkRead,
   subscribedCategories,
+  onStartDeepTracking,
 }: {
   topics: InspirationTopic[];
   readIds: Set<string>;
@@ -1002,6 +1332,7 @@ function TopicList({
   onStartMission: (id: string) => void;
   onMarkRead: (id: string) => void;
   subscribedCategories: Set<string>;
+  onStartDeepTracking: (topic: InspirationTopic) => void;
 }) {
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -1050,17 +1381,13 @@ function TopicList({
         const cat = normalizeCategory(topic.category);
         const isSubscribed = subscribedCategories.has(cat);
 
-        const angles = topic.enrichedOutlines.length > 0
-          ? topic.enrichedOutlines
-          : topic.suggestedAngles.map((a) => ({ angle: a, points: [] as string[], wordCount: "", style: "" }));
-
         return (
           <div
             key={topic.id}
             className={cn(
               "py-4 px-3 transition-all duration-150 relative",
               "hover:bg-blue-100/80 dark:hover:bg-blue-900/30",
-              isTracked && "bg-blue-50/40 dark:bg-blue-950/20 border-l-4 border-l-blue-500",
+              isTracked && "bg-blue-50/40 dark:bg-blue-950/20",
               index < topics.length - 1 && "border-b border-gray-200/80 dark:border-white/[0.06]"
             )}
             onMouseEnter={() => onMarkRead(topic.id)}
@@ -1135,23 +1462,9 @@ function TopicList({
                   </p>
                 )}
 
-                {/* AI Angles card */}
-                {angles.length > 0 && (
-                  <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-3 mb-2.5">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">
-                      <Sparkles size={12} />
-                      AI要点提炼
-                    </div>
-                    <div className="space-y-1">
-                      {angles.map((outline, i) => (
-                        <div key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                          <span className="text-blue-500 dark:text-blue-400 font-semibold shrink-0 mt-px">{i + 1}.</span>
-                          <span>{outline.angle}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* AI 要点提炼 — 真要点（带 points）走真实 LLM 提炼，否则显示"AI 提炼"按钮 */}
+                <AIKeyPointsBlock topic={topic} />
+
 
                 {/* Bottom row: platforms + time + actions */}
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1178,9 +1491,16 @@ function TopicList({
                         className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 transition-colors"
                       >
                         <Rocket size={10} />
-                        {isMissionPending ? "创建中..." : "启动追踪"}
+                        {isMissionPending ? "创建中..." : "快速追踪"}
                       </button>
                     )}
+                    <button
+                      onClick={() => onStartDeepTracking(topic)}
+                      className="text-[11px] text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-0.5 ml-2 transition-colors"
+                    >
+                      <Sparkles size={10} />
+                      深度追踪
+                    </button>
                     <button
                       className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-0.5 ml-2 transition-colors"
                     >
@@ -1656,7 +1976,7 @@ function InspirationInput() {
         )}
 
         {/* Input area */}
-        <div className="flex items-end gap-2">
+        <div className="flex flex-col gap-2">
           <textarea
             ref={textareaRef}
             value={input}
@@ -1666,22 +1986,25 @@ function InspirationInput() {
             rows={4}
             disabled={isLoading}
             className={cn(
-              "flex-1 resize-none rounded-xl bg-gray-100 dark:bg-white/5 px-4 py-3 text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all min-h-[96px]",
+              "w-full resize-none rounded-xl bg-gray-100 dark:bg-white/5 px-4 py-3 text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-1 focus:ring-blue-500/30 transition-all min-h-[96px]",
               isLoading && "opacity-60 cursor-not-allowed"
             )}
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className={cn(
-              "shrink-0 w-9 h-9 rounded-full flex items-center justify-center border-0 transition-all",
-              input.trim() && !isLoading
-                ? "bg-blue-600 text-white hover:bg-blue-700"
-                : "bg-gray-200 dark:bg-white/10 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-            )}
-          >
-            <ArrowUp size={16} />
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-medium border-0 transition-all",
+                input.trim() && !isLoading
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-200 dark:bg-white/10 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              )}
+            >
+              <ArrowUp size={14} />
+              发送
+            </button>
+          </div>
         </div>
 
         {/* Hint */}

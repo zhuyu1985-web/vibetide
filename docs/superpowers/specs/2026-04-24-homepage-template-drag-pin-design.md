@@ -107,11 +107,12 @@ SET pinned_at = NULL, sort_order = COALESCE(maxSort, 0) + 10
 
 ### 5.3 拖拽重排 `reorderHomepageTemplates({ tab, orderedUnpinnedIds })`
 
-单事务：
+单事务（全部 SQL 在同一 DB transaction 内执行）：
 
-1. 校验 `orderedUnpinnedIds` 全部属于当前 org、能出现在当前 tab、且**当前都不是置顶**（防越权/防误传）。
-2. 对数组依序 upsert：第 `i` 个 id → `sort_order = i * 10`（留 gap 方便后续只改局部；但默认实现仍是全量重写，这样最简单稳定）。
-3. 不动置顶行。
+1. **预校验**：`orderedUnpinnedIds` 全部属于当前 org、能出现在当前 tab、且**当前都不是置顶**（防越权/防误传）。
+2. **事务内二次校验（防竞态）**：在同一事务里再次 `SELECT template_id, pinned_at` 查这批 id；若任一 id 的 `pinned_at` 已非 NULL（被并发 `pinHomepageTemplate` 抢先翻成置顶），整事务回滚并返回 409（客户端提示"已有其他人操作，请刷新"）。虽然单 admin 场景罕见，但在事务里加这层防御成本极低。
+3. 对数组依序 upsert：第 `i` 个 id → `sort_order = i * 10`（留 gap 方便后续只改局部；但默认实现仍是全量重写，这样最简单稳定）。
+4. 不动置顶行。
 
 全量重写单 tab 非置顶序是可接受的：单 tab 典型 <30 条，UPDATE 量很小；避免了 fractional indexing 的复杂度。
 
@@ -152,9 +153,9 @@ Grid 3 列拖拽需要 2D 落点判定，Framer Motion 原生不支持。采用*
 
 - 默认态：3 列 grid，所有用户看到相同布局。
 - 管理员在 tab 标题行右侧看到"整理顺序"文本按钮（`variant="ghost"`，带 `ArrowUpDown` 图标，无边框）。
-- 点击 → 当前 tab 切换编辑态：grid `grid-cols-3` → `grid-cols-1`（单列），卡片变窄长条，左侧出现拖拽手柄。按钮文本变"完成"。
+- 点击 → 当前 tab 切换编辑态：**置顶区和非置顶区都从 `grid-cols-3` 变为 `grid-cols-1`**（整个 tab 统一视觉），卡片变窄长条，非置顶卡左侧出现拖拽手柄，置顶卡不出现手柄（置顶区本就不可拖）。按钮文本变"完成"。
 - 再点"完成"回到 grid。
-- 非当前 tab 不受影响。
+- 非当前 tab 不受影响；编辑态是 tab-scoped 的本地 state。
 
 ### 7.3 置顶视觉（无 emoji，全部 Lucide + sky 色系）
 
@@ -251,7 +252,7 @@ const unpinned = list.filter(t => !t.__order?.pinnedAt)
 5. **UI**：
    - 普通用户看不到任何编辑控件；看得到置顶视觉。
    - admin 进入编辑态、拖拽、置顶、取消置顶 4 个路径都乐观 + 服务端落库。
-   - 两个浏览器窗口（同一 admin）一窗拖拽，另一窗 `revalidatePath` 后顺序同步。
+   - **多窗口同步不是 push-based**：`revalidatePath('/home')` 只是把 RSC 缓存标记为失效，另一个已打开的 `/home` 窗口**需要用户主动重新导航（如 tab 内点击 `/home` 链接 / 手动刷新）才会看到新顺序**；不做 WebSocket / polling 推送。
 6. **视觉**：置顶渐变带、`Pin` 图标、拖拽手柄色彩与现有 sky 主色调一致；无边框；无 emoji。
 7. **构建**：`npx tsc --noEmit` 与 `npm run build` 通过。
 

@@ -34,27 +34,39 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { WorkflowsPanel } from "./workflows-panel";
 
 const categoryLabels: Record<SkillCategory, string> = {
-  perception: "感知",
-  analysis: "分析",
-  generation: "生成",
-  production: "制作",
-  management: "管理",
-  knowledge: "知识",
+  web_search: "全网检索",
+  data_collection: "数据采集",
+  topic_planning: "选题策划",
+  content_gen: "内容生成",
+  av_script: "视音频脚本",
+  quality_review: "质量审核",
+  content_analysis: "内容分析",
+  data_analysis: "数据分析",
+  distribution: "渠道分发",
+  other: "其他",
 };
 
 const categoryColors: Record<SkillCategory, string> = {
-  perception:
+  web_search:
+    "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+  data_collection:
     "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  analysis:
-    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  generation:
+  topic_planning:
+    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  content_gen:
     "bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400",
-  production:
+  av_script:
+    "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+  quality_review:
     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  management:
+  content_analysis:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  data_analysis:
+    "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  distribution:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  knowledge:
-    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  other:
+    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
 };
 
 type SkillType = "all" | "builtin" | "custom" | "plugin";
@@ -66,9 +78,10 @@ const typeLabels: Record<SkillType, string> = {
   plugin: "插件",
 };
 
-type SortKey = "bindCount" | "updatedAt" | "name";
+type SortKey = "createdAt" | "bindCount" | "updatedAt" | "name";
 
 const sortOptions: { key: SortKey; label: string; icon: typeof Users }[] = [
+  { key: "createdAt", label: "添加时间", icon: Clock },
   { key: "bindCount", label: "绑定数", icon: ArrowDownWideNarrow },
   { key: "updatedAt", label: "最近更新", icon: Clock },
   { key: "name", label: "名称", icon: SortAsc },
@@ -100,7 +113,7 @@ export function SkillsClient({
   const [localSkills, setLocalSkills] = useState(initialSkills);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<SortKey>("bindCount");
+  const [sortBy, setSortBy] = useState<SortKey>("createdAt");
   const [typeFilter, setTypeFilter] = useState<SkillType>("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<SkillWithBindCount | null>(
@@ -138,6 +151,7 @@ export function SkillsClient({
           version: data.version,
           type: skillType,
           level: 1,
+          createdAt: now,
           updatedAt: now,
           bindCount: 0,
         },
@@ -165,6 +179,8 @@ export function SkillsClient({
 
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
+        case "createdAt":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         case "bindCount":
           return b.bindCount - a.bindCount;
         case "updatedAt":
@@ -327,7 +343,10 @@ export function SkillsClient({
           />
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mr-0.5">
+            分类
+          </span>
           <Button
             variant={categoryFilter === "all" ? "default" : "ghost"}
             size="sm"
@@ -349,7 +368,12 @@ export function SkillsClient({
           ))}
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="h-5 w-px bg-gray-300/60 dark:bg-gray-600/40 self-center" />
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mr-0.5">
+            来源
+          </span>
           {(Object.keys(typeLabels) as SkillType[]).map((t) => (
             <Button
               key={t}

@@ -1,8 +1,10 @@
 "use client";
 
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+import type { WorkflowPickerSkill } from "@/lib/dal/skills";
+import type { InputFieldDef } from "@/lib/types";
 import { AddStepPanel } from "./add-step-panel";
-import { StepDetailPanel } from "./step-detail-panel";
+import { StepDetailPanel, type ToolParamSpec } from "./step-detail-panel";
 import {
   TestResultPanel,
   type TestResultData,
@@ -14,6 +16,20 @@ import {
 
 interface RightPanelProps {
   mode: "add" | "detail" | "testResult";
+  /** Live skills pool for the add-step picker. */
+  skills: WorkflowPickerSkill[];
+  /**
+   * Workflow-level input fields defined by the editor. Surfaced to the step
+   * detail panel so users can pick field bindings (e.g. query ={{topic_title}})
+   * from a dropdown instead of hand-typing Mustache placeholders.
+   */
+  inputFields: InputFieldDef[];
+  /**
+   * Pre-computed tool parameter specs keyed by skillSlug. Populates the
+   * "参数名" dropdown with each tool's real input schema so users don't have
+   * to guess parameter names like `query` / `maxResults` / `timeRange`.
+   */
+  toolParamSpecs?: Record<string, ToolParamSpec[]>;
   // Add mode
   onAddSkillStep: (
     skillSlug: string,
@@ -39,6 +55,9 @@ interface RightPanelProps {
 
 export function RightPanel({
   mode,
+  skills,
+  inputFields,
+  toolParamSpecs,
   onAddSkillStep,
   onAddOutputStep,
   selectedStep,
@@ -69,6 +88,9 @@ export function RightPanel({
     return (
       <StepDetailPanel
         step={selectedStep}
+        skills={skills}
+        inputFields={inputFields}
+        toolParamSpecs={toolParamSpecs}
         onSave={onSaveStep}
         onClose={onCloseDetail}
       />
@@ -86,6 +108,7 @@ export function RightPanel({
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4">
         <AddStepPanel
+          skills={skills}
           onAddSkillStep={onAddSkillStep}
           onAddOutputStep={onAddOutputStep}
         />

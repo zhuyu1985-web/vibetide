@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "./schema";
 import { EMPLOYEE_CORE_SKILLS } from "../lib/constants";
@@ -288,35 +288,7 @@ async function seed() {
   }
   console.log(`   ${empsCreated} new / ${employeesData.length - empsCreated} existing employees\n`);
 
-  // =====================================================================
-  // Phase 1 — Seed 9 个 APP 栏目（§2.0.1 规范化清单）
-  // =====================================================================
-  console.log("P1: Inserting app_channels...");
-
-  const APP_CHANNELS_SEED = [
-    { slug: "app_home",                     displayName: "首页",         reviewTier: "relaxed" as const, icon: "🏠", sortOrder: 0 },
-    { slug: "app_news",                     displayName: "新闻",         reviewTier: "strict" as const,  icon: "📰", sortOrder: 1 },
-    { slug: "app_politics",                 displayName: "时政",         reviewTier: "strict" as const,  icon: "🏛️", sortOrder: 2 },
-    { slug: "app_sports",                   displayName: "体育",         reviewTier: "relaxed" as const, icon: "⚽", sortOrder: 3 },
-    { slug: "app_variety",                  displayName: "综艺",         reviewTier: "relaxed" as const, icon: "🎭", sortOrder: 4 },
-    { slug: "app_livelihood_zhongcao",      displayName: "民生-种草",   reviewTier: "relaxed" as const, icon: "🌱", sortOrder: 5 },
-    { slug: "app_livelihood_tandian",       displayName: "民生-探店",   reviewTier: "relaxed" as const, icon: "🍜", sortOrder: 6 },
-    { slug: "app_livelihood_podcast",       displayName: "民生-播客",   reviewTier: "strict" as const,  icon: "🎧", sortOrder: 7 },
-    { slug: "app_drama",                    displayName: "短剧",         reviewTier: "strict" as const,  icon: "🎬", sortOrder: 8 },
-  ];
-
-  for (const ch of APP_CHANNELS_SEED) {
-    await db.insert(schema.appChannels).values({
-      organizationId: org.id,
-      slug: ch.slug,
-      displayName: ch.displayName,
-      reviewTier: ch.reviewTier,
-      sortOrder: ch.sortOrder,
-      icon: ch.icon,
-    }).onConflictDoNothing({ target: [schema.appChannels.organizationId, schema.appChannels.slug] });
-    console.log(`   app_channel: ${ch.slug} (${ch.displayName})`);
-  }
-  console.log();
+  // 2026-04-23: app_channels 已下线（CMS 推送目标改为 article-mapper 硬编码）
 
   // 4. Seed missions
   console.log("4. Inserting missions...");
@@ -481,6 +453,27 @@ async function seed() {
     },
   ];
 
+  // Idempotency: re-running `npm run db:seed` would otherwise insert another
+  // copy of every demo mission (mission insert below has no onConflict guard,
+  // and createdAt is computed from `Date.now() - Nh` so each run produces a
+  // new "fresh" timestamp). Wipe prior demo rows for this org before re-insert.
+  // Cascade on mission_tasks / mission_messages / mission_artifacts cleans the
+  // children. Match by title only, scoped to this org and to titles defined in
+  // missionsData — so user-created missions with unrelated titles are safe.
+  const demoTitles = missionsData.map((m) => m.title);
+  const wiped = await db
+    .delete(schema.missions)
+    .where(
+      and(
+        eq(schema.missions.organizationId, org.id),
+        inArray(schema.missions.title, demoTitles),
+      ),
+    )
+    .returning({ id: schema.missions.id });
+  if (wiped.length > 0) {
+    console.log(`   Wiped ${wiped.length} stale demo mission(s) before re-seed`);
+  }
+
   for (const mData of missionsData) {
     const teamMemberIds = mData.teamSlugs
       .map((slug) => employeeMap.get(slug))
@@ -612,13 +605,12 @@ async function seed() {
       category: "news" as const,
       icon: "Zap",
       defaultTeam: ["xiaolei", "xiaowen"] as string[],
-      appChannelSlug: "app_news" as string | null,
       steps: [
-        { id: "step-1", order: 1, dependsOn: [] as string[], name: "热点监控", type: "skill" as const, config: { skillSlug: "trend_monitor", skillName: "趋势监控", skillCategory: "perception", parameters: {} }, key: "monitor", label: "热点监控" },
-        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "选题策划", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "plan", label: "选题策划" },
-        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "内容创作", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "create", label: "内容创作" },
-        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "质量审核", type: "skill" as const, config: { skillSlug: "quality_review", skillName: "质量审核", skillCategory: "management", parameters: {} }, key: "review", label: "质量审核" },
-        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "渠道发布", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "publish", label: "渠道发布" },
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "热点监控", type: "skill" as const, config: { skillSlug: "trend_monitor", skillName: "趋势监控", skillCategory: "data_collection", parameters: {} }, key: "monitor", label: "热点监控" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "选题策划", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "content_analysis", parameters: {} }, key: "plan", label: "选题策划" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "内容创作", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "content_gen", parameters: {} }, key: "create", label: "内容创作" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "质量审核", type: "skill" as const, config: { skillSlug: "quality_review", skillName: "质量审核", skillCategory: "quality_review", parameters: {} }, key: "review", label: "质量审核" },
+        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "渠道发布", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "distribution", parameters: {} }, key: "publish", label: "渠道发布" },
       ],
     },
     {
@@ -627,16 +619,15 @@ async function seed() {
       category: "deep" as const,
       icon: "FileSearch",
       defaultTeam: ["xiaolei", "xiaoce", "xiaowen", "xiaoshen", "xiaofa", "xiaoshu"] as string[],
-      appChannelSlug: "app_news" as string | null,
       steps: [
-        { id: "step-1", order: 1, dependsOn: [] as string[], name: "热点监控", type: "skill" as const, config: { skillSlug: "trend_monitor", skillName: "趋势监控", skillCategory: "perception", parameters: {} }, key: "monitor", label: "热点监控" },
-        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "选题策划", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "plan", label: "选题策划" },
-        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "素材准备", type: "skill" as const, config: { skillSlug: "media_search", skillName: "媒资搜索", skillCategory: "knowledge", parameters: {} }, key: "material", label: "素材准备" },
-        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "内容创作", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "create", label: "内容创作" },
-        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "视频制作", type: "skill" as const, config: { skillSlug: "video_edit_plan", skillName: "视频剪辑方案", skillCategory: "production", parameters: {} }, key: "produce", label: "视频制作" },
-        { id: "step-6", order: 6, dependsOn: ["step-5"], name: "质量审核", type: "skill" as const, config: { skillSlug: "quality_review", skillName: "质量审核", skillCategory: "management", parameters: {} }, key: "review", label: "质量审核" },
-        { id: "step-7", order: 7, dependsOn: ["step-6"], name: "渠道发布", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "publish", label: "渠道发布" },
-        { id: "step-8", order: 8, dependsOn: ["step-7"], name: "数据分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "analyze", label: "数据分析" },
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "热点监控", type: "skill" as const, config: { skillSlug: "trend_monitor", skillName: "趋势监控", skillCategory: "data_collection", parameters: {} }, key: "monitor", label: "热点监控" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "选题策划", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "content_analysis", parameters: {} }, key: "plan", label: "选题策划" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "素材准备", type: "skill" as const, config: { skillSlug: "media_search", skillName: "媒资搜索", skillCategory: "data_collection", parameters: {} }, key: "material", label: "素材准备" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "内容创作", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "content_gen", parameters: {} }, key: "create", label: "内容创作" },
+        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "视频制作", type: "skill" as const, config: { skillSlug: "video_edit_plan", skillName: "视频剪辑方案", skillCategory: "av_script", parameters: {} }, key: "produce", label: "视频制作" },
+        { id: "step-6", order: 6, dependsOn: ["step-5"], name: "质量审核", type: "skill" as const, config: { skillSlug: "quality_review", skillName: "质量审核", skillCategory: "quality_review", parameters: {} }, key: "review", label: "质量审核" },
+        { id: "step-7", order: 7, dependsOn: ["step-6"], name: "渠道发布", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "distribution", parameters: {} }, key: "publish", label: "渠道发布" },
+        { id: "step-8", order: 8, dependsOn: ["step-7"], name: "数据分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "data_analysis", parameters: {} }, key: "analyze", label: "数据分析" },
       ],
     },
     {
@@ -645,31 +636,13 @@ async function seed() {
       category: "daily_brief" as const,
       icon: "BarChart3",
       defaultTeam: ["xiaolei"] as string[],
-      appChannelSlug: "app_home" as string | null,
       triggerType: "scheduled" as const,
       triggerConfig: { cron: "0 7 * * *", timezone: "Asia/Shanghai" },
       steps: [
-        { id: "step-1", order: 1, dependsOn: [] as string[], name: "全网热点聚合", type: "skill" as const, config: { skillSlug: "news_aggregation", skillName: "新闻聚合", skillCategory: "perception", parameters: {} }, key: "aggregate", label: "全网热点聚合" },
-        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "热度与价值评估", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "evaluate", label: "热度与价值评估" },
-        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "推荐列表生成", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "generate", label: "推荐列表生成" },
-        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "推送到编辑部", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "dispatch", label: "推送到编辑部" },
-      ],
-    },
-    {
-      name: "金融科技监管日报",
-      description: "工作日定时抓取金融监管政策，分析影响后生成日报并合规审核发布",
-      category: "news" as const,
-      icon: "FileText",
-      defaultTeam: ["xiaoce", "xiaoshen"] as string[],
-      appChannelSlug: "app_news" as string | null,
-      triggerType: "scheduled" as const,
-      triggerConfig: { cron: "0 9 * * 1-5", timezone: "Asia/Shanghai" },
-      steps: [
-        { id: "step-1", order: 1, dependsOn: [] as string[], name: "监管政策抓取", type: "skill" as const, config: { skillSlug: "fintech_regulation_monitor", skillName: "金融监管监控", skillCategory: "perception", parameters: {} }, key: "crawl", label: "监管政策抓取" },
-        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "政策影响分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "analyze", label: "政策影响分析" },
-        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "日报稿件撰写", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "draft", label: "日报稿件撰写" },
-        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "合规审核", type: "skill" as const, config: { skillSlug: "quality_review", skillName: "质量审核", skillCategory: "management", parameters: {} }, key: "review", label: "合规审核" },
-        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "多渠道发布", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "publish", label: "多渠道发布" },
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "全网热点聚合", type: "skill" as const, config: { skillSlug: "news_aggregation", skillName: "新闻聚合", skillCategory: "data_collection", parameters: {} }, key: "aggregate", label: "全网热点聚合" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "热度与价值评估", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "content_analysis", parameters: {} }, key: "evaluate", label: "热度与价值评估" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "推荐列表生成", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "content_gen", parameters: {} }, key: "generate", label: "推荐列表生成" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "推送到编辑部", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "distribution", parameters: {} }, key: "dispatch", label: "推送到编辑部" },
       ],
     },
     {
@@ -678,15 +651,14 @@ async function seed() {
       category: "analytics" as const,
       icon: "BarChart3",
       defaultTeam: ["xiaozi", "xiaoshu"] as string[],
-      appChannelSlug: "app_home" as string | null,
       triggerType: "scheduled" as const,
       triggerConfig: { cron: "0 10 * * 1", timezone: "Asia/Shanghai" },
       steps: [
-        { id: "step-1", order: 1, dependsOn: [] as string[], name: "竞品动态抓取", type: "skill" as const, config: { skillSlug: "competitor_analysis", skillName: "竞品分析", skillCategory: "perception", parameters: {} }, key: "crawl", label: "竞品动态抓取" },
-        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "竞品内容对比", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "compare", label: "竞品内容对比" },
-        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "差异与机会分析", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "insight", label: "差异与机会分析" },
-        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "情报报告生成", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "generation", parameters: {} }, key: "report", label: "情报报告生成" },
-        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "报告推送至管理层", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "dispatch", label: "报告推送至管理层" },
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "竞品动态抓取", type: "skill" as const, config: { skillSlug: "competitor_analysis", skillName: "竞品分析", skillCategory: "data_analysis", parameters: {} }, key: "crawl", label: "竞品动态抓取" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "竞品内容对比", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "data_analysis", parameters: {} }, key: "compare", label: "竞品内容对比" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "差异与机会分析", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "content_analysis", parameters: {} }, key: "insight", label: "差异与机会分析" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "情报报告生成", type: "skill" as const, config: { skillSlug: "content_generate", skillName: "内容生成", skillCategory: "content_gen", parameters: {} }, key: "report", label: "情报报告生成" },
+        { id: "step-5", order: 5, dependsOn: ["step-4"], name: "报告推送至管理层", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "distribution", parameters: {} }, key: "dispatch", label: "报告推送至管理层" },
       ],
     },
     {
@@ -695,13 +667,13 @@ async function seed() {
       category: "distribution" as const,
       icon: "Mail",
       defaultTeam: ["xiaofa"] as string[],
-      appChannelSlug: null as string | null,
       triggerType: "manual" as const,
+      triggerConfig: {} as Record<string, unknown>,
       steps: [
-        { id: "step-1", order: 1, dependsOn: [] as string[], name: "邮件拉取与预处理", type: "skill" as const, config: { skillSlug: "email_classifier", skillName: "邮件分类", skillCategory: "perception", parameters: {} }, key: "ingest", label: "邮件拉取与预处理" },
-        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "情感与紧急度分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "analysis", parameters: {} }, key: "analyze", label: "情感与紧急度分析" },
-        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "自动分类与打标", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "analysis", parameters: {} }, key: "classify", label: "自动分类与打标" },
-        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "派发至对应部门", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "management", parameters: {} }, key: "dispatch", label: "派发至对应部门" },
+        { id: "step-1", order: 1, dependsOn: [] as string[], name: "邮件拉取与预处理", type: "skill" as const, config: { skillSlug: "email_classifier", skillName: "邮件分类", skillCategory: "data_collection", parameters: {} }, key: "ingest", label: "邮件拉取与预处理" },
+        { id: "step-2", order: 2, dependsOn: ["step-1"], name: "情感与紧急度分析", type: "skill" as const, config: { skillSlug: "data_report", skillName: "数据报告", skillCategory: "data_analysis", parameters: {} }, key: "analyze", label: "情感与紧急度分析" },
+        { id: "step-3", order: 3, dependsOn: ["step-2"], name: "自动分类与打标", type: "skill" as const, config: { skillSlug: "topic_extraction", skillName: "选题提取", skillCategory: "content_analysis", parameters: {} }, key: "classify", label: "自动分类与打标" },
+        { id: "step-4", order: 4, dependsOn: ["step-3"], name: "派发至对应部门", type: "skill" as const, config: { skillSlug: "publish_strategy", skillName: "发布策略", skillCategory: "distribution", parameters: {} }, key: "dispatch", label: "派发至对应部门" },
       ],
     },
   ];
@@ -709,14 +681,13 @@ async function seed() {
   // B.1 Unified Scenario Workflow — Task 12:
   // Use seedBuiltinTemplatesForOrg for idempotent upsert via the partial unique
   // index `(org_id, name) WHERE is_builtin=true AND legacy_scenario_key IS NULL`.
-  // This ensures re-runs propagate new fields (icon/defaultTeam/appChannelSlug/etc.) to existing rows.
+  // This ensures re-runs propagate new fields (icon/defaultTeam/etc.) to existing rows.
   const templatesDataSeeds = templatesData.map((tmpl) => ({
     name: tmpl.name,
     description: tmpl.description,
     category: tmpl.category,
     icon: tmpl.icon,
     defaultTeam: tmpl.defaultTeam,
-    appChannelSlug: tmpl.appChannelSlug,
     systemInstruction: null,
     legacyScenarioKey: null,
     steps: tmpl.steps,
@@ -754,6 +725,10 @@ async function seed() {
     const [row] = await db
       .insert(schema.categories)
       .values({ organizationId: org.id, ...cat, level: 0, sortOrder: rootCategories.indexOf(cat) })
+      .onConflictDoUpdate({
+        target: [schema.categories.organizationId, schema.categories.slug, schema.categories.scope],
+        set: { name: cat.name, description: cat.description, updatedAt: new Date() },
+      })
       .returning();
     categoryMap.set(cat.slug, row.id);
     console.log(`   Root: ${cat.name}`);
@@ -782,6 +757,17 @@ async function seed() {
         parentId,
         level: 1,
         sortOrder: i,
+      })
+      .onConflictDoUpdate({
+        target: [schema.categories.organizationId, schema.categories.slug, schema.categories.scope],
+        set: {
+          name: cat.name,
+          description: cat.description,
+          parentId,
+          level: 1,
+          sortOrder: i,
+          updatedAt: new Date(),
+        },
       })
       .returning();
     categoryMap.set(cat.slug, row.id);
@@ -846,19 +832,24 @@ async function seed() {
   ];
 
   for (const article of articlesData) {
-    await db.insert(schema.articles).values({
-      organizationId: org.id,
-      title: article.title,
-      mediaType: article.mediaType,
-      status: article.status,
-      categoryId: categoryMap.get(article.categorySlug) || null,
-      assigneeId: employeeMap.get(article.assigneeSlug) || null,
-      body: article.body,
-      wordCount: article.wordCount,
-      tags: article.tags,
-      publishedAt: article.publishedAt || null,
-      content: { headline: article.title, body: article.body, imageNotes: [] },
-    });
+    await db
+      .insert(schema.articles)
+      .values({
+        organizationId: org.id,
+        title: article.title,
+        mediaType: article.mediaType,
+        status: article.status,
+        categoryId: categoryMap.get(article.categorySlug) || null,
+        assigneeId: employeeMap.get(article.assigneeSlug) || null,
+        body: article.body,
+        wordCount: article.wordCount,
+        tags: article.tags,
+        publishedAt: article.publishedAt || null,
+        content: { headline: article.title, body: article.body, imageNotes: [] },
+      })
+      .onConflictDoNothing({
+        target: [schema.articles.organizationId, schema.articles.title],
+      });
     console.log(`   Article: ${article.title} (${article.status})`);
   }
   console.log();
@@ -1432,224 +1423,19 @@ async function seed() {
   console.log();
 
   // -----------------------------------------------------------------------
-  // Platform Content (35 rows — 5 per platform)
+  // Legacy platform_content / benchmark_analyses / missed_topics seed 已删除
+  //   2026-04-21 topic-compare v2 重构：旧表被 drop，新 seed 走
+  //   src/db/seed-topic-compare.ts（Phase A3 填充）
   // -----------------------------------------------------------------------
-  console.log("📰 Seeding platform content...");
-
-  const [existingContent] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.platformContent).where(eq(schema.platformContent.organizationId, org.id));
-  if (existingContent.count > 0) {
-    console.log(`   Skipping (${existingContent.count} already exist)`);
-  } else {
-    const now = Date.now();
-    const contentData: Array<{
-      platformName: string;
-      items: Array<{
-        title: string;
-        summary: string;
-        sourceUrl: string;
-        author: string;
-        publishedAt: Date;
-        topics: string[];
-        category: string;
-        sentiment: string;
-        importance: number;
-        coverageStatus: string;
-        gapAnalysis?: string;
-      }>;
-    }> = [
-      {
-        platformName: "人民网",
-        items: [
-          { title: "科技部发布《人工智能安全白皮书》全文", summary: "科技部正式发布人工智能安全白皮书，明确了AI发展的六大安全原则和监管框架", sourceUrl: "https://people.com.cn/ai-safety-2026", author: "人民网科技频道", publishedAt: new Date(now - 2 * 3600000), topics: ["AI安全", "科技政策", "人工智能监管"], category: "政策", sentiment: "positive", importance: 92, coverageStatus: "missed", gapAnalysis: "我方未覆盖此重要政策解读" },
-          { title: "两会代表建议加快数字经济立法", summary: "多位全国人大代表在两会期间提交数字经济相关议案", sourceUrl: "https://people.com.cn/digital-economy-proposal", author: "人民日报", publishedAt: new Date(now - 8 * 3600000), topics: ["两会", "数字经济", "立法"], category: "政策", sentiment: "neutral", importance: 78, coverageStatus: "covered" },
-          { title: "新一代国产芯片流片成功", summary: "中科院微电子所宣布新一代5nm国产芯片成功流片", sourceUrl: "https://people.com.cn/chip-breakthrough", author: "人民网科技频道", publishedAt: new Date(now - 18 * 3600000), topics: ["芯片", "半导体", "自主创新"], category: "科技", sentiment: "positive", importance: 85, coverageStatus: "partially_covered", gapAnalysis: "我方仅做基础转载，缺少深度解读" },
-          { title: "全国碳交易市场扩容方案出台", summary: "生态环境部发布碳交易市场扩容方案，新增水泥钢铁行业", sourceUrl: "https://people.com.cn/carbon-market-2026", author: "人民网环保频道", publishedAt: new Date(now - 36 * 3600000), topics: ["碳交易", "双碳", "环保政策"], category: "政策", sentiment: "positive", importance: 70, coverageStatus: "covered" },
-          { title: "乡村振兴数字化转型典型案例发布", summary: "农业农村部公布10个乡村振兴数字化转型典型案例", sourceUrl: "https://people.com.cn/rural-digital-2026", author: "人民网三农频道", publishedAt: new Date(now - 48 * 3600000), topics: ["乡村振兴", "数字化转型"], category: "社会", sentiment: "positive", importance: 55, coverageStatus: "covered" },
-        ],
-      },
-      {
-        platformName: "新华网",
-        items: [
-          { title: "国务院常务会议部署AI产业发展新举措", summary: "国务院常务会议审议通过人工智能产业高质量发展若干措施", sourceUrl: "https://xinhuanet.com/ai-policy-2026", author: "新华社", publishedAt: new Date(now - 4 * 3600000), topics: ["AI产业", "国务院", "产业政策"], category: "政策", sentiment: "positive", importance: 95, coverageStatus: "missed", gapAnalysis: "重要政策发布，我方尚未跟进" },
-          { title: "新能源汽车出口量创历史新高", summary: "海关总署数据显示一季度新能源汽车出口量同比增长45%", sourceUrl: "https://xinhuanet.com/nev-export-2026", author: "新华社经济部", publishedAt: new Date(now - 12 * 3600000), topics: ["新能源汽车", "出口", "制造业"], category: "经济", sentiment: "positive", importance: 80, coverageStatus: "partially_covered", gapAnalysis: "缺少数据可视化分析" },
-          { title: "长三角一体化发展再提速", summary: "长三角三省一市签署新一轮合作框架协议", sourceUrl: "https://xinhuanet.com/yangtze-delta-2026", author: "新华社上海分社", publishedAt: new Date(now - 30 * 3600000), topics: ["长三角", "区域发展", "一体化"], category: "经济", sentiment: "positive", importance: 65, coverageStatus: "covered" },
-          { title: "北京发布全球数字经济标杆城市方案", summary: "北京市政府发布建设全球数字经济标杆城市实施方案2.0版", sourceUrl: "https://xinhuanet.com/bj-digital-2026", author: "新华社北京分社", publishedAt: new Date(now - 42 * 3600000), topics: ["数字经济", "北京", "城市发展"], category: "政策", sentiment: "positive", importance: 72, coverageStatus: "covered" },
-          { title: "全球半导体行业格局深度报告", summary: "全球半导体市场分析报告显示中国产能占比持续提升", sourceUrl: "https://xinhuanet.com/semiconductor-report", author: "新华社国际部", publishedAt: new Date(now - 60 * 3600000), topics: ["半导体", "全球市场", "产能分析"], category: "科技", sentiment: "neutral", importance: 75, coverageStatus: "missed", gapAnalysis: "重要行业报告未跟进" },
-        ],
-      },
-      {
-        platformName: "央视新闻",
-        items: [
-          { title: "AI手机大战：三巨头旗舰同日发布", summary: "华为、小米、OPPO三大品牌同日发布AI旗舰手机", sourceUrl: "https://news.cctv.com/ai-phone-2026", author: "央视财经", publishedAt: new Date(now - 6 * 3600000), topics: ["AI手机", "华为", "小米", "科技消费"], category: "科技", sentiment: "neutral", importance: 88, coverageStatus: "covered" },
-          { title: "春季就业市场调查：AI岗位需求激增", summary: "人社部发布春季就业市场报告，AI相关岗位需求同比增长120%", sourceUrl: "https://news.cctv.com/ai-jobs-2026", author: "央视新闻联播", publishedAt: new Date(now - 15 * 3600000), topics: ["就业", "AI人才", "劳动市场"], category: "社会", sentiment: "positive", importance: 73, coverageStatus: "partially_covered", gapAnalysis: "报道角度单一，缺少求职者视角" },
-          { title: "深圳前海自贸区政策升级", summary: "深圳前海自贸区发布新一轮改革开放方案", sourceUrl: "https://news.cctv.com/qianhai-2026", author: "央视新闻", publishedAt: new Date(now - 40 * 3600000), topics: ["前海", "自贸区", "改革开放"], category: "政策", sentiment: "positive", importance: 62, coverageStatus: "covered" },
-          { title: "全国网络安全攻防演练启动", summary: "年度网络安全攻防演练在全国多个城市同步启动", sourceUrl: "https://news.cctv.com/cyber-exercise-2026", author: "央视新闻", publishedAt: new Date(now - 55 * 3600000), topics: ["网络安全", "攻防演练"], category: "科技", sentiment: "neutral", importance: 58, coverageStatus: "covered" },
-          { title: "字节跳动内部大模型曝光引发热议", summary: "据报道字节跳动内部正在测试新一代大语言模型", sourceUrl: "https://news.cctv.com/bytedance-llm", author: "央视财经", publishedAt: new Date(now - 10 * 3600000), topics: ["字节跳动", "大模型", "AI竞争"], category: "科技", sentiment: "neutral", importance: 90, coverageStatus: "missed", gapAnalysis: "热度极高的科技话题未跟进" },
-        ],
-      },
-      {
-        platformName: "光明网",
-        items: [
-          { title: "教育部发布AI进校园指导意见", summary: "教育部出台人工智能技术在基础教育中的应用指导意见", sourceUrl: "https://gmw.cn/ai-education-2026", author: "光明日报教育版", publishedAt: new Date(now - 5 * 3600000), topics: ["AI教育", "基础教育", "教育政策"], category: "社会", sentiment: "positive", importance: 76, coverageStatus: "missed", gapAnalysis: "教育类政策我方关注不足" },
-          { title: "高校科研成果转化率创新高", summary: "教育部统计2025年全国高校科研成果转化率达到28%", sourceUrl: "https://gmw.cn/research-transfer-2026", author: "光明日报", publishedAt: new Date(now - 24 * 3600000), topics: ["科研转化", "高校", "创新"], category: "科技", sentiment: "positive", importance: 60, coverageStatus: "covered" },
-          { title: "文化数字化战略实施进展报告", summary: "中宣部发布文化数字化战略实施一周年进展报告", sourceUrl: "https://gmw.cn/culture-digital-2026", author: "光明网文化频道", publishedAt: new Date(now - 50 * 3600000), topics: ["文化数字化", "战略报告"], category: "社会", sentiment: "positive", importance: 55, coverageStatus: "covered" },
-          { title: "Z世代消费趋势报告：AI消费占比超15%", summary: "最新消费趋势报告显示Z世代在AI产品上的支出占比首次超过15%", sourceUrl: "https://gmw.cn/gen-z-consumption", author: "光明日报", publishedAt: new Date(now - 32 * 3600000), topics: ["Z世代", "消费趋势", "AI消费"], category: "财经", sentiment: "neutral", importance: 68, coverageStatus: "partially_covered", gapAnalysis: "缺少年轻消费者访谈视角" },
-          { title: "古籍数字化保护工程取得突破", summary: "国家图书馆完成百万页古籍数字化处理", sourceUrl: "https://gmw.cn/ancient-books-digital", author: "光明网文化频道", publishedAt: new Date(now - 70 * 3600000), topics: ["古籍保护", "数字化"], category: "社会", sentiment: "positive", importance: 45, coverageStatus: "covered" },
-        ],
-      },
-      {
-        platformName: "中国新闻网",
-        items: [
-          { title: "OpenAI推出企业版Agent平台", summary: "OpenAI正式发布面向企业客户的AI Agent开发平台", sourceUrl: "https://chinanews.com.cn/openai-agent-2026", author: "中新网科技频道", publishedAt: new Date(now - 3 * 3600000), topics: ["OpenAI", "AI Agent", "企业服务"], category: "科技", sentiment: "neutral", importance: 82, coverageStatus: "missed", gapAnalysis: "国际AI动态跟进不及时" },
-          { title: "海底捞推出AI智能服务员", summary: "海底捞在全国50家门店试点AI智能服务机器人", sourceUrl: "https://chinanews.com.cn/haidilao-ai-2026", author: "中新网财经", publishedAt: new Date(now - 14 * 3600000), topics: ["海底捞", "AI服务", "餐饮科技"], category: "商业", sentiment: "positive", importance: 65, coverageStatus: "missed", gapAnalysis: "商业AI应用案例关注不足" },
-          { title: "跨境电商新政策解读", summary: "商务部发布跨境电商综合试验区扩容方案", sourceUrl: "https://chinanews.com.cn/cross-border-2026", author: "中新社经济部", publishedAt: new Date(now - 28 * 3600000), topics: ["跨境电商", "商务政策"], category: "经济", sentiment: "positive", importance: 63, coverageStatus: "covered" },
-          { title: "直播带货监管新规生效", summary: "市场监管总局发布的直播带货管理办法正式生效实施", sourceUrl: "https://chinanews.com.cn/live-commerce-2026", author: "中新网", publishedAt: new Date(now - 20 * 3600000), topics: ["直播带货", "监管", "电商"], category: "商业", sentiment: "neutral", importance: 70, coverageStatus: "partially_covered", gapAnalysis: "监管细则解读不够深入" },
-          { title: "中东局势对能源市场影响分析", summary: "中东局势持续紧张，国际油价波动加剧", sourceUrl: "https://chinanews.com.cn/middle-east-energy", author: "中新社国际部", publishedAt: new Date(now - 45 * 3600000), topics: ["中东局势", "能源市场", "油价"], category: "经济", sentiment: "negative", importance: 72, coverageStatus: "covered" },
-        ],
-      },
-      {
-        platformName: "澎湃新闻",
-        items: [
-          { title: "两会数字经济前瞻：代表委员提案盘点", summary: "梳理2026年全国两会关于数字经济的十大提案", sourceUrl: "https://thepaper.cn/digital-economy-proposals", author: "澎湃新闻", publishedAt: new Date(now - 7 * 3600000), topics: ["两会", "数字经济", "提案"], category: "政策", sentiment: "neutral", importance: 84, coverageStatus: "partially_covered", gapAnalysis: "缺少代表委员独家观点引用" },
-          { title: "上海AI产业集群效应初显", summary: "上海人工智能产业规模突破5000亿元，集群效应初步形成", sourceUrl: "https://thepaper.cn/sh-ai-cluster-2026", author: "澎湃新闻科技版", publishedAt: new Date(now - 16 * 3600000), topics: ["上海", "AI产业", "产业集群"], category: "经济", sentiment: "positive", importance: 74, coverageStatus: "covered" },
-          { title: "某地自动驾驶事故调查报告出炉", summary: "交通部门发布自动驾驶测试事故调查报告，提出整改建议", sourceUrl: "https://thepaper.cn/autonomous-driving-accident", author: "澎湃新闻", publishedAt: new Date(now - 11 * 3600000), topics: ["自动驾驶", "交通安全", "事故调查"], category: "社会", sentiment: "negative", importance: 91, coverageStatus: "covered" },
-          { title: "长租公寓市场洗牌加速", summary: "头部长租公寓企业市场份额进一步集中", sourceUrl: "https://thepaper.cn/rental-market-2026", author: "澎湃新闻", publishedAt: new Date(now - 38 * 3600000), topics: ["长租公寓", "房地产", "市场格局"], category: "经济", sentiment: "neutral", importance: 50, coverageStatus: "covered" },
-          { title: "全球芯片出口管制新动态", summary: "美国商务部更新芯片出口管制清单，多家中企受影响", sourceUrl: "https://thepaper.cn/chip-export-control", author: "澎湃新闻国际部", publishedAt: new Date(now - 9 * 3600000), topics: ["芯片管制", "中美科技", "出口限制"], category: "科技", sentiment: "negative", importance: 93, coverageStatus: "missed", gapAnalysis: "重大国际科技动态未及时覆盖" },
-        ],
-      },
-      {
-        platformName: "红星新闻",
-        items: [
-          { title: "成都AI产业园落地首批入驻企业", summary: "成都高新区AI产业园迎来首批20家AI企业入驻", sourceUrl: "https://cdsb.com/chengdu-ai-park-2026", author: "红星新闻", publishedAt: new Date(now - 22 * 3600000), topics: ["成都", "AI产业园", "西部发展"], category: "经济", sentiment: "positive", importance: 58, coverageStatus: "covered" },
-          { title: "四川推进数字乡村建设", summary: "四川省发布数字乡村建设三年行动方案", sourceUrl: "https://cdsb.com/digital-village-2026", author: "红星新闻", publishedAt: new Date(now - 35 * 3600000), topics: ["数字乡村", "四川", "乡村振兴"], category: "政策", sentiment: "positive", importance: 52, coverageStatus: "covered" },
-          { title: "西南地区新能源汽车消费报告", summary: "西南五省新能源汽车消费报告显示渗透率首次超过40%", sourceUrl: "https://cdsb.com/sw-nev-2026", author: "红星新闻财经版", publishedAt: new Date(now - 50 * 3600000), topics: ["新能源汽车", "西南市场", "消费数据"], category: "经济", sentiment: "positive", importance: 55, coverageStatus: "covered" },
-          { title: "网红经济泡沫：MCN机构大洗牌", summary: "多家MCN机构面临资金链断裂，行业进入深度调整期", sourceUrl: "https://cdsb.com/mcn-crisis-2026", author: "红星新闻", publishedAt: new Date(now - 26 * 3600000), topics: ["MCN", "网红经济", "行业洗牌"], category: "商业", sentiment: "negative", importance: 67, coverageStatus: "partially_covered", gapAnalysis: "缺少MCN从业者深度访谈" },
-          { title: "川渝地区数据中心建设提速", summary: "成渝地区双城经济圈数据中心集群建设进入快车道", sourceUrl: "https://cdsb.com/datacenter-2026", author: "红星新闻", publishedAt: new Date(now - 65 * 3600000), topics: ["数据中心", "成渝", "新基建"], category: "科技", sentiment: "positive", importance: 60, coverageStatus: "covered" },
-        ],
-      },
-    ];
-
-    let contentInserted = 0;
-    for (const platformData of contentData) {
-      const platformId = platformIdMap.get(platformData.platformName);
-      if (!platformId) {
-        console.log(`   Platform "${platformData.platformName}" not found in map, skipping`);
-        continue;
-      }
-      for (const item of platformData.items) {
-        await db.insert(schema.platformContent).values({
-          organizationId: org.id,
-          platformId,
-          title: item.title,
-          summary: item.summary,
-          sourceUrl: item.sourceUrl,
-          author: item.author,
-          publishedAt: item.publishedAt,
-          topics: item.topics,
-          category: item.category,
-          sentiment: item.sentiment,
-          importance: item.importance,
-          contentHash: `hash_${Date.now()}_${contentInserted}`,
-          coverageStatus: item.coverageStatus,
-          gapAnalysis: item.gapAnalysis,
-          crawledAt: new Date(item.publishedAt.getTime() + 30 * 60000),
-          analyzedAt: new Date(item.publishedAt.getTime() + 60 * 60000),
-        });
-        contentInserted++;
-      }
-      await db.update(schema.monitoredPlatforms).set({ totalContentCount: 5 }).where(eq(schema.monitoredPlatforms.id, platformId));
-      console.log(`   ${platformData.platformName}: 5 content items`);
-    }
-    console.log(`   Total content: ${contentInserted}`);
-  }
+  console.log('⏩ Skipping legacy benchmarking seed (replaced by topic-compare v2)');
   console.log();
 
   // -----------------------------------------------------------------------
-  // Benchmark Analyses (3 rows)
+  // Topic-Compare v2 accounts (2026-04-21)
   // -----------------------------------------------------------------------
-  console.log("📊 Seeding benchmark analyses...");
-
-  const [existingAnalyses] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.benchmarkAnalyses).where(eq(schema.benchmarkAnalyses.organizationId, org.id));
-  if (existingAnalyses.count > 0) {
-    console.log(`   Skipping (${existingAnalyses.count} already exist)`);
-  } else {
-    const analysesNow = Date.now();
-    const analysesData = [
-      {
-        topicTitle: "AI手机大战：三巨头旗舰同日发布",
-        category: "科技",
-        mediaScores: [
-          { media: "我方（Vibe Media）", isUs: true, scores: [{ dimension: "叙事角度", score: 7 }, { dimension: "视觉品质", score: 8 }, { dimension: "互动策略", score: 6 }, { dimension: "时效性", score: 9 }], total: 30, publishTime: "09:15" },
-          { media: "36氪", isUs: false, scores: [{ dimension: "叙事角度", score: 9 }, { dimension: "视觉品质", score: 7 }, { dimension: "互动策略", score: 8 }, { dimension: "时效性", score: 8 }], total: 32, publishTime: "08:30" },
-          { media: "虎嗅", isUs: false, scores: [{ dimension: "叙事角度", score: 8 }, { dimension: "视觉品质", score: 6 }, { dimension: "互动策略", score: 7 }, { dimension: "时效性", score: 7 }], total: 28, publishTime: "09:45" },
-          { media: "澎湃新闻", isUs: false, scores: [{ dimension: "叙事角度", score: 7 }, { dimension: "视觉品质", score: 8 }, { dimension: "互动策略", score: 5 }, { dimension: "时效性", score: 9 }], total: 29, publishTime: "08:00" },
-        ],
-        radarData: [{ dimension: "叙事角度", us: 7, best: 9 }, { dimension: "视觉品质", us: 8, best: 8 }, { dimension: "互动策略", us: 6, best: 8 }, { dimension: "时效性", us: 9, best: 9 }],
-        improvements: ["叙事角度：增加供应链视角的深度分析，参考36氪的多维度拆解方式", "互动策略：添加投票互动和评论引导，提升用户参与度", "标题优化：使用更具冲突性的标题结构"],
-      },
-      {
-        topicTitle: "新能源汽车降价潮",
-        category: "汽车",
-        mediaScores: [
-          { media: "我方（Vibe Media）", isUs: true, scores: [{ dimension: "叙事角度", score: 8 }, { dimension: "视觉品质", score: 7 }, { dimension: "互动策略", score: 7 }, { dimension: "时效性", score: 6 }], total: 28, publishTime: "10:30" },
-          { media: "第一财经", isUs: false, scores: [{ dimension: "叙事角度", score: 9 }, { dimension: "视觉品质", score: 9 }, { dimension: "互动策略", score: 6 }, { dimension: "时效性", score: 8 }], total: 32, publishTime: "08:00" },
-          { media: "财新", isUs: false, scores: [{ dimension: "叙事角度", score: 9 }, { dimension: "视觉品质", score: 7 }, { dimension: "互动策略", score: 5 }, { dimension: "时效性", score: 7 }], total: 28, publishTime: "09:00" },
-        ],
-        radarData: [{ dimension: "叙事角度", us: 8, best: 9 }, { dimension: "视觉品质", us: 7, best: 9 }, { dimension: "互动策略", us: 7, best: 7 }, { dimension: "时效性", us: 6, best: 8 }],
-        improvements: ["时效性：需提前预设模板，降价消息出来后15分钟内发布", "视觉品质：增加数据可视化图表，参考第一财经的交互式价格对比"],
-      },
-      {
-        topicTitle: "两会数字经济前瞻",
-        category: "政策",
-        mediaScores: [
-          { media: "我方（Vibe Media）", isUs: true, scores: [{ dimension: "叙事角度", score: 6 }, { dimension: "视觉品质", score: 7 }, { dimension: "互动策略", score: 8 }, { dimension: "时效性", score: 8 }], total: 29, publishTime: "07:30" },
-          { media: "澎湃新闻", isUs: false, scores: [{ dimension: "叙事角度", score: 9 }, { dimension: "视觉品质", score: 8 }, { dimension: "互动策略", score: 7 }, { dimension: "时效性", score: 9 }], total: 33, publishTime: "06:00" },
-        ],
-        radarData: [{ dimension: "叙事角度", us: 6, best: 9 }, { dimension: "视觉品质", us: 7, best: 8 }, { dimension: "互动策略", us: 8, best: 8 }, { dimension: "时效性", us: 8, best: 9 }],
-        improvements: ["叙事角度：需增加代表委员直接引用和独家观点", "时效性：建议提前24小时准备预测稿件"],
-      },
-    ];
-
-    for (const analysis of analysesData) {
-      await db.insert(schema.benchmarkAnalyses).values({
-        organizationId: org.id,
-        ...analysis,
-        analyzedAt: new Date(analysesNow - Math.floor(Math.random() * 3) * 24 * 3600000),
-      });
-      console.log(`   Analysis: ${analysis.topicTitle}`);
-    }
-  }
-  console.log();
-
-  // -----------------------------------------------------------------------
-  // Missed Topics (8 rows)
-  // -----------------------------------------------------------------------
-  console.log("🔍 Seeding missed topics...");
-
-  const [existingMissed] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.missedTopics).where(eq(schema.missedTopics.organizationId, org.id));
-  if (existingMissed.count > 0) {
-    console.log(`   Skipping (${existingMissed.count} already exist)`);
-  } else {
-    const today = new Date();
-    const missedTopicsData = [
-      { title: "科技部发布AI安全白皮书", priority: "high" as const, competitors: ["财新", "36氪", "澎湃"], heatScore: 78, category: "政策", type: "breaking" as const, status: "missed" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14, 20) },
-      { title: "字节跳动内部大模型曝光", priority: "high" as const, competitors: ["虎嗅", "36氪"], heatScore: 85, category: "科技", type: "trending" as const, status: "tracking" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 30) },
-      { title: "海底捞推出AI服务员", priority: "medium" as const, competitors: ["第一财经"], heatScore: 62, category: "商业", type: "trending" as const, status: "missed" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 13, 0) },
-      { title: "某地自动驾驶事故引发讨论", priority: "high" as const, competitors: ["澎湃", "财新", "第一财经"], heatScore: 91, category: "社会", type: "breaking" as const, status: "resolved" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 10, 15) },
-      { title: "OpenAI推出企业版Agent平台", priority: "medium" as const, competitors: ["36氪"], heatScore: 65, category: "科技", type: "analysis" as const, status: "missed" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 15, 30) },
-      { title: "直播带货新监管规则生效", priority: "medium" as const, competitors: ["澎湃"], heatScore: 58, category: "商业", type: "breaking" as const, status: "tracking" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0) },
-      { title: "Z世代消费趋势报告发布", priority: "low" as const, competitors: ["第一财经", "虎嗅"], heatScore: 45, category: "财经", type: "analysis" as const, status: "missed" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 16, 0) },
-      { title: "全球芯片出口管制新动态", priority: "high" as const, competitors: ["财新", "澎湃", "36氪", "第一财经"], heatScore: 88, category: "科技", type: "breaking" as const, status: "tracking" as const, discoveredAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 45) },
-    ];
-
-    for (const topic of missedTopicsData) {
-      await db.insert(schema.missedTopics).values({
-        organizationId: org.id,
-        ...topic,
-      });
-      console.log(`   Missed topic: ${topic.title}`);
-    }
-  }
+  console.log("📡 Seeding topic-compare v2 accounts...");
+  const { seedTopicCompareAccounts } = await import("./seed-topic-compare");
+  await seedTopicCompareAccounts(org.id);
   console.log();
 
   // -----------------------------------------------------------------------

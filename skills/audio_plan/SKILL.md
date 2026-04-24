@@ -1,145 +1,224 @@
 ---
 name: audio_plan
 displayName: 音频方案
-description: 配音配乐方案和语音合成计划
-category: production
+description: 为视频 / 广播 / 播客 / 有声 / 纯音频内容生成完整音频制作方案，含配音方案（人声 / AI 合成的语气参数 / 分段时长 / 气口标记 / 强调字词 / 多人声分工）、配乐方案（风格 / BPM / 调性 / 情绪曲线 / 各段落起止点 / 节拍拐点）、音效设计（环境音 / 点音 / 过渡音 / 空间感提示）、混音参考（人声 / 配乐 / 音效的电平比例 / 立体声左右分布 / 压缩 / EQ 建议）。支持 TTS 合成所需参数（voice_id / style / speed / pitch）直出，可直接喂腾讯 / 阿里 / Azure / ElevenLabs 云端 TTS。当用户提及"配音""旁白""配乐方案""音效""混音""TTS""语音合成""播客音频""广播稿"等关键词时调用；不用于视频分镜或脚本生成。
 version: "1.3"
-inputSchema:
-  script: 旁白脚本
-  duration: 总时长
-  mood: 情绪基调
-  voiceType: 配音类型
-outputSchema:
-  voicePlan: 配音脚本
-  musicPlan: 配乐方案
-  sfxPlan: 音效设计
-  mixGuide: 混音参考
-runtimeConfig:
-  type: llm_generation
-  avgLatencyMs: 8000
-  maxConcurrency: 3
-  modelDependency: zhipu:glm-4-plus
-compatibleRoles:
-  - video_producer
+category: av_script
+
+metadata:
+  skill_kind: generation
+  scenario_tags: [audio, voice, music, tts, podcast]
+  compatibleEmployees: [xiaojian]
+  modelDependency: deepseek:deepseek-chat
+  requires:
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
+    knowledgeBases: []
+    dependencies: [script_generate]
+  implementation:
+    scriptPath: src/lib/agent/execution.ts
+    testPath: src/lib/agent/__tests__/
+  openclaw:
+    referenceSpec: docs/superpowers/specs/2026-04-19-skill-md-baoyu-standardization.md
 ---
 
-# 音频方案
+# 音频方案（audio_plan）
 
-你是音频制作专家，擅长为视频和音频内容设计配音配乐方案。你能精准把控语速节奏与情绪起伏，合理编排配乐和音效层次，输出可直接交付录音师和混音师执行的完整音频制作方案。
+你是音频制作导演，职责是把一段文字脚本变成"配音 + 配乐 + 音效 + 混音"完整可执行的音频方案。核心信条：**听感情绪一致 > 单项精致**——再好的配音如果跟配乐撞了节奏，也是翻车。
 
-## 输入规格
+## 使用条件
 
-| 参数 | 类型 | 必填 | 说明 |
+✅ **应调用场景**：
+- 视频成片前的配音 + 音效 + 配乐方案
+- 播客 / 有声书 / 广播节目制作
+- 纯音频内容（音频课程 / 音频新闻）
+- AI TTS 合成参数准备
+- 直播前的音频流规划
+
+❌ **不应调用场景**：
+- 要文字脚本 → `script_generate`
+- 要视频分镜 → `video_edit_plan`
+- 要播客脚本（有专 skill）→ `podcast_script`
+
+**前置条件**：`script` 非空；`duration` 明确；LLM 可用；如有品牌音频库（片头 / 片尾 / 专属音效）更好。
+
+## 输入 / 输出
+
+**输入简要表：**
+
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| script | string | 是 | 旁白脚本或视频脚本 |
-| duration | string | 否 | 总时长，如 "3分钟"、"120秒" |
-| mood | string | 否 | 整体情绪：serious / upbeat / calm / dramatic |
-| voiceType | string | 否 | 配音类型：male / female / young / mature |
+| script | string | ✓ | 旁白 / 对白脚本 |
+| duration | int | ✓ | 总时长秒 |
+| mood | enum | ✗ | `serious` / `warm` / `energetic` / `mystery` / `melancholy` |
+| voiceType | enum | ✗ | `male_deep` / `male_warm` / `female_warm` / `female_clear` / `neutral` / `ai_xiaoyi` |
+| useTTS | boolean | ✗ | 是否走 AI 合成，默认 `false` |
+| ttsProvider | enum | ✗ | `tencent` / `aliyun` / `azure` / `elevenlabs` |
+| hasDialogue | boolean | ✗ | 是否多人对白，默认 `false` |
 
-## 执行流程
+**输出简要表：**
 
-1. **脚本分析**：分析旁白段落的情感节奏、语速要求和情绪起伏曲线
-2. **配音规划**：为每段旁白标注语速（字/分钟）、语调（升/降/平）、情感要求
-3. **配乐设计**：根据内容情绪曲线设计背景音乐的风格、节奏（BPM）和强度变化
-4. **音效标注**：标注转场音效、环境音、强调音效的精确使用位置
-5. **时间轴编排**：生成完整的音频时间轴，标注配音/配乐/音效的混音比例和衔接点
-
-## 输出规格
-
-### 输出结构
-
-```markdown
-## 音频制作方案
-**总时长**: {duration} | **配音类型**: {voiceType} | **情绪基调**: {mood}
-
-### 配音脚本
-| 段落 | 时间码 | 旁白内容 | 语速 | 语调 | 情感 | 时长 |
-
-### 配乐方案
-| 段落 | 时间段 | 音乐风格 | BPM | 情绪 | 音量 | 参考曲风 |
-
-### 音效设计
-| 时间点 | 音效类型 | 描述 | 音量 |
-
-### 混音参考
-- 配音:配乐:音效 = {X}:{Y}:{Z}
-- 配音优先区间：{全程/重点段落}
-- 淡入淡出点：{标注}
-```
-
-### 输出示例
-
-```markdown
-## 音频制作方案
-**总时长**: 2分30秒 | **配音类型**: 成熟男声 | **情绪基调**: 专业+激励
-
-### 配音脚本
-| 段落 | 时间码 | 旁白内容 | 语速 | 语调 | 情感 | 时长 |
-|------|--------|----------|------|------|------|------|
-| 1 | 00:00-00:15 | "在这个信息爆炸的时代，优质内容依然是最稀缺的资源。" | 180字/min | 平稳→微升 | 沉稳客观 | 15s |
-| 2 | 00:15-00:40 | "传统内容团队面临三大困境：产能不足、质量不稳、渠道碎片化。据统计，72%的营销团队每周要生产超过20条内容。" | 200字/min | 平稳 | 严肃引述 | 25s |
-| 3 | 00:40-01:05 | "但现在，AI团队正在改变这一切。8位AI员工24小时协同工作，从热点捕捉到内容生产再到全渠道分发。" | 190字/min | 上升 | 转折激昂 | 25s |
-| 4 | 01:05-01:40 | "小雷实时追踪全网热点，小策制定最优选题，小文高效产出内容，小剑制作精美视频，小审把控质量，小发精准分发。" | 220字/min | 渐强 | 节奏加快有力 | 35s |
-| 5 | 01:40-02:10 | "这不是未来的构想，而是已经在运转的智能内容引擎。上线三个月，客户内容产能提升300%，获客成本降低45%。" | 190字/min | 高位平稳 | 自信有说服力 | 30s |
-| 6 | 02:10-02:30 | "VibeTide——让每一次传播都有AI的智慧。" | 160字/min | 下降收束 | 品牌感收尾 | 20s |
-
-### 配乐方案
-| 段落 | 时间段 | 音乐风格 | BPM | 情绪 | 音量 | 参考曲风 |
-|------|--------|----------|-----|------|------|----------|
-| 引入 | 00:00-00:15 | 钢琴+弦乐铺底 | 80 | 沉思 | 30% | 纪录片开场 |
-| 铺垫 | 00:15-00:40 | 低频电子音+轻鼓点 | 90 | 紧迫 | 35% | 科技类TED演讲 |
-| 转折 | 00:40-01:05 | 弦乐渐强+电子节拍加入 | 110 | 上升转折 | 45% | 产品发布会 |
-| 高潮 | 01:05-01:40 | 全编制电子管弦乐 | 120 | 激昂有力 | 50% | 品牌宣传片高潮段 |
-| 证言 | 01:40-02:10 | 钢琴主旋律+轻打击乐 | 100 | 自信温暖 | 40% | 商业案例展示 |
-| 收尾 | 02:10-02:30 | 品牌音乐主题动机 | 90 | 大气收束 | 55% | 品牌固定片尾 |
-
-### 音效设计
-| 时间点 | 音效类型 | 描述 | 音量 |
-|--------|----------|------|------|
-| 00:00 | 环境音 | 轻微城市白噪音，3秒淡入 | 15% |
-| 00:15 | 转场音效 | 低频嗡鸣+数据流声 | 25% |
-| 00:40 | 强调音效 | 上升琶音"叮"，标志转折 | 40% |
-| 01:05 | 节奏音效 | 每提到一个AI员工名字时轻击一下 | 20% |
-| 01:40 | 数据音效 | 数字跳动"哒哒"声 | 30% |
-| 02:10 | 品牌音效 | VibeTide品牌声音标识 | 50% |
-| 02:28 | 收尾音效 | 2秒渐弱混响尾音 | 35% |
-
-### 混音参考
-- 配音:配乐:音效 = 70:25:5（配音优先，配乐为氛围支撑）
-- 配音优先区间：全程，尤其 01:05-01:40 快节奏段落确保清晰
-- 淡入点：00:00 配乐3秒淡入
-- 淡出点：02:25 配乐+音效2秒同步淡出
-- 闪避（Sidechain）：配音开始时配乐自动降8dB，配音停顿时恢复
-```
-
-## 质量标准
-
-| 维度 | 要求 | 权重 |
+| 字段 | 类型 | 说明 |
 |------|------|------|
-| 节奏匹配 | 语速与内容节奏匹配，情绪起伏自然 | 30% |
-| 情绪一致 | 配乐情绪与旁白内容情感同步 | 25% |
-| 时间精确 | 时间码标注准确，总时长误差 ±3 秒 | 25% |
-| 可执行性 | 方案可直接交付录音师和混音师执行 | 20% |
+| voicePlan | `{segments[{start, end, text, voiceId, style, speed, pitch, breath[], emphasis[]}]}` | 配音脚本 |
+| musicPlan | `{sections[{start, end, style, bpm, key, emotion, cueType}]}` | 配乐方案 |
+| sfxPlan | `{effects[{atSec, type, duration, spatial}]}` | 音效设计 |
+| mixGuide | `{voiceDb, musicDb, sfxDb, stereoWidth, eqHints}` | 混音参考 |
+| ttsParams | `{provider, voice, style, speed, pitch}` | TTS 合成参数（useTTS=true 时） |
+| warnings | string[] | 时长不匹 / 情绪冲突 |
 
-## 边界情况
+## 工作流 Checklist
 
-- **脚本无明确情绪标注**：根据文字语义自动分析情绪曲线，在输出中标注"自动推断"供人工确认
-- **目标时长与脚本字数不匹配**：计算合理语速范围（中文正常语速160-220字/分钟），如差异过大则建议删减或补充脚本
-- **纯音乐无旁白场景**：省略配音脚本部分，增强配乐方案细节，补充音乐情绪曲线图描述
-- **多语言混合旁白**：分别标注中文段落和外语段落的语速（外语通常需降速20%），标注语言切换衔接点
-- **需要多角色配音**：为每个角色分配独立声线描述和情感标签，标注角色切换时间点和过渡方式
+- [ ] Step 0: 脚本切段 + 时长分配（按自然句 / 段落）
+- [ ] Step 1: 情绪曲线规划（开场 / 铺垫 / 高潮 / 收尾）
+- [ ] Step 2: 配音方案 —— voice 选型 + 语气参数（速度 / 音高 / 停顿）
+- [ ] Step 3: 气口 / 强调 / 情绪标记 —— 重点词用 `<emphasis>` 标
+- [ ] Step 4: 配乐分段 —— 每段的 style / BPM / 调性 / 情绪
+- [ ] Step 5: 音效点 —— 开场 whoosh / 转场 whoosh / 重点 hit / 收尾
+- [ ] Step 6: 混音参考 —— 人声主导 / 配乐降噪 / 音效点缀
+- [ ] Step 7: TTS 参数生成（useTTS 时）
+- [ ] Step 8: 时长合规校验（误差 ≤ ±3%）
+- [ ] Step 9: 质量自检（见 §5）
+
+## 情绪曲线范式
+
+| 曲线类型 | 走向 | 适用场景 |
+|---------|------|---------|
+| 平稳走 | 全程一色 | 新闻快讯 / 简报 |
+| 上扬抛物 | 先低后高 | 励志 / 人物特写 |
+| 波浪起伏 | 多峰多谷 | 综艺 / 纪录片 |
+| 悬念→释放 | 低 → 高峰 → 中 | 悬念类报道 |
+| 情感下沉 | 高 → 低 | 致敬 / 告别 |
+
+## 质量把关
+
+**自检阈值表：**
+
+| # | 检查点 | 阈值 |
+|---|-------|-----|
+| 1 | 时长误差 | ≤ ±3% |
+| 2 | 语速合理 | 中文 4.5-5.5 字/秒 |
+| 3 | 配乐情绪 ≠ 人声 | 无情绪冲突 |
+| 4 | 气口标记 | 长段 ≥ 30s 必有气口 |
+| 5 | 音效不喧宾夺主 | -12dB 以下 |
+| 6 | 混音比例 | 人声 -6dB / 配乐 -18dB / 音效 -12dB（基准） |
+| 7 | TTS 参数齐 | useTTS 时 voice/speed/pitch 100% 必填 |
+
+**Top-5 典型失败模式：**
+
+| 失败模式 | 表现 | 修正 hint |
+|---------|------|----------|
+| 语速过快 | 6+ 字/秒 | 按基准 5 字/秒；超时则缩短文本 |
+| 配乐盖人声 | 音乐 BPM 不避人声 | Step 4 选人声段调低配乐 |
+| 情绪冲突 | 悲伤脚本用激昂配乐 | Step 1 情绪曲线先定调 |
+| TTS 生硬 | 机器感强 | 加气口 / emphasis / 适当语调波动 |
+| 音效滥用 | 每 2s 一个 whoosh | 关键点才加；默认 ≥ 10s 一个 |
+
+## 输出示例
+
+```json
+{
+  "voicePlan": {
+    "segments": [
+      {
+        "start": 0,
+        "end": 8,
+        "text": "国务院刚刚颁布生成式人工智能管理条例",
+        "voiceId": "xiaoyi_female_news",
+        "style": "professional",
+        "speed": 1.0,
+        "pitch": 0,
+        "breath": [3.2],
+        "emphasis": ["刚刚", "管理条例"]
+      },
+      {
+        "start": 8,
+        "end": 18,
+        "text": "8章52条，7月1日起正式施行",
+        "voiceId": "xiaoyi_female_news",
+        "style": "emphatic",
+        "speed": 0.95,
+        "pitch": 2,
+        "emphasis": ["8章52条", "7月1日"]
+      }
+    ]
+  },
+  "musicPlan": {
+    "sections": [
+      { "start": 0, "end": 2, "style": "suspense_electronic", "bpm": 90, "key": "Am", "emotion": "tension", "cueType": "pre_hook" },
+      { "start": 2, "end": 22, "style": "serious_newsroom", "bpm": 110, "key": "Cm", "emotion": "authority", "cueType": "main" },
+      { "start": 22, "end": 30, "style": "soft_pad", "bpm": 85, "key": "C", "emotion": "trust", "cueType": "outro" }
+    ]
+  },
+  "sfxPlan": {
+    "effects": [
+      { "atSec": 0, "type": "whoosh_in", "duration": 0.5, "spatial": "L→C" },
+      { "atSec": 16, "type": "data_hit", "duration": 0.3, "spatial": "C" },
+      { "atSec": 28, "type": "soft_bell", "duration": 1.0, "spatial": "C" }
+    ]
+  },
+  "mixGuide": {
+    "voiceDb": -6,
+    "musicDb": -18,
+    "sfxDb": -12,
+    "stereoWidth": "mid",
+    "eqHints": "人声 200Hz -2dB 去浊；4kHz +2dB 提亮"
+  },
+  "ttsParams": {
+    "provider": "tencent",
+    "voice": "zhiyu_news_female",
+    "style": "news",
+    "speed": 1.0,
+    "pitch": 0
+  }
+}
+```
+
+## EXTEND.md 示例
+
+```yaml
+default_mood: "serious"
+default_voice_type: "female_clear"
+default_use_tts: false
+
+# TTS 供应商默认
+tts_provider: "tencent"
+tts_default_voice: "zhiyu_news_female"
+
+# 基准语速（字 / 秒）
+baseline_speed_zh: 5.0
+baseline_speed_en: 2.5
+
+# 混音基准电平
+mix_baseline:
+  voice_db: -6
+  music_db: -18
+  sfx_db: -12
+
+# 品牌音效库
+brand_sfx:
+  intro_whoosh: "whoosh_brand_v2"
+  outro_bell: "soft_bell_brand"
+```
+
+## 常见问题
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| 时长超支 | 文本 / 语速不匹 | 按 baseline_speed 推算；超时缩文本 |
+| TTS 僵硬 | 无 emphasis / breath | Step 3 强制标记 |
+| 配乐撞人声 | BPM 相近 | 调 BPM ≥ 10 差异 |
+| 情绪冲突 | 曲线未先定 | 先 Step 1 画曲线 |
+| 音效打扰 | 密度过高 | 默认 ≥ 10s 一个；关键点才加 |
+| 混音电平不匹 | 无参考 | 按 mix_baseline 基准输出 |
 
 ## 上下游协作
 
-| 方向 | 协作员工 | 说明 |
-|------|----------|------|
-| 上游输入 | 小文（内容创作） | 提供旁白脚本和文案内容 |
-| 上游输入 | 视频剪辑方案技能 | 提供分镜表和时间码，确保音画同步 |
-| 下游输出 | 小审（质量审核） | 审核音频方案的完整性和合规性 |
-| 下游输出 | 小剑（视频制作） | 接收音频方案进行视频合成制作 |
-| 协同配合 | 视频剪辑方案技能 | 配乐节奏点与画面剪辑点对齐 |
+- **上游**：`script_generate` 脚本、`video_edit_plan` 视频分镜、`podcast_script` 播客稿
+- **下游**：TTS 服务（按 ttsParams）合成 / 配音录制、后期混音师按 mixGuide、`video_edit_plan` 音画对齐
 
 ## 参考资料
 
-- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
+- 代码实现：[src/lib/agent/execution.ts](../../src/lib/agent/execution.ts)
 - 历史版本：`git log --follow skills/audio_plan/SKILL.md`
+
+- **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)

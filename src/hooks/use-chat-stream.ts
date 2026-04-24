@@ -170,6 +170,7 @@ export function useChatStream({
             onTextDelta: (_delta, acc) => {
               setIsStreaming(true);
               setMessages((prev) => {
+                if (prev.length <= assistantIdx) return prev;
                 const updated = [...prev];
                 updated[assistantIdx] = {
                   role: "assistant",
@@ -190,6 +191,7 @@ export function useChatStream({
             },
             onError: (msg) => {
               setMessages((prev) => {
+                if (prev.length <= assistantIdx) return prev;
                 const updated = [...prev];
                 updated[assistantIdx] = {
                   role: "assistant",
@@ -202,6 +204,7 @@ export function useChatStream({
         );
 
         setMessages((prev) => {
+          if (prev.length <= assistantIdx) return prev;
           const updated = [...prev];
           updated[assistantIdx] = {
             role: "assistant",
@@ -220,6 +223,7 @@ export function useChatStream({
 
         // Re-apply final sources and refCount from the done callback
         setMessages((prev) => {
+          if (prev.length <= assistantIdx) return prev;
           const updated = [...prev];
           const sources = [
             ...new Set([...(updated[assistantIdx]?.sources ?? [])]),
@@ -232,6 +236,7 @@ export function useChatStream({
         });
       } catch (err) {
         setMessages((prev) => {
+          if (prev.length <= assistantIdx) return prev;
           const updated = [...prev];
           updated[assistantIdx] = {
             role: "assistant",

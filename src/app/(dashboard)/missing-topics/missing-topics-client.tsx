@@ -1,381 +1,317 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { toast } from "sonner";
+import { RefreshCcw, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
-import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/shared/data-table";
 import { Button } from "@/components/ui/button";
-import type { MissingTopicClue, MissingTopicKPIs } from "@/lib/types";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  runMissedTopicDetection,
+  confirmMissedTopic,
+  excludeMissedTopic,
+  markMissedTopicPushed,
+} from "@/app/actions/missing-topics";
+import type { MissingTopicRow } from "@/lib/dal/missing-topics";
 
-/* ─── Helpers ─── */
-
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${m}-${day} ${h}:${min}`;
-}
-
-function getUrgency(heatScore: number): "urgent" | "normal" | "watch" {
-  if (heatScore > 80) return "urgent";
-  if (heatScore >= 50) return "normal";
-  return "watch";
-}
-
-function urgencyIcon(heatScore: number): string {
-  const u = getUrgency(heatScore);
-  if (u === "urgent") return "🔴";
-  if (u === "normal") return "🟡";
-  return "🟢";
-}
-
-function heatBarColor(heatScore: number): string {
-  if (heatScore > 80) return "bg-red-500";
-  if (heatScore >= 50) return "bg-amber-500";
-  return "bg-gray-400";
-}
-
-/* ─── Source type config ─── */
-
-const sourceTypeConfig: Record<
-  MissingTopicClue["sourceType"],
-  { label: string; color: string }
-> = {
-  social_hot: {
-    label: "🔥 社媒热榜",
-    color:
-      "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  },
-  benchmark_media: {
-    label: "📰 对标媒体",
-    color:
-      "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  },
-  sentiment_event: {
-    label: "⚠️ 舆情预警",
-    color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-  },
+const LEVEL_LABEL: Record<string, string> = {
+  central: "央级",
+  provincial: "省级",
+  city: "地市",
+  industry: "行业",
+  self_media: "自媒体",
 };
 
-/* ─── Status badge config ─── */
-
-const statusConfig: Record<
-  MissingTopicClue["status"],
+const STATUS_CONFIG: Record<
+  MissingTopicRow["uiStatus"],
   { label: string; color: string }
 > = {
-  covered: {
-    label: "已覆盖",
-    color:
-      "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  },
-  suspected: {
-    label: "疑似漏题",
-    color:
-      "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  },
-  confirmed: {
-    label: "已确认漏题",
-    color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-  },
-  excluded: {
-    label: "已排除",
-    color:
-      "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
-  },
-  pushed: {
-    label: "已推送",
-    color:
-      "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  },
+  covered: { label: "已覆盖", color: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" },
+  suspected: { label: "疑似漏题", color: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300" },
+  confirmed: { label: "已确认", color: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" },
+  excluded: { label: "已排除", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  pushed: { label: "已推送", color: "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" },
 };
 
-/* ─── Filter & Sort Types ─── */
-
-type SourceFilter = "all" | "social_hot" | "benchmark_media" | "sentiment_event";
-type StatusFilter = "all" | "covered" | "suspected" | "confirmed" | "excluded" | "pushed";
-type SortMode = "heat" | "time";
-
-const sourceFilters: { key: SourceFilter; label: string }[] = [
-  { key: "all", label: "全部" },
-  { key: "social_hot", label: "🔥 社媒热榜" },
-  { key: "benchmark_media", label: "📰 对标媒体" },
-  { key: "sentiment_event", label: "⚠️ 舆情预警" },
-];
-
-const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: "all", label: "全部状态" },
-  { key: "suspected", label: "疑似漏题" },
-  { key: "confirmed", label: "已确认漏题" },
-  { key: "covered", label: "已覆盖" },
-  { key: "pushed", label: "已推送" },
-  { key: "excluded", label: "已排除" },
-];
-
-/* ─── Component ─── */
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 interface Props {
-  clues: MissingTopicClue[];
-  kpis: MissingTopicKPIs;
+  items: MissingTopicRow[];
+  kpis: {
+    totalClues: number;
+    suspectedMissed: number;
+    confirmedMissed: number;
+    covered: number;
+    excluded: number;
+    pushed: number;
+    coverageRate: number;
+  };
 }
 
-export function MissingTopicsClient({ clues, kpis }: Props) {
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortMode, setSortMode] = useState<SortMode>("heat");
+export function MissingTopicsClient({ items, kpis }: Props) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  function handleDetect() {
+    startTransition(async () => {
+      const res = await runMissedTopicDetection();
+      if (res.success) {
+        toast.success(
+          `扫描 ${res.scanned} 条对标报道：新增 ${res.created}，已覆盖 ${res.covered}`
+        );
+        router.refresh();
+      } else {
+        toast.error(res.error || "识别失败");
+      }
+    });
+  }
+
+  function handleConfirm(id: string) {
+    startTransition(async () => {
+      const res = await confirmMissedTopic(id);
+      if (res.success) {
+        toast.success("已确认为漏题");
+        router.refresh();
+      } else toast.error(res.error || "失败");
+    });
+  }
+
+  function handleExclude(id: string) {
+    const reason = prompt("排除原因（选填）") ?? "";
+    startTransition(async () => {
+      const res = await excludeMissedTopic({
+        topicId: id,
+        reasonCode: "manual_excluded",
+        reasonText: reason || undefined,
+      });
+      if (res.success) {
+        toast.success("已排除");
+        router.refresh();
+      } else toast.error(res.error || "失败");
+    });
+  }
+
+  function handlePush(id: string) {
+    startTransition(async () => {
+      const res = await markMissedTopicPushed(id);
+      if (res.success) {
+        toast.success("已推送");
+        router.refresh();
+      } else toast.error(res.error || "推送失败");
+    });
+  }
 
   const filtered = useMemo(() => {
-    let list = clues;
-
-    if (sourceFilter !== "all") {
-      list = list.filter((c) => c.sourceType === sourceFilter);
-    }
-
-    if (statusFilter !== "all") {
-      list = list.filter((c) => c.status === statusFilter);
-    }
-
-    const sorted = [...list].sort((a, b) => {
-      if (sortMode === "heat") return b.heatScore - a.heatScore;
-      return new Date(b.discoveredAt).getTime() - new Date(a.discoveredAt).getTime();
-    });
-
-    return sorted;
-  }, [clues, sourceFilter, statusFilter, sortMode]);
-
-  function rowBg(clue: MissingTopicClue): string {
-    if (clue.status !== "suspected") return "";
-    const u = getUrgency(clue.heatScore);
-    if (u === "urgent") return "bg-red-50/50 dark:bg-red-950/20";
-    if (u === "normal") return "bg-amber-50/50 dark:bg-amber-950/20";
-    return "";
-  }
+    if (statusFilter === "all") return items;
+    return items.filter((i) => i.uiStatus === statusFilter);
+  }, [items, statusFilter]);
 
   return (
     <div className="max-w-[1400px] mx-auto">
       <PageHeader
         title="漏题筛查"
-        description="系统从社媒热榜、对标媒体、舆情系统自动采集线索，筛查疑似漏题并提醒处置"
+        description="对标账号发了、我方账号未覆盖的话题线索"
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDetect}
+            disabled={pending}
+          >
+            <RefreshCcw className={`w-4 h-4 mr-1.5 ${pending ? "animate-spin" : ""}`} />
+            {pending ? "扫描中..." : "从对标报道刷新"}
+          </Button>
+        }
       />
 
-      {/* ── KPI Dashboard ── */}
-      <div className="grid grid-cols-5 gap-3 mb-5">
-        {/* 今日线索总量 */}
-        <GlassCard padding="md">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            今日线索总量
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {kpis.totalClues}
-          </p>
+      {/* KPI */}
+      <div className="grid grid-cols-6 gap-3 mb-4">
+        <GlassCard padding="sm">
+          <div className="text-xs text-gray-500">总线索</div>
+          <div className="text-2xl font-bold mt-1">{kpis.totalClues}</div>
         </GlassCard>
-
-        {/* 疑似漏题 */}
-        <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-5">
-          <p className="text-xs font-medium text-red-600 dark:text-red-400">
-            疑似漏题
-          </p>
-          <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
-            {kpis.suspectedMissed}
-          </p>
+        <div className="rounded-xl bg-orange-50 dark:bg-orange-950/30 p-4">
+          <div className="text-xs text-orange-600">疑似漏题</div>
+          <div className="text-2xl font-bold mt-1 text-orange-600">{kpis.suspectedMissed}</div>
         </div>
-
-        {/* 已确认漏题 */}
-        <div className="rounded-xl bg-orange-50 dark:bg-orange-950/30 p-5">
-          <p className="text-xs font-medium text-orange-600 dark:text-orange-400">
-            已确认漏题
-          </p>
-          <p className="mt-1 text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {kpis.confirmedMissed}
-          </p>
+        <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-4">
+          <div className="text-xs text-red-600">已确认</div>
+          <div className="text-2xl font-bold mt-1 text-red-600">{kpis.confirmedMissed}</div>
         </div>
-
-        {/* 已处置 */}
-        <div className="rounded-xl bg-green-50 dark:bg-green-950/30 p-5">
-          <p className="text-xs font-medium text-green-600 dark:text-green-400">
-            已处置
-          </p>
-          <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
-            {kpis.handled}
-          </p>
+        <div className="rounded-xl bg-green-50 dark:bg-green-950/30 p-4">
+          <div className="text-xs text-green-600">已覆盖</div>
+          <div className="text-2xl font-bold mt-1 text-green-600">{kpis.covered}</div>
         </div>
-
-        {/* 线索覆盖率 */}
-        <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-5">
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-            线索覆盖率
-          </p>
-          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {kpis.coverageRate}
-            <span className="text-sm font-normal ml-0.5">%</span>
-          </p>
+        <div className="rounded-xl bg-sky-50 dark:bg-sky-950/30 p-4">
+          <div className="text-xs text-sky-600">已推送</div>
+          <div className="text-2xl font-bold mt-1 text-sky-600">{kpis.pushed}</div>
         </div>
+        <GlassCard padding="sm">
+          <div className="text-xs text-gray-500">覆盖率</div>
+          <div className="text-2xl font-bold mt-1">{kpis.coverageRate}%</div>
+        </GlassCard>
       </div>
 
-      {/* ── Filter Bar ── */}
-      <GlassCard padding="sm" className="mb-5">
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Source type filter */}
-          <div className="flex gap-1">
-            {sourceFilters.map((f) => (
-              <Button
-                key={f.key}
-                variant={sourceFilter === f.key ? "default" : "ghost"}
-                size="sm"
-                className="border-0"
-                onClick={() => setSourceFilter(f.key)}
-              >
-                {f.label}
-              </Button>
-            ))}
+      <div className="mb-3">
+        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+          <TabsList variant="line">
+            <TabsTrigger value="all">全部</TabsTrigger>
+            <TabsTrigger value="suspected">疑似漏题</TabsTrigger>
+            <TabsTrigger value="confirmed">已确认</TabsTrigger>
+            <TabsTrigger value="covered">已覆盖</TabsTrigger>
+            <TabsTrigger value="pushed">已推送</TabsTrigger>
+            <TabsTrigger value="excluded">已排除</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {filtered.length === 0 ? (
+        <GlassCard padding="lg">
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <p className="text-sm">{items.length === 0 ? "暂无漏题线索" : "当前筛选无数据"}</p>
+            <p className="text-xs mt-2">点击右上角「从对标报道刷新」生成线索</p>
           </div>
-
-          {/* Status filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="h-8 rounded-md bg-white/60 dark:bg-gray-800/60 px-2.5 text-sm outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 transition"
-          >
-            {statusFilters.map((f) => (
-              <option key={f.key} value={f.key}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Sort toggle */}
-          <div className="flex gap-1 ml-auto">
-            <Button
-              variant={sortMode === "heat" ? "default" : "ghost"}
-              size="sm"
-              className="border-0"
-              onClick={() => setSortMode("heat")}
-            >
-              按热度
-            </Button>
-            <Button
-              variant={sortMode === "time" ? "default" : "ghost"}
-              size="sm"
-              className="border-0"
-              onClick={() => setSortMode("time")}
-            >
-              按时间
-            </Button>
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* ── Clue Table ── */}
-      <GlassCard padding="none">
-        {/* Table header */}
-        <div className="grid grid-cols-[1fr_110px_140px_100px_110px_110px_100px] gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
-          <span>线索标题</span>
-          <span>线索来源</span>
-          <span>来源详情</span>
-          <span>热度</span>
-          <span>入库时间</span>
-          <span>漏题状态</span>
-          <span>操作</span>
-        </div>
-
-        {/* Table body */}
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
-            <Search className="h-10 w-10 mb-3 opacity-40" />
-            <p className="text-sm font-medium">暂无线索数据</p>
-            <p className="text-xs mt-1">
-              系统将定时从社媒热榜、舆情系统、对标媒体采集线索
-            </p>
-          </div>
-        ) : (
-          filtered.map((clue) => {
-            const src = sourceTypeConfig[clue.sourceType];
-            const st = statusConfig[clue.status];
-            const canViewDetail =
-              clue.status !== "covered" && clue.status !== "excluded";
-
-            return (
-              <div
-                key={clue.id}
-                className={`grid grid-cols-[1fr_110px_140px_100px_110px_110px_100px] gap-2 px-5 py-4 border-b border-gray-50 dark:border-gray-800/50 last:border-b-0 items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition ${rowBg(clue)}`}
-              >
-                {/* 线索标题 */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="shrink-0">{urgencyIcon(clue.heatScore)}</span>
-                  <span className="text-sm text-gray-900 dark:text-gray-100 truncate font-normal">
-                    {clue.title}
-                  </span>
-                  {clue.isMultiSource && (
-                    <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 text-[10px] px-1.5 py-0 leading-4 shrink-0 border-0">
-                      🔗多源
-                    </Badge>
-                  )}
-                </div>
-
-                {/* 线索来源 */}
-                <div>
-                  <span
-                    className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${src.color}`}
-                  >
-                    {src.label}
-                  </span>
-                </div>
-
-                {/* 来源详情 */}
-                <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {clue.sourceDetail}
-                </span>
-
-                {/* 热度 */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${heatBarColor(clue.heatScore)}`}
-                      style={{ width: `${clue.heatScore}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-600 dark:text-gray-400 tabular-nums w-7 text-right">
-                    {clue.heatScore}
-                  </span>
-                </div>
-
-                {/* 入库时间 */}
-                <span className="text-sm text-gray-600 dark:text-gray-400 font-normal">
-                  {formatTime(clue.discoveredAt)}
-                </span>
-
-                {/* 漏题状态 */}
-                <div>
-                  <span
-                    className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${st.color}`}
-                  >
-                    {st.label}
-                  </span>
-                </div>
-
-                {/* 操作 */}
-                <div>
-                  {canViewDetail ? (
+        </GlassCard>
+      ) : (
+        <DataTable
+            rows={filtered}
+            rowKey={(r) => r.id}
+            columns={[
+              {
+                key: "title",
+                header: "线索标题",
+                render: (r) => (
+                  <div className="min-w-0">
                     <Link
-                      href={`/missing-topics/${clue.id}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition"
+                      href={`/missing-topics/${r.id}`}
+                      className="text-sm text-gray-900 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 truncate block"
                     >
-                      查看详情 &rarr;
+                      {r.title}
                     </Link>
+                    {r.topic && (
+                      <div className="text-xs text-gray-500 mt-0.5 truncate">
+                        {r.topic}
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: "source",
+                header: "主要来源",
+                width: "200px",
+                render: (r) => (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-700">{r.primarySourceName}</span>
+                    {r.primarySourceLevel && (
+                      <span className="text-[10px] text-gray-500">
+                        {LEVEL_LABEL[r.primarySourceLevel] ?? r.primarySourceLevel}
+                      </span>
+                    )}
+                    {r.primarySourceUrl && (
+                      <a
+                        href={r.primarySourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sky-600 hover:text-sky-700"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: "relatedCount",
+                header: "多源",
+                width: "60px",
+                align: "center",
+                render: (r) =>
+                  r.relatedCount > 0 ? (
+                    <span className="text-xs text-gray-600">+{r.relatedCount}</span>
                   ) : (
-                    <span className="text-sm text-gray-400 dark:text-gray-500">
-                      —
+                    <span className="text-xs text-gray-400">-</span>
+                  ),
+              },
+              {
+                key: "discoveredAt",
+                header: "发现时间",
+                width: "110px",
+                render: (r) => <span className="text-xs text-gray-500">{fmtDate(r.discoveredAt)}</span>,
+              },
+              {
+                key: "heatScore",
+                header: "热度",
+                width: "60px",
+                align: "right",
+                render: (r) => <span className="text-xs">{r.heatScore}</span>,
+              },
+              {
+                key: "status",
+                header: "状态",
+                width: "90px",
+                render: (r) => {
+                  const s = STATUS_CONFIG[r.uiStatus];
+                  return (
+                    <span className={`text-[11px] px-2 py-0.5 rounded ${s.color}`}>
+                      {s.label}
                     </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </GlassCard>
+                  );
+                },
+              },
+              {
+                key: "actions",
+                header: "操作",
+                width: "220px",
+                render: (r) => {
+                  if (r.uiStatus === "excluded" || r.uiStatus === "covered") {
+                    return <span className="text-xs text-gray-400">-</span>;
+                  }
+                  return (
+                    <div className="flex gap-1">
+                      {r.uiStatus !== "confirmed" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => handleConfirm(r.id)}
+                        >
+                          确认
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => handleExclude(r.id)}
+                      >
+                        排除
+                      </Button>
+                      {r.uiStatus !== "pushed" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => handlePush(r.id)}
+                        >
+                          推送
+                        </Button>
+                      )}
+                    </div>
+                  );
+                },
+              },
+          ]}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -231,7 +232,7 @@ function DocumentsTab({
       await deleteKnowledgeItem(id);
       router.refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "删除失败");
+      toast.error(err instanceof Error ? err.message : "删除失败");
     } finally {
       setDeletingId(null);
     }
@@ -467,7 +468,7 @@ function SettingsTab({ kb }: { kb: KBDetail }) {
         await updateKnowledgeBase(kb.id, { name, description, type });
         router.refresh();
       } catch (err) {
-        alert(err instanceof Error ? err.message : "保存失败");
+        toast.error(err instanceof Error ? err.message : "保存失败");
       }
     });
   };
@@ -479,7 +480,7 @@ function SettingsTab({ kb }: { kb: KBDetail }) {
       setReindexOpen(false);
       router.refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "重建失败");
+      toast.error(err instanceof Error ? err.message : "重建失败");
     } finally {
       setReindexing(false);
     }
@@ -491,7 +492,7 @@ function SettingsTab({ kb }: { kb: KBDetail }) {
       await deleteKnowledgeBase(kb.id);
       router.push("/knowledge-bases");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "删除失败");
+      toast.error(err instanceof Error ? err.message : "删除失败");
       setDeleting(false);
     }
   };

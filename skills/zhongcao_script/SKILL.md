@@ -3,7 +3,7 @@ name: zhongcao_script
 displayName: 种草视频脚本生成
 description: 为民生种草场景生成 15-60 秒竖屏短视频脚本（小红书/抖音/视频号风格）。输入商品信息或场景描述，输出含钩子、5 段式故事板、平台化 CTA 的完整脚本。严格遵守《广告法》禁用词规则。当用户提及"种草""安利""带货""好物推荐""商品视频脚本"时调用。
 version: 2.0.0
-category: generation
+category: av_script
 
 metadata:
   skill_kind: generation

@@ -87,7 +87,10 @@ function buildSearchVariants(query: string) {
   ).slice(0, 3);
 }
 
-function buildGoogleNewsUrl(query: string, timeRange: WebSearchTimeRange) {
+function buildGoogleNewsUrl(
+  query: string,
+  timeRange: WebSearchTimeRange | undefined,
+) {
   const whenSuffix =
     timeRange === "1h"
       ? " when:1h"
@@ -164,12 +167,27 @@ function parseRssItems(xml: string, engine: NewsFeedItem["engine"]): NewsFeedIte
     .filter((item): item is NewsFeedItem => Boolean(item));
 }
 
-function filterByTimeRange(items: NewsFeedItem[], timeRange: WebSearchTimeRange) {
-  if (timeRange === "all") return items;
+function filterByTimeRange(
+  items: NewsFeedItem[],
+  timeRange: WebSearchTimeRange | undefined,
+) {
+  // 调用方未指定 timeRange → 不按时间过滤（由 Tavily 的相关性排序兜底）。
+  // 由用户在步骤参数里显式控制，不在这里写死默认值。
+  if (!timeRange || timeRange === "all") return items;
   const maxAge = TIME_RANGE_MS[timeRange];
   const now = Date.now();
+  // 严格窗口（1h / 24h）里，没有可解析的发布日期必须剔除 —— 不然就会出现
+  // 下面这个经典翻车：
+  //   用户搜 "CCBN"（中文垂直话题），Tavily 的 time_range=day 过滤并不严
+  //   格，会把 2024 年旧文章以"相关度高"为由塞进返回；中文站点 meta 日期
+  //   又解析不出来（publishedAtMs=null），原来的 `return true` 让它们一路
+  //   通关。LLM 拿到这些"日期不明"的旧条目当作 24h 内新闻产出，就报出了
+  //   "3 月 20 日"（其实是 2024-03-20）这种过期日期。
+  //
+  // 宽窗口（7d / 30d）仍允许无日期条目：补背景资料是主要用途，日期权重低。
+  const strict = timeRange === "1h" || timeRange === "24h";
   return items.filter((item) => {
-    if (!item.publishedAtMs) return true;
+    if (!item.publishedAtMs) return !strict;
     return now - item.publishedAtMs <= maxAge;
   });
 }
@@ -339,14 +357,20 @@ import {
 function createToolDefinitions(): ToolSet {
   return {
     web_search: tool({
-      description: "搜索互联网最新信息并提炼热点话题，返回实时结果、来源与热点聚类",
+      description:
+        "搜索互联网最新信息并提炼热点话题。timeRange 由调用方按语义显式指定：" +
+        "覆盖'最近一周'/多天研究 → '7d'；覆盖'最近一月'/'本月'/具体月份 → '30d'；" +
+        "只要今日突发 → '24h'；不关心时效 → 省略或 'all'。**不在此处写死默认值**，" +
+        "以免对长周期话题（垂直展会、年度盘点等）误用 24h 窗口漏查。",
       inputSchema: z.object({
         query: z.string().describe("搜索关键词或自然语言问题"),
         timeRange: z
           .enum(["1h", "24h", "7d", "30d", "all"])
           .optional()
-          .default("24h")
-          .describe("时间范围"),
+          .describe(
+            "相对当前日期的时间窗。省略时不按时间过滤（Tavily 也不传 time_range）。" +
+              "周报/特稿类必须显式设 7d 或 30d。",
+          ),
         sources: z.array(z.string()).optional().describe("来源过滤，如央媒/行业媒体/社交/新闻媒体"),
         maxResults: z.number().optional().default(8).describe("最大结果数，默认 8，最大 20"),
         topic: z
@@ -354,14 +378,20 @@ function createToolDefinitions(): ToolSet {
           .optional()
           .describe("搜索类型（仅 Tavily 通道生效）"),
       }),
-      execute: async ({ query, timeRange = "24h", sources, maxResults = 8, topic }) => {
+      execute: async ({ query, timeRange, sources, maxResults = 8, topic }) => {
         const trimmedQuery = query.trim();
         if (!trimmedQuery) {
           return {
             query: "",
             generatedAt: new Date().toISOString(),
             summary: "查询词为空，无法执行检索。",
-            coverage: { totalFetched: 0, returnedCount: 0, sourceCount: 0, timeRange, sourceFilters: sources ?? [] },
+            coverage: {
+              totalFetched: 0,
+              returnedCount: 0,
+              sourceCount: 0,
+              timeRange: timeRange ?? "unset",
+              sourceFilters: sources ?? [],
+            },
             results: [],
             hotTopics: [],
             warnings: ["查询词不能为空"],
@@ -586,6 +616,283 @@ function createToolDefinitions(): ToolSet {
         };
       },
     }),
+    // ────────────────────────────────────────────────────────────────
+    // 新闻聚合 / 趋势监控 / 社交舆情 / 热度评分
+    //
+    // 这 4 个工具是"真实数据检索类"：LLM 无法凭空伪造外部世界数据（新闻
+    // 条目、平台热榜、报道量），必须调真 API。此前它们只在 resolveTools
+    // 兜底里给了占位返回，LLM 按 SKILL.md 模板补数据就会出"04-23 10:30
+    // 财政部预算报告"这种未来时间幻觉。本轮把它们升级成真工具。
+    //
+    // 实现策略：复用已有 searchViaTavily + fetchTrendingFromApi 通道，
+    // 在外层包一层 SKILL.md 期望的输出结构。
+    // ────────────────────────────────────────────────────────────────
+    news_aggregation: tool({
+      description:
+        "按关键词 + 时间窗聚合多源新闻（央媒、财经、门户、社交），返回结构化列表（含标题/来源/URL/发布时间/来源类型），供下游 fact_check / content_generate 使用。内部复用 Tavily 通道，不用 LLM 生编。",
+      inputSchema: z.object({
+        query: z.string().describe("聚合的话题关键词"),
+        maxResults: z.number().optional().default(10),
+        timeRange: z
+          .enum(["1h", "24h", "7d", "30d", "all"])
+          .optional()
+          .describe("时间窗。突发今日 24h / 本周 7d / 本月 30d / 长周期不设"),
+        topic: z.enum(["general", "news", "finance"]).optional().default("news"),
+      }),
+      execute: async ({ query, maxResults = 10, timeRange, topic = "news" }) => {
+        if (!process.env.TAVILY_API_KEY) {
+          return {
+            query,
+            generatedAt: new Date().toISOString(),
+            results: [],
+            warnings: ["未配置 TAVILY_API_KEY，无法聚合新闻"],
+          };
+        }
+        const tavily = await searchViaTavily(query.trim(), {
+          timeRange,
+          maxResults: Math.min(maxResults, 20),
+          topic,
+        });
+        // 字段命名沿用 web_search 的 `results` —— 下游 mission-executor
+        // 统一按 `results` 检测 0 / 稀疏结果并注入强约束警示。
+        const results = tavily.items.map((it) => ({
+          title: it.title,
+          source: it.source,
+          sourceType: SOURCE_TYPE_LABELS[it.sourceType],
+          credibility: it.credibility,
+          url: it.url,
+          publishedAt: it.publishedAt,
+          snippet: it.snippet,
+        }));
+        return {
+          query,
+          generatedAt: new Date().toISOString(),
+          timeRange: timeRange ?? "unset",
+          totalFetched: tavily.items.length,
+          results,
+          summary: tavily.answer ?? null,
+          warnings: results.length === 0 ? ["Tavily 未命中任何条目，建议放宽 timeRange 或换关键词"] : [],
+        };
+      },
+    }),
+    trend_monitor: tool({
+      description:
+        "监控话题/关键词的实时趋势：调 Tavily 看近期报道走向，调多平台热榜 API 看是否上榜。返回 {搜索结果, 上榜平台, 讨论热度}。",
+      inputSchema: z.object({
+        query: z.string().describe("监控关键词"),
+        timeRange: z
+          .enum(["1h", "24h", "7d", "30d"])
+          .optional()
+          .default("24h")
+          .describe("监控时间窗，默认 24h"),
+      }),
+      execute: async ({ query, timeRange = "24h" }) => {
+        const warnings: string[] = [];
+        const q = query.trim();
+
+        // 并行：Tavily 新闻 + 多平台热榜搜索
+        const [tavilyRes, trendingRes] = await Promise.allSettled([
+          process.env.TAVILY_API_KEY
+            ? searchViaTavily(q, { timeRange, maxResults: 8, topic: "news" })
+            : Promise.reject(new Error("TAVILY_API_KEY 未配置")),
+          process.env.TRENDING_API_KEY
+            ? fetchTrendingFromApi("search", { query: q, limit: 20 })
+            : Promise.reject(new Error("TRENDING_API_KEY 未配置")),
+        ]);
+
+        const newsItems =
+          tavilyRes.status === "fulfilled"
+            ? tavilyRes.value.items.slice(0, 8).map((it) => ({
+                title: it.title,
+                source: it.source,
+                url: it.url,
+                publishedAt: it.publishedAt,
+              }))
+            : [];
+        if (tavilyRes.status === "rejected") {
+          warnings.push(`Tavily: ${tavilyRes.reason instanceof Error ? tavilyRes.reason.message : String(tavilyRes.reason)}`);
+        }
+
+        const trendingItems =
+          trendingRes.status === "fulfilled"
+            ? trendingRes.value.map((t) => ({
+                platform: t.platform,
+                title: t.title,
+                rank: t.rank,
+                heat: t.heat,
+              }))
+            : [];
+        if (trendingRes.status === "rejected") {
+          warnings.push(`热榜: ${trendingRes.reason instanceof Error ? trendingRes.reason.message : String(trendingRes.reason)}`);
+        }
+
+        return {
+          query: q,
+          generatedAt: new Date().toISOString(),
+          timeRange,
+          newsItems,
+          onPlatforms: Array.from(new Set(trendingItems.map((t) => t.platform))),
+          trendingItems,
+          signals: {
+            newsCount: newsItems.length,
+            platformCount: new Set(trendingItems.map((t) => t.platform)).size,
+            hasMomentum: newsItems.length >= 3 || trendingItems.length >= 5,
+          },
+          warnings,
+        };
+      },
+    }),
+    social_listening: tool({
+      description:
+        "监测话题在社交平台（微博/知乎/小红书/B站/抖音）的讨论热度和关联条目。返回各平台命中的讨论列表。",
+      inputSchema: z.object({
+        query: z.string().describe("监测关键词"),
+        platforms: z
+          .array(z.string())
+          .optional()
+          .describe("指定平台，默认 weibo/zhihu/xiaohongshu/bilibili/douyin"),
+        limit: z.number().optional().default(10).describe("每平台条数"),
+      }),
+      execute: async ({ query, platforms, limit = 10 }) => {
+        if (!process.env.TRENDING_API_KEY) {
+          return {
+            query,
+            generatedAt: new Date().toISOString(),
+            items: [],
+            warnings: ["未配置 TRENDING_API_KEY"],
+          };
+        }
+        const targetPlatforms = platforms ?? [
+          "weibo",
+          "zhihu",
+          "xiaohongshu",
+          "bilibili",
+          "douyin",
+        ];
+        try {
+          const items = await fetchTrendingFromApi("search", {
+            query: query.trim(),
+            platforms: targetPlatforms,
+            limit,
+          });
+          const byPlatform = new Map<string, typeof items>();
+          for (const item of items) {
+            const list = byPlatform.get(item.platform) ?? [];
+            list.push(item);
+            byPlatform.set(item.platform, list);
+          }
+          return {
+            query,
+            generatedAt: new Date().toISOString(),
+            platforms: Array.from(byPlatform.keys()),
+            totalCount: items.length,
+            byPlatform: Object.fromEntries(
+              Array.from(byPlatform.entries()).map(([p, list]) => [
+                p,
+                list.slice(0, limit).map((it) => ({
+                  title: it.title,
+                  rank: it.rank,
+                  heat: it.heat,
+                  url: it.url,
+                })),
+              ]),
+            ),
+            warnings: items.length === 0 ? ["该关键词在指定平台无命中"] : [],
+          };
+        } catch (err) {
+          return {
+            query,
+            generatedAt: new Date().toISOString(),
+            items: [],
+            warnings: [`热榜 API 调用失败: ${err instanceof Error ? err.message : String(err)}`],
+          };
+        }
+      },
+    }),
+    heat_scoring: tool({
+      description:
+        "基于真实报道量 + 社交讨论 + 跨平台覆盖度打 0-100 热度分并给出 S/A/B/C 等级。不用 LLM 估分，按确定性公式算。",
+      inputSchema: z.object({
+        query: z.string().describe("评分话题"),
+        timeRange: z
+          .enum(["1h", "24h", "7d", "30d"])
+          .optional()
+          .default("24h"),
+      }),
+      execute: async ({ query, timeRange = "24h" }) => {
+        const q = query.trim();
+        const warnings: string[] = [];
+
+        const [newsRes, trendingRes] = await Promise.allSettled([
+          process.env.TAVILY_API_KEY
+            ? searchViaTavily(q, { timeRange, maxResults: 20, topic: "news" })
+            : Promise.reject(new Error("TAVILY_API_KEY 未配置")),
+          process.env.TRENDING_API_KEY
+            ? fetchTrendingFromApi("search", { query: q, limit: 30 })
+            : Promise.reject(new Error("TRENDING_API_KEY 未配置")),
+        ]);
+
+        const newsItems = newsRes.status === "fulfilled" ? newsRes.value.items : [];
+        if (newsRes.status === "rejected") {
+          warnings.push(`Tavily: ${newsRes.reason instanceof Error ? newsRes.reason.message : String(newsRes.reason)}`);
+        }
+        const trendingItems = trendingRes.status === "fulfilled" ? trendingRes.value : [];
+        if (trendingRes.status === "rejected") {
+          warnings.push(`热榜: ${trendingRes.reason instanceof Error ? trendingRes.reason.message : String(trendingRes.reason)}`);
+        }
+
+        // 四维量化：媒体关注度 / 社交讨论 / 跨平台覆盖 / 来源可信度
+        const mediaScore = Math.min(100, newsItems.length * 8); // 12+ 条满分
+        const socialScore = Math.min(100, trendingItems.length * 5); // 20+ 条满分
+        const platformCount = new Set(trendingItems.map((t) => t.platform)).size;
+        const crossPlatformScore =
+          platformCount >= 5 ? 100 : platformCount >= 3 ? 75 : platformCount * 25;
+        const officialCount = newsItems.filter((it) => it.sourceType === "official").length;
+        const credibilityScore = Math.min(100, officialCount * 25);
+
+        const score = Math.round(
+          mediaScore * 0.3 +
+            socialScore * 0.25 +
+            crossPlatformScore * 0.2 +
+            credibilityScore * 0.25,
+        );
+        const grade = score >= 90 ? "S" : score >= 70 ? "A" : score >= 50 ? "B" : "C";
+
+        return {
+          query: q,
+          generatedAt: new Date().toISOString(),
+          timeRange,
+          score,
+          grade,
+          dimensions: {
+            media: mediaScore,
+            social: socialScore,
+            crossPlatform: crossPlatformScore,
+            credibility: credibilityScore,
+          },
+          evidence: {
+            newsCount: newsItems.length,
+            trendingCount: trendingItems.length,
+            platformCount,
+            officialSourceCount: officialCount,
+            sampleNews: newsItems.slice(0, 3).map((it) => ({
+              title: it.title,
+              source: it.source,
+              url: it.url,
+              publishedAt: it.publishedAt,
+            })),
+            samplePlatforms: Array.from(new Set(trendingItems.map((t) => t.platform))).slice(0, 5),
+          },
+          confidence:
+            newsItems.length + trendingItems.length >= 5
+              ? "high"
+              : newsItems.length + trendingItems.length >= 2
+                ? "medium"
+                : "low",
+          warnings,
+        };
+      },
+    }),
     content_generate: tool({
       description: "根据大纲和要求生成内容文本",
       inputSchema: z.object({
@@ -601,7 +908,7 @@ function createToolDefinitions(): ToolSet {
         try {
           const { generateText: gen } = await import("ai");
           const { getLanguageModel, resolveModelConfig } = await import("./model-router");
-          const cfg = resolveModelConfig(["generation"], { temperature: 0.7, maxTokens: Math.min(maxLength * 2, 8192) });
+          const cfg = resolveModelConfig(["content_gen"], { temperature: 0.7, maxTokens: Math.min(maxLength * 2, 8192) });
           const model = getLanguageModel(cfg);
           const { text, usage } = await gen({
             model,
@@ -623,7 +930,7 @@ function createToolDefinitions(): ToolSet {
         try {
           const { generateText: gen } = await import("ai");
           const { getLanguageModel, resolveModelConfig } = await import("./model-router");
-          const cfg = resolveModelConfig(["analysis"], { temperature: 0.2, maxTokens: 4096 });
+          const cfg = resolveModelConfig(["quality_review"], { temperature: 0.2, maxTokens: 4096 });
           const model = getLanguageModel(cfg);
           const claimsList = claims?.length ? `\n\n需要重点核查的声明：\n${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}` : "";
           const { text: result } = await gen({
@@ -710,11 +1017,366 @@ function createToolDefinitions(): ToolSet {
         };
       },
     }),
+    cms_publish: tool({
+      description:
+        "把一篇稿件真实入库到华栖云 CMS。**appId / catalogId 已硬编码为 " +
+        "1768 / 10210（演示环境指定）**，不依赖 app_channels 映射表。流程：" +
+        "1) 新建 articles 行（status=approved）；" +
+        "2) 直接构造 MapperContext（硬编码 appId/catalogId/siteId）并调 " +
+        "saveArticle 走 /web/article/save 真实接口；" +
+        "3) 返回 CMS 侧 articleId / publishedUrl / previewUrl。" +
+        "前置要求：env 里 CMS_HOST / CMS_LOGIN_CMC_ID / CMS_LOGIN_CMC_TID / " +
+        "CMS_TENANT_ID + VIBETIDE_CMS_PUBLISH_ENABLED=true。",
+      inputSchema: z.object({
+        title: z.string().describe("稿件标题"),
+        body: z
+          .string()
+          .describe("稿件正文（纯文本/Markdown，mapper 会转成 CMS content blocks）"),
+        summary: z.string().optional().describe("摘要（50-120 字）"),
+        authorName: z
+          .string()
+          .optional()
+          .describe("作者，默认 'AI 编辑部'"),
+        coverImageUrl: z.string().optional().describe("封面图 URL"),
+        tags: z.array(z.string()).optional().describe("标签数组"),
+        // 下面两个由执行器注入，用户在"参数配置"里不需要填。
+        organizationId: z
+          .string()
+          .optional()
+          .describe("组织 ID（由 workflow 执行器自动注入）"),
+        operatorId: z
+          .string()
+          .optional()
+          .describe("操作者 ID（由 workflow 执行器自动注入）"),
+      }),
+      execute: async ({
+        title,
+        body,
+        summary,
+        authorName,
+        coverImageUrl,
+        tags,
+        organizationId,
+        operatorId,
+      }) => {
+        // 硬编码的 siteId/appId/catalogId 已经在 article-mapper/index.ts 的
+        // loadMapperContext 里写死（81/1768/10210），publishArticleToCms 会自动读到。
+        // 这里改回走它的完整 9 步流程（feature flag → load article → 状态校验 →
+        // load ctx → 幂等检查 → mapping → cms_publications 审计 → saveArticle →
+        // 触发 cms/publication.submitted 轮询事件），跟 SKILL.md Workflow
+        // Checklist 对齐。
+        if (!organizationId) {
+          return {
+            success: false,
+            error: {
+              code: "missing_context",
+              message:
+                "cms_publish 需要 organizationId —— workflow 执行器未注入。",
+              stage: "config" as const,
+            },
+          };
+        }
+
+        // 1. 先建 articles 行（status=approved），过 publishArticleToCms 的状态白名单
+        const { db } = await import("@/db");
+        const { articles } = await import("@/db/schema/articles");
+        // articles 表没有 coverImageUrl / authorName 字段（DAL 层的 Article 接口里才有，
+        // 原因是封面/作者通过 article_assets / content.headline 间接关联）。
+        // 这里只写入 DB 真实列；封面和作者通过 publishArticleToCms 内部映射时走
+        // MapperContext 的 coverImageDefault / author 兜底即可。
+        const [created] = await db
+          .insert(articles)
+          .values({
+            organizationId,
+            title,
+            body,
+            summary: summary ?? null,
+            status: "approved",
+            tags: tags ?? [],
+            mediaType: "article",
+            publishedAt: new Date(),
+          })
+          .returning({ id: articles.id });
+        void coverImageUrl; // 兜底值走 ctx.coverImageDefault（由 loadMapperContext 读 env 得到）
+        void authorName; // 兜底值走 ctx.author（在 loadMapperContext 里默认"智媒编辑部"）
+        if (!created?.id) {
+          return {
+            success: false,
+            error: {
+              code: "article_create_failed",
+              message: "创建 articles 行失败",
+              stage: "config" as const,
+            },
+          };
+        }
+
+        // 2. 调 publishArticleToCms 完整走 9 步（含 cms_publications 审计 +
+        //    Inngest 轮询事件）。feature flag / config 校验都由它内部做，
+        //    siteId/appId/catalogId 由 loadMapperContext 读硬编码常量得到。
+        const { publishArticleToCms } = await import("@/lib/cms");
+        try {
+          const pubResult = await publishArticleToCms({
+            articleId: created.id,
+            operatorId: operatorId ?? "workflow_system",
+            triggerSource: "workflow",
+            allowUpdate: true,
+          });
+          return {
+            success: pubResult.success,
+            articleId: created.id,
+            publicationId: pubResult.publicationId,
+            cmsArticleId: pubResult.cmsArticleId,
+            cmsState: pubResult.cmsState,
+            publishedUrl: pubResult.publishedUrl,
+            previewUrl: pubResult.previewUrl,
+            timings: pubResult.timings,
+            meta: {
+              title,
+              // 硬编码值来自 article-mapper/index.ts 的 HARDCODED_* 常量
+              appId: 1768,
+              catalogId: 10210,
+              siteId: 81,
+              authorName: authorName ?? "AI 编辑部",
+            },
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          let stage = "unknown";
+          if (err && typeof err === "object" && "name" in err) {
+            const name = String((err as { name?: string }).name || "");
+            if (name.includes("Auth")) stage = "auth";
+            else if (name.includes("Business")) stage = "cms_business";
+            else if (name.includes("Network")) stage = "network";
+            else if (name.includes("Config")) stage = "config";
+            else if (name.includes("Schema")) stage = "mapping";
+          }
+          return {
+            success: false,
+            articleId: created.id,
+            error: { code: `cms_${stage}`, message, stage },
+            meta: {
+              appId: 1768,
+              catalogId: 10210,
+              siteId: 81,
+            },
+          };
+        }
+      },
+    }),
   };
 }
 
 const ALL_TOOLS = createToolDefinitions();
 const BUILTIN_SKILL_NAME_TO_SLUG = getBuiltinSkillNameToSlug();
+
+/**
+ * 这个 skill slug 是否对应 ALL_TOOLS 里已注册的真实工具实现？
+ * 测试运行 / 预执行路径用它判断"这步骤能不能真调"——能真调就不用 LLM 模拟，
+ * 从而保证测试输出跟实际执行输出一致。
+ */
+export function isToolRegistered(toolName: string): boolean {
+  return !!ALL_TOOLS[toolName] && typeof ALL_TOOLS[toolName].execute === "function";
+}
+
+// ---------------------------------------------------------------------------
+// Tool parameter introspection (for step-config UI)
+//
+// 工作流步骤编辑器里的"参数配置"需要让用户从该步骤对应工具的真实参数列表
+// 里挑选，而不是手写 `query` / `maxResults` 这些字段名 —— 用户根本不知道该
+// 工具支持什么参数。这里用 zod v4 的 toJSONSchema 从已注册的 ToolSet 里反
+// 推出参数 schema，供 UI 消费。
+// ---------------------------------------------------------------------------
+
+export interface ToolParamSpec {
+  name: string;
+  description?: string;
+  required: boolean;
+  type: string; // "string" / "number" / "boolean" / "enum" / "array" / "unknown"
+  enumValues?: readonly string[];
+  defaultValue?: unknown;
+}
+
+/**
+ * 返回 ALL_TOOLS 里所有工具的参数 spec 映射（skillSlug → specs）。供工作流
+ * 编辑器的 server 页面预计算后透传给客户端组件，避免客户端直接 import 这个
+ * 文件（会拖进 db / drizzle 等 server-only 依赖）。
+ */
+export function getAllToolParamSpecs(): Record<string, ToolParamSpec[]> {
+  const out: Record<string, ToolParamSpec[]> = {};
+  for (const slug of Object.keys(ALL_TOOLS)) {
+    const specs = getToolParamSpecs(slug);
+    if (specs.length > 0) out[slug] = specs;
+  }
+  return out;
+}
+
+/**
+ * 查询某工具（按 skillSlug）的参数清单。参数来自工具定义里的 zod inputSchema，
+ * 靠 zod v4 的 `z.toJSONSchema` 转成 JSON Schema 再摘字段。
+ * 若工具没注册、schema 结构异常、或 toJSONSchema 失败，返回空数组 —— 调用方
+ * 应该在 UI 里回退到"手输参数名"。
+ */
+export function getToolParamSpecs(toolName: string): ToolParamSpec[] {
+  const t = ALL_TOOLS[toolName];
+  if (!t) return [];
+  type ToolWithSchema = { inputSchema?: unknown };
+  const schema = (t as unknown as ToolWithSchema).inputSchema;
+  if (!schema || typeof schema !== "object") return [];
+
+  try {
+    // z.toJSONSchema 是 zod v4 的稳定 API（v3 没有）。项目已升到 zod 4.3+。
+    // 参考：https://zod.dev/json-schema
+    const json = z.toJSONSchema(schema as z.ZodType) as Record<string, unknown>;
+    const properties = json.properties;
+    if (!properties || typeof properties !== "object") return [];
+    const required = new Set(
+      Array.isArray(json.required) ? (json.required as string[]) : [],
+    );
+    return Object.entries(properties as Record<string, Record<string, unknown>>).map(
+      ([name, p]) => {
+        const enumVals = Array.isArray(p.enum) ? (p.enum as string[]) : undefined;
+        let resolvedType: string;
+        if (enumVals) {
+          resolvedType = "enum";
+        } else if (typeof p.type === "string") {
+          resolvedType = p.type;
+        } else {
+          resolvedType = "unknown";
+        }
+        return {
+          name,
+          description: typeof p.description === "string" ? p.description : undefined,
+          required: required.has(name),
+          type: resolvedType,
+          enumValues: enumVals,
+          defaultValue: p.default,
+        };
+      },
+    );
+  } catch (err) {
+    console.warn(`[tool-registry] getToolParamSpecs(${toolName}) failed:`, err);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// invokeToolDirectly —— Server-side direct tool invocation
+//
+// 为什么要这个接口：某些步骤（比如 web_search）哪怕工具可用，LLM 仍会绕开
+// 工具按 SKILL.md 的输出模板空转出伪造数据（观察到的实际事故：输入 "CCBN"
+// 产出虚构的"暴雨红色预警"、"浦东机场延误"新闻）。当步骤在编辑器里显式
+// 绑定了参数（step.config.parameters），我们直接 server 端调工具，把真实
+// 结果喂给 LLM —— 这样 LLM 无法伪造，它看到的只能是真数据。
+//
+// 调用方（mission-executor）负责：
+//   1. 基于 mission.inputParams 渲染好参数值
+//   2. 把字符串值按 tool schema 做最基础的类型转换（数字/布尔）
+//   3. 调本函数，拿到 { ok, result, error }
+//   4. 序列化 result 作为【前置工具结果】注入到 LLM userInstructions
+// ---------------------------------------------------------------------------
+export async function invokeToolDirectly(
+  toolName: string,
+  rawParams: Record<string, unknown>,
+  /**
+   * 调用方注入的上下文 —— 用户在"参数配置"里不需要填的字段，由工作流
+   * 执行器（mission-executor / test-run 路由）从请求 / mission 带过来。
+   * 目前主要用于需要 orgId 才能跑的工具（cms_publish / media_search 等
+   * 多租户资源写入场景）。未被对应工具消费的字段会被 zod schema 忽略。
+   */
+  context?: {
+    organizationId?: string;
+    operatorId?: string;
+  },
+): Promise<
+  | { ok: true; toolName: string; params: Record<string, unknown>; result: unknown }
+  | { ok: false; toolName: string; params: Record<string, unknown>; error: string }
+> {
+  const t = ALL_TOOLS[toolName];
+  if (!t) {
+    return {
+      ok: false,
+      toolName,
+      params: rawParams,
+      error: `工具 \`${toolName}\` 未在 ALL_TOOLS 中注册`,
+    };
+  }
+  if (typeof t.execute !== "function") {
+    return {
+      ok: false,
+      toolName,
+      params: rawParams,
+      error: `工具 \`${toolName}\` 未提供 execute 实现`,
+    };
+  }
+
+  // Best-effort 类型强转：UI 里所有 value 都是字符串，schema 可能期望 number / boolean / array。
+  // 走 zod inputSchema 解析前先做宽松映射。
+  // 注入上下文：只合并用户未显式提供的字段，避免盖掉用户绑定值。
+  const rawWithContext: Record<string, unknown> = { ...rawParams };
+  if (context?.organizationId && rawWithContext.organizationId === undefined) {
+    rawWithContext.organizationId = context.organizationId;
+  }
+  if (context?.operatorId && rawWithContext.operatorId === undefined) {
+    rawWithContext.operatorId = context.operatorId;
+  }
+  const coerced: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawWithContext)) {
+    if (typeof v === "string") {
+      const trimmed = v.trim();
+      if (trimmed === "") continue; // 空串视为未提供该参数
+      if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+        // 纯数字字符串 → number
+        coerced[k] = Number(trimmed);
+        continue;
+      }
+      if (trimmed === "true" || trimmed === "false") {
+        coerced[k] = trimmed === "true";
+        continue;
+      }
+      coerced[k] = trimmed;
+    } else {
+      coerced[k] = v;
+    }
+  }
+
+  // 通过 tool 的 inputSchema 做最终校验（若定义了）。失败就带着 coerced 原样给 execute。
+  type ToolWithSchema = {
+    execute?: (
+      input: unknown,
+      opts: { toolCallId: string; messages: unknown[] },
+    ) => unknown;
+    inputSchema?: { parse?: (input: unknown) => unknown };
+  };
+  const tw = t as unknown as ToolWithSchema;
+  let parsedInput: unknown = coerced;
+  if (tw.inputSchema?.parse) {
+    try {
+      parsedInput = tw.inputSchema.parse(coerced);
+    } catch (err) {
+      return {
+        ok: false,
+        toolName,
+        params: coerced,
+        error: `参数校验失败：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
+  try {
+    const result = await (tw.execute!)(parsedInput, {
+      toolCallId: `prefetch-${Date.now()}`,
+      messages: [],
+    });
+    return { ok: true, toolName, params: parsedInput as Record<string, unknown>, result };
+  } catch (err) {
+    return {
+      ok: false,
+      toolName,
+      params: parsedInput as Record<string, unknown>,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Resolve skill names to AgentTool descriptors

@@ -204,12 +204,6 @@ export function WorkflowsPanel({ workflows }: WorkflowsPanelProps) {
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
-                      {wf.appChannelSlug && (
-                        <span className="truncate max-w-[100px]">
-                          → {wf.appChannelSlug}
-                        </span>
-                      )}
-                      <span className="text-gray-300 dark:text-gray-600">|</span>
                       <span>{(wf.steps as unknown[] | null)?.length ?? 0} 步</span>
                     </div>
                   </div>

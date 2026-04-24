@@ -3,6 +3,7 @@
 import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/shared/date-picker";
@@ -773,14 +774,14 @@ export function SearchWorkbenchClient({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => alert("S3 阶段接入综合分析功能")}
+            onClick={() => toast.info("S3 阶段接入综合分析功能")}
           >
             综合分析
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => alert("S6 阶段接入导出功能")}
+            onClick={() => toast.info("S6 阶段接入导出功能")}
           >
             导出选中
           </Button>

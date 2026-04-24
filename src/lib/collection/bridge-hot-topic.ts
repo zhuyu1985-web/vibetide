@@ -18,7 +18,6 @@ interface SourceChannelEntry {
 
 export interface BridgeHotTopicResult {
   hotTopicId: string;
-  isNew: boolean;
   shouldEnrich: boolean;
   priority: "P0" | "P1" | "P2";
   heatScore: number;
@@ -76,57 +75,39 @@ export async function bridgeCollectedItemToHotTopic(
     .update(normalizeTitleKey(item.title))
     .digest("hex");
 
-  const [existing] = await db
-    .select({ id: hotTopics.id })
-    .from(hotTopics)
-    .where(
-      and(
-        eq(hotTopics.organizationId, organizationId),
-        eq(hotTopics.titleHash, legacyTitleHash),
-      ),
-    )
-    .limit(1);
-
-  let hotTopicId: string;
-  let isNew: boolean;
-
-  if (existing) {
-    await db
-      .update(hotTopics)
-      .set({
+  // 原子 upsert：select-then-insert/update 在并行场景下会撞 hot_topics_org_title_hash_uniq
+  // 唯一约束（同一标题的 2 条 collected_item 同时桥接时），用 onConflictDoUpdate 让 PG
+  // 单条语句完成插入或更新，并行批量 bridge 安全。
+  const [upserted] = await db
+    .insert(hotTopics)
+    .values({
+      organizationId,
+      title: item.title,
+      titleHash: legacyTitleHash,
+      sourceUrl: item.canonicalUrl,
+      priority,
+      heatScore,
+      trend: "plateau",
+      source: platforms[0] ?? item.firstSeenChannel,
+      category,
+      platforms,
+      heatCurve: [],
+      discoveredAt: new Date(item.firstSeenAt),
+      collectedItemId: itemId,
+    })
+    .onConflictDoUpdate({
+      target: [hotTopics.organizationId, hotTopics.titleHash],
+      set: {
         platforms,
         heatScore,
         priority,
         collectedItemId: itemId,
         updatedAt: new Date(),
-      })
-      .where(eq(hotTopics.id, existing.id));
-    hotTopicId = existing.id;
-    isNew = false;
-  } else {
-    const [inserted] = await db
-      .insert(hotTopics)
-      .values({
-        organizationId,
-        title: item.title,
-        titleHash: legacyTitleHash,
-        sourceUrl: item.canonicalUrl,
-        priority,
-        heatScore,
-        trend: "plateau",
-        source: platforms[0] ?? item.firstSeenChannel,
-        category,
-        platforms,
-        heatCurve: [],
-        discoveredAt: new Date(item.firstSeenAt),
-        collectedItemId: itemId,
-      })
-      .returning({ id: hotTopics.id });
-    hotTopicId = inserted.id;
-    isNew = true;
-  }
+      },
+    })
+    .returning({ id: hotTopics.id });
 
   const shouldEnrich = priority === "P0" || priority === "P1" || heatScore >= 30;
 
-  return { hotTopicId, isNew, shouldEnrich, priority, heatScore };
+  return { hotTopicId: upserted.id, shouldEnrich, priority, heatScore };
 }

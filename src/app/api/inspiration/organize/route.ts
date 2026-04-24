@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   if (!message?.trim()) return new Response("Empty message", { status: 400 });
 
-  const config = resolveModelConfig(["analysis"]);
+  const config = resolveModelConfig(["content_analysis"]);
   const model = getLanguageModel(config);
 
   const encoder = new TextEncoder();

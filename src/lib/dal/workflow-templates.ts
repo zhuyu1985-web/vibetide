@@ -82,13 +82,27 @@ export async function getMyWorkflows(userId: string) {
 export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
   const orgId = await getCurrentUserOrg();
 
+  // 过滤掉"视觉上空"的 builtin 行：
+  //  A) steps 为空 / 非数组 / 长度 0
+  //  B) 有 step 但所有 step 的 config.skillSlug+skillName 都无效
+  // 清理脚本：`npm run db:cleanup-empty-workflows`
+  const hasSteps = sql`${workflowTemplates.steps} IS NOT NULL
+    AND jsonb_typeof(${workflowTemplates.steps}) = 'array'
+    AND jsonb_array_length(${workflowTemplates.steps}) > 0
+    AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(${workflowTemplates.steps}) AS s
+      WHERE coalesce(s->'config'->>'skillSlug', '') <> ''
+         OR coalesce(s->'config'->>'skillName', '') <> ''
+    )`;
+
   const rows = await db.query.workflowTemplates.findMany({
     where: orgId
       ? and(
           eq(workflowTemplates.organizationId, orgId),
-          eq(workflowTemplates.isBuiltin, true)
+          eq(workflowTemplates.isBuiltin, true),
+          hasSteps
         )
-      : eq(workflowTemplates.isBuiltin, true),
+      : and(eq(workflowTemplates.isBuiltin, true), hasSteps),
     orderBy: [asc(workflowTemplates.createdAt)],
   });
 
@@ -117,7 +131,6 @@ export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
     icon: null,
     inputFields: [],
     defaultTeam: [],
-    appChannelSlug: null,
     systemInstruction: null,
     legacyScenarioKey: null,
     // 2026-04-20 规格文档（baoyu SKILL.md body）— virtual rows 暂时空串
@@ -164,7 +177,6 @@ export interface ListFilter {
   category?: WorkflowTemplateCategory;
   isBuiltin?: boolean;
   isEnabled?: boolean; // default true
-  appChannelSlug?: string;
   employeeSlug?: string; // defaultTeam @> [employeeSlug]
 }
 
@@ -192,14 +204,24 @@ export async function listWorkflowTemplatesByOrg(
 
   conds.push(eq(workflowTemplates.isEnabled, filter.isEnabled ?? true));
 
+  // 排除"视觉上空"的模板（steps 为空 OR 所有 step 都没有效 skill）—— 防止
+  // 首页/场景网格显示不可用卡片。
+  conds.push(
+    sql`${workflowTemplates.steps} IS NOT NULL
+      AND jsonb_typeof(${workflowTemplates.steps}) = 'array'
+      AND jsonb_array_length(${workflowTemplates.steps}) > 0
+      AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(${workflowTemplates.steps}) AS s
+        WHERE coalesce(s->'config'->>'skillSlug', '') <> ''
+           OR coalesce(s->'config'->>'skillName', '') <> ''
+      )`,
+  );
+
   if (filter.category !== undefined) {
     conds.push(eq(workflowTemplates.category, filter.category));
   }
   if (filter.isBuiltin !== undefined) {
     conds.push(eq(workflowTemplates.isBuiltin, filter.isBuiltin));
-  }
-  if (filter.appChannelSlug !== undefined) {
-    conds.push(eq(workflowTemplates.appChannelSlug, filter.appChannelSlug));
   }
   if (filter.employeeSlug !== undefined) {
     // jsonb contains check: default_team @> '["<slug>"]'
@@ -252,7 +274,6 @@ export interface CreateWorkflowTemplateInput {
   icon?: string | null;
   inputFields?: unknown[];
   defaultTeam?: string[];
-  appChannelSlug?: string | null;
   systemInstruction?: string | null;
   legacyScenarioKey?: string | null;
   triggerType?: "manual" | "scheduled";
@@ -277,7 +298,6 @@ export async function createWorkflowTemplate(
       icon: input.icon ?? null,
       inputFields: (input.inputFields ?? []) as never,
       defaultTeam: (input.defaultTeam ?? []) as never,
-      appChannelSlug: input.appChannelSlug ?? null,
       systemInstruction: input.systemInstruction ?? null,
       legacyScenarioKey: input.legacyScenarioKey ?? null,
       triggerType: input.triggerType ?? "manual",
@@ -295,7 +315,6 @@ export interface UpdateWorkflowTemplateInput {
   icon?: string | null;
   inputFields?: unknown[];
   defaultTeam?: string[];
-  appChannelSlug?: string | null;
   systemInstruction?: string | null;
   isEnabled?: boolean;
   steps?: unknown[];
@@ -327,7 +346,6 @@ export interface BuiltinSeedInput {
   icon?: string | null;
   inputFields?: unknown[];
   defaultTeam?: string[];
-  appChannelSlug?: string | null;
   systemInstruction?: string | null;
   legacyScenarioKey: string | null;
   steps: unknown[];
@@ -368,7 +386,6 @@ export async function seedBuiltinTemplatesForOrg(
       icon: seed.icon ?? null,
       inputFields: (seed.inputFields ?? []) as never,
       defaultTeam: (seed.defaultTeam ?? []) as never,
-      appChannelSlug: seed.appChannelSlug ?? null,
       systemInstruction: seed.systemInstruction ?? null,
       legacyScenarioKey: seed.legacyScenarioKey,
       steps: seed.steps as never,
@@ -383,24 +400,25 @@ export async function seedBuiltinTemplatesForOrg(
       isFeatured: seed.isFeatured ?? false,
     };
 
-    // onConflictDoUpdate 规则：
+    // onConflictDoUpdate 规则（2026-04-20 修订）：
     // - 重置（seed 即真相）：description / category / icon / input_fields / default_team
-    //   / app_channel_slug / system_instruction / steps / trigger_type / trigger_config
-    //   / launch_mode / prompt_template / updated_at
-    // - 不覆盖（保留 org admin 手动设置）：is_public / owner_employee_id / is_enabled
+    //   / system_instruction / steps / trigger_type / trigger_config
+    //   / launch_mode / prompt_template / owner_employee_id / updated_at
+    //   (ownerEmployeeId 从"保留"移到"重置"，支持垂类归属重分配)
+    // - 不覆盖（保留 org admin 手动设置）：is_public / is_enabled
     const setOnConflict = {
       description: baseValues.description,
       category: baseValues.category,
       icon: baseValues.icon,
       inputFields: baseValues.inputFields,
       defaultTeam: baseValues.defaultTeam,
-      appChannelSlug: baseValues.appChannelSlug,
       systemInstruction: baseValues.systemInstruction,
       steps: baseValues.steps,
       triggerType: baseValues.triggerType,
       triggerConfig: baseValues.triggerConfig,
       launchMode: baseValues.launchMode,
       promptTemplate: baseValues.promptTemplate,
+      ownerEmployeeId: baseValues.ownerEmployeeId,
       isFeatured: baseValues.isFeatured,
       updatedAt: new Date(),
     };

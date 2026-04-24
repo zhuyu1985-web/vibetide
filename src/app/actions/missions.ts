@@ -23,7 +23,7 @@ import { getWorkflowTemplateByLegacyKey } from "@/lib/dal/workflow-templates";
 // same org + title + instruction within this window return the existing row
 // instead of creating a second one. Guards against double-click / keyboard-
 // Enter races that slip past the UI `disabled` guard.
-const USER_DEDUP_WINDOW_MS = 30_000;
+const USER_DEDUP_WINDOW_MS = 8_000;
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -32,6 +32,63 @@ async function requireAuth() {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
   return user;
+}
+
+/**
+ * Resolve (or auto-provision) the dedicated "任务总监" employee (slug="leader")
+ * for a given organization.
+ *
+ * Leader identity must be STABLE — the leader coordinates the mission, so it
+ * has to be a singleton per org regardless of which workflow template the
+ * user runs. Prior code in `workflow-launch.ts` conflated this with the
+ * template's `ownerEmployeeId`, which caused the leader badge to land on
+ * whichever employee happened to "own" the template (e.g. 内容创作师 for
+ * 科技周报, 热点猎手 for 每日时政热点) — i.e. "whoever is first up to do
+ * work", exactly the regression the user reported.
+ *
+ * Exported so every mission-creating entrypoint uses the same source of truth.
+ */
+export async function getOrProvisionLeader(
+  organizationId: string,
+): Promise<typeof aiEmployees.$inferSelect> {
+  const existing = await db.query.aiEmployees.findFirst({
+    where: and(
+      eq(aiEmployees.slug, "leader"),
+      eq(aiEmployees.organizationId, organizationId),
+    ),
+  });
+  if (existing) return existing;
+
+  // Race-safe provisioning via the unique index (organization_id, slug).
+  const [created] = await db
+    .insert(aiEmployees)
+    .values({
+      organizationId,
+      slug: "leader",
+      name: "任务总监",
+      nickname: "小领",
+      title: "智能项目管理与任务调度",
+      motto: "统筹全局，高效协作",
+      roleType: "manager",
+      authorityLevel: "coordinator",
+      status: "idle",
+      isPreset: 1,
+    })
+    .onConflictDoNothing({
+      target: [aiEmployees.organizationId, aiEmployees.slug],
+    })
+    .returning();
+  if (created) return created;
+
+  // Lost the insert race — another caller just provisioned. Re-read.
+  const afterRace = await db.query.aiEmployees.findFirst({
+    where: and(
+      eq(aiEmployees.slug, "leader"),
+      eq(aiEmployees.organizationId, organizationId),
+    ),
+  });
+  if (!afterRace) throw new Error("Failed to provision leader employee");
+  return afterRace;
 }
 
 /**
@@ -80,51 +137,7 @@ export async function startMission(data: {
     throw new Error("User has no organization. Please complete setup first.");
   }
 
-  // Find the leader employee in the user's organization
-  let leader = await db.query.aiEmployees.findFirst({
-    where: and(
-      eq(aiEmployees.slug, "leader"),
-      eq(aiEmployees.organizationId, organizationId)
-    ),
-  });
-
-  // Auto-provision leader if missing in this organization. Use onConflict to
-  // win any race against concurrent provisioning requests — the unique index
-  // `ai_employees_org_slug_uidx` guarantees we never create two leaders.
-  if (!leader) {
-    const [created] = await db
-      .insert(aiEmployees)
-      .values({
-        organizationId,
-        slug: "leader",
-        name: "任务总监",
-        nickname: "小领",
-        title: "智能项目管理与任务调度",
-        motto: "统筹全局，高效协作",
-        roleType: "manager",
-        authorityLevel: "coordinator",
-        status: "idle",
-        isPreset: 1,
-      })
-      .onConflictDoNothing({
-        target: [aiEmployees.organizationId, aiEmployees.slug],
-      })
-      .returning();
-    if (created) {
-      leader = created;
-    } else {
-      // Lost the race — another request just created the leader. Re-read.
-      leader = await db.query.aiEmployees.findFirst({
-        where: and(
-          eq(aiEmployees.slug, "leader"),
-          eq(aiEmployees.organizationId, organizationId),
-        ),
-      });
-      if (!leader) {
-        throw new Error("Failed to provision leader employee");
-      }
-    }
-  }
+  const leader = await getOrProvisionLeader(organizationId);
 
   // Soft dedup: if the same user submitted an identical mission in the last
   // USER_DEDUP_WINDOW_MS ms, return that one instead of creating a second.
@@ -201,47 +214,7 @@ export async function startMissionFromModule(data: {
    */
   workflowTemplateId?: string;
 }) {
-  // Find leader
-  let leader = await db.query.aiEmployees.findFirst({
-    where: and(
-      eq(aiEmployees.slug, "leader"),
-      eq(aiEmployees.organizationId, data.organizationId)
-    ),
-  });
-
-  if (!leader) {
-    const [created] = await db
-      .insert(aiEmployees)
-      .values({
-        organizationId: data.organizationId,
-        slug: "leader",
-        name: "任务总监",
-        nickname: "小领",
-        title: "智能项目管理与任务调度",
-        motto: "统筹全局，高效协作",
-        roleType: "manager",
-        authorityLevel: "coordinator",
-        status: "idle",
-        isPreset: 1,
-      })
-      .onConflictDoNothing({
-        target: [aiEmployees.organizationId, aiEmployees.slug],
-      })
-      .returning();
-    if (created) {
-      leader = created;
-    } else {
-      leader = await db.query.aiEmployees.findFirst({
-        where: and(
-          eq(aiEmployees.slug, "leader"),
-          eq(aiEmployees.organizationId, data.organizationId),
-        ),
-      });
-      if (!leader) {
-        throw new Error("Failed to provision leader employee");
-      }
-    }
-  }
+  const leader = await getOrProvisionLeader(data.organizationId);
 
   const instruction = data.sourceContext
     ? `${data.userInstruction}\n\n来源上下文：\n${JSON.stringify(data.sourceContext, null, 2)}`
@@ -453,6 +426,41 @@ export async function deleteMissions(missionIds: string[]): Promise<{
 }
 
 /**
+ * Pre-flight check for "new mission" UX: returns the most-recent in-flight
+ * mission (queued / planning / executing) that uses the same workflow template
+ * for the current user's org. UI uses this to warn the user before launching
+ * a duplicate run, while still letting them proceed intentionally (e.g. same
+ * template with different input parameters).
+ *
+ * Returns null when there is no active run.
+ */
+export async function findActiveMissionByTemplate(
+  workflowTemplateId: string,
+): Promise<{ id: string; title: string; status: string; createdAt: string } | null> {
+  await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return null;
+
+  const row = await db.query.missions.findFirst({
+    where: and(
+      eq(missions.organizationId, orgId),
+      eq(missions.workflowTemplateId, workflowTemplateId),
+      inArray(missions.status, ["queued", "planning", "executing"]),
+    ),
+    orderBy: (m, { desc }) => [desc(m.createdAt)],
+    columns: { id: true, title: true, status: true, createdAt: true },
+  });
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
  * 重新执行已终止的任务（创建新 Mission，复制原始参数）
  */
 export async function retryMission(missionId: string) {
@@ -472,6 +480,9 @@ export async function retryMission(missionId: string) {
     title: `${original.title}（重新执行）`,
     scenario: original.scenario,
     userInstruction: original.userInstruction,
+    // 关键：保留原 mission 的工作流模板，否则重试会丢模板，
+    // 走 LLM 分解或派工兜底（5 步全砸 leader），跟首次执行体验完全不一致。
+    workflowTemplateId: original.workflowTemplateId ?? undefined,
   });
 }
 

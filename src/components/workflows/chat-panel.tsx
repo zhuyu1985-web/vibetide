@@ -273,13 +273,13 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
   }, [chatInput, generating, scrollChatToBottom, onWorkflowGenerated, buildApiMessages]);
 
   return (
-    <div className="w-[360px] border-r border-border flex flex-col shrink-0 bg-muted/30">
+    <div className="w-[440px] border-r border-border flex flex-col shrink-0 bg-muted/30">
       {/* Header */}
       <div className="px-4 pt-5 pb-3">
-        <h2 className="text-sm font-semibold text-foreground">
+        <h2 className="text-base font-semibold text-foreground">
           创建您的自定义工作流
         </h2>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
           描述您的任务，让 AI 自动完成
         </p>
       </div>
@@ -291,19 +291,19 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
           <div className="relative mt-4 mb-4">
             <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-4">
               <div className="flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
+                <Sparkles className="w-4 h-4 text-purple-500 mt-1 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground">
                     从这里开始！
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                     描述要自动化的内容，AI 将为您构建
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowGuide(false)}
-                className="mt-3 px-3 py-1.5 rounded-lg bg-purple-500/10 text-xs text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors cursor-pointer border-0"
+                className="mt-3 px-3 py-1.5 rounded-lg bg-purple-500/10 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors cursor-pointer border-0"
               >
                 知道了
               </button>
@@ -322,31 +322,31 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
             className={`mb-3 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             {msg.role === "user" ? (
-              <div className="max-w-[85%] rounded-xl bg-primary/10 px-3 py-2 text-xs text-foreground">
+              <div className="max-w-[85%] rounded-xl bg-primary/10 px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
                 {msg.content}
               </div>
             ) : (
-              <div className="max-w-[85%] flex items-start gap-1.5">
+              <div className="max-w-[92%] flex items-start gap-2">
                 {msg.type === "thinking" && (
-                  <Loader2 className="w-3 h-3 animate-spin text-muted-foreground mt-0.5 shrink-0" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground mt-1 shrink-0" />
                 )}
                 {msg.type === "result" && (
-                  <CheckCircle2 className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-1 shrink-0" />
                 )}
                 {msg.type === "error" && (
-                  <AlertCircle className="w-3 h-3 text-destructive mt-0.5 shrink-0" />
+                  <AlertCircle className="w-3.5 h-3.5 text-destructive mt-1 shrink-0" />
                 )}
-                <span
-                  className={`text-xs ${
+                <div
+                  className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${
                     msg.type === "error"
                       ? "text-destructive"
                       : msg.type === "result"
                         ? "text-green-600 dark:text-green-400 font-medium"
-                        : "text-muted-foreground"
+                        : "text-foreground/90"
                   }`}
                 >
                   {msg.content}
-                </span>
+                </div>
               </div>
             )}
           </div>
@@ -354,8 +354,8 @@ export function ChatPanel({ mode, onWorkflowGenerated }: ChatPanelProps) {
 
         {/* Generating spinner */}
         {generating && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
             <span>AI 正在生成工作流...</span>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { inngest } from "@/inngest/client";
-import { publishArticleToCms, type PublishInput } from "@/lib/cms";
+import { publishArticleToCms } from "@/lib/cms";
 import {
   getPublicationById,
   incrementAttempt,
@@ -72,7 +72,6 @@ export const cmsPublishRetry = inngest.createFunction(
       try {
         const result = await publishArticleToCms({
           articleId: pub.articleId,
-          appChannelSlug: pub.appChannelSlug as PublishInput["appChannelSlug"],
           operatorId: pub.operatorId ?? "system",
           triggerSource: "scheduled",
           allowUpdate: true,

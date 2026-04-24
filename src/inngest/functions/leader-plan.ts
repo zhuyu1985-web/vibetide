@@ -13,6 +13,7 @@ import {
   buildLeaderDecomposePrompt,
   parseLeaderOutput,
   validateDAG,
+  pickEmployeeForStep,
 } from "@/lib/mission-core";
 
 /**
@@ -68,10 +69,12 @@ export const leaderPlan = inngest.createFunction(
             Array.isArray(tpl.steps) && tpl.steps.length > 0
               ? (tpl.steps as WorkflowStepDef[])
               : null;
-          return { name: tpl.name, steps };
+          const defaultTeam = (tpl.defaultTeam as string[] | null) ?? [];
+          return { name: tpl.name, steps, defaultTeam };
         })
       : null;
     const templateSteps = templateInfo?.steps ?? null;
+    const templateDefaultTeam = templateInfo?.defaultTeam ?? [];
     // 优先展示模板名，fallback 到 legacy slug。
     const scenarioLabel = templateInfo?.name ?? mission.scenario;
 
@@ -85,11 +88,8 @@ export const leaderPlan = inngest.createFunction(
         const selectedEmployeeIds = new Set<string>();
 
         for (const s of sorted) {
-          // 员工分配：step.config.employeeSlug → 其他相关 fallback → leader
-          const slugFromConfig = s.config?.employeeSlug ?? s.employeeSlug;
-          const matched = slugFromConfig
-            ? availableEmployees.find((e) => e.slug === slugFromConfig)
-            : null;
+          // 员工分配：显式 employeeSlug → defaultTeam 内技能匹配 → 团队轮询 → leader
+          const matched = pickEmployeeForStep(s, templateDefaultTeam, availableEmployees);
           const assignedEmployeeId = matched?.id ?? mission.leaderEmployeeId;
           selectedEmployeeIds.add(assignedEmployeeId);
 
@@ -112,6 +112,9 @@ export const leaderPlan = inngest.createFunction(
               description,
               expectedOutput: null,
               assignedEmployeeId,
+              // See mission-executor.ts fast-path: persist skillSlug so task
+              // executor can load the matching SKILL.md at runtime.
+              assignedRole: s.config?.skillSlug ?? null,
               dependencies: depTaskIds,
               priority: s.order ?? 0,
               status: "pending",

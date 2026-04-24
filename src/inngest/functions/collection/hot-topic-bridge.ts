@@ -44,7 +44,6 @@ export const collectionHotTopicBridge = inngest.createFunction(
     return {
       itemId,
       hotTopicId: result.hotTopicId,
-      isNew: result.isNew,
       priority: result.priority,
       heatScore: result.heatScore,
       enriched: result.shouldEnrich,

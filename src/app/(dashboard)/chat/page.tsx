@@ -1,21 +1,20 @@
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
+import { db } from "@/db";
+import { userProfiles } from "@/db/schema/users";
+import { eq } from "drizzle-orm";
 import { getEmployees } from "@/lib/dal/employees";
 import { getSavedConversations } from "@/lib/dal/conversations";
+import { listTemplatesForHomepageByTab } from "@/lib/dal/workflow-templates-listing";
 import { ChatCenterClient } from "./chat-center-client";
-import type { AIEmployee, ScenarioCardData } from "@/lib/types";
-import type { SavedConversationRow } from "@/db/types";
-// NOTE: getAllScenariosByOrg / @/lib/dal/scenarios removed 2026-04-20
-// (employee_scenarios table DROPPED at commit a066cbb). scenarioMap
-// stays empty until ChatCenterClient migrates to workflow_templates.
+import type { AIEmployee, InputFieldDef, ScenarioCardData } from "@/lib/types";
+import type { SavedConversationRow, WorkflowTemplateRow } from "@/db/types";
+import type { EmployeeId } from "@/lib/constants";
 
 export default async function ChatPage() {
   let employees: AIEmployee[] = [];
   let savedConversations: SavedConversationRow[] = [];
-  // Legacy `employee_scenarios` table dropped 2026-04-20 — scenarioMap
-  // stays empty until ChatCenterClient is migrated to workflow_templates
-  // (Phase 3).
   const scenarioMap: Record<string, ScenarioCardData[]> = {};
 
   try {
@@ -31,6 +30,35 @@ export default async function ChatPage() {
     } = await supabase.auth.getUser();
     if (user) {
       savedConversations = await getSavedConversations(user.id);
+
+      const profile = await db
+        .select({ organizationId: userProfiles.organizationId })
+        .from(userProfiles)
+        .where(eq(userProfiles.id, user.id))
+        .limit(1);
+      const orgId = profile[0]?.organizationId;
+
+      if (orgId && employees.length > 0) {
+        const slugs = employees.map((e) => e.id as EmployeeId);
+        const results = await Promise.all(
+          slugs.map((slug) =>
+            listTemplatesForHomepageByTab(orgId, slug).catch(
+              () => [] as WorkflowTemplateRow[],
+            ),
+          ),
+        );
+        slugs.forEach((slug, i) => {
+          scenarioMap[slug] = results[i].map((t) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description ?? "",
+            icon: t.icon ?? "",
+            welcomeMessage: null,
+            inputFields: (t.inputFields ?? []) as InputFieldDef[],
+            toolsHint: [],
+          }));
+        });
+      }
     }
   } catch {
     // Gracefully degrade — empty list

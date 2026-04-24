@@ -1,8 +1,6 @@
 import type { CmsArticleSaveDTO } from "../types";
-import { CmsConfigError, CmsSchemaError } from "../errors";
+import { CmsSchemaError } from "../errors";
 import { requireCmsConfig } from "../feature-flags";
-import { getAppChannelBySlug } from "@/lib/dal/app-channels";
-import { listCmsApps } from "@/lib/dal/cms-apps";
 
 import type { MapperContext, ArticleForMapper } from "./common";
 import { mapToType1, type Type1Article } from "./type1-article";
@@ -65,57 +63,43 @@ export async function mapArticleToCms(
 }
 
 /**
- * 从 app_channels + cms_apps + env 加载 MapperContext。
+ * 硬编码的 CMS 推送目标（跳过 app_channels ↔ cms_catalogs 绑定）。
  *
- * @param organizationId 组织 id
- * @param appChannelSlug 目标 APP 栏目 slug（app_news / app_politics / ...）
- * @param org             { brandName: string } 组织信息（用于 source 字段）
+ * 阶段 1（保障流程跑通）：所有稿件直推到固定站点/应用/栏目。后续接入
+ * categories ↔ cms_catalogs 绑定时改这三个常量来源即可。
  */
-export async function loadMapperContext(
-  organizationId: string,
-  appChannelSlug: string,
+const HARDCODED_SITE_ID = 81;
+const HARDCODED_APP_ID = 1768;
+const HARDCODED_CATALOG_ID = 10210;
+
+/**
+ * 从 env 加载 MapperContext。
+ *
+ * 当前不做 app_channels / category 级路由——推送目标写死在
+ * HARDCODED_* 常量；mapper 其它字段仍来自 CMS 配置。
+ *
+ * @param org { brandName: string } 组织信息（作为 source 字段兜底）
+ */
+export function loadMapperContext(
   org: { brandName: string },
-): Promise<MapperContext> {
+): MapperContext {
   const config = requireCmsConfig();
 
-  const appChannel = await getAppChannelBySlug(organizationId, appChannelSlug);
-  if (!appChannel) {
-    throw new CmsConfigError(
-      `app_channel_not_mapped: ${appChannelSlug}（请在 /settings/cms-mapping 配置）`,
-    );
-  }
-
-  if (!appChannel.defaultCatalog) {
-    throw new CmsConfigError(
-      `app_channel "${appChannelSlug}" 未绑定 default_catalog；请先运行 cms_catalog_sync 并在 /settings/cms-mapping 设置`,
-    );
-  }
-
-  const catalog = appChannel.defaultCatalog;
-  // 找到对应 siteId 的 app 记录（listCmsApps 默认返回全部 APP）
-  const apps = await listCmsApps(organizationId, "CHANNEL_APP");
-  const app = apps.find((a) => a.siteId === catalog.siteId);
-  if (!app) {
-    throw new CmsConfigError(
-      `未找到 siteId=${catalog.siteId} 对应的 cms_app；请重新跑 cms_catalog_sync`,
-    );
-  }
-
   return {
-    siteId: catalog.siteId,
-    appId: catalog.appId,
-    catalogId: catalog.cmsCatalogId,
+    siteId: HARDCODED_SITE_ID,
+    appId: HARDCODED_APP_ID,
+    catalogId: HARDCODED_CATALOG_ID,
     tenantId: config.tenantId,
     loginId: config.loginCmcId,
     loginTid: config.loginCmcTid,
     username: config.username,
     source: org.brandName || "智媒编辑部",
     author: "智媒编辑部",
-    listStyleDefault: (appChannel.defaultListStyle as MapperContext["listStyleDefault"]) ?? {
+    listStyleDefault: {
       imageUrlList: [],
       listStyleName: "默认",
       listStyleType: "0",
     },
-    coverImageDefault: appChannel.defaultCoverUrl ?? config.defaultCoverUrl,
+    coverImageDefault: config.defaultCoverUrl,
   };
 }

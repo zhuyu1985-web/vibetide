@@ -25,7 +25,6 @@ import {
   findLatestSuccessByArticle,
 } from "@/lib/dal/cms-publications";
 import { insertWorkflowArtifact } from "@/lib/dal/workflow-artifacts";
-import type { AppChannelSlug } from "@/lib/dal/app-channels";
 
 /**
  * 通知任务中心 —— 若 article 关联了 mission，写 workflow_artifacts 供 UI 可视化。
@@ -95,13 +94,10 @@ async function notifyMissionChannelSafely(params: {
 
 export interface PublishInput {
   articleId: string;
-  appChannelSlug: AppChannelSlug;
   operatorId: string;
   triggerSource: "manual" | "workflow" | "scheduled" | "daily_plan";
   /** 是否允许覆盖 CMS 已有稿件（默认 true，走 CMS MODIFY） */
   allowUpdate?: boolean;
-  /** 覆盖默认栏目（可选） */
-  overrideCatalogId?: string;
 }
 
 export interface PublishResult {
@@ -186,12 +182,10 @@ export async function publishArticleToCms(
     };
   }
 
-  // 4. MapperContext（loadMapperContext 内部调 app_channels 映射，未配置抛 CmsConfigError）
-  const ctx: MapperContext = await loadMapperContext(
-    article.organizationId,
-    input.appChannelSlug,
-    { brandName: org.brandName ?? "智媒编辑部" },
-  );
+  // 4. MapperContext（硬编码推送目标：siteId/appId/catalogId，见 article-mapper/index.ts）
+  const ctx: MapperContext = loadMapperContext({
+    brandName: org.brandName ?? "智媒编辑部",
+  });
 
   // 6. 映射
   const mappingStart = performance.now();
@@ -230,7 +224,6 @@ export async function publishArticleToCms(
   const publicationId = await createPublication({
     organizationId: article.organizationId,
     articleId: input.articleId,
-    appChannelSlug: input.appChannelSlug,
     cmsType,
     requestHash,
     requestPayload: dto,
