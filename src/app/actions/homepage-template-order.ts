@@ -7,21 +7,12 @@ import { workflowTemplateTabOrder, workflowTemplates } from "@/db/schema/workflo
 // 本文件使用 getCurrentUserProfile 而非 cms.ts 里的 getCurrentUserAndOrg——
 // 需要 role / isSuperAdmin 字段做管理员判定，后者只返回 userId+orgId。
 import { getCurrentUserProfile } from "@/lib/dal/auth";
-// Task 4 — `ALLOWED_TAB_KEYS` / `isAllowedTabKey` 抽到 `src/lib/homepage-template-tabs.ts`，
-// 允许 client 组件复用同一份 tab 白名单（`"use server"` 文件只能 export async）。
+// Task 4 — `ALLOWED_TAB_KEYS` / `isAllowedTabKey` / `SHARED_HOMEPAGE_ACTION_ERROR`
+// 均抽到 `src/lib/homepage-template-tabs.ts`：`"use server"` 文件只能 export
+// async 函数，不能 export 常量；统一放在共享模块供 server action、client
+// 组件、测试都 import。
+import type { HomepageActionResult } from "@/lib/homepage-template-tabs";
 import { isAllowedTabKey } from "@/lib/homepage-template-tabs";
-
-// ─── Shared constants / utils ────────────────────────────────────────
-
-export const SHARED_HOMEPAGE_ACTION_ERROR = {
-  FORBIDDEN: "FORBIDDEN",
-  INVALID_TAB: "INVALID_TAB",
-  CONFLICT: "CONFLICT",
-} as const;
-
-export type HomepageActionResult =
-  | { ok: true }
-  | { ok: false; error: keyof typeof SHARED_HOMEPAGE_ACTION_ERROR; message?: string };
 
 async function requireAdminContext(): Promise<
   | { ok: true; userId: string; organizationId: string }

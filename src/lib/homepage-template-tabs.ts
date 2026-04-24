@@ -24,3 +24,24 @@ export type AllowedTabKey = (typeof ALLOWED_TAB_KEYS)[number];
 export function isAllowedTabKey(key: string): key is AllowedTabKey {
   return (ALLOWED_TAB_KEYS as readonly string[]).includes(key);
 }
+
+/**
+ * 首页 server action 的错误码集合。
+ *
+ * 抽到本模块同为 Next.js "use server" 限制：server action 文件只能 export
+ * async 函数；同步 const 对象必须放在独立模块里，供 server action、client
+ * 组件、测试共同 import。
+ */
+export const SHARED_HOMEPAGE_ACTION_ERROR = {
+  FORBIDDEN: "FORBIDDEN",
+  INVALID_TAB: "INVALID_TAB",
+  CONFLICT: "CONFLICT",
+} as const;
+
+export type HomepageActionResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: keyof typeof SHARED_HOMEPAGE_ACTION_ERROR;
+      message?: string;
+    };
