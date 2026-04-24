@@ -14,7 +14,7 @@ import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { RecentSection } from "@/components/home/recent-section";
 import { EmbeddedChatPanel } from "@/components/home/embedded-chat-panel";
-import type { ScenarioCardData } from "@/lib/types";
+import type { ScenarioCardData, InputFieldDef } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
 
 // ---------------------------------------------------------------------------
@@ -92,12 +92,23 @@ export function HomeClient({
 
   const effectiveEmployee: EmployeeId = activeEmployee ?? "xiaolei";
 
-  // Per-employee scenarios from DB — only when user explicitly selected an employee
+  // 2026-04-20 chips 数据源切到 workflow_templates（员工绑定的日常工作流）
+  // 取 templatesByTab[employee]，按 ScenarioCardData 形状适配既有 chip handler。
+  // scenarioMap 自 legacy employee_scenarios 表删除后恒为空，保留 prop 仅作签名兼容。
+  void scenarioMap;
   const allEmployeeScenarios: ScenarioCardData[] = activeEmployee
-    ? (scenarioMap[activeEmployee] ?? [])
+    ? (templatesByTab[activeEmployee] ?? []).map((t: WorkflowTemplateRow) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description ?? "",
+        icon: t.icon ?? "",
+        welcomeMessage: null,
+        inputFields: (t.inputFields ?? []) as InputFieldDef[],
+        toolsHint: [],
+      }))
     : [];
-  // Normal mode: top 3; Chat mode: all
-  const activeScenarios = chatOpen ? allEmployeeScenarios : allEmployeeScenarios.slice(0, 3);
+  // 单行展示：截顶 4 个，配合 flex-nowrap + overflow-hidden 保证不换行。
+  const activeScenarios = allEmployeeScenarios.slice(0, 4);
 
   // ── Chat stream hook ──
   const chat = useChatStream({ employeeSlug: effectiveEmployee });
@@ -260,14 +271,16 @@ export function HomeClient({
           />
         </div>
 
-        {/* Scenario chips — only when an employee is actively selected */}
+        {/* Scenario chips — only when an employee is actively selected.
+            Source: templatesByTab[employee] (员工绑定的日常工作流)，单行展示。 */}
         {activeEmployee && activeScenarios.length > 0 && (
-          <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+          <div className="px-4 pb-2 flex flex-nowrap gap-1.5 overflow-hidden">
             {activeScenarios.map((scenario) => (
               <button
                 key={scenario.id}
                 onClick={() => handleEmployeeScenarioClick(scenario)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                title={scenario.description || scenario.name}
+                className="inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors cursor-pointer whitespace-nowrap max-w-[10rem] truncate"
               >
                 {scenario.name}
               </button>
