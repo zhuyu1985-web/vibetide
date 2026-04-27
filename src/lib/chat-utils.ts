@@ -15,13 +15,18 @@ export interface SkillUsed {
 }
 
 export interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   durationMs?: number;
   thinkingSteps?: ThinkingStep[];
   skillsUsed?: SkillUsed[];
   sources?: string[];
   referenceCount?: number;
+  /** mission_card 消息用字段（kind 缺省视为 "text"，向后兼容） */
+  kind?: "text" | "mission_card";
+  missionId?: string;
+  templateId?: string;
+  templateName?: string;
 }
 
 /** SSE event parsed from a text buffer. */

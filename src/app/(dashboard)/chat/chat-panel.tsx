@@ -65,6 +65,7 @@ import {
   IntentConfirmCard,
 } from "@/components/chat/intent-bubble";
 import { MessageActions } from "@/components/chat/message-actions";
+import { MissionCardMessage } from "@/components/chat/mission-card-message";
 import {
   ModelSwitcher,
   DEFAULT_MODEL_ID,
@@ -667,6 +668,17 @@ export function ChatPanel({
             /* ── Messages ── */
             <>
               {messages.map((msg, i) => {
+                // mission_card 类消息直接渲染卡片，跳过 MessageBubble 逻辑
+                if (msg.kind === "mission_card" && msg.missionId) {
+                  return (
+                    <MissionCardMessage
+                      key={i}
+                      missionId={msg.missionId}
+                      templateName={msg.templateName ?? "任务"}
+                    />
+                  );
+                }
+
                 // Check if this user message is the last one before the assistant response
                 const isLastUserBeforeAssistant =
                   msg.role === "user" &&

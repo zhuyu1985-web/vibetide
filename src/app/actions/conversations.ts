@@ -21,13 +21,17 @@ export async function saveConversation(data: {
   title: string;
   summary?: string;
   messages: {
-    role: "user" | "assistant";
+    role: "user" | "assistant" | "system";
     content: string;
     durationMs?: number;
     thinkingSteps?: { tool: string; label: string; skillName?: string }[];
     skillsUsed?: { tool: string; skillName: string }[];
     sources?: string[];
     referenceCount?: number;
+    kind?: "text" | "mission_card";
+    missionId?: string;
+    templateId?: string;
+    templateName?: string;
   }[];
   scenarioId?: string;
   metadata?: Record<string, unknown>;
