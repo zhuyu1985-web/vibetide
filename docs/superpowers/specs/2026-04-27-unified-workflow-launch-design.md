@@ -163,13 +163,13 @@ interface WorkflowLaunchDialogProps {
 - 启动失败显示在 dialog 内部错误条（保持现状）
 - mission 创建后的运行失败属于 mission 系统的事，dialog 不负责
 
-### 4.3 三入口替换路径
+### 4.4 三入口替换路径
 
 | 入口 | 当前组件 | 改为 |
 |---|---|---|
-| `/employee/[id]` `EmployeeWorkflowsSection` | 直接调 `startMission()` | 弹 `WorkflowLaunchDialog`，`entry='employee'` |
-| `/home` `ScenarioGrid.handleCardClick` | `launchMode==='direct'` 直启 / 否则弹 `WorkflowLaunchDialog` | **统一**弹 `WorkflowLaunchDialog`，`entry='home'`（删除 launchMode 分支） |
-| `/chat` `ChatCenterClient.handleSelectScenario` | 弹 `ScenarioFormSheet` 或直接发消息 | 弹 `WorkflowLaunchDialog`，`entry='chat'`，`onLaunched` 回调插入 mission_card 消息 |
+| `/employee/[id]` `EmployeeWorkflowsSection` | 直接调 `startMission()` | 弹 `WorkflowLaunchDialog`，**不传** `onLaunched`（默认 push 到 mission console） |
+| `/home` `ScenarioGrid.handleCardClick` | `launchMode==='direct'` 直启 / 否则弹 `WorkflowLaunchDialog` | **统一**弹 `WorkflowLaunchDialog`，**不传** `onLaunched`（删除 launchMode 分支） |
+| `/chat` 内联 scenario 表单（`chat-panel.tsx:974-1075`） | 内联 form + `onScenarioFormSubmit` | 弹 `WorkflowLaunchDialog`，**传** `onLaunched`：拿 missionId 在对话流插入 mission_card 消息 |
 
 ---
 
@@ -288,7 +288,7 @@ UI 结构：
 ### Phase 3 — 配置入口可见化
 - 卡片"⋯"菜单组件实现
 - 三入口卡片接入菜单（仅 admin/owner 可见）
-- 接入既有的 编辑 / 复制 / 置顶 / 隐藏 actions
+- 接入既有的 编辑 / 复制 / 置顶 三个 actions（"隐藏"留作独立 follow-up，见 §6.1）
 
 **验收：**
 - admin 在 employee/home/chat 卡片上能直接跳到编辑页
