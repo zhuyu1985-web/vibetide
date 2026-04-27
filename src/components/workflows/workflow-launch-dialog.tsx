@@ -294,6 +294,11 @@ export interface WorkflowLaunchDialogProps {
   template: WorkflowTemplateRow;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * 启动成功回调。如果未传，沿用旧行为（router.push 到 mission console）。
+   * Chat 入口必须传这个：拿到 missionId 后向对话流插入 mission_card 消息。
+   */
+  onLaunched?: (result: { missionId: string; template: WorkflowTemplateRow }) => void;
 }
 
 /**
@@ -311,6 +316,7 @@ export function WorkflowLaunchDialog({
   template,
   open,
   onOpenChange,
+  onLaunched,
 }: WorkflowLaunchDialogProps) {
   const router = useRouter();
   const fields: InputFieldDef[] = React.useMemo(
@@ -350,7 +356,11 @@ export function WorkflowLaunchDialog({
         return;
       }
       onOpenChange(false);
-      router.push(`/missions/${res.missionId}`);
+      if (onLaunched) {
+        onLaunched({ missionId: res.missionId, template });
+      } else {
+        router.push(`/missions/${res.missionId}`);
+      }
     } catch (e) {
       setErrors({
         _global: e instanceof Error ? e.message : "启动失败",
@@ -372,8 +382,8 @@ export function WorkflowLaunchDialog({
 
         <div className="space-y-4 py-2">
           {fields.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              此场景无需填写参数，点击"启动"直接开始。
+            <p className="text-sm text-muted-foreground py-2">
+              {template.description ?? "点击「启动」立即创建任务。"}
             </p>
           ) : (
             fields.map((f, idx) => (
