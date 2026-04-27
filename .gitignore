@@ -45,3 +45,7 @@ next-env.d.ts
 
 # Playwright MCP 调试产物
 .playwright-mcp/
+
+# 数据库 dump / 备份文件（不入仓）
+*.sql
+!supabase/migrations/*.sql
