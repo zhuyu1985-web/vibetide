@@ -519,6 +519,8 @@ git commit -m "refactor(chat): pass WorkflowTemplateRow directly to chat client"
 
 ### Task 11: Chat — 删除内联 scenario 表单 + 用 dialog
 
+> **⚠️ STOP gate：** 本 task 的 commit **不可独立 PR 上线**。Phase 1 后 chat 入口暂时跳到 `/missions/[id]`，必须等 Task 18（Phase 2 末）一起上线，否则 chat 用户被踢出对话流的体验过夜降级（spec §7 / §8 强约束）。本 commit 只为开发期分步可 review；推 PR 之前必须 Phase 1+2 完成。
+
 **Files:**
 - Modify: `src/app/(dashboard)/chat/chat-panel.tsx`（line 974-1075 内联表单整段）
 - Modify: `src/app/(dashboard)/chat/chat-center-client.tsx`（`handleSelectScenario` + dialog state）
@@ -634,7 +636,22 @@ npm test
 
 预期：全过。
 
-- [ ] **Step 13.4：手动三入口回归**
+- [ ] **Step 13.4：DB 列已删验证**
+
+```bash
+npm run db:studio
+```
+打开 Drizzle Studio → `workflow_templates` 表 → 确认 `launch_mode` 列**不再存在**。同时随便选一行已存在的 builtin template → 其它字段（name/inputFields/promptTemplate）完整无损。
+
+- [ ] **Step 13.5：grep 全 src 无 launchMode 残留**
+
+```bash
+grep -rn 'launchMode\|launch_mode' src --include="*.ts" --include="*.tsx"
+```
+
+预期：零命中。
+
+- [ ] **Step 13.6：手动三入口回归**
 
 启动 dev：
 ```bash
@@ -644,7 +661,7 @@ npm run dev
 依次测试：
 - `/home` → 选任意场景卡片 → 弹 dialog → 填表单或确认 → 跳 `/missions/[id]`
 - `/employee/xiaolei` → 选任意"日常工作流"卡片 → 弹 dialog → 启动 → 跳 `/missions/[id]`
-- `/chat` → 选员工 → 选场景 → 弹 dialog → 启动 → 跳 `/missions/[id]`
+- `/chat` → 选员工 → 选场景 → 弹 dialog → 启动 → 跳 `/missions/[id]`（Phase 1 暂行，Task 18 改）
 
 三处行为一致即 Phase 1 完成。
 
@@ -656,6 +673,14 @@ npm run dev
 
 **Files:**
 - Modify: `src/db/schema/saved-conversations.ts`
+
+- [ ] **Step 14.0：grep 自定义 Message interface**
+
+```bash
+grep -rn 'interface Message\|type Message\b\|Message\[\]' src/app/\(dashboard\)/chat src/components/chat 2>/dev/null
+```
+
+如果 chat-panel 或 chat-center-client 有自定义的 `Message` interface（不是直接用 schema 的类型），同步在那里加 `kind` / `missionId` / `templateId` / `templateName` 字段。
 
 - [ ] **Step 14.1：扩展 messages jsonb 元素类型**
 
@@ -697,56 +722,182 @@ git commit -m "feat(chat-schema): extend message type with mission_card fields"
 
 ---
 
-### Task 15: 创建 useMissionProgress hook
+### Task 15: 创建 useMissionProgress hook（纯靠 SSE，不依赖额外 GET 端点）
 
 **Files:**
+- Create: `src/lib/chat/parse-mission-event.ts`（纯函数，便于 vitest 测试）
+- Create: `src/lib/chat/__tests__/parse-mission-event.test.ts`
 - Create: `src/lib/hooks/use-mission-progress.ts`
-- Create: `src/lib/hooks/__tests__/use-mission-progress.test.ts`
 
-- [ ] **Step 15.1：先调研 SSE 端点的事件结构**
+**SSE 端点已确认事件**（见 `src/app/api/missions/[id]/progress/route.ts:60-95`，事实结论）：
+- `task-update`：`{ taskId, title, status, progress, assignedEmployeeId }` —— 首轮 poll 会为每个 task 各发一条（因为 prevTaskMap 初始为空），**hook 累积这些事件即可重建完整 task 列表**，不需要额外 GET 端点
+- `mission-progress`：`{ status, progress, completedTasks, totalTasks }` —— 整体进度
+- `mission-completed`：`{ status, progress }` —— 终态后端自关闭
+- `error`：`{ message: "Mission not found" }` —— 404 场景
 
-读 `src/app/api/missions/[id]/progress/route.ts` 完整文件，记下：
-- 发送的 event name 列表（如 `progress`、`tasks_changed`、`status_changed`、`done` 等）
-- 每个 event 的 data 形态
+**因此本 task 删除了原 plan 里的 GET 端点 fallback；Task 19 整体取消（合并到本 task 决策）。**
 
-- [ ] **Step 15.2：写失败测试**
+- [ ] **Step 15.1：写纯函数 + 失败测试**
 
-`src/lib/hooks/__tests__/use-mission-progress.test.ts`：
+`src/lib/chat/parse-mission-event.ts`：
 
 ```ts
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useMissionProgress } from "../use-mission-progress";
+export type MissionEventName =
+  | "task-update"
+  | "mission-progress"
+  | "mission-completed"
+  | "error";
 
-describe("useMissionProgress", () => {
-  beforeEach(() => {
-    // mock EventSource
+export interface MissionTask {
+  id: string;
+  title: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  progress?: number;
+  assignedEmployeeId?: string | null;
+}
+
+export interface MissionProgressData {
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  progress: number;
+  tasksByid: Record<string, MissionTask>;
+  notFound: boolean;
+}
+
+export function emptyMissionProgress(): MissionProgressData {
+  return { status: "pending", progress: 0, tasksByid: {}, notFound: false };
+}
+
+/**
+ * 把单条 SSE 事件 merge 进当前 state。纯函数，便于 vitest 单测。
+ * 未知事件名直接返回 prev。
+ */
+export function applyMissionEvent(
+  prev: MissionProgressData,
+  event: MissionEventName,
+  raw: string,
+): MissionProgressData {
+  let data: unknown;
+  try { data = JSON.parse(raw); } catch { return prev; }
+  if (typeof data !== "object" || data === null) return prev;
+  const d = data as Record<string, unknown>;
+
+  if (event === "error" && d.message === "Mission not found") {
+    return { ...prev, notFound: true };
+  }
+  if (event === "task-update" && typeof d.taskId === "string") {
+    return {
+      ...prev,
+      tasksByid: {
+        ...prev.tasksByid,
+        [d.taskId]: {
+          id: d.taskId,
+          title: String(d.title ?? ""),
+          status: (d.status as MissionTask["status"]) ?? "pending",
+          progress: typeof d.progress === "number" ? d.progress : undefined,
+          assignedEmployeeId: (d.assignedEmployeeId as string | null) ?? null,
+        },
+      },
+    };
+  }
+  if (event === "mission-progress" || event === "mission-completed") {
+    return {
+      ...prev,
+      status: (d.status as MissionProgressData["status"]) ?? prev.status,
+      progress: typeof d.progress === "number" ? d.progress : prev.progress,
+    };
+  }
+  return prev;
+}
+```
+
+`src/lib/chat/__tests__/parse-mission-event.test.ts`：
+
+```ts
+import { describe, it, expect } from "vitest";
+import {
+  applyMissionEvent,
+  emptyMissionProgress,
+} from "../parse-mission-event";
+
+describe("applyMissionEvent", () => {
+  it("starts empty", () => {
+    const s = emptyMissionProgress();
+    expect(s.status).toBe("pending");
+    expect(s.progress).toBe(0);
+    expect(Object.keys(s.tasksByid)).toHaveLength(0);
+    expect(s.notFound).toBe(false);
   });
 
-  it("returns initial loading state then transitions to running", async () => {
-    const { result } = renderHook(() => useMissionProgress("mission-id-1"));
-    expect(result.current.status).toBe("loading");
-    // simulate SSE event
-    // ...
-    await waitFor(() => expect(result.current.status).toBe("running"));
+  it("accumulates task-update events into tasksByid", () => {
+    let s = emptyMissionProgress();
+    s = applyMissionEvent(s, "task-update", JSON.stringify({
+      taskId: "t1", title: "选题", status: "running",
+    }));
+    s = applyMissionEvent(s, "task-update", JSON.stringify({
+      taskId: "t2", title: "写作", status: "pending",
+    }));
+    expect(Object.keys(s.tasksByid)).toHaveLength(2);
+    expect(s.tasksByid.t1.status).toBe("running");
   });
 
-  it("handles 404 (mission deleted) by returning notFound state", async () => {
-    // mock fetch to return 404
-    // ...
-    const { result } = renderHook(() => useMissionProgress("missing-id"));
-    await waitFor(() => expect(result.current.status).toBe("not_found"));
+  it("updates existing task on subsequent task-update", () => {
+    let s = emptyMissionProgress();
+    s = applyMissionEvent(s, "task-update", JSON.stringify({
+      taskId: "t1", title: "选题", status: "running",
+    }));
+    s = applyMissionEvent(s, "task-update", JSON.stringify({
+      taskId: "t1", title: "选题", status: "completed",
+    }));
+    expect(s.tasksByid.t1.status).toBe("completed");
+    expect(Object.keys(s.tasksByid)).toHaveLength(1);
   });
 
-  it("self-closes on terminal status", async () => {
-    // ...
+  it("merges mission-progress event", () => {
+    let s = emptyMissionProgress();
+    s = applyMissionEvent(s, "mission-progress", JSON.stringify({
+      status: "running", progress: 30,
+    }));
+    expect(s.status).toBe("running");
+    expect(s.progress).toBe(30);
+  });
+
+  it("sets notFound on error event", () => {
+    let s = emptyMissionProgress();
+    s = applyMissionEvent(s, "error", JSON.stringify({
+      message: "Mission not found",
+    }));
+    expect(s.notFound).toBe(true);
+  });
+
+  it("ignores malformed JSON", () => {
+    const s = emptyMissionProgress();
+    expect(applyMissionEvent(s, "task-update", "not-json")).toEqual(s);
+  });
+
+  it("ignores unknown event names", () => {
+    const s = emptyMissionProgress();
+    expect(applyMissionEvent(s, "unknown" as never, "{}")).toEqual(s);
   });
 });
 ```
 
-注：本项目目前**没有**使用 React Testing Library，需要确认是否引入。如不引入，把测试改为纯 logic test（提取 SSE 消息解析为纯函数测）。
+- [ ] **Step 15.2：跑测试，确认全部失败（pure 函数都还没写就 PASS 也行，但你应该看到导入错误）**
 
-- [ ] **Step 15.3：实现 hook**
+```bash
+npx vitest run src/lib/chat/__tests__/parse-mission-event.test.ts
+```
+
+预期：因为 parse-mission-event.ts 还没写所以 import 失败 → 整个 file FAIL。
+
+- [ ] **Step 15.3：写实现，跑测试转绿**
+
+`src/lib/chat/parse-mission-event.ts` 内容见 Step 15.1。再跑：
+```bash
+npx vitest run src/lib/chat/__tests__/parse-mission-event.test.ts
+```
+预期：7/7 PASS。
+
+- [ ] **Step 15.4：写 React hook（薄壳，调 pure 函数）**
 
 `src/lib/hooks/use-mission-progress.ts`：
 
@@ -754,112 +905,65 @@ describe("useMissionProgress", () => {
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  applyMissionEvent,
+  emptyMissionProgress,
+  type MissionProgressData,
+  type MissionEventName,
+} from "@/lib/chat/parse-mission-event";
 
-export type MissionProgressState =
-  | { status: "loading" }
-  | { status: "not_found" }
-  | { status: "error"; error: string }
-  | {
-      status: "pending" | "running" | "completed" | "failed";
-      progress: number;
-      tasks: Array<{
-        id: string;
-        title: string;
-        status: "pending" | "running" | "completed" | "failed" | "skipped";
-        employeeId?: string;
-      }>;
-    };
-
-export function useMissionProgress(missionId: string): MissionProgressState {
-  const [state, setState] = useState<MissionProgressState>({ status: "loading" });
+export function useMissionProgress(missionId: string): MissionProgressData & {
+  isLoading: boolean;
+} {
+  const [state, setState] = useState<MissionProgressData>(emptyMissionProgress);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!missionId) return;
-    let cancelled = false;
+    setState(emptyMissionProgress());
+    setIsLoading(true);
 
-    // 1. 拉初始状态
-    (async () => {
-      try {
-        const res = await fetch(`/api/missions/${missionId}`);
-        if (cancelled) return;
-        if (res.status === 404) {
-          setState({ status: "not_found" });
-          return;
-        }
-        if (!res.ok) {
-          setState({ status: "error", error: `HTTP ${res.status}` });
-          return;
-        }
-        const data = await res.json();
-        setState({
-          status: data.status,
-          progress: data.progress ?? 0,
-          tasks: data.tasks ?? [],
-        });
-      } catch (e) {
-        if (cancelled) return;
-        setState({ status: "error", error: e instanceof Error ? e.message : "fetch failed" });
-      }
-    })();
-
-    // 2. 订阅 SSE
     const es = new EventSource(`/api/missions/${missionId}/progress`);
-    es.addEventListener("progress", (ev) => {
-      if (cancelled) return;
-      try {
-        const data = JSON.parse((ev as MessageEvent).data);
-        setState((prev) => {
-          if (prev.status === "loading" || prev.status === "not_found" || prev.status === "error") {
-            return prev;
-          }
-          return { ...prev, ...data };
-        });
-      } catch {
-        // ignore malformed
+
+    const onEvent = (name: MissionEventName) => (ev: Event) => {
+      const me = ev as MessageEvent;
+      setIsLoading(false);
+      setState((prev) => applyMissionEvent(prev, name, me.data));
+    };
+
+    es.addEventListener("task-update", onEvent("task-update"));
+    es.addEventListener("mission-progress", onEvent("mission-progress"));
+    es.addEventListener("mission-completed", (ev) => {
+      onEvent("mission-completed")(ev);
+      es.close();
+    });
+    es.addEventListener("error", (ev) => {
+      // SSE 错误事件可能无 data；如果有 data 走 applyMissionEvent，否则忽略
+      if ((ev as MessageEvent).data) {
+        onEvent("error")(ev);
       }
     });
-    es.addEventListener("done", () => es.close());
-    es.onerror = () => {
-      // SSE 自关闭场景下不算 error；持续失败不抛
-    };
 
-    return () => {
-      cancelled = true;
-      es.close();
-    };
+    return () => es.close();
   }, [missionId]);
 
-  return state;
+  return { ...state, isLoading };
 }
 ```
 
-- [ ] **Step 15.4：跑测试**
+- [ ] **Step 15.5：tsc 验证**
 
 ```bash
-npx vitest run src/lib/hooks/__tests__/use-mission-progress.test.ts
+npx tsc --noEmit | grep -E "parse-mission-event|use-mission-progress"
 ```
 
-预期：通过（如果决定不写 RTL 测试，跳过）。
-
-- [ ] **Step 15.5：检查 mission 详情 API 是否存在**
-
-```bash
-ls src/app/api/missions/\[id\]/route.ts 2>/dev/null
-```
-
-如果没有 GET 路由返回 mission 完整字段，本 hook 的初始 fetch 会 404。两种处理：
-1. 创建一个 GET `/api/missions/[id]` 端点返回 `{ status, progress, tasks }`
-2. 或者直接通过 SSE 拿首个 event 当初始状态（去掉初始 fetch）
-
-倾向方案 2 — 简化 hook，等 SSE 第一个 event。如果 SSE 5s 内无 event，显示 loading/timeout。
-
-调整 hook：删除初始 fetch 块，纯靠 SSE。404 fallback 改为：SSE 连接失败（如端点直接返回 404 关闭）→ 设 `not_found`。
+预期：无错。
 
 - [ ] **Step 15.6：Commit**
 
 ```bash
-git add src/lib/hooks/use-mission-progress.ts src/lib/hooks/__tests__/use-mission-progress.test.ts
-git commit -m "feat(hooks): add useMissionProgress for SSE subscription"
+git add src/lib/chat/parse-mission-event.ts src/lib/chat/__tests__/parse-mission-event.test.ts src/lib/hooks/use-mission-progress.ts
+git commit -m "feat(hooks): add useMissionProgress + parseMissionEvent for SSE-driven UI"
 ```
 
 ---
@@ -987,7 +1091,7 @@ git commit -m "feat(chat): add MissionCardMessage component"
 
 - [ ] **Step 17.1：在消息渲染循环中加 kind 判断**
 
-找到 chat-panel 渲染 messages 的地方（搜 `messages.map`），加上：
+锚点：在 `chat-panel.tsx` 中 grep `messages.map(` 找到主渲染循环（chat-panel 文件 1000+ 行）。如果同时有多处，选中"渲染对话气泡"那处（前后通常有 `<MessageBubble`、`assistant` / `user` 字符串、`role` 判断）。在 map 回调最开头加上：
 ```tsx
 {messages.map((m, i) => {
   if (m.kind === "mission_card" && m.missionId) {
@@ -1028,7 +1132,26 @@ git commit -m "feat(chat): render mission_card messages in chat-panel"
 **Files:**
 - Modify: `src/app/(dashboard)/chat/chat-center-client.tsx`
 
-- [ ] **Step 18.1：替换 onLaunched 回调**
+- [ ] **Step 18.1：清理遗留 scenario state（Task 11 没删干净的）**
+
+打开 `chat-center-client.tsx`，确认以下符号不再被任何代码使用，**全部删除**：
+- `activeScenario` state + `setActiveScenario` setter（搜全文）
+- `inlineScenario` state + `setInlineScenario` setter
+- `handleScenarioSubmit` 整个函数
+- `scenarioInputs` state + `setScenarioInputs`
+- `scenarioInputsRef` ref
+- `pendingIntent` / `setPendingIntent` 如果只为 scenario 走 intent bubble 用
+- `welcomeMessage` 引用 + `renderScenarioTemplate` 调用
+- `import { renderScenarioTemplate }` 等孤立 import
+
+每个符号删除前 grep 一次确认没有别处引用：
+```bash
+grep -n 'activeScenario\|inlineScenario\|handleScenarioSubmit\|scenarioInputs\|renderScenarioTemplate' "src/app/(dashboard)/chat/chat-center-client.tsx"
+```
+
+如某个符号还被 chat-panel.tsx 等子组件 props 消费，先把那边的 prop 也删干净，再删本文件的 state。
+
+- [ ] **Step 18.2：替换 onLaunched 回调**
 
 把 Task 11 写的：
 ```tsx
@@ -1051,17 +1174,16 @@ onLaunched={({ missionId, template }) => {
       templateName: template.name,
     },
   ]);
-  setActiveScenario(null);  // 或对应的清理逻辑
 }}
 ```
 
-可以删 `useRouter` 如果别处不再用。
+如果 `useRouter` 在 chat-center-client 别处还在用就保留 import；否则删。
 
-- [ ] **Step 18.2：保存会话时确保 mission_card 字段持久化**
+- [ ] **Step 18.3：保存会话时确保 mission_card 字段持久化**
 
-找 `saveCurrentConversation`（约在 line 380-401），确认 `setMessages` 后 `messages` 数组里的 mission_card 条目能完整 stringify 到 jsonb（理论上自动，但 TS 类型已扩展所以编译期检查会过）。
+找 `saveCurrentConversation`（约在 line 380-401），确认 `setMessages` 后 `messages` 数组里的 mission_card 条目能完整 stringify 到 jsonb——TS 类型已扩展所以编译期检查会过；运行时不需要特殊处理（jsonb 直接接 JS object）。
 
-- [ ] **Step 18.3：tsc + 视觉验证**
+- [ ] **Step 18.4：tsc + 视觉验证**
 
 ```bash
 npx tsc --noEmit | grep chat-center
@@ -1069,75 +1191,18 @@ npx tsc --noEmit | grep chat-center
 
 启动 dev → `/chat` → 选员工 → 选场景 → 启动后**留在 chat 页**，对话流出现 mission_card 消息，显示步骤进度。
 
-- [ ] **Step 18.4：Commit**
+- [ ] **Step 18.5：Commit**
 
 ```bash
 git add "src/app/(dashboard)/chat/chat-center-client.tsx"
-git commit -m "feat(chat): insert mission_card on launch instead of router.push"
+git commit -m "feat(chat): insert mission_card on launch + cleanup legacy scenario state"
 ```
 
 ---
 
-### Task 19: 验证 mission API 提供详情端点（如果 hook 用 fetch）
+### Task 19: ~~验证 mission API 端点~~（已取消）
 
-**Files:**
-- Conditional create: `src/app/api/missions/[id]/route.ts`
-
-- [ ] **Step 19.1：检查 GET /api/missions/[id] 是否存在**
-
-```bash
-ls src/app/api/missions/\[id\]/ 2>/dev/null
-```
-
-如果只有 `progress/route.ts` 没有 `route.ts`，需要新建。
-
-- [ ] **Step 19.2（条件）：创建 GET 端点**
-
-如 hook 仍依赖初始 fetch（Task 15 Step 15.5 决定不删的话），创建 `src/app/api/missions/[id]/route.ts`：
-
-```ts
-import { NextRequest } from "next/server";
-import { db } from "@/db";
-import { missions, missionTasks } from "@/db/schema";
-import { eq } from "drizzle-orm";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  const mission = await db.query.missions.findFirst({ where: eq(missions.id, id) });
-  if (!mission) return new Response("Not Found", { status: 404 });
-
-  const tasks = await db.query.missionTasks.findMany({
-    where: eq(missionTasks.missionId, id),
-    orderBy: (t, { asc }) => [asc(t.sortOrder)],
-  });
-
-  return Response.json({
-    status: mission.status,
-    progress: mission.progress ?? 0,
-    tasks: tasks.map((t) => ({
-      id: t.id,
-      title: t.title,
-      status: t.status,
-      employeeId: t.assigneeEmployeeId,
-    })),
-  });
-}
-```
-
-字段名以实际 schema 为准 — 如 `missions.progress` 不存在，从 mission_tasks 计算。
-
-- [ ] **Step 19.3：Commit**
-
-如果新建了端点：
-```bash
-git add "src/app/api/missions/[id]/route.ts"
-git commit -m "feat(api): add GET /api/missions/[id] for initial state fetch"
-```
+**Status：删除。** Task 15 决策为"纯靠 SSE，不需要 GET 端点"——SSE 端点首轮 poll 会通过 `task-update` 事件把所有 task 各发一遍，hook 累积即可。原 Task 19 已不需要，编号空缺，**直接跳到 Task 20**。
 
 ---
 
@@ -1166,6 +1231,8 @@ npm test
 
 - 启动 mission 后立即把它从 mission console 删了 → chat 卡片显示"任务已被删除"灰态
 - chat 内连续启动 2 个场景 → 两条卡片都正确订阅各自 SSE
+- **mission 自然完成**：等任意一个 mission 跑到终态（completed / failed），卡片应显示对应的状态 icon（✅/❌）+ 不再轮询（network 面板看 EventSource 已 close）
+- **刷新页面后的 mission_card rehydrate**：保存会话 → 刷新页面 → 重新打开会话 → mission_card 重新订阅 SSE 显示当前状态（不论 mission 已完成还是仍在跑）
 
 ---
 
@@ -1284,18 +1351,36 @@ git commit -m "feat(home): use WorkflowCardMenu for admin actions"
 
 页面顶层判定 admin/owner（参考 home/page.tsx 第 145-157 行的 `canManageHomepage` 模式），传给 `EmployeeWorkflowsSection`。
 
-- [ ] **Step 23.2：在每个 workflow 卡片右上角加菜单**
+- [ ] **Step 23.2：把外层 button 换成 div（嵌套 button 不合法）**
 
-button 的 className 加 `relative`，里面加：
+employee 页 workflow 卡片当前是 `<button onClick={() => handleStart(wf)}>`，但 `WorkflowCardMenu` 内部也用 `<Button>` 触发，HTML 不允许嵌套 button。
+
+**唯一方案**：把外层 `<button>` 换成：
 ```tsx
-{canManage && (
-  <div className="absolute right-1 top-1" onClick={(e) => e.stopPropagation()}>
-    <WorkflowCardMenu templateId={wf.id} />
-  </div>
-)}
+<div
+  role="button"
+  tabIndex={0}
+  onClick={() => setLaunching(wf)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setLaunching(wf);
+    }
+  }}
+  className="... relative ..."  // 加 relative 让菜单 absolute 定位
+>
+  ...
+  {canManage && (
+    <div className="absolute right-1 top-1" onClick={(e) => e.stopPropagation()}>
+      <WorkflowCardMenu templateId={wf.id} />
+    </div>
+  )}
+</div>
 ```
 
-注意 employee 页的卡片用的是 `<button>` 元素 — 嵌套 button 是不合法的。需要把外层 button 改成 div + onClick + role="button" + tabIndex=0，或者菜单触发器用 onClick stopPropagation 即可（chrome 容忍嵌套 button）。**推荐方案**：外层改 div。
+注：Task 9 已把卡片点击改为弹 dialog，此处只需加菜单层。
+
+**不要走 "stopPropagation 让浏览器容忍嵌套 button" 这条路** —— 会触发 React 19 hydration warning，且无障碍工具会乱报。
 
 - [ ] **Step 23.3：tsc + 视觉验证**
 
