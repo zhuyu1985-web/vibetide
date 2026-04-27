@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -77,8 +77,7 @@ import { SkillComboManager } from "./skill-combo-manager";
 import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo } from "@/lib/types";
 import type { SkillRecommendation } from "@/lib/dal/skills";
 import type { WorkflowTemplateRow } from "@/db/types";
-import { startMission } from "@/app/actions/missions";
-import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
+import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
 import * as LucideIcons from "lucide-react";
 import { FileText as FileTextIcon, type LucideIcon } from "lucide-react";
 
@@ -1364,32 +1363,8 @@ function EmployeeWorkflowsSection({
   workflows: WorkflowTemplateRow[];
   employeeNickname: string;
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [launching, setLaunching] = useState<WorkflowTemplateRow | null>(null);
   const [expanded, setExpanded] = useState(false);
-
-  const handleStart = (wf: WorkflowTemplateRow) => {
-    if (isPending) return;
-    setPendingId(wf.id);
-    startTransition(async () => {
-      try {
-        const result = await startMission({
-          title: wf.name,
-          scenario: templateToScenarioSlug(wf),
-          userInstruction: wf.description ?? "",
-          workflowTemplateId: wf.id,
-        });
-        if (result?.id) {
-          router.push(`/missions/${result.id}`);
-        }
-      } catch (err) {
-        console.error("[employee-workflows] startMission failed:", err);
-      } finally {
-        setPendingId(null);
-      }
-    });
-  };
 
   const resolveIcon = (iconName: string | null | undefined): LucideIcon => {
     if (!iconName) return FileTextIcon;
@@ -1403,6 +1378,7 @@ function EmployeeWorkflowsSection({
     : workflows.slice(0, WORKFLOWS_COLLAPSED_COUNT);
 
   return (
+    <>
     <GlassCard className="mt-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
@@ -1430,14 +1406,12 @@ function EmployeeWorkflowsSection({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-2">
         {visibleWorkflows.map((wf) => {
           const Icon = resolveIcon(wf.icon);
-          const loading = pendingId === wf.id;
           return (
             <button
               key={wf.id}
               type="button"
-              onClick={() => handleStart(wf)}
-              disabled={isPending}
-              className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+              onClick={() => setLaunching(wf)}
+              className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left group"
             >
               <div className="shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20 flex items-center justify-center group-hover:from-indigo-500/20 group-hover:to-violet-500/20 transition-colors">
                 <Icon
@@ -1450,7 +1424,7 @@ function EmployeeWorkflowsSection({
                   {wf.name}
                 </p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-                  {loading ? "启动中..." : wf.description ?? "—"}
+                  {wf.description ?? "—"}
                 </p>
               </div>
             </button>
@@ -1458,5 +1432,13 @@ function EmployeeWorkflowsSection({
         })}
       </div>
     </GlassCard>
+    {launching && (
+      <WorkflowLaunchDialog
+        template={launching}
+        open={!!launching}
+        onOpenChange={(o) => !o && setLaunching(null)}
+      />
+    )}
+    </>
   );
 }
