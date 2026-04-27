@@ -15,12 +15,12 @@ export interface MissionTask {
 export interface MissionProgressData {
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   progress: number;
-  tasksByid: Record<string, MissionTask>;
+  tasksById: Record<string, MissionTask>;
   notFound: boolean;
 }
 
 export function emptyMissionProgress(): MissionProgressData {
-  return { status: "pending", progress: 0, tasksByid: {}, notFound: false };
+  return { status: "pending", progress: 0, tasksById: {}, notFound: false };
 }
 
 /**
@@ -43,8 +43,8 @@ export function applyMissionEvent(
   if (event === "task-update" && typeof d.taskId === "string") {
     return {
       ...prev,
-      tasksByid: {
-        ...prev.tasksByid,
+      tasksById: {
+        ...prev.tasksById,
         [d.taskId]: {
           id: d.taskId,
           title: String(d.title ?? ""),

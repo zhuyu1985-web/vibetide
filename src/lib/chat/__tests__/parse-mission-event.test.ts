@@ -9,11 +9,11 @@ describe("applyMissionEvent", () => {
     const s = emptyMissionProgress();
     expect(s.status).toBe("pending");
     expect(s.progress).toBe(0);
-    expect(Object.keys(s.tasksByid)).toHaveLength(0);
+    expect(Object.keys(s.tasksById)).toHaveLength(0);
     expect(s.notFound).toBe(false);
   });
 
-  it("accumulates task-update events into tasksByid", () => {
+  it("accumulates task-update events into tasksById", () => {
     let s = emptyMissionProgress();
     s = applyMissionEvent(s, "task-update", JSON.stringify({
       taskId: "t1", title: "选题", status: "running",
@@ -21,8 +21,8 @@ describe("applyMissionEvent", () => {
     s = applyMissionEvent(s, "task-update", JSON.stringify({
       taskId: "t2", title: "写作", status: "pending",
     }));
-    expect(Object.keys(s.tasksByid)).toHaveLength(2);
-    expect(s.tasksByid.t1.status).toBe("running");
+    expect(Object.keys(s.tasksById)).toHaveLength(2);
+    expect(s.tasksById.t1.status).toBe("running");
   });
 
   it("updates existing task on subsequent task-update", () => {
@@ -33,8 +33,8 @@ describe("applyMissionEvent", () => {
     s = applyMissionEvent(s, "task-update", JSON.stringify({
       taskId: "t1", title: "选题", status: "completed",
     }));
-    expect(s.tasksByid.t1.status).toBe("completed");
-    expect(Object.keys(s.tasksByid)).toHaveLength(1);
+    expect(s.tasksById.t1.status).toBe("completed");
+    expect(Object.keys(s.tasksById)).toHaveLength(1);
   });
 
   it("merges mission-progress event", () => {
