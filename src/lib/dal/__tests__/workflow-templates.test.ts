@@ -39,7 +39,7 @@ describe("listWorkflowTemplatesByOrg", () => {
           isBuiltin: true,
           isEnabled: true,
           defaultTeam: ["xiaolei"],
-          steps: [{ id: "s1", config: { skillSlug: "test_skill" } }],
+          steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }],
         },
         {
           organizationId: orgId,
@@ -48,7 +48,7 @@ describe("listWorkflowTemplatesByOrg", () => {
           isBuiltin: true,
           isEnabled: true,
           defaultTeam: ["xiaoce", "xiaowen"],
-          steps: [{ id: "s1", config: { skillSlug: "test_skill" } }],
+          steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }],
         },
         {
           organizationId: orgId,
@@ -57,7 +57,7 @@ describe("listWorkflowTemplatesByOrg", () => {
           isBuiltin: true,
           isEnabled: true,
           defaultTeam: ["xiaolei", "xiaowen"],
-          steps: [{ id: "s1", config: { skillSlug: "test_skill" } }],
+          steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }],
         },
         {
           organizationId: orgId,
@@ -66,7 +66,7 @@ describe("listWorkflowTemplatesByOrg", () => {
           isBuiltin: false,
           isEnabled: true,
           defaultTeam: [],
-          steps: [{ id: "s1", config: { skillSlug: "test_skill" } }],
+          steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }],
         },
       ])
       .onConflictDoNothing();
@@ -261,14 +261,14 @@ describe("seedBuiltinTemplatesForOrg", () => {
       category: "news",
       legacyScenarioKey: "seed_news_key_1",
       defaultTeam: ["xiaolei"],
-      steps: [{ id: "s1", config: { skillSlug: "test_skill" } }],
+      steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }],
     },
     {
       name: "seed-custom-no-key",
       category: "custom",
       legacyScenarioKey: null,     // 走 (org_id, name) WHERE is_builtin partial index
       defaultTeam: [],
-      steps: [{ id: "s1", config: { skillSlug: "test_skill" } }],
+      steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }],
     },
   ];
 
@@ -325,8 +325,8 @@ describe("B.1 AC: two-entry same-source assertion", () => {
 
     // Seed at least 2 rows so set comparison is meaningful
     await db.insert(workflowTemplates).values([
-      { organizationId: orgId, name: "two-entry-a", category: "news", isBuiltin: true, isEnabled: true, defaultTeam: ["xiaolei"], steps: [{ id: "s1", config: { skillSlug: "test_skill" } }] },
-      { organizationId: orgId, name: "two-entry-b", category: "deep", isBuiltin: true, isEnabled: true, defaultTeam: ["xiaoce"], steps: [{ id: "s1", config: { skillSlug: "test_skill" } }] },
+      { organizationId: orgId, name: "two-entry-a", category: "news", isBuiltin: true, isEnabled: true, defaultTeam: ["xiaolei"], steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }] },
+      { organizationId: orgId, name: "two-entry-b", category: "deep", isBuiltin: true, isEnabled: true, defaultTeam: ["xiaoce"], steps: [{ id: "s1", order: 1, dependsOn: [], name: "step1", type: "skill" as const, config: { skillSlug: "test_skill", parameters: {} } }] },
       // One disabled row to verify filter consistency
       { organizationId: orgId, name: "two-entry-disabled", category: "news", isBuiltin: true, isEnabled: false, defaultTeam: [], steps: [] },
       // One non-builtin to verify filter consistency
