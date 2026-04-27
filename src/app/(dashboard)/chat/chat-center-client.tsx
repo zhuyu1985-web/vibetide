@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
 import { EmployeeListPanel } from "./employee-list-panel";
 import { ChatPanel } from "./chat-panel";
 import type { ChatMessage } from "@/lib/chat-utils";
@@ -27,7 +26,6 @@ export function ChatCenterClient({
   savedConversations: initialSavedConversations,
   scenarioMap,
 }: ChatCenterClientProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Determine initial slug from URL or first employee
@@ -77,8 +75,6 @@ export function ChatCenterClient({
     useState<SavedConversationRow | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [tab, setTab] = useState<"employees" | "saved">("employees");
-  const [inlineScenario, setInlineScenario] =
-    useState<WorkflowTemplateRow | null>(null);
   const [launching, setLaunching] = useState<WorkflowTemplateRow | null>(null);
   const [savedConversations, setSavedConversations] = useState(
     initialSavedConversations
@@ -114,9 +110,6 @@ export function ChatCenterClient({
     }
     setUnreadCounts(newUnread);
   }, [selectedSlug]);
-
-  // Track whether the initial scenario was from a first execution (for follow-ups)
-  const scenarioInputsRef = useRef<Record<string, string>>({});
 
   const selectedEmployee = employees.find((e) => e.id === selectedSlug) ?? null;
 
@@ -301,12 +294,10 @@ export function ChatCenterClient({
       const restored = messagesMapRef.current[slug] ?? [];
       setMessages(restored);
       setActiveScenario(null);
-      setInlineScenario(null);
       setViewingSaved(null);
       setIsSaved(false);
       setSelectedSlug(slug);
       setTab("employees");
-      scenarioInputsRef.current = {};
       // Clear unread for the target employee
       setUnreadCounts((prev) => {
         if (!prev[slug]) return prev;
@@ -354,10 +345,8 @@ export function ChatCenterClient({
   const handleNewChat = useCallback(() => {
     clearMessages();
     setActiveScenario(null);
-    setInlineScenario(null);
     setViewingSaved(null);
     setIsSaved(false);
-    scenarioInputsRef.current = {};
     // Clear stored messages for current employee
     delete messagesMapRef.current[selectedSlug];
     setUnreadCounts((prev) => {
@@ -411,49 +400,6 @@ export function ChatCenterClient({
     [],
   );
 
-  /* ── Execute scenario with inputs ── */
-  const handleScenarioSubmit = useCallback(
-    async (scenario: WorkflowTemplateRow, inputs: Record<string, string>) => {
-      if (!selectedEmployee) return;
-      setActiveScenario(scenario);
-      setInlineScenario(null);
-      setIsSaved(false);
-      scenarioInputsRef.current = inputs;
-
-      const fields = scenario.inputFields ?? [];
-      const inputSummary = fields
-        .map((f) => `${f.label}: ${inputs[f.name] || "全部"}`)
-        .join("，");
-      const userContent = inputSummary || `请执行「${scenario.name}」`;
-
-      // Build intent display from scenario metadata
-      const scenarioIntent: IntentResult = {
-        intentType: "content_creation",
-        summary: `场景：${scenario.name}${inputSummary ? ` — ${inputSummary}` : ""}`,
-        confidence: 1.0,
-        steps: [
-          {
-            employeeSlug: selectedEmployee.id as import("@/lib/constants").EmployeeId,
-            employeeName: selectedEmployee.nickname,
-            skills: ["content_generate"],
-            taskDescription: scenario.description ?? "",
-          },
-        ],
-        reasoning: `用户选择了预设场景「${scenario.name}」`,
-      };
-      setPendingIntent(scenarioIntent);
-      setPendingMessage(userContent);
-
-      await executeChat(userContent, [], "/api/scenarios/execute", {
-        employeeDbId: selectedEmployee.dbId,
-        scenarioId: scenario.id,
-        userInputs: inputs,
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedEmployee, executeChat, setPendingIntent, setPendingMessage]
-  );
-
   /* ── Handle intent card confirm ── */
   const handleIntentConfirm = useCallback(
     (editedIntent: IntentResult) => {
@@ -480,7 +426,7 @@ export function ChatCenterClient({
 
   /* ── Cancel inline scenario ── */
   const handleCancelScenario = useCallback(() => {
-    setInlineScenario(null);
+    // no-op: inline scenario form removed; kept for ChatPanel prop compatibility
   }, []);
 
   /* ── Regenerate an assistant message ── */
@@ -501,10 +447,19 @@ export function ChatCenterClient({
           template={launching}
           open={!!launching}
           onOpenChange={(o) => !o && setLaunching(null)}
-          onLaunched={({ missionId }) => {
-            // Phase 1 暂行：跳到 mission console（与 home/employee 一致）
-            // Phase 2 (Task 18) 改为：插入 mission_card 消息到对话流
-            router.push(`/missions/${missionId}`);
+          onLaunched={({ missionId, template }) => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                content: "",
+                kind: "mission_card",
+                missionId,
+                templateId: template.id,
+                templateName: template.name,
+              },
+            ]);
+            setLaunching(null);
           }}
         />
       )}
@@ -524,13 +479,11 @@ export function ChatCenterClient({
         messages={messages}
         scenarios={scenarios}
         activeScenario={activeScenario}
-        inlineScenario={inlineScenario}
         viewingSaved={viewingSaved}
         isSaved={isSaved}
         loading={loading}
         onSendMessage={handleSendMessage}
         onSelectScenario={handleSelectScenario}
-        onScenarioFormSubmit={handleScenarioSubmit}
         onCancelScenario={handleCancelScenario}
         onSave={handleSave}
         onNewChat={handleNewChat}

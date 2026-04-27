@@ -215,14 +215,11 @@ interface ChatPanelProps {
   messages: ChatMessage[];
   scenarios: WorkflowTemplateRow[];
   activeScenario: WorkflowTemplateRow | null;
-  /** Scenario whose inline form is currently shown (null = free chat mode) */
-  inlineScenario: WorkflowTemplateRow | null;
   viewingSaved: SavedConversationRow | null;
   isSaved: boolean;
   loading: boolean;
   onSendMessage: (text: string) => void;
   onSelectScenario: (scenario: WorkflowTemplateRow) => void;
-  onScenarioFormSubmit: (scenario: WorkflowTemplateRow, inputs: Record<string, string>) => void;
   onCancelScenario: () => void;
   onSave: () => void;
   onNewChat: () => void;
@@ -246,13 +243,11 @@ export function ChatPanel({
   messages,
   scenarios,
   activeScenario,
-  inlineScenario,
   viewingSaved,
   isSaved,
   loading,
   onSendMessage,
   onSelectScenario,
-  onScenarioFormSubmit,
   onCancelScenario,
   onSave,
   onNewChat,
@@ -270,7 +265,6 @@ export function ChatPanel({
   onIntentCancel,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
-  const [scenarioInputs, setScenarioInputs] = useState<Record<string, string>>({});
   const [inputHovered, setInputHovered] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [borderDone, setBorderDone] = useState(false);
@@ -395,7 +389,6 @@ export function ChatPanel({
   }, [
     employee?.id,
     activeScenario?.id,
-    inlineScenario?.id,
     viewingSaved,
     messages,
     messages.length,
