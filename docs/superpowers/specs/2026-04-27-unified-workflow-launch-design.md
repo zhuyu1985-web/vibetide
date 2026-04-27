@@ -64,66 +64,104 @@ ALTER TABLE workflow_templates DROP COLUMN launch_mode;
 - `inputFields: InputFieldDef[]` — 唯一决定"是否显示表单"
 - `promptTemplate` / `defaultTeam` / `ownerEmployeeId` / `category` 等
 
-### 3.2 `chat_messages` 扩展
+### 3.2 对话消息扩展（重要：不存在独立 `chat_messages` 表）
 
-新增"任务卡片"消息类型：
+**现状调研：** vibetide 没有独立的 `chat_messages` 表。会话和消息都存在 `saved_conversations.messages` 这个 jsonb 数组里（见 `src/db/schema/saved-conversations.ts`）。每条消息现有形态：
 
-**方案：在 `metadata` jsonb 中存 kind**（无需 schema 变更）
 ```ts
 {
-  // existing fields...
-  metadata: {
-    kind: 'mission_card',
-    missionId: 'uuid',
-    templateId: 'uuid',     // 冗余，便于不查 mission 表就能展示模板名
-    templateName: string,
-  }
+  role: "user" | "assistant",
+  content: string,
+  durationMs?: number,
+  thinkingSteps?: { tool: string; label: string; skillName?: string }[],
+  skillsUsed?: { tool: string; skillName: string }[],
+  sources?: string[],
+  referenceCount?: number,
 }
 ```
 
-普通对话消息 `metadata.kind` 缺省 → 走现有渲染逻辑。
+**变更方案（仅扩展 TypeScript 类型，无 schema 迁移）：**
 
-### 3.3 代码层删除清单
+```ts
+// 在 saved_conversations.messages 的元素类型上扩展两个可选字段
+{
+  role: "user" | "assistant" | "system",      // 新增 'system' 用于任务卡片
+  content: string,
+  // 新增 — 当且仅当 kind === 'mission_card' 时填
+  kind?: "text" | "mission_card",             // 缺省视为 "text"
+  missionId?: string,                         // 卡片绑定的 mission
+  templateId?: string,                        // 冗余存便于卡片显示模板名
+  templateName?: string,                      // 同上
+  // ...其它现有可选字段保持不变
+}
+```
 
-- [ ] `EMPLOYEE_SCENARIOS` 常量（`src/lib/constants.ts`，B.1 之后已无消费者）
-- [ ] `ScenarioFormSheet` 组件（`src/app/(dashboard)/chat/scenario-form-sheet.tsx`）
-- [ ] `workflow_templates.launchMode` 字段及所有引用
-- [ ] DAL `WorkflowTemplateRow` 类型中的 `launchMode`
+`kind` 缺省 / 等于 `"text"` → 走现有 `MessageBubble` 渲染逻辑；`kind === "mission_card"` → 走新组件 `<MissionCardMessage>`。
+
+**对未保存的临时会话（in-memory）：** 同样的消息类型扩展，无需变更存储。
+
+### 3.3 代码层删除清单（已核实）
+
+- [x] ~~`EMPLOYEE_SCENARIOS` 常量~~ — **已不在 src 内**（grep 验证），无需删除，文档/spec 中可能还有残留
+- [ ] `ScenarioFormSheet` 组件（`src/app/(dashboard)/chat/scenario-form-sheet.tsx`）— 已是 orphan dead code（grep 确认无 importer），直接 `rm`
+- [ ] `chat-panel.tsx` 内联 scenario 表单（`inlineScenario` 渲染块，`src/app/(dashboard)/chat/chat-panel.tsx:974-1075`）— **这才是 chat 真实在用的表单**，Phase 1 用 `WorkflowLaunchDialog` 替换它
+- [ ] `workflow_templates.launchMode` 字段（`src/db/schema/workflows.ts:88`）及所有引用
+- [ ] DAL `WorkflowTemplateRow` 类型中的 `launchMode`（自 InferSelectModel 推导，删 schema 字段后自动消失）
 - [ ] `seed-builtin-workflows.ts` 中所有 `launchMode: 'form'/'direct'`
+- [ ] `scenario-grid.tsx` 中 `tpl.launchMode === 'direct'` 的分支
 
 ---
 
 ## 4. 统一启动组件 `WorkflowLaunchDialog`
 
-### 4.1 签名
+### 4.1 当前签名（`src/components/workflows/workflow-launch-dialog.tsx:293`）
 
 ```ts
-<WorkflowLaunchDialog
-  template={tpl}                  // workflow_templates 一行
-  open={open}
-  onOpenChange={setOpen}
-  entry={'home' | 'employee' | 'chat'}   // 入口 hint，决定启动后跳转/回调
-  onLaunched?={(result: { missionId: string }) => void}  // chat 入口用
-/>
+interface WorkflowLaunchDialogProps {
+  template: WorkflowTemplateRow;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
 ```
 
-### 4.2 内部行为
+提交逻辑当前**硬编码** `router.push('/missions/' + missionId)`（line 353），这是 chat 入口必须改的痛点——chat 不能跳转，要插消息。
+
+### 4.2 重构后签名
+
+```ts
+interface WorkflowLaunchDialogProps {
+  template: WorkflowTemplateRow;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /**
+   * 启动成功回调。如果未传，沿用旧行为（router.push 到 mission console）。
+   * Chat 入口必须传这个：拿到 missionId 后向对话流插入 mission_card 消息。
+   */
+  onLaunched?: (result: { missionId: string; template: WorkflowTemplateRow }) => void;
+}
+```
+
+**为什么用 optional `onLaunched` 而不是 `entry: 'home'|'employee'|'chat'` 枚举：**
+- 不耦合 dialog 与具体页面，外部完全控制成功后行为
+- 默认行为（`router.push`）保持向后兼容，home/employee 不传该 prop 即可
+- chat 传回调，自己决定怎么把 missionId 接入对话流
+
+### 4.3 内部行为
 
 **渲染：**
-- `template.inputFields.length > 0` → 渲染表单
-- `template.inputFields.length === 0` → 极简模式：仅显示标题 + 描述 + 大"启动"按钮
+- `template.inputFields.length > 0` → 渲染表单（保持现状）
+- `template.inputFields.length === 0` → 极简模式：仅显示标题 + 描述 + 大"启动"按钮（**新增分支**）
 
 **提交：**
 1. 校验 `inputFields` 必填
-2. 调 `startMissionFromTemplate(template.id, formValues)`
-3. 拿到 `missionId`，根据 `entry`：
-   - `home` / `employee` → `router.push('/missions/' + missionId)`
-   - `chat` → 调 `onLaunched({ missionId })` 回调（chat 用它在对话流插入 mission_card 消息）
-4. 关闭 dialog
+2. 调 `startMissionFromTemplate(template.id, formValues)`（已有 action）
+3. 拿到 `missionId`：
+   - 如果传了 `onLaunched` → 调用回调，dialog 关闭
+   - 如果没传 → 默认 `router.push('/missions/' + missionId)`，dialog 关闭
 
 **错误处理：**
-- 启动失败显示在 dialog 内部错误条
-- mission 创建后失败属于 mission 系统的事，dialog 不再负责
+- 启动失败显示在 dialog 内部错误条（保持现状）
+- mission 创建后的运行失败属于 mission 系统的事，dialog 不负责
 
 ### 4.3 三入口替换路径
 
@@ -160,17 +198,17 @@ ALTER TABLE workflow_templates DROP COLUMN launch_mode;
 - 卡片组件挂载时订阅 mission 实时通道
 - 同时拉一次 mission 当前状态做初始渲染（处理"reload chat 时 mission 已完成"场景）
 
-### 5.3 实时通道选型
+### 5.3 实时通道（已确认存在）
 
-**Phase 2 实施时再选：** 候选方案——
-- 复用现有 mission console 的 SSE 端点（如 `/api/missions/[id]/stream`）— 优先
-- 如果不存在，新建一个 SSE 端点，同时 mission console 也迁过来用
-- Supabase Realtime / Inngest Realtime 留作后期扩展（不在 Phase 2 范围）
+**复用现有 SSE：** `src/app/api/missions/[id]/progress/route.ts` 已经是 SSE 端点（每 2s 轮询 mission/tasks 状态字段，发增量；终态自关闭）。
+
+**Phase 2 直接复用，不新建。** mission console 也用同一端点（如不一致，Phase 2 顺手对齐）。
 
 **重入支持：**
-- reload chat → mission_card 消息照常渲染 → 组件挂载时按 missionId 重新订阅 + 拉初始状态
-- 已完成的 mission：拉到终态后停止订阅，仅展示结果
-- 进行中的 mission：继续订阅，看实时进度
+- reload chat → mission_card 消息照常渲染 → `MissionCardMessage` 挂载时按 missionId 订阅 `/api/missions/[id]/progress` + 同时拉一次 `/api/missions/[id]` 取当前状态做初始渲染
+- 已完成的 mission：SSE 端点自关闭后停止订阅，仅展示终态
+- 进行中的 mission：继续订阅看实时进度
+- mission **已被删除**的 fallback：拉初始状态返回 404 时显示"任务已被删除"灰态卡片，不订阅 SSE
 
 ### 5.4 卡片组件 `MissionCardMessage`
 
@@ -195,11 +233,15 @@ UI 结构：
 **位置：** Employee 页 / Home 页 / Chat 场景列表的每个工作流卡片右上角
 **可见性：** 仅 `admin` / `owner` / 超级管理员
 
-**菜单项：**
-- **编辑工作流** → `/workflows/[id]`
-- **复制为我的工作流** → `/scenarios/customize?from=[id]`
-- **置顶 / 取消置顶**（home 页已有，归并到此菜单）
-- **隐藏**（不在此入口展示，受 `homepage_template_visibility` 等表控制）
+**菜单项（Phase 3 范围）：**
+- **编辑工作流** → `/workflows/[id]`（已有页面）
+- **复制为我的工作流** → `/scenarios/customize?from=[id]`（已有页面）
+- **置顶 / 取消置顶** — home 页已有，归并到此菜单复用现有 `pin_homepage_template` action
+
+**"隐藏"功能不在 Phase 3 范围（开放问题）：**
+- 现状：没有 `homepage_template_visibility` 这类表；现有 `workflow_template_tab_order` 只管 pin + sort
+- 实施"隐藏"需要先建表或加字段，属于独立设计点
+- Phase 3 只做 编辑 / 复制 / 置顶 三项，"隐藏"留作 follow-up spec
 
 ### 6.2 唯一编辑入口
 
@@ -212,17 +254,23 @@ UI 结构：
 ## 7. Phase 划分
 
 ### Phase 1 — 统一启动（本 spec 核心）
-- Schema 迁移：删 `launchMode` 字段
-- Seed 同步：删 `seed-builtin-workflows.ts` 中所有 `launchMode`
-- `WorkflowLaunchDialog` 升级（签名扩展、空 `inputFields` 极简模式）
-- 三入口替换：employee / home / chat 都改为弹 `WorkflowLaunchDialog`
-- 删 `ScenarioFormSheet` 组件
-- 删 `EMPLOYEE_SCENARIOS` 常量
-- DAL/types 同步去 `launchMode`
+
+**因为 Phase 1 后 chat 入口"暂时跳到 /missions/[id]"会显著降级 chat 体验（用户被踢出对话流），所以 Phase 1 + Phase 2 必须在同一个 PR / 同一天内完成上线，不允许 Phase 1 单独发布留过夜。** Phase 3 可以延后。
+
+- Schema 迁移：`ALTER TABLE workflow_templates DROP COLUMN launch_mode;`（破坏性变更，单 PR 内同时改 schema + seed + 所有消费者）
+- Seed 同步：删 `seed-builtin-workflows.ts` 中所有 `launchMode` 字段（保留 `launchMode: 'form'` 作 default 的不再需要）
+- `WorkflowLaunchDialog` 升级（新增 `onLaunched` 可选回调、空 `inputFields` 极简模式）
+- 三入口替换：
+  - `/employee/[id]` `EmployeeWorkflowsSection` → 弹 `WorkflowLaunchDialog`，不传 `onLaunched`（默认 push）
+  - `/home` `ScenarioGrid.handleCardClick` → 弹 `WorkflowLaunchDialog`，删 `launchMode==='direct'` 分支
+  - `/chat` 把 `chat-panel.tsx:974-1075` 内联表单换成 `WorkflowLaunchDialog`，**Phase 1 暂传 `onLaunched: ({missionId}) => router.push('/missions/' + missionId)`**（与 Phase 2 同 PR 上线后立即换成插消息）
+- 删 `ScenarioFormSheet` 组件文件（orphan）
+- DAL `WorkflowTemplateRow` 类型自动同步（InferSelectModel）
+- 现有运行中 mission 行的 `launch_mode` 列被 DROP 后不影响 mission 自身字段，但要确认 DAL 查询没有 select launchMode
 
 **验收：**
 - 三入口选同一模板，行为一致（同样弹表单或同样不弹）
-- 所有启动都建 mission，跳 `/missions/[id]`（chat 入口暂时也跳，Phase 2 改）
+- 所有启动都建 mission；home/employee 入口跳 `/missions/[id]`；chat 入口跳 `/missions/[id]`（Phase 2 改为插消息）
 - `npx tsc --noEmit` 零错误，`npm run build` 通过
 
 ### Phase 2 — Chat-Mission 投影
@@ -252,12 +300,15 @@ UI 结构：
 
 | 风险 | 缓解 |
 |---|---|
-| Phase 1 删 `launchMode` 是 breaking schema 变更 | 单分支单人开发（CLAUDE.md 约定），同 PR 改 schema + seed + 所有消费者 |
-| Phase 2 SSE 端点不存在 | Phase 2 第一步先确认/新建 SSE 端点，再做卡片组件 |
+| Phase 1 删 `launchMode` 是 breaking schema 变更 | 单分支单人开发（CLAUDE.md 约定），同 PR 改 schema + seed + 所有消费者；Phase 1 与 Phase 2 必须同 PR 上线避免 chat 体验过夜降级 |
+| `DROP COLUMN launch_mode` 时是否阻塞 in-flight 写入 | mission 创建路径 `startMissionFromTemplate` 不读 launchMode（只读 inputFields/promptTemplate），DROP 不影响进行中的 mission 执行；schema push 需在低峰期跑 |
+| Phase 2 SSE 端点不存在 | **已确认存在** `src/app/api/missions/[id]/progress/route.ts`，直接复用 |
 | chat 投影后 mission console 是否冗余 | 不冗余——mission console 是"任务管理/历史"视图（批量、过滤、删除），chat 卡片是"实时观察"视图，两者并存 |
+| chat 历史里 mission 已被删除，mission_card 怎么显示 | `MissionCardMessage` 拉初始状态返回 404 时显示"任务已被删除"灰态卡片，不订阅 SSE，仍保留 templateName 让用户知道当时启动的是什么 |
 | 用户已有的 in-flight mission 在 Phase 2 上线后能否被 chat 重新接管 | 不能也不需要——Phase 2 上线后**新启动**的 chat mission 才插卡片消息；已有的仍走 mission console |
 | Employee 页用户习惯"一点就启动"的快捷感 | 空 `inputFields` 极简模式：dialog 只有标题+描述+大"启动"按钮，单击成本可控；不会显著降低使用频率 |
 | chat 内一次启动多个 mission 会刷屏 | 卡片可折叠（默认展开当前最新一个，历史卡片折叠）；不在 Phase 2 强制做，看用户反馈 |
+| 回滚方案 | Phase 1 落库后无法直接 ALTER ADD COLUMN 回滚（数据已丢）；备份 = git revert + 重新 push schema（恢复字段为 default 'form'），可接受。chat 入口可以临时切回 inline form（git revert 单文件）|
 
 ---
 
@@ -272,6 +323,6 @@ UI 结构：
 
 ## 10. 开放问题（不阻塞 spec，实施时再定）
 
-1. **Phase 2 SSE 端点的选型**：复用 mission console 现有的还是新建？需要在 Phase 2 开工前先做 5 分钟的代码调研确认
-2. **`mission_card` 消息的 `templateName` 是否冗余存**：存了避免初次渲染等查询，但模板改名后旧消息会显示旧名——可接受
-3. **卡片"⋯"菜单的"隐藏"操作语义**：是 hide-from-this-tab 还是 disable-globally？倾向 hide-from-this-tab（receiver 是 `homepage_template_visibility` 这类已有表）
+1. **`mission_card` 消息的 `templateName` 是否冗余存**：存了避免初次渲染等查询，但模板改名后旧消息会显示旧名——可接受
+2. **"隐藏"功能（Phase 3 follow-up）**：需要新表或新字段（现有 `workflow_template_tab_order` 不含 hidden 字段）。语义 hide-from-this-tab vs disable-globally？倾向 hide-from-this-tab。本 spec 不覆盖，独立 follow-up
+3. **未保存对话（in-memory）的 mission_card**：用户启动 mission 后没保存会话直接关页，下次进入还能看到这个 mission 吗？倾向"不能"——临时会话不持久 mission_card；用户要持久化必须保存会话。Phase 2 实施时确认
