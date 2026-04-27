@@ -8,14 +8,14 @@ import { getEmployees } from "@/lib/dal/employees";
 import { getSavedConversations } from "@/lib/dal/conversations";
 import { listTemplatesForHomepageByTab } from "@/lib/dal/workflow-templates-listing";
 import { ChatCenterClient } from "./chat-center-client";
-import type { AIEmployee, InputFieldDef, ScenarioCardData } from "@/lib/types";
+import type { AIEmployee } from "@/lib/types";
 import type { SavedConversationRow, WorkflowTemplateRow } from "@/db/types";
 import type { EmployeeId } from "@/lib/constants";
 
 export default async function ChatPage() {
   let employees: AIEmployee[] = [];
   let savedConversations: SavedConversationRow[] = [];
-  const scenarioMap: Record<string, ScenarioCardData[]> = {};
+  const scenarioMap: Record<string, WorkflowTemplateRow[]> = {};
 
   try {
     employees = await getEmployees();
@@ -48,15 +48,7 @@ export default async function ChatPage() {
           ),
         );
         slugs.forEach((slug, i) => {
-          scenarioMap[slug] = results[i].map((t) => ({
-            id: t.id,
-            name: t.name,
-            description: t.description ?? "",
-            icon: t.icon ?? "",
-            welcomeMessage: null,
-            inputFields: (t.inputFields ?? []) as InputFieldDef[],
-            toolsHint: [],
-          }));
+          scenarioMap[slug] = results[i];
         });
       }
     }

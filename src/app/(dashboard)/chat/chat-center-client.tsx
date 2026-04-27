@@ -9,16 +9,15 @@ import {
   saveConversation,
   deleteSavedConversation,
 } from "@/app/actions/conversations";
-import type { AIEmployee, ScenarioCardData } from "@/lib/types";
-import type { SavedConversationRow } from "@/db/types";
+import type { AIEmployee } from "@/lib/types";
+import type { SavedConversationRow, WorkflowTemplateRow } from "@/db/types";
 import type { IntentResult } from "@/lib/agent/types";
 import { useChatStream } from "@/hooks/use-chat-stream";
-import { renderScenarioTemplate } from "@/lib/scenario-template";
 
 interface ChatCenterClientProps {
   employees: AIEmployee[];
   savedConversations: SavedConversationRow[];
-  scenarioMap: Record<string, ScenarioCardData[]>;
+  scenarioMap: Record<string, WorkflowTemplateRow[]>;
 }
 
 export function ChatCenterClient({
@@ -70,13 +69,13 @@ export function ChatCenterClient({
   // Scenarios come from server-side props — instant lookup, no fetch needed
   const scenarios = scenarioMap[selectedSlug] ?? [];
   const [activeScenario, setActiveScenario] =
-    useState<ScenarioCardData | null>(null);
+    useState<WorkflowTemplateRow | null>(null);
   const [viewingSaved, setViewingSaved] =
     useState<SavedConversationRow | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [tab, setTab] = useState<"employees" | "saved">("employees");
   const [inlineScenario, setInlineScenario] =
-    useState<ScenarioCardData | null>(null);
+    useState<WorkflowTemplateRow | null>(null);
   const [savedConversations, setSavedConversations] = useState(
     initialSavedConversations
   );
@@ -402,21 +401,8 @@ export function ChatCenterClient({
 
   /* ── Select scenario — show inline form or execute directly ── */
   const handleSelectScenario = useCallback(
-    (scenario: ScenarioCardData) => {
-      // Show welcome message as an opening assistant message when the user
-      // enters the scenario. Welcome text typically doesn't reference input
-      // placeholders, so we render with empty inputs here.
-      if (scenario.welcomeMessage) {
-        const welcome = renderScenarioTemplate(scenario.welcomeMessage, {});
-        if (welcome.trim()) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: welcome },
-          ]);
-        }
-      }
-
-      if (scenario.inputFields.length > 0) {
+    (scenario: WorkflowTemplateRow) => {
+      if ((scenario.inputFields ?? []).length > 0) {
         setInlineScenario(scenario);
       } else {
         // No inputs needed, execute directly
@@ -427,19 +413,20 @@ export function ChatCenterClient({
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [setMessages],
+    [],
   );
 
   /* ── Execute scenario with inputs ── */
   const handleScenarioSubmit = useCallback(
-    async (scenario: ScenarioCardData, inputs: Record<string, string>) => {
+    async (scenario: WorkflowTemplateRow, inputs: Record<string, string>) => {
       if (!selectedEmployee) return;
       setActiveScenario(scenario);
       setInlineScenario(null);
       setIsSaved(false);
       scenarioInputsRef.current = inputs;
 
-      const inputSummary = scenario.inputFields
+      const fields = scenario.inputFields ?? [];
+      const inputSummary = fields
         .map((f) => `${f.label}: ${inputs[f.name] || "全部"}`)
         .join("，");
       const userContent = inputSummary || `请执行「${scenario.name}」`;
@@ -453,8 +440,8 @@ export function ChatCenterClient({
           {
             employeeSlug: selectedEmployee.id as import("@/lib/constants").EmployeeId,
             employeeName: selectedEmployee.nickname,
-            skills: scenario.toolsHint.length > 0 ? scenario.toolsHint : ["content_generate"],
-            taskDescription: scenario.description,
+            skills: ["content_generate"],
+            taskDescription: scenario.description ?? "",
           },
         ],
         reasoning: `用户选择了预设场景「${scenario.name}」`,

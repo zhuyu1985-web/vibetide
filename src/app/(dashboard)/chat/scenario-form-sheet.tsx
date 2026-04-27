@@ -20,13 +20,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Sparkles } from "lucide-react";
-import type { ScenarioCardData } from "@/lib/types";
 import { normalizeFieldOption } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
 
 interface ScenarioFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  scenario: ScenarioCardData | null;
+  scenario: WorkflowTemplateRow | null;
   onSubmit: (inputs: Record<string, string>) => void;
 }
 
@@ -47,7 +47,7 @@ export function ScenarioFormSheet({
 
   if (!scenario) return null;
 
-  const allRequiredFilled = scenario.inputFields
+  const allRequiredFilled = (scenario.inputFields ?? [])
     .filter((f) => f.required)
     .every((f) => inputs[f.name]?.trim());
 
@@ -69,7 +69,7 @@ export function ScenarioFormSheet({
         </SheetHeader>
 
         <div className="flex-1 space-y-4 py-4">
-          {scenario.inputFields.map((field) => (
+          {(scenario.inputFields ?? []).map((field) => (
             <div key={field.name} className="space-y-2">
               <Label className="text-sm font-medium text-gray-600 dark:text-gray-300">
                 {field.label}

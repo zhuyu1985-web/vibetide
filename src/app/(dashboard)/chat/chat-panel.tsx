@@ -53,8 +53,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { EMPLOYEE_META, EMPLOYEE_SHORT_DESC, type EmployeeId } from "@/lib/constants";
-import type { AIEmployee, ScenarioCardData } from "@/lib/types";
+import type { AIEmployee } from "@/lib/types";
 import { normalizeFieldOption } from "@/lib/types";
+import type { WorkflowTemplateRow } from "@/db/types";
 import type { ChatMessage, ThinkingStep, SkillUsed } from "@/lib/chat-utils";
 import type { SavedConversationRow } from "@/db/types";
 import { cn } from "@/lib/utils";
@@ -211,16 +212,16 @@ function buildBorderPath(w: number, h: number, r: number): string {
 interface ChatPanelProps {
   employee: AIEmployee | null;
   messages: ChatMessage[];
-  scenarios: ScenarioCardData[];
-  activeScenario: ScenarioCardData | null;
+  scenarios: WorkflowTemplateRow[];
+  activeScenario: WorkflowTemplateRow | null;
   /** Scenario whose inline form is currently shown (null = free chat mode) */
-  inlineScenario: ScenarioCardData | null;
+  inlineScenario: WorkflowTemplateRow | null;
   viewingSaved: SavedConversationRow | null;
   isSaved: boolean;
   loading: boolean;
   onSendMessage: (text: string) => void;
-  onSelectScenario: (scenario: ScenarioCardData) => void;
-  onScenarioFormSubmit: (scenario: ScenarioCardData, inputs: Record<string, string>) => void;
+  onSelectScenario: (scenario: WorkflowTemplateRow) => void;
+  onScenarioFormSubmit: (scenario: WorkflowTemplateRow, inputs: Record<string, string>) => void;
   onCancelScenario: () => void;
   onSave: () => void;
   onNewChat: () => void;
@@ -629,7 +630,7 @@ export function ChatPanel({
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     {scenarios.slice(0, 6).map((s) => {
-                      const Icon = ICON_MAP[s.icon] || Sparkles;
+                      const Icon = ICON_MAP[s.icon ?? ""] || Sparkles;
                       return (
                         <button
                           key={s.id}
@@ -983,7 +984,7 @@ export function ChatPanel({
                 <div className="bg-gradient-to-br from-white/80 to-gray-50/70 dark:from-gray-800/60 dark:to-gray-800/40 backdrop-blur-sm rounded-2xl shadow-[0_1px_6px_rgba(0,0,0,0.06)] ring-1 ring-gray-200/30 dark:ring-gray-700/30 px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
                     {(() => {
-                      const ScIcon = ICON_MAP[inlineScenario.icon] || Sparkles;
+                      const ScIcon = ICON_MAP[inlineScenario.icon ?? ""] || Sparkles;
                       return <ScIcon size={16} style={{ color: meta?.color ?? "#3b82f6" }} />;
                     })()}
                     <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
@@ -994,7 +995,7 @@ export function ChatPanel({
                     {inlineScenario.description}
                   </p>
                   <div className="space-y-3">
-                    {inlineScenario.inputFields.map((field) => (
+                    {(inlineScenario.inputFields ?? []).map((field) => (
                       <div key={field.name}>
                         <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                           {field.label}
@@ -1038,7 +1039,7 @@ export function ChatPanel({
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                                 e.preventDefault();
-                                const allFilled = inlineScenario.inputFields.every(
+                                const allFilled = (inlineScenario.inputFields ?? []).every(
                                   (f) => !f.required || scenarioInputs[f.name]?.trim()
                                 );
                                 if (allFilled) {
@@ -1057,14 +1058,14 @@ export function ChatPanel({
                       type="button"
                       className={cn(
                         "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 border-0",
-                        inlineScenario.inputFields.every(
+                        (inlineScenario.inputFields ?? []).every(
                           (f) => !f.required || scenarioInputs[f.name]?.trim()
                         )
                           ? "bg-blue-500 text-white hover:bg-blue-600 shadow-sm"
                           : "bg-gray-200 dark:bg-gray-600 text-gray-400 cursor-not-allowed"
                       )}
                       disabled={
-                        !inlineScenario.inputFields.every(
+                        !(inlineScenario.inputFields ?? []).every(
                           (f) => !f.required || scenarioInputs[f.name]?.trim()
                         )
                       }
@@ -1124,7 +1125,7 @@ export function ChatPanel({
             return (
               <div className="flex flex-wrap gap-1.5 px-5 pt-2.5 pb-1">
                 {visible.map((s) => {
-                  const Icon = ICON_MAP[s.icon] || Sparkles;
+                  const Icon = ICON_MAP[s.icon ?? ""] || Sparkles;
                   return (
                     <button
                       key={s.id}
