@@ -46,7 +46,7 @@ export function CtaSection() {
             viewport={{ margin: "-50px" }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <ShimmerButton variant="primary" href="/missions">
+            <ShimmerButton variant="primary" href="/home">
               免费开始使用
               <ArrowRight className="h-4 w-4" />
             </ShimmerButton>

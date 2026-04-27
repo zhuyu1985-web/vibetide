@@ -139,7 +139,7 @@ export function Navbar() {
           <ThemeSwitcher />
 
           <Link
-            href="/missions"
+            href="/home"
             className="rounded-2xl bg-primary px-5 py-2 text-sm font-medium text-primary-foreground shadow-md transition-all hover:shadow-lg hover:brightness-110 cursor-pointer"
             style={{
               boxShadow: "0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent)",
@@ -206,7 +206,7 @@ export function Navbar() {
                 登录
               </Link>
               <Link
-                href="/missions"
+                href="/home"
                 className="rounded-xl bg-primary px-3 py-2.5 text-center text-sm font-medium text-primary-foreground"
                 style={{
                   boxShadow: "0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)",

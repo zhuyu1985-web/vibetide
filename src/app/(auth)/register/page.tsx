@@ -38,7 +38,7 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push("/missions");
+    router.push("/home");
     router.refresh();
   }
 

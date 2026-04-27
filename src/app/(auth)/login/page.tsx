@@ -32,7 +32,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/missions");
+    router.push("/home");
     router.refresh();
   }
 
