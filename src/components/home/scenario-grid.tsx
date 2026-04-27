@@ -186,9 +186,9 @@ function TemplateCard({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <div className="mb-1.5">{iconNode}</div>
-            <h3 className="flex items-center gap-1.5 truncate text-base font-medium">
-              {tpl.name}
+            <h3 className="flex items-center gap-2 truncate text-base font-medium">
+              <span className="shrink-0">{iconNode}</span>
+              <span className="truncate">{tpl.name}</span>
               {pinned && (
                 <Pin
                   size={14}
