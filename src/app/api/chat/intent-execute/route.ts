@@ -10,6 +10,11 @@ import { assembleAgent } from "@/lib/agent/assembly";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import type { IntentResult } from "@/lib/agent/intent-recognition";
 import { notifyChatMessage } from "@/lib/channels/chat-notifier";
+import {
+  extractSearchQuery,
+  parseExplicitTimeRange,
+  resolveWebSearchTimeRange,
+} from "@/lib/chat/search-params";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -36,73 +41,6 @@ function extractDomain(url: string): string {
   } catch {
     return url;
   }
-}
-
-/**
- * 把首页场景表单 / 自由输入的消息转成给 Tavily 的检索关键词。
- *
- * 场景表单发出的消息长这样：
- *   场景：本地新闻
- *   本地区域: 成都 青羊区
- *   新闻范围: 抖音
- *   产出条数: 1
- *
- * 整段直接丢给 Tavily 命中率极差（label 文字会稀释关键词，纯数字字段
- * 当噪音）。这里做轻量解析：抽出场景名 + 非数字值字段，拼成关键词串。
- *
- * 非场景表单的自由输入（没有 `场景：` 开头或单行文本）原样返回。
- */
-function extractSearchQuery(message: string): string {
-  const lines = message
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  if (lines.length <= 1 || !lines[0].startsWith("场景：")) {
-    return message;
-  }
-
-  const values: string[] = [];
-  const scenarioName = lines[0].replace(/^场景：/, "").trim();
-  if (scenarioName) values.push(scenarioName);
-
-  for (const line of lines.slice(1)) {
-    const m = line.match(/^[^:：]+[:：]\s*(.+)$/);
-    if (!m) continue;
-    const value = m[1].trim();
-    if (!value) continue;
-    if (/^\d+$/.test(value)) continue; // 跳过"产出条数: 3"这种
-    values.push(value);
-  }
-
-  return values.length > 0 ? values.join(" ") : message;
-}
-
-/**
- * 根据用户消息语义推断 Tavily web_search 的 timeRange。
- * 规则与 tool-registry.ts 里 web_search 的 description 对齐：
- * - 今日 / 每日 / 实时 / 今天 / daily → 24h
- * - 本周 / 最近一周 / 最近几天 → 7d
- * - 本月 / 近一月 / 年度展会类（CCBN/世博等长周期专有名词） → 30d
- * - 其余 → undefined（不做时间过滤，由 Tavily 按相关度排序）
- */
-function inferTimeRange(
-  message: string
-): "24h" | "7d" | "30d" | undefined {
-  const lower = message.toLowerCase();
-  if (/今日|每日|今天|daily|实时|real[-\s]?time|breaking/i.test(message) ||
-      /\btoday\b/.test(lower)) {
-    return "24h";
-  }
-  if (/本周|这周|最近一周|近一周|weekly|past\s+week/i.test(message)) {
-    return "7d";
-  }
-  if (/本月|近一月|最近一月|这个月|近期|monthly|past\s+month/i.test(message)) {
-    return "30d";
-  }
-  // 未命中时不设 timeRange —— 放开时间让 Tavily 按相关度返回，
-  // 避免 CCBN 这种年度专有名词被 24h 窗口过滤掉。
-  return undefined;
 }
 
 function extractSources(toolResult: unknown): string[] {
@@ -334,17 +272,24 @@ export async function POST(req: Request) {
             );
 
             const searchQuery = extractSearchQuery(message);
-            const inferredTimeRange = inferTimeRange(message);
+            // 优先级：显式（场景表单 "检索时间窗: 24h"）> 自然语言推断。
+            // 显式命中时跳过 widenFallback —— 用户明确指定的窗口不应被自动
+            // 放宽（否则"突发新闻 1h"可能被悄悄放成 30d，彻底背离语义）。
+            const explicitTimeRange = parseExplicitTimeRange(message);
+            const resolvedTimeRange = resolveWebSearchTimeRange(message);
             // 自动放宽序列：当"每日/今日"窗口空载时，按 24h → 7d → 30d 逐步放宽
             // 重试，避免 LLM 拿到"0 条真实数据"之后从训练语料里伪造"看起来最近"
             // 的条目（典型翻车：每日时政热点拿到 12 天前的伪造日期）。
             const widenFallback: Array<"24h" | "7d" | "30d"> =
-              inferredTimeRange === "24h" ? ["24h", "7d", "30d"] : [];
-            let widenedTimeRange: "24h" | "7d" | "30d" | undefined =
-              inferredTimeRange;
+              !explicitTimeRange && resolvedTimeRange === "24h"
+                ? ["24h", "7d", "30d"]
+                : [];
+            let widenedTimeRange: "1h" | "24h" | "7d" | "30d" | undefined =
+              resolvedTimeRange;
             for (const toolName of toolsToPrefetch) {
-              // timeRange 按语义动态推断（inferTimeRange）：
-              //   "每日/今日" → 24h；"本周" → 7d；"本月" → 30d；其余不设
+              // timeRange 优先从启动表单显式字段取值（"检索时间窗: 1h/24h/7d/30d"），
+              // 否则按语义推断（inferTimeRange）：
+              //   "突发/今日/每日" → 24h；"本周" → 7d；"本月" → 30d；其余不设
               // 以前写死 30d 的后果：搜"每日时政热点"拿到 12 天前的旧文章
               // （tool-registry.ts 的 description 早就说过不要写死默认）。
               // query 走 extractSearchQuery —— 把场景表单格式（含 "场景：XX"
@@ -354,8 +299,8 @@ export async function POST(req: Request) {
                 maxResults: 8,
                 topic: "news",
               };
-              if (inferredTimeRange) {
-                params.timeRange = inferredTimeRange;
+              if (resolvedTimeRange) {
+                params.timeRange = resolvedTimeRange;
               }
 
               // 通知客户端"正在调技能"
@@ -541,7 +486,7 @@ export async function POST(req: Request) {
               // timeRange 放宽提示：用户输入"每日"但 24h 没命中 → 自动放宽到
               // 7d/30d 的场景，要在报告里明确标注，避免用户误以为是今日数据。
               const widenedNotice =
-                inferredTimeRange === "24h" &&
+                resolvedTimeRange === "24h" &&
                 widenedTimeRange &&
                 widenedTimeRange !== "24h"
                   ? `\n\n> ⚠️ 过去 24 小时内未检索到相关报道，已自动放宽到 **${widenedTimeRange}** 窗口，以下为近期数据（非今日新发）。`
@@ -557,7 +502,7 @@ export async function POST(req: Request) {
 
 ## 未检索到符合条件的真实报道
 
-已按 "${inferredTimeRange ?? "不限"}" 时间窗 + 放宽到 "${widenedTimeRange ?? "（未放宽）"}" 重试仍无命中。可能原因：
+已按 "${resolvedTimeRange ?? "不限"}" 时间窗 + 放宽到 "${widenedTimeRange ?? "（未放宽）"}" 重试仍无命中。可能原因：
 - 当前话题在过去时段无新发报道
 - 检索关键词过窄（试试精简到 2-3 个核心词）
 - 信源域名白名单未覆盖（当前限定央媒/行业媒体域）
