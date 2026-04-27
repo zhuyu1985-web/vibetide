@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { EmployeeListPanel } from "./employee-list-panel";
 import { ChatPanel } from "./chat-panel";
 import type { ChatMessage } from "@/lib/chat-utils";
@@ -13,6 +14,7 @@ import type { AIEmployee } from "@/lib/types";
 import type { SavedConversationRow, WorkflowTemplateRow } from "@/db/types";
 import type { IntentResult } from "@/lib/agent/types";
 import { useChatStream } from "@/hooks/use-chat-stream";
+import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
 
 interface ChatCenterClientProps {
   employees: AIEmployee[];
@@ -25,6 +27,7 @@ export function ChatCenterClient({
   savedConversations: initialSavedConversations,
   scenarioMap,
 }: ChatCenterClientProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Determine initial slug from URL or first employee
@@ -76,6 +79,7 @@ export function ChatCenterClient({
   const [tab, setTab] = useState<"employees" | "saved">("employees");
   const [inlineScenario, setInlineScenario] =
     useState<WorkflowTemplateRow | null>(null);
+  const [launching, setLaunching] = useState<WorkflowTemplateRow | null>(null);
   const [savedConversations, setSavedConversations] = useState(
     initialSavedConversations
   );
@@ -399,20 +403,11 @@ export function ChatCenterClient({
     }
   }, [selectedEmployee, selectedSlug, messages, isSaved, activeScenario]);
 
-  /* ── Select scenario — show inline form or execute directly ── */
+  /* ── Select scenario — open WorkflowLaunchDialog ── */
   const handleSelectScenario = useCallback(
     (scenario: WorkflowTemplateRow) => {
-      if ((scenario.inputFields ?? []).length > 0) {
-        setInlineScenario(scenario);
-      } else {
-        // No inputs needed, execute directly
-        setInlineScenario(null);
-        setActiveScenario(scenario);
-        handleScenarioSubmit(scenario, {});
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setLaunching(scenario);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -501,6 +496,18 @@ export function ChatCenterClient({
 
   return (
     <div ref={rootRef} className="flex flex-1 min-h-0 overflow-hidden">
+      {launching && (
+        <WorkflowLaunchDialog
+          template={launching}
+          open={!!launching}
+          onOpenChange={(o) => !o && setLaunching(null)}
+          onLaunched={({ missionId }) => {
+            // Phase 1 暂行：跳到 mission console（与 home/employee 一致）
+            // Phase 2 (Task 18) 改为：插入 mission_card 消息到对话流
+            router.push(`/missions/${missionId}`);
+          }}
+        />
+      )}
       <EmployeeListPanel
         employees={employees}
         savedConversations={savedConversations}
