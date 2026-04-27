@@ -35,6 +35,7 @@ export default async function EmployeeProfilePage({
 
   let orgId = "";
   let canManageScenarios = false;
+  let canManage = false;
   try {
     const [org, profile] = await Promise.all([
       getCurrentUserOrg(),
@@ -44,6 +45,12 @@ export default async function EmployeeProfilePage({
     canManageScenarios = Boolean(
       profile?.permissions.includes(PERMISSIONS.AI_MANAGE),
     );
+    if (profile) {
+      canManage =
+        profile.isSuperAdmin ||
+        profile.role === "admin" ||
+        profile.role === "owner";
+    }
   } catch {
     // fallback
   }
@@ -101,6 +108,7 @@ export default async function EmployeeProfilePage({
       unprocessedFeedbackCount={unprocessedFeedbackCount}
       employeeWorkflows={employeeWorkflows}
       canManageScenarios={canManageScenarios}
+      canManage={canManage}
     />
   );
 }

@@ -78,6 +78,7 @@ import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo } from "@/lib/types"
 import type { SkillRecommendation } from "@/lib/dal/skills";
 import type { WorkflowTemplateRow } from "@/db/types";
 import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
+import { WorkflowCardMenu } from "@/components/workflows/workflow-card-menu";
 import * as LucideIcons from "lucide-react";
 import { FileText as FileTextIcon, type LucideIcon } from "lucide-react";
 
@@ -140,6 +141,8 @@ interface EmployeeProfileClientProps {
    * For now we derive this lazily inside the tab via the server action's
    * own guard — no gating on the client. */
   canManageScenarios?: boolean;
+  /** Whether the current user is admin/owner/superAdmin — shows ⋯ menu on workflow cards. */
+  canManage?: boolean;
 }
 
 export function EmployeeProfileClient({
@@ -158,6 +161,7 @@ export function EmployeeProfileClient({
   unprocessedFeedbackCount = 0,
   employeeWorkflows = [],
   canManageScenarios = true,
+  canManage = false,
 }: EmployeeProfileClientProps) {
   const router = useRouter();
   const [skillBrowserOpen, setSkillBrowserOpen] = useState(false);
@@ -366,6 +370,7 @@ export function EmployeeProfileClient({
         <EmployeeWorkflowsSection
           workflows={employeeWorkflows}
           employeeNickname={employee.nickname}
+          canManage={canManage}
         />
       )}
 
@@ -1359,9 +1364,11 @@ const WORKFLOWS_COLLAPSED_COUNT = 12;
 function EmployeeWorkflowsSection({
   workflows,
   employeeNickname,
+  canManage = false,
 }: {
   workflows: WorkflowTemplateRow[];
   employeeNickname: string;
+  canManage?: boolean;
 }) {
   const [launching, setLaunching] = useState<WorkflowTemplateRow | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -1407,11 +1414,18 @@ function EmployeeWorkflowsSection({
         {visibleWorkflows.map((wf) => {
           const Icon = resolveIcon(wf.icon);
           return (
-            <button
+            <div
               key={wf.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setLaunching(wf)}
-              className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left group"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setLaunching(wf);
+                }
+              }}
+              className="relative flex items-start gap-3 p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer text-left group"
             >
               <div className="shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20 flex items-center justify-center group-hover:from-indigo-500/20 group-hover:to-violet-500/20 transition-colors">
                 <Icon
@@ -1427,7 +1441,15 @@ function EmployeeWorkflowsSection({
                   {wf.description ?? "—"}
                 </p>
               </div>
-            </button>
+              {canManage && (
+                <div
+                  className="absolute right-1 top-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <WorkflowCardMenu templateId={wf.id} />
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
