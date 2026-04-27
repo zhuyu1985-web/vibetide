@@ -41,7 +41,6 @@ interface WorkflowEditorProps {
     triggerConfig?: { cron?: string; timezone?: string } | null;
     steps: WorkflowStepDef[];
     inputFields?: InputFieldDef[];
-    launchMode?: "form" | "direct";
     promptTemplate?: string;
   };
   mode: "create" | "edit";
@@ -98,12 +97,9 @@ export function WorkflowEditor({
   );
   const [isEnabled, setIsEnabled] = useState(false);
 
-  // ── Launch / input fields / prompt template ──
+  // ── Input fields / prompt template ──
   const [inputFields, setInputFields] = useState<InputFieldDef[]>(
     initialData?.inputFields ?? []
-  );
-  const [launchMode, setLaunchMode] = useState<"form" | "direct">(
-    initialData?.launchMode ?? "form"
   );
   const [promptTemplate, setPromptTemplate] = useState<string>(
     initialData?.promptTemplate ?? ""
@@ -192,7 +188,6 @@ export function WorkflowEditor({
           triggerConfig,
           steps: stepsHook.steps,
           inputFields,
-          launchMode,
           promptTemplate: promptTemplate.trim() || undefined,
         });
         // 保存后停留在当前页 —— 清掉"未保存改动"标记，给一个 toast 反馈。
@@ -207,7 +202,6 @@ export function WorkflowEditor({
           triggerConfig,
           steps: stepsHook.steps,
           inputFields,
-          launchMode,
           promptTemplate: promptTemplate.trim() || undefined,
         });
         // 创建成功 → 跳到该工作流的 edit 页（mode=edit），用户继续在同一个工作流上
@@ -235,7 +229,6 @@ export function WorkflowEditor({
     triggerConfig,
     stepsHook.steps,
     inputFields,
-    launchMode,
     promptTemplate,
     router,
   ]);
@@ -361,22 +354,6 @@ export function WorkflowEditor({
                 {c.label}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={launchMode}
-          onValueChange={(v) => {
-            setLaunchMode(v as "form" | "direct");
-            stepsHook.setHasChanges(true);
-          }}
-        >
-          <SelectTrigger className="w-[140px] h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="form">启动方式：表单</SelectItem>
-            <SelectItem value="direct">启动方式：直发</SelectItem>
           </SelectContent>
         </Select>
 

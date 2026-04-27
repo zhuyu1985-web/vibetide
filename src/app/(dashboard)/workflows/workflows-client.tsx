@@ -132,35 +132,10 @@ export function WorkflowsClient({
         showFeedback("error", "工作流不存在");
         return;
       }
-      const fields = (wf.inputFields ?? []) as InputFieldDef[];
-      const hasPrompt = (wf.promptTemplate ?? "").trim().length > 0;
-      // "direct" + 无字段 + 无 prompt 模板 → 允许一键启动，不弹 dialog
-      if (wf.launchMode === "direct" && fields.length === 0 && !hasPrompt) {
-        startTransition(async () => {
-          try {
-            const res = await startMissionFromTemplate(id, {});
-            if (!res.ok) {
-              showFeedback(
-                "error",
-                res.errors._global ?? "运行失败"
-              );
-              return;
-            }
-            showFeedback("success", "工作流已开始运行");
-            router.push(`/missions/${res.missionId}`);
-          } catch (err) {
-            showFeedback(
-              "error",
-              err instanceof Error ? err.message : "运行失败"
-            );
-          }
-        });
-        return;
-      }
-      // 有字段 / promptTemplate / launchMode=form → 弹 dialog 让用户填参数
+      // 统一弹 dialog 让用户填参数 / 确认启动
       setLaunchTemplate(wf);
     },
-    [myWorkflows, router, showFeedback]
+    [myWorkflows, showFeedback]
   );
 
   const handleEdit = useCallback(

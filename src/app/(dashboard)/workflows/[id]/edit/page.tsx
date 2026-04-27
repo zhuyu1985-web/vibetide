@@ -38,8 +38,6 @@ export default async function EditWorkflowPage({
           triggerConfig: workflow.triggerConfig,
           steps: workflow.steps,
           inputFields: workflow.inputFields ?? [],
-          launchMode:
-            workflow.launchMode === "direct" ? "direct" : "form",
           promptTemplate: workflow.promptTemplate ?? "",
         }}
       />

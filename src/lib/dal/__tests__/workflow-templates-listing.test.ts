@@ -30,7 +30,6 @@ const mk = (p: Partial<WorkflowTemplateRow>): WorkflowTemplateRow =>
     content: "",
     isPublic: p.isPublic ?? true,
     ownerEmployeeId: p.ownerEmployeeId ?? null,
-    launchMode: "form",
     promptTemplate: null,
     createdAt: p.createdAt ?? new Date(),
     updatedAt: new Date(),

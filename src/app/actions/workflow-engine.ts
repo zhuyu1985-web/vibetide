@@ -147,7 +147,6 @@ export async function updateWorkflowTemplate(
     steps?: WorkflowStepDef[];
     content?: string;
     inputFields?: InputFieldDef[];
-    launchMode?: "form" | "direct";
     promptTemplate?: string;
   }
 ) {
@@ -267,7 +266,6 @@ export async function saveWorkflow(data: {
   triggerConfig?: { cron?: string; timezone?: string } | null;
   steps: WorkflowStepDef[];
   inputFields?: InputFieldDef[];
-  launchMode?: "form" | "direct";
   promptTemplate?: string;
 }) {
   const user = await requireAuth();
@@ -292,9 +290,6 @@ export async function saveWorkflow(data: {
       ...(data.inputFields !== undefined
         ? { inputFields: data.inputFields }
         : {}),
-      ...(data.launchMode !== undefined
-        ? { launchMode: data.launchMode }
-        : {}),
       ...(data.promptTemplate !== undefined
         ? { promptTemplate: data.promptTemplate }
         : {}),
@@ -318,7 +313,6 @@ export async function updateWorkflow(
     triggerConfig?: { cron?: string; timezone?: string } | null;
     steps?: WorkflowStepDef[];
     inputFields?: InputFieldDef[];
-    launchMode?: "form" | "direct";
     promptTemplate?: string;
   }
 ) {

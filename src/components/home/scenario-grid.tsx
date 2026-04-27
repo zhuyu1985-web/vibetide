@@ -31,7 +31,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
-import { startMissionFromTemplate } from "@/app/actions/workflow-launch";
 import {
   pinHomepageTemplate,
   reorderHomepageTemplates,
@@ -117,7 +116,6 @@ interface TemplateCardProps {
   pinned: boolean;
   editing: boolean;
   canManage: boolean;
-  isDirectStarting: boolean;
   onClickCard: () => void;
   onTogglePin: () => void;
 }
@@ -128,7 +126,6 @@ function TemplateCard({
   pinned,
   editing,
   canManage,
-  isDirectStarting,
   onClickCard,
   onTogglePin,
 }: TemplateCardProps) {
@@ -233,13 +230,13 @@ function TemplateCard({
         <div className="mt-auto flex justify-end pt-4">
           <Button
             size="sm"
-            disabled={isDirectStarting || editing}
+            disabled={editing}
             onClick={(e) => {
               e.stopPropagation();
               if (!editing) onClickCard();
             }}
           >
-            {isDirectStarting ? "启动中…" : "启动"}
+            启动
           </Button>
         </div>
       </GlassCard>
@@ -256,10 +253,6 @@ export function ScenarioGrid({
   const router = useRouter();
   const [launching, setLaunching] =
     React.useState<WorkflowTemplateRow | null>(null);
-  const [directStartingId, setDirectStartingId] = React.useState<string | null>(
-    null,
-  );
-  const [directError, setDirectError] = React.useState<string | null>(null);
 
   // Task 4 — 每个 tab 独立的"整理顺序"开关（同时只能编辑一个 tab）。
   const [editingTab, setEditingTab] = React.useState<string | null>(null);
@@ -270,27 +263,10 @@ export function ScenarioGrid({
   >({});
 
   const handleCardClick = React.useCallback(
-    async (tpl: WorkflowTemplateRow) => {
-      setDirectError(null);
-      if (tpl.launchMode === "direct") {
-        setDirectStartingId(tpl.id);
-        try {
-          const res = await startMissionFromTemplate(tpl.id, {});
-          if (res.ok) {
-            router.push(`/missions/${res.missionId}`);
-          } else {
-            setDirectError(res.errors._global ?? "启动失败");
-          }
-        } catch (e) {
-          setDirectError(e instanceof Error ? e.message : "启动失败");
-        } finally {
-          setDirectStartingId(null);
-        }
-      } else {
-        setLaunching(tpl);
-      }
+    (tpl: WorkflowTemplateRow) => {
+      setLaunching(tpl);
     },
-    [router],
+    [],
   );
 
   const handleReorder = React.useCallback(
@@ -378,8 +354,6 @@ export function ScenarioGrid({
         </Popover>
       </div>
 
-      {directError && <p className="text-xs text-red-600">{directError}</p>}
-
       <Tabs defaultValue="featured" className="w-full gap-5">
         <TabsList
           variant="glass"
@@ -458,7 +432,6 @@ export function ScenarioGrid({
                           pinned
                           editing={showEditing}
                           canManage={canManageHomepage && isSharedTab}
-                          isDirectStarting={directStartingId === tpl.id}
                           onClickCard={() => handleCardClick(tpl)}
                           onTogglePin={() => handleTogglePin(tab.key, tpl)}
                         />
@@ -486,7 +459,6 @@ export function ScenarioGrid({
                             pinned={false}
                             editing
                             canManage={canManageHomepage && isSharedTab}
-                            isDirectStarting={directStartingId === tpl.id}
                             onClickCard={() => handleCardClick(tpl)}
                             onTogglePin={() =>
                               handleTogglePin(tab.key, tpl)
@@ -505,7 +477,6 @@ export function ScenarioGrid({
                           pinned={false}
                           editing={false}
                           canManage={canManageHomepage && isSharedTab}
-                          isDirectStarting={directStartingId === tpl.id}
                           onClickCard={() => handleCardClick(tpl)}
                           onTogglePin={() => handleTogglePin(tab.key, tpl)}
                         />

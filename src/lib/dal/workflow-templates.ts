@@ -138,7 +138,6 @@ export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
     // 2026-04-20 realignment — virtual rows 默认值
     isPublic: true,
     ownerEmployeeId: null,
-    launchMode: "form",
     promptTemplate: null,
     isFeatured: false,
   }));
@@ -356,8 +355,6 @@ export interface BuiltinSeedInput {
   isPublic?: boolean;
   /** 员工专属归属；null = 公共场景 */
   ownerEmployeeId?: string | null;
-  /** form = 需填表；direct = 一键启动 */
-  launchMode?: "form" | "direct";
   /** Mustache 风格 prompt 模板 */
   promptTemplate?: string | null;
   /** 主流场景 tab 标记；默认 false。仅内置预设会设为 true。 */
@@ -391,10 +388,9 @@ export async function seedBuiltinTemplatesForOrg(
       steps: seed.steps as never,
       triggerType: seed.triggerType ?? "manual",
       triggerConfig: (seed.triggerConfig ?? {}) as never,
-      // 2026-04-20 realignment — 新 4 列
+      // 2026-04-20 realignment — 新 3 列
       isPublic: seed.isPublic ?? true,
       ownerEmployeeId: seed.ownerEmployeeId ?? null,
-      launchMode: seed.launchMode ?? "form",
       promptTemplate: seed.promptTemplate ?? null,
       // 2026-04-20 homepage — "主流场景" tab 标识
       isFeatured: seed.isFeatured ?? false,
@@ -403,7 +399,7 @@ export async function seedBuiltinTemplatesForOrg(
     // onConflictDoUpdate 规则（2026-04-20 修订）：
     // - 重置（seed 即真相）：description / category / icon / input_fields / default_team
     //   / system_instruction / steps / trigger_type / trigger_config
-    //   / launch_mode / prompt_template / owner_employee_id / updated_at
+    //   / prompt_template / owner_employee_id / updated_at
     //   (ownerEmployeeId 从"保留"移到"重置"，支持垂类归属重分配)
     // - 不覆盖（保留 org admin 手动设置）：is_public / is_enabled
     const setOnConflict = {
@@ -416,7 +412,6 @@ export async function seedBuiltinTemplatesForOrg(
       steps: baseValues.steps,
       triggerType: baseValues.triggerType,
       triggerConfig: baseValues.triggerConfig,
-      launchMode: baseValues.launchMode,
       promptTemplate: baseValues.promptTemplate,
       ownerEmployeeId: baseValues.ownerEmployeeId,
       isFeatured: baseValues.isFeatured,

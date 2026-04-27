@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_templates" DROP COLUMN "launch_mode";

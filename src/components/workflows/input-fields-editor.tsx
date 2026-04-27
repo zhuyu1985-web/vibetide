@@ -103,7 +103,7 @@ export function InputFieldsEditor({ value, onChange }: InputFieldsEditorProps) {
 
       {value.length === 0 ? (
         <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
-          暂无字段（launchMode=direct 时可留空）
+          暂无字段
         </p>
       ) : (
         <div className="space-y-3">

@@ -10,7 +10,6 @@
  *
  * 新字段（相对 BuiltinSeedInput）：
  *  - ownerEmployeeId：员工专属场景的归属，公共场景为 null
- *  - launchMode："form" 需表单输入；"direct" 一键启动
  *  - promptTemplate：Mustache 风格 prompt 模板
  *
  * 向后兼容：保留 `buildBuiltinScenarioSeeds()` export，返回 BuiltinSeedInput[]。
@@ -39,8 +38,6 @@ export interface BuiltinWorkflowSeed {
   ownerEmployeeId: EmployeeId | null;
   /** 默认团队（第一个一般是 owner / 主执行员工） */
   defaultTeam: EmployeeId[];
-  /** form = 需填输入字段；direct = 一键启动 */
-  launchMode: "form" | "direct";
   inputFields: InputFieldDef[];
   steps: WorkflowStepDef[];
   systemInstruction?: string;
@@ -97,7 +94,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaowen", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "event_keywords",
@@ -156,7 +152,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaoce"],
-    launchMode: "form",
     inputFields: [
       {
         name: "platforms",
@@ -210,7 +205,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "conference_name",
@@ -258,7 +252,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaolei"],
-    launchMode: "form",
     inputFields: [
       {
         name: "main_topic",
@@ -310,7 +303,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaozi", "xiaowen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "series_theme",
@@ -367,7 +359,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "livelihood",
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaolei", "xiaowen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "city",
@@ -422,7 +413,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaozi", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -473,7 +463,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoce", "xiaozi", "xiaoshen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -520,7 +509,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "social",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaozi", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "content_source",
@@ -580,7 +568,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaozi",
     defaultTeam: ["xiaozi", "xiaolei"],
-    launchMode: "form",
     inputFields: [
       {
         name: "keywords",
@@ -633,7 +620,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaozi",
     defaultTeam: ["xiaozi"],
-    launchMode: "form",
     inputFields: [
       {
         name: "source_batch",
@@ -674,7 +660,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaozi",
     defaultTeam: ["xiaozi", "xiaoshen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "material_urls",
@@ -715,7 +700,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaozi",
     defaultTeam: ["xiaozi", "xiaoce", "xiaowen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -761,7 +745,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoce", "xiaoshen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -810,7 +793,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "deep",
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoshu", "xiaozi"],
-    launchMode: "form",
     inputFields: [
       {
         name: "data_topic",
@@ -862,7 +844,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaozi"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -911,7 +892,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaozi", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -960,7 +940,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaowen", "xiaozi"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -1014,7 +993,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaolei"],
-    launchMode: "form",
     inputFields: [
       {
         name: "text_to_check",
@@ -1055,7 +1033,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "content_to_review",
@@ -1094,7 +1071,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "content",
@@ -1134,7 +1110,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaowen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "content",
@@ -1177,7 +1152,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "content",
@@ -1218,7 +1192,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaolei"],
-    launchMode: "form",
     inputFields: [
       {
         name: "sources",
@@ -1261,7 +1234,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: "xiaoshen",
     defaultTeam: ["xiaoshen", "xiaowen", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "article_id",
@@ -1315,7 +1287,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "distribution",
     ownerEmployeeId: "xiaofa",
     defaultTeam: ["xiaofa", "xiaozi"],
-    launchMode: "direct",
     inputFields: [],
     systemInstruction:
       "针对当前待分发稿件,自动识别可分发平台(APP / 微信 / 微博 / 抖音 / 视频号),按各平台规则改写文案并生成发布时序与策略。输出:1) 各平台改写稿 2) 发布时序 3) 互动引导 4) 风险提示。",
@@ -1335,7 +1306,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "distribution",
     ownerEmployeeId: "xiaofa",
     defaultTeam: ["xiaofa", "xiaozi"],
-    launchMode: "form",
     inputFields: [
       {
         name: "target_platform",
@@ -1377,7 +1347,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "distribution",
     ownerEmployeeId: "xiaofa",
     defaultTeam: ["xiaofa", "xiaowen"],
-    launchMode: "form",
     inputFields: [
       {
         name: "core_message",
@@ -1419,7 +1388,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "distribution",
     ownerEmployeeId: "xiaofa",
     defaultTeam: ["xiaofa", "xiaoshu"],
-    launchMode: "form",
     inputFields: [
       {
         name: "content_type",
@@ -1485,7 +1453,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "daily_brief",
     ownerEmployeeId: "xiaoshu",
     defaultTeam: ["xiaoshu", "xiaowen"],
-    launchMode: "direct",
     inputFields: [],
     systemInstruction:
       "生成今日数据日报。结构:1) 核心指标速览(阅读 / 互动 / 转化) 2) 热点舆情摘要 3) 同环比趋势 4) 异动预警 5) 明日关注点。",
@@ -1506,7 +1473,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "daily_brief",
     ownerEmployeeId: "xiaoshu",
     defaultTeam: ["xiaoshu", "xiaowen", "xiaoce"],
-    launchMode: "form",
     inputFields: [
       {
         name: "period",
@@ -1547,7 +1513,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "analytics",
     ownerEmployeeId: "xiaoshu",
     defaultTeam: ["xiaoshu", "xiaolei", "xiaoce"],
-    launchMode: "form",
     inputFields: [
       {
         name: "analysis_topic",
@@ -1600,7 +1565,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: null,
     defaultTeam: ["xiaolei", "xiaozi", "xiaofa"],
-    launchMode: "direct",
     inputFields: [],
     systemInstruction:
       "生成今日要闻推送包。流程：1) 扫描全网热榜 2) 多源聚合今日要闻 3) 按重要性排序产出 Top 5~8 条 4) 每条含一句话摘要 / 延伸阅读 / 推荐发布时段。",
@@ -1622,7 +1586,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: null,
     defaultTeam: ["xiaolei", "xiaoce", "xiaozi", "xiaojian", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "conference_name",
@@ -1671,7 +1634,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "video",
     ownerEmployeeId: null,
     defaultTeam: ["xiaoce", "xiaozi", "xiaojian"],
-    launchMode: "form",
     inputFields: [
       {
         name: "topic",
@@ -1717,7 +1679,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaolei", "xiaoce", "xiaozi", "xiaoshen", "xiaofa"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "feature_topic",
@@ -1773,7 +1734,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     category: "news",
     ownerEmployeeId: null,
     defaultTeam: ["xiaolei", "xiaozi", "xiaoshen", "xiaofa"],
-    launchMode: "form",
     inputFields: [
       {
         name: "incident_location",
@@ -1835,7 +1795,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaofa"],
     isFeatured: true,
-    launchMode: "form",
     triggerType: "scheduled",
     triggerConfig: { cron: "30 8 * * *", timezone: "Asia/Shanghai" },
     inputFields: [
@@ -1899,7 +1858,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoce", "xiaozi"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "topic_scope",
@@ -1957,7 +1915,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaowen", "xiaoshen"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "region",
@@ -2014,7 +1971,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaolei", "xiaojian"],
     isFeatured: true,
-    launchMode: "direct",
     inputFields: [],
     systemInstruction:
       "从今日热榜挑选 1-3 个适合播客节奏的选题，每个输出一集播客脚本。结构：开场钩子（30 秒）/ 主讲（6-8 分钟，口语化）/ 互动问答（2-3 个）/ 收尾金句。末尾给出音频节奏建议（BPM / 音乐风格）。",
@@ -2037,7 +1993,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaojian",
     defaultTeam: ["xiaojian", "xiaowen", "xiaoshen"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "city",
@@ -2085,7 +2040,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
     isFeatured: true,
-    launchMode: "direct",
     inputFields: [],
     systemInstruction:
       "检索近期川超热门比赛（优先最近 3 天），挑选 1-2 场重点赛事。每场产出：1) 赛事简介（对阵 / 比分 / 关键时刻）2) 进球集锦要点（含时间点）3) 赛前准备 / 花絮 4) 赛后影响（积分 / 舆情）。图文可直发体育频道。",
@@ -2108,7 +2062,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaowen",
     defaultTeam: ["xiaowen", "xiaoshen", "xiaofa"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "platform",
@@ -2160,7 +2113,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaoce",
     defaultTeam: ["xiaoce", "xiaolei", "xiaowen"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "region",
@@ -2213,7 +2165,6 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     ownerEmployeeId: "xiaolei",
     defaultTeam: ["xiaolei", "xiaozi", "xiaowen"],
     isFeatured: true,
-    launchMode: "form",
     inputFields: [
       {
         name: "topic_range",
@@ -2257,12 +2208,12 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────
-// Chunk C：`toBuiltinSeedInput` 现携带新 4 列（isPublic / ownerEmployeeId
-// / launchMode / promptTemplate），由 `seedBuiltinTemplatesForOrg` 写入 DB。
+// Chunk C：`toBuiltinSeedInput` 现携带新 3 列（isPublic / ownerEmployeeId
+// / promptTemplate），由 `seedBuiltinTemplatesForOrg` 写入 DB。
 
 /**
  * Map a `BuiltinWorkflowSeed` to `BuiltinSeedInput` shape consumed by
- * `seedBuiltinTemplatesForOrg`. 新 4 列（isPublic / ownerEmployeeId / launchMode
+ * `seedBuiltinTemplatesForOrg`. 新 3 列（isPublic / ownerEmployeeId
  * / promptTemplate）以原样透传；`isPublic` 默认 true。
  */
 function toBuiltinSeedInput(w: BuiltinWorkflowSeed): BuiltinSeedInput {
@@ -2278,10 +2229,9 @@ function toBuiltinSeedInput(w: BuiltinWorkflowSeed): BuiltinSeedInput {
     steps: w.steps,
     triggerType: w.triggerType ?? "manual",
     triggerConfig: w.triggerConfig ?? {},
-    // 2026-04-20 realignment — 新 4 列
+    // 2026-04-20 realignment — 新 3 列
     isPublic: true,
     ownerEmployeeId: w.ownerEmployeeId,
-    launchMode: w.launchMode,
     promptTemplate: w.promptTemplate ?? null,
     // 2026-04-20 homepage
     isFeatured: w.isFeatured ?? false,
