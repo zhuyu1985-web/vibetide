@@ -8,6 +8,7 @@ import {
   real,
   boolean,
   unique,
+  uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -178,10 +179,18 @@ export const benchmarkAccounts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    uq: unique("uq_benchmark_acc_global").on(t.platform, t.handle, t.organizationId),
+    // 用 uniqueIndex 而非 unique 约束 —— DB 里实际是 unique index（migration
+    // 20260421000004 用 CONSTRAINT UNIQUE 创建会同时建 pg_index entry）。
+    // drizzle-kit push 的 introspection 对 unique() 检测有 false-positive，
+    // 改用 uniqueIndex 与 DB 形态完全一致，避免反复弹"add constraint"提示。
+    uq: uniqueIndex("uq_benchmark_acc_global").on(t.platform, t.handle, t.organizationId),
     platLevelIdx: index("idx_benchmark_acc_platform_level").on(t.platform, t.level),
     enabledIdx: index("idx_benchmark_acc_enabled").on(t.isEnabled),
-    orgIdx: index("idx_benchmark_acc_org").on(t.organizationId),
+    // partial index：与 migration 20260421000004 保持一致。drizzle 的 .where()
+    // 必须显式声明，否则 push 会以为 schema 改了非 partial → 弹另一个 drift 提示。
+    orgIdx: index("idx_benchmark_acc_org")
+      .on(t.organizationId)
+      .where(sql`${t.organizationId} IS NOT NULL`),
   }),
 );
 
