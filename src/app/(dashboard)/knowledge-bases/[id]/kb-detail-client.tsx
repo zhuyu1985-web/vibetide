@@ -18,16 +18,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -570,46 +561,26 @@ function SettingsTab({ kb }: { kb: KBDetail }) {
         </Button>
       </div>
 
-      {/* Reindex confirm */}
-      <AlertDialog open={reindexOpen} onOpenChange={setReindexOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认重建索引？</AlertDialogTitle>
-            <AlertDialogDescription>
-              将清空 {kb.chunkCount} 个 chunks 的向量并重新生成。期间该知识库不可被检索。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-0">取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReindex} disabled={reindexing} className="border-0">
-              {reindexing ? <Loader2 className="w-4 h-4 animate-spin" /> : "确认重建"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={reindexOpen}
+        onOpenChange={setReindexOpen}
+        title="确认重建索引？"
+        description={`将清空 ${kb.chunkCount} 个 chunks 的向量并重新生成。期间该知识库不可被检索。`}
+        confirmText="确认重建"
+        loading={reindexing}
+        onConfirm={handleReindex}
+      />
 
-      {/* Delete confirm */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除知识库？</AlertDialogTitle>
-            <AlertDialogDescription>
-              将同时删除 {kb.documentCount} 个文档、{kb.chunkCount} 个 chunks，
-              并解除 {kb.boundEmployeeCount} 名员工的绑定。此操作不可恢复。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-0">取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="border-0 bg-red-500 hover:bg-red-600 text-white"
-            >
-              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "确认删除"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="确认删除知识库？"
+        description={`将同时删除 ${kb.documentCount} 个文档、${kb.chunkCount} 个 chunks，并解除 ${kb.boundEmployeeCount} 名员工的绑定。此操作不可恢复。`}
+        confirmText="确认删除"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

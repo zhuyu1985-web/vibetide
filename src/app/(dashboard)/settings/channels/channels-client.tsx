@@ -32,16 +32,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -689,29 +680,16 @@ export function ChannelsClient({
         </SheetContent>
       </Sheet>
 
-      {/* ── Delete Confirm ── */}
-      <AlertDialog
+      <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除渠道配置？</AlertDialogTitle>
-            <AlertDialogDescription>
-              将永久删除「{deleteTarget?.name}」及其相关 Webhook 配置，此操作不可撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isPending ? <Loader2 size={14} className="animate-spin" /> : "确认删除"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title="确认删除渠道配置？"
+        description={`将永久删除「${deleteTarget?.name ?? ""}」及其相关 Webhook 配置，此操作不可撤销。`}
+        confirmText="确认删除"
+        variant="danger"
+        loading={isPending}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

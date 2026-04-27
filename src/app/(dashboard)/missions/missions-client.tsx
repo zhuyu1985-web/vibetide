@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -803,38 +804,16 @@ export function MissionsClient({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>永久删除所选任务？</AlertDialogTitle>
-            <AlertDialogDescription>
-              即将删除 {selectedIds.size} 个任务及其下的子任务、消息、产出物。
-              此操作不可恢复。运行中的任务会被自动跳过。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={(e) => {
-                e.preventDefault();
-                handleBatchDelete();
-              }}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <>
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                  删除中...
-                </>
-              ) : (
-                "确认删除"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="永久删除所选任务？"
+        description={`即将删除 ${selectedIds.size} 个任务及其下的子任务、消息、产出物。此操作不可恢复。运行中的任务会被自动跳过。`}
+        confirmText="确认删除"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleBatchDelete}
+      />
     </div>
   );
 }

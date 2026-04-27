@@ -18,16 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -550,30 +541,16 @@ export default function UsersClient({
         </DialogContent>
       </Dialog>
 
-      {/* ── Confirm AlertDialog ── */}
-      <AlertDialog
+      <ConfirmDialog
         open={!!confirmAction}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmAction?.title}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmAction?.description}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmAction}
-              disabled={loading}
-              className="bg-red-500 text-white hover:bg-red-600"
-            >
-              {loading ? "处理中..." : "确认"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={confirmAction?.title ?? ""}
+        description={confirmAction?.description ?? ""}
+        confirmText="确认"
+        variant="danger"
+        loading={loading}
+        onConfirm={handleConfirmAction}
+      />
     </div>
   );
 }
