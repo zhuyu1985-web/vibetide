@@ -119,14 +119,24 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
         ],
       },
       {
-        name: "event_time",
-        label: "事件发生时间",
-        type: "date",
-        required: false,
+        name: "time_range",
+        label: "检索时间窗",
+        type: "select",
+        required: true,
+        defaultValue: "24h",
+        placeholder: "选择检索时间窗",
+        // 值保持 Tavily web_search 约定（1h/24h/7d/30d）；home 启动表单对本字段
+        // 不做 label 映射，以便 route 直接解析出显式 timeRange，跳过 inferTimeRange。
+        options: [
+          { value: "1h", label: "过去 1 小时" },
+          { value: "24h", label: "过去 24 小时" },
+          { value: "7d", label: "过去 7 天" },
+          { value: "30d", label: "过去 30 天" },
+        ],
       },
     ],
     systemInstruction:
-      "围绕 {{event_keywords}} 追踪突发事件。极高时效要求（{{urgency_level}}），必须核对多源信息交叉印证。产出结构：1) 事件速报（200 字内）2) 已知事实列表 3) 信源置信度标注 4) 进展追踪钩子。",
+      "围绕 {{event_keywords}} 追踪突发事件。极高时效要求（{{urgency_level}}），检索窗口 {{time_range}}，必须核对多源信息交叉印证。产出结构：1) 事件速报（200 字内）2) 已知事实列表 3) 信源置信度标注 4) 进展追踪钩子。",
     promptTemplate:
       "请针对「{{event_keywords}}」进行突发新闻追踪，紧急程度 {{urgency_level}}，产出可直发的简讯稿。",
     steps: [

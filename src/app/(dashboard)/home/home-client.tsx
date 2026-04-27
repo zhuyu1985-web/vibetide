@@ -273,12 +273,20 @@ export function HomeClient({
         return mapped.join("、");
       };
 
+      // 技术字段（如 time_range）的 select 值必须保留原值，因为下游
+      // intent-execute/route.ts 会按 "1h/24h/7d/30d" 解析出 Tavily timeRange。
+      // 被 label 映射成"过去 24 小时"之后，parseExplicitTimeRange 会匹配失败，
+      // 又退化成 inferTimeRange 的文本猜测。
+      const RAW_VALUE_FIELD_NAMES = new Set(["time_range"]);
+
       const summary = Object.entries(inputs)
         .filter(([, v]) => v)
         .map(([k, v]) => {
           const field = scenario.inputFields.find((f) => f.name === k);
+          const isRawValueField = RAW_VALUE_FIELD_NAMES.has(k);
           const displayValue =
-            field?.type === "select" || field?.type === "multiselect"
+            !isRawValueField &&
+            (field?.type === "select" || field?.type === "multiselect")
               ? labelForValue(field, v)
               : v;
           return `${field?.label ?? k}: ${displayValue}`;
