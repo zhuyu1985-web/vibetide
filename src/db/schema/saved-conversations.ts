@@ -20,13 +20,18 @@ export const savedConversations = pgTable("saved_conversations", {
   messages: jsonb("messages")
     .$type<
       {
-        role: "user" | "assistant";
+        role: "user" | "assistant" | "system";
         content: string;
         durationMs?: number;
         thinkingSteps?: { tool: string; label: string; skillName?: string }[];
         skillsUsed?: { tool: string; skillName: string }[];
         sources?: string[];
         referenceCount?: number;
+        // mission_card 消息用字段（kind 缺省视为 "text"，向后兼容）
+        kind?: "text" | "mission_card";
+        missionId?: string;
+        templateId?: string;
+        templateName?: string;
       }[]
     >()
     .notNull()
