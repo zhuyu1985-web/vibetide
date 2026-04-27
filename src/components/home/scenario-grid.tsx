@@ -10,7 +10,6 @@ import {
   FileText,
   GripVertical,
   Pin,
-  PinOff,
   Settings2,
   Workflow,
   type LucideIcon,
@@ -31,6 +30,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
+import { WorkflowCardMenu } from "@/components/workflows/workflow-card-menu";
 import {
   pinHomepageTemplate,
   reorderHomepageTemplates,
@@ -201,18 +201,16 @@ function TemplateCard({
             )}
           </div>
           {canManage && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={pinned ? "取消置顶" : "置顶"}
-              className="absolute right-2 top-2 rounded-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePin();
-              }}
+            <div
+              className="absolute right-2 top-2"
+              onClick={(e) => e.stopPropagation()}
             >
-              {pinned ? <PinOff size={14} /> : <Pin size={14} />}
-            </Button>
+              <WorkflowCardMenu
+                templateId={tpl.id}
+                isPinned={pinned}
+                onTogglePin={onTogglePin}
+              />
+            </div>
           )}
         </div>
         {team.length > 0 && (
