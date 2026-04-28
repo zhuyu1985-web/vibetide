@@ -238,10 +238,13 @@ UI 结构：
 - **复制为我的工作流** → `/scenarios/customize?from=[id]`（已有页面）
 - **置顶 / 取消置顶** — home 页已有，归并到此菜单复用现有 `pin_homepage_template` action
 
-**"隐藏"功能不在 Phase 3 范围（开放问题）：**
-- 现状：没有 `homepage_template_visibility` 这类表；现有 `workflow_template_tab_order` 只管 pin + sort
-- 实施"隐藏"需要先建表或加字段，属于独立设计点
-- Phase 3 只做 编辑 / 复制 / 置顶 三项，"隐藏"留作 follow-up spec
+**"隐藏"功能不需要单独做（已被现有 `isEnabled` 覆盖）：**
+- `workflow_templates.isEnabled: boolean` 字段早已存在（`schema/workflows.ts:66`）
+- DAL 列表查询默认只返 `isEnabled = true`（`workflow-templates.ts:204`）
+- 已有 action `softDisableWorkflowTemplate(id)` 设 `isEnabled = false`（`workflow-templates.ts:336`）
+- `/workflows/[id]/edit` 编辑页可改这个字段
+- 被禁用的模板自动不在 home / employee / chat 三入口出现，已运行的 mission 不受影响（运行时是新启实例）
+- → 不在 WorkflowCardMenu 里加快捷"禁用"项（低频动作，admin 走编辑页足够）
 
 ### 6.2 唯一编辑入口
 
@@ -288,7 +291,7 @@ UI 结构：
 ### Phase 3 — 配置入口可见化
 - 卡片"⋯"菜单组件实现
 - 三入口卡片接入菜单（仅 admin/owner 可见）
-- 接入既有的 编辑 / 复制 / 置顶 三个 actions（"隐藏"留作独立 follow-up，见 §6.1）
+- 接入既有的 编辑 / 复制 / 置顶 三个 actions（"禁用"复用 isEnabled 字段，admin 走 /workflows/[id]/edit；不进菜单，见 §6.1）
 
 **验收：**
 - admin 在 employee/home/chat 卡片上能直接跳到编辑页
@@ -324,5 +327,5 @@ UI 结构：
 ## 10. 开放问题（不阻塞 spec，实施时再定）
 
 1. **`mission_card` 消息的 `templateName` 是否冗余存**：存了避免初次渲染等查询，但模板改名后旧消息会显示旧名——可接受
-2. **"隐藏"功能（Phase 3 follow-up）**：需要新表或新字段（现有 `workflow_template_tab_order` 不含 hidden 字段）。语义 hide-from-this-tab vs disable-globally？倾向 hide-from-this-tab。本 spec 不覆盖，独立 follow-up
+2. ~~**"隐藏"功能**~~：**已关闭**——现有 `isEnabled` 字段 + `softDisableWorkflowTemplate` action + `/workflows/[id]/edit` 编辑页已完整覆盖此场景，不需要新表 / 新字段 / 新菜单项（见 §6.1）
 3. **未保存对话（in-memory）的 mission_card**：用户启动 mission 后没保存会话直接关页，下次进入还能看到这个 mission 吗？倾向"不能"——临时会话不持久 mission_card；用户要持久化必须保存会话。Phase 2 实施时确认
