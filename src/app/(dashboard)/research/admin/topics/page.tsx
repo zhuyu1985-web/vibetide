@@ -5,8 +5,6 @@ import { PERMISSIONS } from "@/lib/rbac-constants";
 import { listResearchTopics } from "@/lib/dal/research/research-topics";
 import { TopicsClient } from "./topics-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function TopicsAdminPage() {
   const ctx = await getCurrentUserAndOrg();
   if (!ctx) redirect("/login");

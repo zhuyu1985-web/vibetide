@@ -6,8 +6,6 @@ import {
 } from "@/lib/dal/topic-compare";
 import { TopicCompareClient } from "./topic-compare-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function TopicComparePage() {
   let items: TopicCompareListRow[] = [];
   let platformOptions: Awaited<ReturnType<typeof listTopicComparePlatformOptions>> = [];

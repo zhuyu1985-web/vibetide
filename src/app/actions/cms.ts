@@ -8,7 +8,7 @@ import {
   type PublishResult,
   type SyncResult,
 } from "@/lib/cms";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 
 // ---------------------------------------------------------------------------
@@ -18,16 +18,6 @@ import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 // knowledge-bases.ts 保持一致。组织信息从 user_profiles 查询（通过共享的
 // getCurrentUserAndOrg helper）。
 // ---------------------------------------------------------------------------
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireUserAndOrg(): Promise<{ userId: string; organizationId: string }> {
   await requireAuth();
   const ctx = await getCurrentUserAndOrg();

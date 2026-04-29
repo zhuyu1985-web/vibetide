@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSyncLogById } from "@/lib/dal/cms-sync-logs";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 
 export const runtime = "nodejs";
@@ -8,10 +8,7 @@ export const dynamic = "force-dynamic";
 
 // Inline auth helpers — matches project convention (see benchmarking.ts / cms.ts).
 async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }

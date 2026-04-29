@@ -3,19 +3,9 @@
 import { db } from "@/db";
 import { caseLibrary, hitPredictions, competitorHits } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 // --- Case Library (F3.3.02) ---
 
 export async function addToCaseLibrary(data: {

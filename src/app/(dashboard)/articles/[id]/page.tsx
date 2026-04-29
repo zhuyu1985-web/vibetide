@@ -5,8 +5,6 @@ import { getAIAnalysisCache } from "@/lib/dal/ai-analysis";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import ArticleDetailClient from "./article-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function ArticleDetailPage({
   params,
 }: {

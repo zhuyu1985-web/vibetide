@@ -3,19 +3,9 @@
 import { db } from "@/db";
 import { improvementTrackings } from "@/db/schema/improvement-tracking";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 /**
  * Create a new improvement tracking record for a suggestion.
  */

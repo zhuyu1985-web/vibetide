@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getKnowledgeSources } from "@/lib/dal/channel-advisors";
 import CreateAdvisorClient from "./create-advisor-client";
 

@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getProductionTemplates, getTemplateStats } from "@/lib/dal/production-templates";
 import { ProductionTemplatesClient } from "./production-templates-client";

@@ -4,6 +4,8 @@ import { PermissionProvider } from "@/components/providers/permission-provider";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Toaster } from "sonner";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {

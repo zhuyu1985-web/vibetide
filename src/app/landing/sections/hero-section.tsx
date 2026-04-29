@@ -58,7 +58,7 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <ShimmerButton variant="primary" href="/home">
+          <ShimmerButton variant="primary" href="/register">
             免费开始使用
             <ArrowRight className="h-4 w-4" />
           </ShimmerButton>

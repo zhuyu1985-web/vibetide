@@ -1,22 +1,13 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { LandingPage } from "./landing/landing-page";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      redirect("/home");
-    }
-  } catch {
-    // Supabase unavailable — show landing page
+  const user = await getCurrentUser();
+  if (user) {
+    redirect("/home");
   }
-
   return <LandingPage />;
 }

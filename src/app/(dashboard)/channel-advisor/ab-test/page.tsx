@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getChannelAdvisors } from "@/lib/dal/channel-advisors";
 import { getAbTests } from "@/lib/dal/advisor-tests";
 import { getCurrentUserOrg } from "@/lib/dal/auth";

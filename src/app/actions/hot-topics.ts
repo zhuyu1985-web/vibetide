@@ -12,7 +12,7 @@ import {
   aiEmployees,
 } from "@/db/schema";
 import { and, eq, isNotNull, ne, inArray } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import {
@@ -35,17 +35,6 @@ import { executeMissionDirect } from "@/lib/mission-executor";
 import { generateText } from "ai";
 import { resolveModelConfig, getLanguageModel } from "@/lib/agent/model-router";
 import { gte, gt as drizzleGt, desc, sql as drizzleSql, or } from "drizzle-orm";
-
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 export async function createHotTopic(data: {
   organizationId: string;
   title: string;

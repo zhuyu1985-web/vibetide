@@ -2,8 +2,6 @@ import { getAssetsByLibrary, getLibraryStats, getMediaCategoryTree } from "@/lib
 import MediaAssetsModuleClient from "./media-assets-client";
 import type { MediaLibraryType } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
-
 export default async function MediaAssetsPage({
   searchParams,
 }: {

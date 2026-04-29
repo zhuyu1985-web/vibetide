@@ -5,7 +5,7 @@ import { workflowTemplates, skills } from "@/db/schema";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { InputFieldDef } from "@/lib/types";
 import { eq, inArray, sql } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { isSuperAdmin } from "@/lib/rbac";
@@ -31,16 +31,6 @@ function findBuiltinTemplateById(
     ) ?? null
   );
 }
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 /**
  * Validate that every `type:"skill"` step references a real skill (by slug)
  * and overwrite the step's cached `skillName` / `skillCategory` with the

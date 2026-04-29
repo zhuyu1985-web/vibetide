@@ -3,19 +3,9 @@
 import { db } from "@/db";
 import { articleAnnotations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { AnnotationColor } from "@/app/(dashboard)/articles/[id]/types";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 export async function createAnnotation(
   articleId: string,
   data: {

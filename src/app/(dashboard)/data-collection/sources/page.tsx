@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { SourcesClient } from "./sources-client";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
 
-export const dynamic = "force-dynamic";
-
 export default async function SourcesPage() {
   const orgId = await getCurrentUserOrg();
   if (!orgId) redirect("/login");

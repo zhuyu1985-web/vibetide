@@ -1,5 +1,5 @@
 import { verify } from "@/lib/cognitive/verify-learner";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { aiEmployees, userProfiles, intentLogs } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -64,10 +64,7 @@ function extractSources(toolResult: unknown): string[] {
 export async function POST(req: Request) {
   try {
     // Auth
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) {
       return new Response("Unauthorized", { status: 401 });
     }

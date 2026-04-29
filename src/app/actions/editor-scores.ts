@@ -1,19 +1,9 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { awardPoints } from "@/lib/dal/editor-scores";
 import { revalidatePath } from "next/cache";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 // ---------------------------------------------------------------------------
 // awardEditorPoints — 给编辑发放积分 (M3.F29)
 // ---------------------------------------------------------------------------

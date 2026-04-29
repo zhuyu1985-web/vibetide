@@ -1,7 +1,5 @@
-export const dynamic = "force-dynamic";
-
 import { getMyWorkflows, getBuiltinTemplates } from "@/lib/dal/workflow-templates";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { isSuperAdmin } from "@/lib/rbac";
 import { WorkflowsClient } from "./workflows-client";
 import type { WorkflowTemplateRow } from "@/db/types";
@@ -19,10 +17,7 @@ export default async function WorkflowsPage() {
   let isAdmin = false;
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (user) {
       const [mine, builtin, admin] = await Promise.all([

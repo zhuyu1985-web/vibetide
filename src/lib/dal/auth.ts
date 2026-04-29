@@ -1,29 +1,10 @@
 "use server";
 
 import { cache } from "react";
-import { db } from "@/db";
-import { userProfiles, organizations, userRoles, roles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
-
-// Auto-provision a user_profiles record linked to the default org.
-async function ensureUserProfile(userId: string, displayName: string): Promise<string | null> {
-  const defaultOrg = await db.query.organizations.findFirst({
-    orderBy: (o, { asc }) => [asc(o.createdAt)],
-  });
-  if (!defaultOrg) return null;
-
-  await db
-    .insert(userProfiles)
-    .values({
-      id: userId,
-      organizationId: defaultOrg.id,
-      displayName,
-    })
-    .onConflictDoNothing();
-
-  return defaultOrg.id;
-}
+import { db } from "@/db";
+import { userProfiles, userRoles, roles } from "@/db/schema";
+import { getCurrentUser } from "@/lib/auth";
 
 // Retry a DB query up to `n` times with exponential backoff
 async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
@@ -32,38 +13,33 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
       return await fn();
     } catch (err) {
       if (i === retries) throw err;
-      // Wait 1s, then 2s before retrying
       await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
     }
   }
   throw new Error("unreachable");
 }
 
-// cache() deduplicates per-request: multiple DAL functions calling this
-// in the same render pass share one Supabase auth round-trip.
+// cache() deduplicates per-request
 export const getCurrentUserAndOrg = cache(
   async (): Promise<{ userId: string; organizationId: string } | null> => {
     try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const user = await getCurrentUser();
       if (!user) return null;
+
+      // Trust the session for org id, but fall back to DB lookup for safety
+      if (user.organizationId) {
+        return { userId: user.id, organizationId: user.organizationId };
+      }
 
       const profile = await withRetry(() =>
         db.query.userProfiles.findFirst({
           where: eq(userProfiles.id, user.id),
         })
       );
-
-      if (profile?.organizationId)
+      if (profile?.organizationId) {
         return { userId: user.id, organizationId: profile.organizationId };
-
-      const name = user.user_metadata?.display_name || user.email || "用户";
-      const orgId = await ensureUserProfile(user.id, name);
-      if (!orgId) return null;
-      return { userId: user.id, organizationId: orgId };
+      }
+      return null;
     } catch {
       console.warn("[auth] getCurrentUserAndOrg failed, returning null");
       return null;
@@ -71,33 +47,10 @@ export const getCurrentUserAndOrg = cache(
   }
 );
 
-export const getCurrentUserOrg = cache(
-  async (): Promise<string | null> => {
-    try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return null;
-
-      // Retry DB query if circuit breaker is recovering
-      const profile = await withRetry(() =>
-        db.query.userProfiles.findFirst({
-          where: eq(userProfiles.id, user.id),
-        })
-      );
-
-      if (profile?.organizationId) return profile.organizationId;
-
-      const name = user.user_metadata?.display_name || user.email || "用户";
-      return ensureUserProfile(user.id, name);
-    } catch (err) {
-      console.error("[auth] user_profiles query failed:", err);
-      return null;
-    }
-  }
-);
+export const getCurrentUserOrg = cache(async (): Promise<string | null> => {
+  const ctx = await getCurrentUserAndOrg();
+  return ctx?.organizationId ?? null;
+});
 
 /**
  * Full user context including permissions. Used by layout/sidebar to decide
@@ -123,11 +76,9 @@ export const getCurrentUserProfile = cache(
       });
       if (!profile) return null;
 
-      // Fetch permissions from role assignments
       let permissions: string[] = [];
 
       if (profile.isSuperAdmin) {
-        // Lazy import to avoid circular dependency
         const { ALL_PERMISSIONS } = await import("@/lib/rbac");
         permissions = [...ALL_PERMISSIONS];
       } else {

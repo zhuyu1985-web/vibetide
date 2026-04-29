@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { getChannelConfigForOrg } from "@/lib/dal/channels";
 import { sendChannelMessage } from "@/lib/channels/outbound";
 import { db } from "@/db";
@@ -8,10 +8,7 @@ import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   // Auth
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }

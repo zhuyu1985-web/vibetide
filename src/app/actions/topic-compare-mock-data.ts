@@ -8,24 +8,15 @@ import {
   benchmarkAccounts,
   benchmarkPosts,
 } from "@/db/schema";
-import { userProfiles } from "@/db/schema/users";
 import { and, eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import crypto from "node:crypto";
 
 async function requireUserAndOrg() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("未登录");
-
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-  });
-  if (!profile?.organizationId) throw new Error("用户未关联组织");
-  return { userId: user.id, orgId: profile.organizationId };
+  const user = await requireAuth();
+  if (!user.organizationId) throw new Error("用户未关联组织");
+  return { userId: user.id, orgId: user.organizationId };
 }
 
 function computeFingerprint(title: string): string {

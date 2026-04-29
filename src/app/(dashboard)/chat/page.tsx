@@ -1,9 +1,4 @@
-export const dynamic = "force-dynamic";
-
-import { createClient } from "@/lib/supabase/server";
-import { db } from "@/db";
-import { userProfiles } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
 import { getEmployees } from "@/lib/dal/employees";
 import { getSavedConversations } from "@/lib/dal/conversations";
 import { listTemplatesForHomepageByTab } from "@/lib/dal/workflow-templates-listing";
@@ -24,19 +19,10 @@ export default async function ChatPage() {
   }
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (user) {
       savedConversations = await getSavedConversations(user.id);
-
-      const profile = await db
-        .select({ organizationId: userProfiles.organizationId })
-        .from(userProfiles)
-        .where(eq(userProfiles.id, user.id))
-        .limit(1);
-      const orgId = profile[0]?.organizationId;
+      const orgId = user.organizationId;
 
       if (orgId && employees.length > 0) {
         const slugs = employees.map((e) => e.id as EmployeeId);

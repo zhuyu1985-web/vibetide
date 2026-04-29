@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
   getPublishCalendar,
@@ -11,16 +11,6 @@ import type {
   TimeSlotRecommendation,
   HourlyEngagement,
 } from "@/lib/dal/publish-calendar";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 // ---------------------------------------------------------------------------
 // getCalendarData — 获取发布日历数据 (M3.F06)
 // ---------------------------------------------------------------------------

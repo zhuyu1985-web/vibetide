@@ -4,8 +4,6 @@ import { workflowTemplates } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { WorkflowDetailClient } from "./workflow-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function WorkflowDetailPage({
   params,
 }: {

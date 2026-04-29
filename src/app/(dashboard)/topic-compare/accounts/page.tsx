@@ -2,8 +2,6 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { listMyAccounts, type MyAccountRow } from "@/lib/dal/my-accounts";
 import { MyAccountsClient } from "./my-accounts-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function MyAccountsPage() {
   let rows: MyAccountRow[] = [];
   try {

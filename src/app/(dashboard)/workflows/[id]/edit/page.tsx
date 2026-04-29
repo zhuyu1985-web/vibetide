@@ -4,8 +4,6 @@ import { getAllToolParamSpecs } from "@/lib/agent/tool-registry";
 import { WorkflowEditor } from "@/components/workflows/workflow-editor";
 import { notFound } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
 export default async function EditWorkflowPage({
   params,
 }: {

@@ -6,8 +6,6 @@ import {
 } from "@/lib/dal/missing-topics";
 import { MissingTopicsClient } from "./missing-topics-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function MissingTopicsPage() {
   let items: MissingTopicRow[] = [];
   let kpis = {

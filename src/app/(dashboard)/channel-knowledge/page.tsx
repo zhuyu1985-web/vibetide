@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getKnowledgeSources, getKnowledgeItems, getChannelDNA, getSyncLogs } from "@/lib/dal/channel-advisors";
 import ChannelKnowledgeClient from "./channel-knowledge-client";
 

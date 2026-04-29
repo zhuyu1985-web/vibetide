@@ -3,20 +3,10 @@
 import { db } from "@/db";
 import { aiEmployees, employeeSkills, employeeKnowledgeBases, skills } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import type { NewAIEmployee, NewSkill, NewEmployeeSkill } from "@/db/types";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireOwnedEmployee(employeeId: string) {
   const orgId = await getCurrentUserOrg();
   if (!orgId) throw new Error("无法获取组织信息");

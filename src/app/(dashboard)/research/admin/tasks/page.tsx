@@ -8,8 +8,6 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { Plus } from "lucide-react";
 import { ResearchBreadcrumb } from "../../research-breadcrumb";
 
-export const dynamic = "force-dynamic";
-
 const STATUS_LABELS: Record<string, string> = {
   pending: "排队中",
   crawling: "采集中",

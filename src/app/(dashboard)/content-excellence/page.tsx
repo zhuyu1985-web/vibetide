@@ -4,8 +4,6 @@ import {
 } from "@/lib/dal/content-excellence";
 import ContentExcellenceClient from "./content-excellence-client";
 
-export const dynamic = "force-dynamic";
-
 function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 5000): Promise<T> {
   return Promise.race([
     promise.catch(() => fallback),

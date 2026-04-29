@@ -6,8 +6,6 @@ import { listMediaOutlets } from "@/lib/dal/research/media-outlets";
 import { searchNewsArticles } from "@/lib/dal/research/news-article-search";
 import { SearchWorkbenchClient } from "./search-workbench-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function ResearchPage() {
   const ctx = await getCurrentUserAndOrg();
   if (!ctx) redirect("/login");

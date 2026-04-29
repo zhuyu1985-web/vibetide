@@ -3,22 +3,12 @@
 import { db } from "@/db";
 import { articleAiAnalysis, articleChatHistory } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type {
   AIAnalysisPerspective,
   AISentiment,
 } from "@/app/(dashboard)/articles/[id]/types";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 export async function cacheAIAnalysis(
   articleId: string,
   perspective: AIAnalysisPerspective,
@@ -27,10 +17,7 @@ export async function cacheAIAnalysis(
   metadata?: Record<string, unknown>
 ) {
   const user = await requireAuth();
-
-  // Derive organizationId from user profile metadata (populated at sign-up)
-  const organizationId: string =
-    (user.user_metadata?.organization_id as string | undefined) ?? "";
+  const organizationId = user.organizationId;
 
   await db
     .insert(articleAiAnalysis)

@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getReviewResults } from "@/lib/dal/reviews";
 import { getComplianceHistory } from "@/lib/dal/compliance";

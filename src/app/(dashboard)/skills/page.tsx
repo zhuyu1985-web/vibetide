@@ -4,8 +4,6 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import type { WorkflowTemplateRow } from "@/db/types";
 import { SkillsClient } from "./skills-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function SkillsPage() {
   let skills: Awaited<ReturnType<typeof getSkillsWithBindCount>> = [];
   let workflows: WorkflowTemplateRow[] = [];

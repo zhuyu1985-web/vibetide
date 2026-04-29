@@ -9,7 +9,7 @@ import {
   topicMatches,
 } from "@/db/schema";
 import { userProfiles } from "@/db/schema/users";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { resolveModelConfig, getLanguageModel } from "@/lib/agent/model-router";
 import {
   tenDimensionAnalysisSchema,
@@ -64,8 +64,7 @@ function extractJson(text: string): unknown | null {
  *   error
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     return new Response(JSON.stringify({ error: "请先登录" }), {
       status: 401,

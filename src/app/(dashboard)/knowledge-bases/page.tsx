@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { redirect } from "next/navigation";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { listKnowledgeBaseSummariesByOrg } from "@/lib/dal/knowledge-bases";

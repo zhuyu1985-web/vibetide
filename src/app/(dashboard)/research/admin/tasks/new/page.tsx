@@ -5,8 +5,6 @@ import { listResearchTopics } from "@/lib/dal/research/research-topics";
 import { listCqDistricts } from "@/lib/dal/research/cq-districts";
 import { NewTaskClient } from "./new-task-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function NewResearchTaskPage() {
   const ctx = await getCurrentUserAndOrg();
   if (!ctx) redirect("/login");

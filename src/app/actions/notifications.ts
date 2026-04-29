@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import {
   markAsRead,
@@ -10,16 +10,6 @@ import {
 import { db } from "@/db";
 import { userProfiles } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 export async function markMessageRead(messageId: string) {
   const user = await requireAuth();
   await markAsRead(user.id, messageId);

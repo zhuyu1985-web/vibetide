@@ -13,7 +13,7 @@ import {
   skillUsageRecords,
 } from "@/db/schema";
 import { eq, and, lt, inArray, sql, gte } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { executeMissionDirect } from "@/lib/mission-executor";
@@ -24,16 +24,6 @@ import { getWorkflowTemplateByLegacyKey } from "@/lib/dal/workflow-templates";
 // instead of creating a second one. Guards against double-click / keyboard-
 // Enter races that slip past the UI `disabled` guard.
 const USER_DEDUP_WINDOW_MS = 8_000;
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 /**
  * Resolve (or auto-provision) the dedicated "任务总监" employee (slug="leader")
  * for a given organization.

@@ -5,7 +5,7 @@ import { aiEmployees } from "@/db/schema/ai-employees";
 import { skills, employeeSkills } from "@/db/schema/skills";
 import { skillCombos } from "@/db/schema/skill-combos";
 import { eq, and, inArray } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import {
   getConfigVersion,
@@ -13,16 +13,6 @@ import {
   getSkillCombo,
 } from "@/lib/dal/employee-advanced";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 // ---------------------------------------------------------------------------
 // Helper: snapshot current employee config
 // ---------------------------------------------------------------------------

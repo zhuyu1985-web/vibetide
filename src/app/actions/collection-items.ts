@@ -1,7 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { requireAuth } from "@/lib/auth";
 import {
   getCollectedItemDetail,
   getDerivedRecordsForItem,
@@ -9,14 +8,9 @@ import {
 } from "@/lib/dal/collected-items";
 
 async function requireOrg(): Promise<string> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  const orgId = await getCurrentUserOrg();
-  if (!orgId) throw new Error("无法获取组织信息");
-  return orgId;
+  const user = await requireAuth();
+  if (!user.organizationId) throw new Error("无法获取组织信息");
+  return user.organizationId;
 }
 
 export interface ItemDetailPayload {

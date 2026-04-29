@@ -5,8 +5,6 @@ import {
 } from "@/lib/dal/benchmark-accounts";
 import { BenchmarkAccountsClient } from "./benchmark-accounts-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function BenchmarkAccountsPage() {
   let rows: BenchmarkAccountRow[] = [];
   try {

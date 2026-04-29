@@ -3,19 +3,11 @@
 import { db } from "@/db";
 import { mediaAssets, assetTags, userProfiles } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { deleteObject } from "@/lib/volc-tos";
 import { getAssetsByLibrary } from "@/lib/dal/assets";
 import type { MediaAssetType, SecurityLevel, MediaLibraryType } from "@/lib/types";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function getProfile(authUserId: string) {
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, authUserId),

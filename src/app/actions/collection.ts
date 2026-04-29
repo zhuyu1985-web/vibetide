@@ -4,8 +4,8 @@ import { db } from "@/db";
 import { collectionSources, collectionRuns } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
+import { requireAuth } from "@/lib/auth";
+import { getCurrentUserProfile } from "@/lib/dal/auth";
 import { getAdapter } from "@/lib/collection/registry";
 import { inngest } from "@/inngest/client";
 import { assertSourceOwnership } from "@/lib/dal/collection";
@@ -13,19 +13,13 @@ import { z } from "zod";
 import "@/lib/collection/adapters"; // ensure adapters are registered
 
 async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
+  return requireAuth();
 }
 
 async function requireOrg(): Promise<string> {
-  await requireUser();
-  const orgId = await getCurrentUserOrg();
-  if (!orgId) throw new Error("无法获取组织信息");
-  return orgId;
+  const user = await requireAuth();
+  if (!user.organizationId) throw new Error("无法获取组织信息");
+  return user.organizationId;
 }
 
 // ──────────────────────────────────────────────────────

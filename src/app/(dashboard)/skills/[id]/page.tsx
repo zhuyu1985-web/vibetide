@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 import { getSkillDetailPageData } from "@/lib/dal/skills";
 import { SkillDetailClient } from "./skill-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function SkillDetailPage({
   params,
 }: {

@@ -1,9 +1,8 @@
 import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { missions } from "@/db/schema/missions";
 import { savedConversations } from "@/db/schema/saved-conversations";
-import { userProfiles } from "@/db/schema/users";
 import { desc, eq } from "drizzle-orm";
 import { getEmployees } from "@/lib/dal/employees";
 import { getCurrentUserProfile } from "@/lib/dal/auth";
@@ -14,8 +13,6 @@ import {
 import type { ScenarioCardData } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
 import { HomeClient } from "./home-client";
-
-export const dynamic = "force-dynamic";
 
 // 2026-04-20 首页 tab 重构 — "主流场景 + 8 职能 + 我的工作流" = 10 tab，
 // 服务端并行 fetch 所有 tab 数据，支持切换无感。
@@ -55,20 +52,10 @@ export default async function HomePage() {
   let canManageHomepage = false;
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (user) {
-      // Get user's organization
-      const profile = await db
-        .select({ organizationId: userProfiles.organizationId })
-        .from(userProfiles)
-        .where(eq(userProfiles.id, user.id))
-        .limit(1);
-
-      const orgId = profile[0]?.organizationId;
+      const orgId = user.organizationId;
 
       // Fetch recent missions (missions belong to org)
       if (orgId) {

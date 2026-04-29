@@ -10,23 +10,13 @@ import {
 import { missionTasks } from "@/db/schema/missions";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import type { AuditStage, AuditMode, TrailAction, TrailStage, AuditIssue } from "@/lib/dal/audit";
 
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireOrg(): Promise<string> {
   await requireAuth();
   const orgId = await getCurrentUserOrg();

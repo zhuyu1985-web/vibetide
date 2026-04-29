@@ -4,8 +4,6 @@ import { listCmsCatalogsForBindingDropdown } from "@/lib/dal/cms-catalogs";
 import { listRecentSyncLogs } from "@/lib/dal/cms-sync-logs";
 import { CmsMappingClient } from "./cms-mapping-client";
 
-export const dynamic = "force-dynamic";
-
 /**
  * CMS 栏目映射配置页（Phase 1 简化版）。
  *

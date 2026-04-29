@@ -7,23 +7,13 @@ import {
 } from "@/db/schema/user-feedback";
 import { aiEmployees } from "@/db/schema/ai-employees";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 
 // ---------------------------------------------------------------------------
 // Auth helper (local, same pattern as other action files)
 // ---------------------------------------------------------------------------
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 // ---------------------------------------------------------------------------
 // M4.F144 — Submit user feedback on AI output
 // ---------------------------------------------------------------------------

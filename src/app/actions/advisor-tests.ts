@@ -7,19 +7,9 @@ import {
 } from "@/db/schema/advisor-tests";
 import { channelAdvisors } from "@/db/schema/channel-advisors";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 /**
  * Run comparison test: for each advisor, generate a mock response.
  */

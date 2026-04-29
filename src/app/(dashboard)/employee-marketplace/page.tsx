@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getEmployees } from "@/lib/dal/employees";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { EmployeeMarketplaceClient } from "./employee-marketplace-client";

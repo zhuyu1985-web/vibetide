@@ -3,17 +3,9 @@
 import { db } from "@/db";
 import { reviveRecommendations, styleAdaptations, internationalAdaptations, mediaAssets } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { StyleVariant, InternationalAdaptation } from "@/lib/types";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 export async function triggerDailyReviveScan() {
   await requireAuth();
   // Placeholder: In production, run asset matching algorithm

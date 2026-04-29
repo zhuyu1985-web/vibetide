@@ -3,8 +3,6 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getMissingTopicDetail } from "@/lib/dal/missing-topics";
 import { MissingTopicDetailClient } from "./missing-topic-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function MissingTopicDetailPage({
   params,
 }: {

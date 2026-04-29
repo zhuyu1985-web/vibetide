@@ -2,20 +2,10 @@
 
 import { db } from "@/db";
 import { complianceChecks } from "@/db/schema/compliance";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { checkContentCompliance } from "@/lib/dal/compliance";
 import { revalidatePath } from "next/cache";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 /**
  * Run a compliance check on the provided content.
  * Saves the result to the database and returns detected issues.

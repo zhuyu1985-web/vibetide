@@ -6,8 +6,6 @@ import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import type { WorkflowTemplateRow } from "@/db/types";
 import { after } from "next/server";
 
-export const dynamic = "force-dynamic";
-
 export default async function MissionsPage() {
   const orgId = await getCurrentUserOrg();
 

@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {

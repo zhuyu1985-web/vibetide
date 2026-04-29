@@ -2,8 +2,6 @@ import { WorkflowEditor } from "@/components/workflows/workflow-editor";
 import { listSkillsForWorkflowPicker } from "@/lib/dal/skills";
 import { getAllToolParamSpecs } from "@/lib/agent/tool-registry";
 
-export const dynamic = "force-dynamic";
-
 export default async function NewWorkflowPage() {
   const skills = await listSkillsForWorkflowPicker().catch(() => []);
   // 预计算工具参数 spec 透传给 WorkflowEditor —— 客户端不能直接 import

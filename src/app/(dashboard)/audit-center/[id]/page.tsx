@@ -3,8 +3,6 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getAuditRecord, getTrailLogs, getAuditHistory } from "@/lib/dal/audit";
 import { AuditDetailClient } from "./audit-detail-client";
 
-export const dynamic = "force-dynamic";
-
 interface Props {
   params: Promise<{ id: string }>;
 }

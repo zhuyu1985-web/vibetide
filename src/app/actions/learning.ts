@@ -5,19 +5,9 @@ import { employeeMemories } from "@/db/schema/employee-memories";
 import { aiEmployees } from "@/db/schema/ai-employees";
 import { userFeedback } from "@/db/schema/user-feedback";
 import { eq, and, count } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 // ---------------------------------------------------------------------------
 // Add a learning memory manually
 // ---------------------------------------------------------------------------

@@ -8,8 +8,6 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getAdapterMeta } from "@/lib/collection/adapter-meta";
 import { SourceDetailClient } from "./source-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function SourceDetailPage({
   params,
 }: {

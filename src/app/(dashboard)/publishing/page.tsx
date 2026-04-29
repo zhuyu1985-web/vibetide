@@ -7,8 +7,6 @@ import {
 } from "@/lib/dal/publish-calendar";
 import PublishingClient from "./publishing-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function PublishingPage() {
   const orgId = await getCurrentUserOrg().catch(() => null);
 

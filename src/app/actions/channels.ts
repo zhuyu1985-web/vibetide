@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { channelConfigs, channelMessages } from "@/db/schema/channels";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getChannelConfigForOrg } from "@/lib/dal/channels";
 import type { ChannelPlatform, ChannelMessageStatus } from "@/lib/dal/channels";
@@ -12,16 +12,6 @@ import type { ChannelPlatform, ChannelMessageStatus } from "@/lib/dal/channels";
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireOrg(): Promise<string> {
   await requireAuth();
   const orgId = await getCurrentUserOrg();

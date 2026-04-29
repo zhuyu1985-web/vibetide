@@ -3,16 +3,8 @@
 import { db } from "@/db";
 import { channelAdvisors, channelDnaProfiles, knowledgeBases, knowledgeSyncLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 export async function createChannelAdvisor(data: {
   organizationId: string;
   name: string;

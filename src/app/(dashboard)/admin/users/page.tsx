@@ -6,8 +6,6 @@ import { isSuperAdmin } from "@/lib/rbac";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 import UsersClient from "./users-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function UsersPage() {
   const ctx = await requirePermission(PERMISSIONS.SYSTEM_MANAGE_USERS);
   const superAdmin = await isSuperAdmin(ctx.userId);

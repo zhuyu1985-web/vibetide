@@ -49,12 +49,17 @@ export const organizations = pgTable("organizations", {
 });
 
 export const userProfiles = pgTable("user_profiles", {
-  id: uuid("id").primaryKey(), // matches Supabase auth.users.id
+  id: uuid("id").primaryKey(), // legacy: matched Supabase auth.users.id; now self-managed uuid
   organizationId: uuid("organization_id").references(() => organizations.id),
   displayName: text("display_name").notNull(),
   role: text("role").notNull().default("editor"), // legacy: admin, editor, viewer
   isSuperAdmin: boolean("is_super_admin").notNull().default(false),
   avatarUrl: text("avatar_url"),
+  // Self-built auth (replaces Supabase Auth)
+  email: text("email").unique(),
+  passwordHash: text("password_hash"),
+  passwordHashAlgo: text("password_hash_algo").default("argon2id"),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

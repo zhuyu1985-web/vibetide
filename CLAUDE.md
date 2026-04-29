@@ -45,7 +45,7 @@ npm run db:seed      # Seed database (npx tsx src/db/seed.ts)
 
 - **Framework:** Next.js 16.1.6, React 19, TypeScript 5 (strict mode)
 - **Database:** Supabase (PostgreSQL) via Drizzle ORM 0.45.1 with `postgres` driver
-- **Auth:** Supabase Auth (@supabase/ssr for SSR cookie management)
+- **Auth:** Self-built (iron-session encrypted cookie + argon2id password hashing). DB-only — Supabase Auth (GoTrue) no longer used.
 - **AI:** AI SDK (Vercel) v6, @ai-sdk/anthropic
 - **UI:** shadcn/ui (new-york style), Radix UI, Tailwind CSS v4, Lucide icons
 - **Charts:** Recharts 3.7
@@ -98,10 +98,22 @@ Mutations  → Server Actions (src/app/actions/) ─────────┘
 
 ### Auth Flow
 
-- **Supabase clients:** `src/lib/supabase/client.ts` (browser), `server.ts` (RSC/actions)
-- **Middleware helper** (`src/lib/supabase/middleware.ts`): `updateSession()` refreshes cookies, redirects unauthenticated users to `/login`, redirects authenticated users away from auth pages to `/home`. Note: no active root `middleware.ts` file currently exists.
-- **Server Actions** in `src/app/actions/auth.ts`: `signIn`, `signUp`, `signOut`
-- Email/password auth only (no social login)
+完全自建，不依赖 Supabase Auth / GoTrue。所有用户认证只读写 `public.user_profiles` 表。
+
+- **Auth lib** (`src/lib/auth/`):
+  - `hash.ts` — `hashPassword` / `verifyPassword`（argon2id，m=19MiB / t=2 / p=1）
+  - `session.ts` — iron-session AES-256-GCM 加密 cookie（`vibetide-session`），7 天滑动过期
+  - `current-user.ts` — `getCurrentUser()`（cached per-request）+ `requireAuth()`（未登录抛 redirect /login）
+  - `index.ts` — barrel export
+- **Server Actions** in `src/app/actions/auth.ts`:
+  - `signIn`：查 `userProfiles.email` → `verifyPassword` → 写 `lastLoginAt` → `setSession`
+  - `signUp`：校验 email 唯一 → `hashPassword` → INSERT `userProfiles` 关联默认 org → `setSession`
+  - `signOut`：`destroySession`
+- **Proxy**（`src/proxy.ts`）— Next.js 16 路由拦截器（旧名 middleware）。读 `vibetide-session` cookie 用 `unsealData` 解密。公共路径（`/`, `/auth/*`）直接放行；`/login` 与 `/register` 已登录则跳 `/home`；其余未登录跳 `/login?next=...`
+- **`user_profiles` 表**：`id` (uuid)、`email` (unique)、`password_hash`、`password_hash_algo` (`'argon2id'`)、`last_login_at`、`organization_id`、`display_name`、`role`、`is_super_admin`、`avatar_url`
+- **Admin 用户管理**（`src/app/actions/admin.ts`）：直接 `db.insert(userProfiles)` 写入，停用账号 = `password_hash = NULL`
+- **Env 必填**：`AUTH_SESSION_SECRET`（≥ 32 字符）、`AUTH_SESSION_TTL_SECONDS`（默认 604800）
+- Email/password auth only (no social login / OAuth / 邮件验证 / 找回密码)
 
 ### AI Employee System
 

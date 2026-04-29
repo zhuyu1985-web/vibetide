@@ -1,8 +1,6 @@
 import { ReactNode } from "react";
 import { DataCollectionTabs } from "./data-collection-tabs";
 
-export const dynamic = "force-dynamic";
-
 export default function DataCollectionLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col">

@@ -8,7 +8,7 @@ import {
   benchmarkAccounts,
 } from "@/db/schema";
 import { userProfiles } from "@/db/schema/users";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { resolveModelConfig, getLanguageModel } from "@/lib/agent/model-router";
 import {
   missedTopicComparisonSchema,
@@ -52,8 +52,7 @@ function extractJson(text: string): unknown | null {
  *   error
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return jsonError(401, "请先登录");
 
   const profile = await db.query.userProfiles.findFirst({

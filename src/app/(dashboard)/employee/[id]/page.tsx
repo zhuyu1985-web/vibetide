@@ -12,8 +12,6 @@ import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
 import { EmployeeProfileClient } from "./employee-profile-client";
 
-export const dynamic = "force-dynamic";
-
 function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 15000): Promise<T> {
   return Promise.race([
     promise.catch(() => fallback),

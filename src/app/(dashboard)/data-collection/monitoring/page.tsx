@@ -9,8 +9,6 @@ import {
 import { listCollectionSources } from "@/lib/dal/collection";
 import { MonitoringClient } from "./monitoring-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function MonitoringPage() {
   const orgId = await getCurrentUserOrg();
   if (!orgId) redirect("/login");

@@ -9,8 +9,6 @@ import {
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import AnalyticsClient from "./analytics-client";
 
-export const dynamic = "force-dynamic";
-
 function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 5000): Promise<T> {
   return Promise.race([
     promise.catch(() => fallback),

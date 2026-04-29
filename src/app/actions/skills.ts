@@ -3,23 +3,13 @@
 import { db } from "@/db";
 import { skills, skillFiles, skillVersions, skillUsageRecords, workflowTemplates } from "@/db/schema";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
 import type { SkillCategory } from "@/lib/types";
 import { parseFrontmatter } from "@/lib/skill-package";
 import { encrypt } from "@/lib/crypto";
 import { validatePluginUrl } from "@/lib/plugin-security";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireCurrentOrgId() {
   const orgId = await getCurrentUserOrg();
   if (!orgId) throw new Error("无法获取组织信息");

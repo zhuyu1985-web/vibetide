@@ -6,8 +6,6 @@ import { listMediaOutlets } from "@/lib/dal/research/media-outlets";
 import { listCqDistricts } from "@/lib/dal/research/cq-districts";
 import { MediaOutletsClient } from "./media-outlets-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function MediaOutletsAdminPage() {
   const ctx = await getCurrentUserAndOrg();
   if (!ctx) redirect("/login");

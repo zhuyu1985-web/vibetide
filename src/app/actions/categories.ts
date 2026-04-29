@@ -3,19 +3,11 @@
 import { db } from "@/db";
 import { categories, mediaAssets, categoryPermissions } from "@/db/schema";
 import { eq, and, count } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { revalidatePath } from "next/cache";
 import { getCategoryPermissions, getOrgUsers } from "@/lib/dal/assets";
 import type { CategoryPermissionType, PermissionGranteeType } from "@/lib/types";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireAuthWithOrg() {
   await requireAuth();
   const orgId = await getCurrentUserOrg();

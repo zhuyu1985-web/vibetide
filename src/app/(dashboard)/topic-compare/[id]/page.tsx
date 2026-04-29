@@ -3,8 +3,6 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getTopicCompareDetail } from "@/lib/dal/topic-compare";
 import { TopicDetailClient } from "./topic-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function TopicCompareDetailPage({
   params,
 }: {

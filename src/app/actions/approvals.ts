@@ -3,19 +3,9 @@
 import { db } from "@/db";
 import { aiEmployees } from "@/db/schema/ai-employees";
 import { eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { WORK_PREFERENCE_TEMPLATES } from "@/lib/constants";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 /**
  * M4.F22: Apply a work preference template to an AI employee.
  * Looks up the template from constants and updates the employee's workPreferences.

@@ -7,8 +7,6 @@ import {
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
 import { ContentClient, type CollectedItemViewModel } from "./content-client";
 
-export const dynamic = "force-dynamic";
-
 type TimeWindow = "24h" | "7d" | "30d" | "all";
 
 function sinceFromTimeWindow(tw: TimeWindow): number | undefined {

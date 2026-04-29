@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 import {
   getInspirationTopics,

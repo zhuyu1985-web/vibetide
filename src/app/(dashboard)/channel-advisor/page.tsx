@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { getChannelAdvisors } from "@/lib/dal/channel-advisors";
 import ChannelAdvisorClient from "./channel-advisor-client";
 

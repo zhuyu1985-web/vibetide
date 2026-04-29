@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import {
   organizations,
@@ -10,7 +11,7 @@ import {
 } from "@/db/schema";
 import { eq, and, count } from "drizzle-orm";
 import { requirePermission, PERMISSIONS } from "@/lib/rbac";
-import { createClient } from "@/lib/supabase/server";
+import { hashPassword } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
 // Organization CRUD
@@ -75,26 +76,28 @@ export async function createUser(data: {
 }) {
   await requirePermission(PERMISSIONS.SYSTEM_MANAGE_USERS);
 
-  // Create auth user via Supabase Admin API
-  const supabase = await createClient();
-  const { data: authData, error } = await supabase.auth.admin.createUser({
-    email: data.email,
-    password: data.password,
-    email_confirm: true,
-    user_metadata: { display_name: data.displayName },
+  if (data.password.length < 8) {
+    throw new Error("密码至少 8 位");
+  }
+
+  const email = data.email.trim().toLowerCase();
+  const existing = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.email, email),
   });
+  if (existing) throw new Error("该邮箱已被注册");
 
-  if (error) throw new Error(`创建用户失败: ${error.message}`);
-  const userId = authData.user.id;
+  const userId = randomUUID();
+  const passwordHash = await hashPassword(data.password);
 
-  // Create user profile
   await db.insert(userProfiles).values({
     id: userId,
     organizationId: data.organizationId,
     displayName: data.displayName,
+    email,
+    passwordHash,
+    passwordHashAlgo: "argon2id",
   });
 
-  // Assign role
   await db.insert(userRoles).values({
     userId,
     roleId: data.roleId,
@@ -137,7 +140,6 @@ export async function updateUser(
 export async function deactivateUser(userId: string) {
   await requirePermission(PERMISSIONS.SYSTEM_MANAGE_USERS);
 
-  // Prevent deactivating super admins
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, userId),
   });
@@ -145,12 +147,11 @@ export async function deactivateUser(userId: string) {
     throw new Error("无法停用超级管理员账号");
   }
 
-  // Disable auth user via Supabase Admin API
-  const supabase = await createClient();
-  const { error } = await supabase.auth.admin.updateUserById(userId, {
-    ban_duration: "876000h", // ~100 years
-  });
-  if (error) throw new Error(`停用用户失败: ${error.message}`);
+  // 清空密码即停用 — 用户无法登录但 user_profile 保留
+  await db
+    .update(userProfiles)
+    .set({ passwordHash: null, updatedAt: new Date() })
+    .where(eq(userProfiles.id, userId));
 
   revalidatePath("/admin/users");
 }

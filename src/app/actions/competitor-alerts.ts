@@ -2,20 +2,10 @@
 
 import { db } from "@/db";
 import { competitors } from "@/db/schema/benchmarking";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 interface CompetitorAnomaly {
   competitorName: string;
   type: "follower_spike" | "posting_frequency" | "engagement_spike";

@@ -5,27 +5,13 @@ import { workflowTemplates } from "@/db/schema/workflows";
 import { missions } from "@/db/schema/missions";
 import { aiEmployees } from "@/db/schema/ai-employees";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { validateInputs } from "@/lib/input-fields-validation";
 import type { InputFieldDef } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 import { executeMissionDirect } from "@/lib/mission-executor";
 import { getOrProvisionLeader } from "@/app/actions/missions";
-
-/**
- * Private auth guard — mirrors the inline `requireAuth` pattern used in
- * `src/app/actions/missions.ts`. Deliberately NOT a shared helper because
- * the canonical pattern in this repo is inline-per-file (see `missions.ts:28`).
- */
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("未登录");
-  return user;
-}
 
 /**
  * Replace `{{key}}` placeholders in a prompt template with values from `params`.

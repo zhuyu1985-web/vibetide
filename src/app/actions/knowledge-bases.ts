@@ -8,7 +8,7 @@ import {
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { assertKnowledgeBaseOwnership } from "@/lib/dal/knowledge-bases";
 import { chunkText, buildSnippet } from "@/lib/knowledge/chunking";
@@ -18,16 +18,6 @@ import { inngest } from "@/inngest/client";
 // ---------------------------------------------------------------------------
 // Auth helpers (multi-tenant boundary)
 // ---------------------------------------------------------------------------
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return user;
-}
-
 async function requireOrg(): Promise<string> {
   await requireAuth();
   const orgId = await getCurrentUserOrg();

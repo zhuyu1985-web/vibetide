@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 import { getAssetDetailFull } from "@/lib/dal/assets";
 import AssetDetailClient from "./asset-detail-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function AssetDetailPage({
   params,
 }: {
