@@ -6,13 +6,15 @@ import { cn } from "@/lib/utils";
 
 interface MissionProgressChipProps {
   state: MissionProgressData;
+  /** 用于把 querySelector 限定到当前 mission 容器；多 mission 在页面时不跨任务跳转。 */
+  missionId: string;
 }
 
 /**
  * Floating mini progress indicator for a long mission stream. Click jumps to
- * the currently running step bubble.
+ * the currently running step bubble (scoped to this mission's container).
  */
-export function MissionProgressChip({ state }: MissionProgressChipProps) {
+export function MissionProgressChip({ state, missionId }: MissionProgressChipProps) {
   const tasks = Object.values(state.tasksById).sort(
     (a, b) => (a.phase ?? 0) - (b.phase ?? 0),
   );
@@ -25,7 +27,10 @@ export function MissionProgressChip({ state }: MissionProgressChipProps) {
 
   const handleClick = () => {
     if (typeof document === "undefined") return;
-    const el = document.querySelector('[data-status="running"]');
+    // 限定在当前 mission 容器里查 running 步骤，避免页面有多个 mission 时跨任务跳转
+    const el = document.querySelector(
+      `[data-mission-id="${missionId}"] [data-status="running"]`,
+    );
     if (el && "scrollIntoView" in el) {
       (el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
     }

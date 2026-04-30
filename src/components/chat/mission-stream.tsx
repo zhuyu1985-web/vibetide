@@ -68,8 +68,8 @@ export function MissionStream({
       : orderedTasks;
 
   return (
-    <div className="space-y-3">
-      <MissionProgressChip state={state} />
+    <div data-mission-id={missionId} className="relative space-y-3">
+      <MissionProgressChip state={state} missionId={missionId} />
 
       {state.init && (
         <MissionPlanningBubble
@@ -85,7 +85,8 @@ export function MissionStream({
           task={task}
           stepNumber={idx + 1}
           totalSteps={visibleTasks.length}
-          skillName={state.init?.steps[idx]?.skillName}
+          // 按 phase 而不是数组 index 反查 skillName，规避取消场景下 index 错位
+          skillName={state.init?.steps.find((s) => s.phase === task.phase)?.skillName}
           ownerEmployee={ownerEmployee}
           employees={employees}
           missionId={missionId}
