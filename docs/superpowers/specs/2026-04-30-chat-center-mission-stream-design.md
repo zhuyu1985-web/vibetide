@@ -105,11 +105,11 @@
 | `pending` | `text-gray-500`，⏰ 图标，opacity-50 | （无正文） |
 | `running` | `text-blue-600`，旋转 Loader2，"进行中…" | 跳动三点骨架 + 可选实时元信息 |
 | `completed` | `text-blue-600`，✅，耗时，"引用 N 篇资料" | `outputSummary` markdown + "查看完整结果"链接 |
-| `failed` | `text-red-600`，⚠️ "执行失败"，"已重试 X/3" | 红卡：`error_message` + 「重试本步」「跳过此步」「查看错误日志」三按钮 |
+| `failed` | `text-red-600`，⚠️ "执行失败"，"已重试 X/3" | 红卡：`error_message` + 「重试本步」按钮（必显） + 「跳过此步」按钮（仅当 `skipMissionTask` server action 已存在时显示，详见 §6.1） + 「查看错误日志」链接 |
 | `skipped` | `text-gray-500`，⏭️ "已跳过（依赖失败）"，opacity-50 | （无正文） |
 | `cancelled` | `text-gray-500`，⏹️ "已取消"，opacity-50 | （无正文） |
 
-**打字机渲染**：`completed` 状态下 `outputSummary` 通过 `useTypewriter(text, 30 chars/sec)` 自定义 hook 输出，完成后停在末态。**只在状态首次切换到 completed 那次播放打字机**；后续重渲染（如父组件其他原因更新）直接显示完整文本，避免回放骚扰。
+**打字机渲染**：`completed` 状态下 `outputSummary` 通过 `useTypewriter(text, 30 chars/sec)` 自定义 hook 输出，完成后停在末态。**只在状态首次切换到 completed 那次播放打字机**；后续重渲染（如父组件其他原因更新）直接显示完整文本，避免回放骚扰。实现要点：SSE 每 2 秒会重发同样的 task-update payload，需在组件内用 `useRef<Set<string>>` 记录已播放过打字机的 taskId，避免每次轮询都触发回放。
 
 **技能徽章**：`skillName` 存在时显示紫色 chip；不存在时不渲染。
 
@@ -186,7 +186,7 @@
 
 - `templateName: string`
 - `templateId: string`
-- `steps: Array<{ phase: number; name: string; skillName?: string; assignedEmployeeIdHint?: string }>` —— 从 `workflow_templates.steps` 直接读
+- `steps: Array<{ phase: number; name: string; skillName?: string; assignedEmployeeIdHint?: string }>` —— 从 `workflow_templates.steps` 直接读。`assignedEmployeeIdHint` 用于 §3.2 计划总览气泡里的"员工去重列表"渲染；步骤气泡的真实头像仍按 `task.assignedEmployeeId` 反查（§3.1）。
 
 之所以用 init 事件而非每条 task-update 都带 step 信息，是因为 step 元信息（name / skillName）在 mission 创建后是不变的，没必要每次都推。
 
