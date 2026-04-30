@@ -219,7 +219,7 @@ export async function verify(
     // 1. Call LLM for self-evaluation
     const model = getLanguageModel({
       provider: "openai",
-      model: "deepseek-chat",
+      model: process.env.OPENAI_MODEL || "deepseek-chat",
       temperature: 0.2,
       maxTokens: 2000,
     });
