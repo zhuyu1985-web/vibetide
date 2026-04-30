@@ -100,14 +100,23 @@ function TaskRow({
 }: {
   task: {
     title: string;
-    status: "pending" | "running" | "completed" | "failed" | "skipped";
+    status:
+      | "pending"
+      | "ready"
+      | "claimed"
+      | "in_progress"
+      | "in_review"
+      | "completed"
+      | "failed"
+      | "cancelled"
+      | "blocked";
   };
 }) {
   const icon =
     task.status === "completed" ? "✅" :
     task.status === "failed" ? "❌" :
-    task.status === "running" ? "🔄" :
-    task.status === "skipped" ? "⏭️" :
+    task.status === "in_progress" || task.status === "in_review" ? "🔄" :
+    task.status === "cancelled" ? "⏭️" :
     "⏳";
   return (
     <div className="text-xs text-muted-foreground flex items-center gap-2">

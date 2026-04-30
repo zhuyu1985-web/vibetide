@@ -2,14 +2,33 @@ export type MissionEventName =
   | "task-update"
   | "mission-progress"
   | "mission-completed"
+  | "mission-init"
   | "error";
 
 export interface MissionTask {
   id: string;
   title: string;
-  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  status: "pending" | "ready" | "claimed" | "in_progress" | "in_review" | "completed" | "failed" | "cancelled" | "blocked";
   progress?: number;
   assignedEmployeeId?: string | null;
+  outputSummary?: string | null;
+  errorMessage?: string | null;
+  errorRecoverable?: boolean;
+  retryCount?: number;
+  phase?: number | null;
+}
+
+export interface MissionInitStep {
+  phase: number;
+  name: string;
+  skillName?: string;
+  assignedEmployeeIdHint?: string;
+}
+
+export interface MissionInitData {
+  templateId: string;
+  templateName: string;
+  steps: MissionInitStep[];
 }
 
 export interface MissionProgressData {
@@ -17,10 +36,11 @@ export interface MissionProgressData {
   progress: number;
   tasksById: Record<string, MissionTask>;
   notFound: boolean;
+  init: MissionInitData | null;
 }
 
 export function emptyMissionProgress(): MissionProgressData {
-  return { status: "pending", progress: 0, tasksById: {}, notFound: false };
+  return { status: "pending", progress: 0, tasksById: {}, notFound: false, init: null };
 }
 
 /**
@@ -40,6 +60,26 @@ export function applyMissionEvent(
   if (event === "error" && d.message === "Mission not found") {
     return { ...prev, notFound: true };
   }
+  if (event === "mission-init") {
+    if (typeof d.templateId !== "string" || !Array.isArray(d.steps)) return prev;
+    return {
+      ...prev,
+      init: {
+        templateId: d.templateId,
+        templateName: String(d.templateName ?? ""),
+        steps: (d.steps as unknown[]).map((s) => {
+          const r = s as Record<string, unknown>;
+          return {
+            phase: typeof r.phase === "number" ? r.phase : 0,
+            name: String(r.name ?? ""),
+            skillName: typeof r.skillName === "string" ? r.skillName : undefined,
+            assignedEmployeeIdHint: typeof r.assignedEmployeeIdHint === "string"
+              ? r.assignedEmployeeIdHint : undefined,
+          };
+        }),
+      },
+    };
+  }
   if (event === "task-update" && typeof d.taskId === "string") {
     return {
       ...prev,
@@ -51,6 +91,11 @@ export function applyMissionEvent(
           status: (d.status as MissionTask["status"]) ?? "pending",
           progress: typeof d.progress === "number" ? d.progress : undefined,
           assignedEmployeeId: (d.assignedEmployeeId as string | null) ?? null,
+          outputSummary: typeof d.outputSummary === "string" ? d.outputSummary : null,
+          errorMessage: typeof d.errorMessage === "string" ? d.errorMessage : null,
+          errorRecoverable: typeof d.errorRecoverable === "boolean" ? d.errorRecoverable : undefined,
+          retryCount: typeof d.retryCount === "number" ? d.retryCount : 0,
+          phase: typeof d.phase === "number" ? d.phase : null,
         },
       },
     };

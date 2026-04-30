@@ -36,6 +36,7 @@ export function useMissionProgress(missionId: string): MissionProgressData & {
       setState((prev) => applyMissionEvent(prev, name, me.data));
     };
 
+    es.addEventListener("mission-init", onEvent("mission-init"));
     es.addEventListener("task-update", onEvent("task-update"));
     es.addEventListener("mission-progress", onEvent("mission-progress"));
     es.addEventListener("mission-completed", (ev) => {

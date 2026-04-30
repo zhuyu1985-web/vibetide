@@ -1,14 +1,23 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { missions, missionTasks } from "@/db/schema";
+import { workflowTemplates, type WorkflowStepDef } from "@/db/schema/workflows";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 /**
  * SSE endpoint for real-time mission progress.
- * Polls lightweight status fields every 2s and emits diffs.
- * Self-closes on terminal mission status.
+ *
+ * Lifecycle:
+ *   1. On connect: emit a one-shot `mission-init` event carrying the
+ *      template id/name and step metadata (phase / name / skillName /
+ *      assignedEmployeeIdHint). Used by the chat-stream UI to render the
+ *      planning overview bubble + per-step skill badges before any task
+ *      has actually run. Best-effort: any failure is swallowed and the
+ *      front-end falls back to plain task-driven rendering.
+ *   2. Then poll `missions` + `mission_tasks` every 2s and emit diffs.
+ *   3. Self-close on terminal mission status (completed/failed/cancelled).
  */
 export async function GET(
   req: NextRequest,
@@ -25,6 +34,40 @@ export async function GET(
         if (closed) return;
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
+
+      // ── 一次性发 mission-init ─────────────────────────────────────────
+      // 失败不致命：自由对话路径产生的 mission 可能没有 workflowTemplateId，
+      // 老 mission 可能 template 已被删；任何分支问题都让前端按 task-driven 兜底。
+      try {
+        const m = await db.query.missions.findFirst({
+          where: eq(missions.id, missionId),
+          columns: { id: true, workflowTemplateId: true, title: true },
+        });
+        if (m?.workflowTemplateId) {
+          const tpl = await db.query.workflowTemplates.findFirst({
+            where: eq(workflowTemplates.id, m.workflowTemplateId),
+            columns: { id: true, name: true, steps: true },
+          });
+          if (tpl) {
+            const steps = (tpl.steps ?? []) as WorkflowStepDef[];
+            const initSteps = steps
+              .map((s, idx) => ({
+                phase: typeof s.order === "number" ? s.order : idx + 1,
+                name: s.name ?? s.label ?? "",
+                skillName: s.config?.skillName,
+                assignedEmployeeIdHint: s.config?.employeeSlug ?? s.employeeSlug,
+              }))
+              .sort((a, b) => a.phase - b.phase);
+            send("mission-init", {
+              templateId: tpl.id,
+              templateName: tpl.name,
+              steps: initSteps,
+            });
+          }
+        }
+      } catch {
+        // init 拉失败不致命，前端会 fallback
+      }
 
       // Track previous state for diffing
       let prevTaskMap = new Map<string, string>();
@@ -45,6 +88,11 @@ export async function GET(
               status: missionTasks.status,
               progress: missionTasks.progress,
               assignedEmployeeId: missionTasks.assignedEmployeeId,
+              outputSummary: missionTasks.outputSummary,
+              errorMessage: missionTasks.errorMessage,
+              errorRecoverable: missionTasks.errorRecoverable,
+              retryCount: missionTasks.retryCount,
+              phase: missionTasks.phase,
             }).from(missionTasks).where(eq(missionTasks.missionId, missionId)),
           ]);
 
@@ -67,6 +115,11 @@ export async function GET(
                 status: t.status,
                 progress: t.progress,
                 assignedEmployeeId: t.assignedEmployeeId,
+                outputSummary: t.outputSummary,
+                errorMessage: t.errorMessage,
+                errorRecoverable: t.errorRecoverable === 1,
+                retryCount: t.retryCount,
+                phase: t.phase,
               });
             }
           }
