@@ -50,10 +50,10 @@ export function MissionProgressChip({ state }: MissionProgressChipProps) {
               className={cn(
                 "w-1.5 h-1.5 rounded-full",
                 ui === "completed" && "bg-blue-500",
-                ui === "running" && "bg-blue-500 animate-pulse",
+                ui === "running" && "bg-blue-300 animate-pulse",
                 ui === "failed" && "bg-red-500",
-                ui === "cancelled" && "bg-gray-300",
-                ui === "pending" && "bg-gray-300",
+                ui === "cancelled" && "bg-gray-400",
+                ui === "pending" && "bg-gray-200 dark:bg-gray-600",
               )}
             />
           );

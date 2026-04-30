@@ -66,6 +66,9 @@ export function MissionPlanningBubble({
               );
             })}
           </ol>
+          <div className="mt-3 text-[12px] text-gray-500 flex items-center gap-1">
+            现在开始执行 →
+          </div>
         </div>
       </div>
     </div>
