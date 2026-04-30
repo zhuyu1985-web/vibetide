@@ -474,6 +474,7 @@ export function ChatCenterClient({
       />
       <ChatPanel
         employee={selectedEmployee}
+        employees={employees}
         messages={messages}
         scenarios={scenarios}
         activeScenario={activeScenario}

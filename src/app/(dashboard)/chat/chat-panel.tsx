@@ -65,7 +65,7 @@ import {
   IntentConfirmCard,
 } from "@/components/chat/intent-bubble";
 import { MessageActions } from "@/components/chat/message-actions";
-import { MissionCardMessage } from "@/components/chat/mission-card-message";
+import { MissionStream } from "@/components/chat/mission-stream";
 import {
   ModelSwitcher,
   DEFAULT_MODEL_ID,
@@ -212,6 +212,8 @@ function buildBorderPath(w: number, h: number, r: number): string {
 
 interface ChatPanelProps {
   employee: AIEmployee | null;
+  /** All org employees — used by MissionStream to resolve assignee avatars. */
+  employees: AIEmployee[];
   messages: ChatMessage[];
   scenarios: WorkflowTemplateRow[];
   activeScenario: WorkflowTemplateRow | null;
@@ -240,6 +242,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({
   employee,
+  employees,
   messages,
   scenarios,
   activeScenario,
@@ -664,10 +667,12 @@ export function ChatPanel({
                 // mission_card 类消息直接渲染卡片，跳过 MessageBubble 逻辑
                 if (msg.kind === "mission_card" && msg.missionId) {
                   return (
-                    <MissionCardMessage
+                    <MissionStream
                       key={i}
                       missionId={msg.missionId}
                       templateName={msg.templateName ?? "任务"}
+                      ownerEmployee={employee}
+                      employees={employees}
                     />
                   );
                 }
