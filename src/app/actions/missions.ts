@@ -731,7 +731,13 @@ export async function cleanupStuckMissions() {
  *
  * 仅 status=failed 的子任务可重试。重置为 ready → 清错误 → retryCount++ →
  * emit `mission/task-ready`，由 `executeMissionTask` Inngest 函数消费。
+ *
+ * 注：手动重试上限 = MAX_MANUAL_RETRIES（3 次）。配合 handle-task-failure
+ * 的 MAX_RETRIES=2 自动重试，单子任务最多累积 5 次尝试，足够覆盖瞬时
+ * 故障，又避免无界重试形成死循环。
  */
+const MAX_MANUAL_RETRIES = 3;
+
 export async function retryMissionTask(taskId: string) {
   await requireAuth();
   const orgId = await getCurrentUserOrg();
@@ -740,7 +746,9 @@ export async function retryMissionTask(taskId: string) {
   const task = await db.query.missionTasks.findFirst({
     where: eq(missionTasks.id, taskId),
   });
-  if (!task) throw new Error("任务不存在");
+  // 任务不存在 / 不属于当前组织 都返回同一句模糊错误，避免向未授权调用者
+  // 泄露 task 是否存在的信号（与同文件 archiveMission/deleteMission 对齐）。
+  if (!task) throw new Error("任务不存在或无权操作");
 
   const mission = await db.query.missions.findFirst({
     where: and(
@@ -748,10 +756,18 @@ export async function retryMissionTask(taskId: string) {
       eq(missions.organizationId, orgId),
     ),
   });
-  if (!mission) throw new Error("无权操作");
+  if (!mission) throw new Error("任务不存在或无权操作");
 
   if (task.status !== "failed") {
     throw new Error("只能重试失败的任务");
+  }
+
+  // I1: 手动重试上限。复用现有 retryCount 字段（含自动重试与手动重试），
+  // 简单可控；超出时给用户清晰指引而不是静默吞掉。
+  if ((task.retryCount ?? 0) >= MAX_MANUAL_RETRIES) {
+    throw new Error(
+      `已达到最大重试次数（${MAX_MANUAL_RETRIES} 次），请联系管理员或查看错误日志`,
+    );
   }
 
   await db
@@ -765,14 +781,27 @@ export async function retryMissionTask(taskId: string) {
     })
     .where(eq(missionTasks.id, taskId));
 
-  await inngest.send({
-    name: "mission/task-ready",
-    data: {
-      missionId: task.missionId,
-      taskId: task.id,
-      organizationId: orgId,
-    },
-  });
+  // I2: Inngest 投递失败回滚 status=failed，避免任务卡在 ready 永不被消费。
+  // 注意 retryCount 不回滚 —— 保留递增可阻止 Inngest 真正不可用时的紧密重试循环。
+  try {
+    await inngest.send({
+      name: "mission/task-ready",
+      data: {
+        missionId: task.missionId,
+        taskId: task.id,
+        organizationId: orgId,
+      },
+    });
+  } catch (err) {
+    console.error("[retryMissionTask] inngest.send failed, rolling back:", err);
+    await db
+      .update(missionTasks)
+      .set({ status: "failed", errorMessage: "重试事件投递失败，请稍后再试" })
+      .where(eq(missionTasks.id, taskId));
+    throw new Error("重试请求投递失败，请稍后再试");
+  }
 
-  revalidatePath(`/missions/${task.missionId}`);
+  // I3: 不再调 revalidatePath('/missions/[id]') —— chat-center 内联重试不导航，
+  // SSE 推送即可刷新气泡；详情页再次进入时会自然 re-fetch，多余的失效只是
+  // copy-paste 自 cancelMission 的旧惯性。
 }

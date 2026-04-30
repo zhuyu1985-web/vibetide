@@ -30,6 +30,8 @@ interface MissionStepBubbleProps {
   missionId: string;
   /** Commit 3 wires this in; Commit 2 leaves undefined. */
   onRetry?: () => void;
+  /** True while a retry is in-flight — disables the button to prevent double-click. */
+  retryPending?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export function MissionStepBubble({
   employees,
   missionId,
   onRetry,
+  retryPending,
 }: MissionStepBubbleProps) {
   const uiState = mapTaskStatusToUiState(task.status);
 
@@ -145,6 +148,7 @@ export function MissionStepBubble({
           revealedSummary={revealed}
           missionId={missionId}
           onRetry={onRetry}
+          retryPending={retryPending}
         />
       </MissionBubbleShell>
     </div>
@@ -184,12 +188,14 @@ function StepBody({
   revealedSummary,
   missionId,
   onRetry,
+  retryPending,
 }: {
   uiState: ReturnType<typeof mapTaskStatusToUiState>;
   task: MissionTask;
   revealedSummary: string;
   missionId: string;
   onRetry?: () => void;
+  retryPending?: boolean;
 }) {
   if (uiState === "running") {
     return (
@@ -234,10 +240,12 @@ function StepBody({
           <button
             type="button"
             onClick={onRetry}
-            disabled={!recoverable}
-            className="border-0 text-xs px-2.5 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed dark:disabled:bg-gray-700"
+            disabled={!recoverable || retryPending}
+            className="border-0 text-xs px-2.5 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed dark:disabled:bg-gray-700 inline-flex items-center gap-1"
           >
-            {recoverable ? "重试此步骤" : "无法重试"}
+            {retryPending && <Loader2 size={12} className="animate-spin" />}
+            {/* TODO(spec polish): 替换 mission-step-bubble.tsx:120 的「已重试 N 次」为「N/3」展示，与 retryMissionTask 的 MAX_MANUAL_RETRIES=3 上限对齐 */}
+            {recoverable ? (retryPending ? "重试中…" : "重试此步骤") : "无法重试"}
           </button>
         ) : (
           <Link

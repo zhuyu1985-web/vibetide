@@ -1,5 +1,7 @@
 "use client";
 
+import { useTransition } from "react";
+import { toast } from "sonner";
 import { Loader2, AlertCircle } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
 import { useMissionProgress } from "@/lib/hooks/use-mission-progress";
@@ -30,6 +32,7 @@ export function MissionStream({
   employees,
 }: MissionStreamProps) {
   const state = useMissionProgress(missionId);
+  const [retryPending, startRetryTransition] = useTransition();
 
   if (state.isLoading) {
     return (
@@ -92,14 +95,20 @@ export function MissionStream({
           ownerEmployee={ownerEmployee}
           employees={employees}
           missionId={missionId}
-          onRetry={async () => {
-            try {
-              await retryMissionTask(task.id);
-            } catch (e) {
-              console.error("重试失败:", e);
-              alert(e instanceof Error ? e.message : "重试失败");
-            }
+          onRetry={() => {
+            // 包 useTransition：触发期间 retryPending=true，按钮 disabled 防双击。
+            // SSE 回写 ready→running 有 1-3s 延迟，立即给乐观 toast 避免用户连点。
+            startRetryTransition(async () => {
+              try {
+                await retryMissionTask(task.id);
+                toast.success("已重新提交，请稍候");
+              } catch (e) {
+                console.error("重试失败:", e);
+                toast.error(e instanceof Error ? e.message : "重试失败");
+              }
+            });
           }}
+          retryPending={retryPending}
         />
       ))}
 
