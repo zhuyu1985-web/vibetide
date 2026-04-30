@@ -18,6 +18,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { executeMissionDirect } from "@/lib/mission-executor";
 import { getWorkflowTemplateByLegacyKey } from "@/lib/dal/workflow-templates";
+import { inngest } from "@/inngest/client";
 
 // Soft dedup window for direct user-submitted missions. Two inserts with the
 // same org + title + instruction within this window return the existing row
@@ -723,4 +724,55 @@ export async function cleanupStuckMissions() {
       })
       .where(eq(missions.id, m.id));
   }
+}
+
+/**
+ * 重试单个失败的子任务（chat-center 内联重试入口）。
+ *
+ * 仅 status=failed 的子任务可重试。重置为 ready → 清错误 → retryCount++ →
+ * emit `mission/task-ready`，由 `executeMissionTask` Inngest 函数消费。
+ */
+export async function retryMissionTask(taskId: string) {
+  await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) throw new Error("无法获取组织信息");
+
+  const task = await db.query.missionTasks.findFirst({
+    where: eq(missionTasks.id, taskId),
+  });
+  if (!task) throw new Error("任务不存在");
+
+  const mission = await db.query.missions.findFirst({
+    where: and(
+      eq(missions.id, task.missionId),
+      eq(missions.organizationId, orgId),
+    ),
+  });
+  if (!mission) throw new Error("无权操作");
+
+  if (task.status !== "failed") {
+    throw new Error("只能重试失败的任务");
+  }
+
+  await db
+    .update(missionTasks)
+    .set({
+      status: "ready",
+      errorMessage: null,
+      retryCount: (task.retryCount ?? 0) + 1,
+      startedAt: null,
+      completedAt: null,
+    })
+    .where(eq(missionTasks.id, taskId));
+
+  await inngest.send({
+    name: "mission/task-ready",
+    data: {
+      missionId: task.missionId,
+      taskId: task.id,
+      organizationId: orgId,
+    },
+  });
+
+  revalidatePath(`/missions/${task.missionId}`);
 }

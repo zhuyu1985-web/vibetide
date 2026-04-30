@@ -5,6 +5,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { useMissionProgress } from "@/lib/hooks/use-mission-progress";
 import { mapTaskStatusToUiState } from "@/lib/mission-task-status";
 import type { AIEmployee } from "@/lib/types";
+import { retryMissionTask } from "@/app/actions/missions";
 import { MissionPlanningBubble } from "./mission-planning-bubble";
 import { MissionStepBubble } from "./mission-step-bubble";
 import { MissionProgressChip } from "./mission-progress-chip";
@@ -19,7 +20,8 @@ interface MissionStreamProps {
 
 /**
  * 顶层 mission 流：用 SSE 状态分别渲染规划气泡、各步骤气泡、收尾气泡，
- * 并固定一个全局进度小芯片。Commit 2 不接 onRetry，留给 Commit 3。
+ * 并固定一个全局进度小芯片。失败步骤的"重试本步"按钮直接调
+ * `retryMissionTask` server action，不再跳详情页。
  */
 export function MissionStream({
   missionId,
@@ -90,7 +92,14 @@ export function MissionStream({
           ownerEmployee={ownerEmployee}
           employees={employees}
           missionId={missionId}
-          // Commit 3 will wire onRetry; intentionally omitted here.
+          onRetry={async () => {
+            try {
+              await retryMissionTask(task.id);
+            } catch (e) {
+              console.error("重试失败:", e);
+              alert(e instanceof Error ? e.message : "重试失败");
+            }
+          }}
         />
       ))}
 
