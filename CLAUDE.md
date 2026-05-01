@@ -55,6 +55,16 @@ npm run db:seed      # Seed database (npx tsx src/db/seed.ts)
 
 ## Architecture
 
+### 架构决策记录（ADRs）
+
+重大架构决定记录在 `docs/adr/`。**做架构相关变更前必须读相关 ADR**；如果当前任务与某条 ADR 冲突，先告知 owner 评估是否 reopen ADR，不要直接绕过。
+
+当前生效：
+
+- [`2026-05-01-platform-supabase-strategy.md`](docs/adr/2026-05-01-platform-supabase-strategy.md) — 留 self-hosted Supabase；统一栈不分 SKU；不引入 supabase-js / 不替换 Inngest / 不做极简版客户化部署。该 ADR §5 Non-Goals 列出明确禁止的方向。
+
+ADR 是 immutable 决策快照——情况变了写新 ADR 引用并 supersede 老的，不要修改老 ADR 内容。
+
 ### Route Structure
 
 Three route areas under `src/app/`:

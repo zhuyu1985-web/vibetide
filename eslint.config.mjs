@@ -2,6 +2,34 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// Architecture rules from ADRs. See docs/adr/.
+//
+// ADR-2026-05-01 (platform-supabase-strategy):
+//   - DB 走 Drizzle，不引入 supabase-js 做数据操作
+//   - Auth 走 iron-session，不再用 Supabase Auth Helpers / SSR Client
+//   - 激活 Realtime（P1）时可针对性放行 @supabase/supabase-js 用于客户端订阅
+const architectureRules = {
+  "no-restricted-imports": [
+    "error",
+    {
+      paths: [
+        {
+          name: "@supabase/supabase-js",
+          message:
+            "ADR-2026-05-01: 当前架构不使用 Supabase 客户端 SDK。DB 走 Drizzle，Auth 走 iron-session。激活 Realtime（P1 路线图）时再解禁该 import 用于客户端订阅，并同步更新 ADR。",
+        },
+      ],
+      patterns: [
+        {
+          group: ["@supabase/auth-helpers-*", "@supabase/ssr"],
+          message:
+            "ADR-2026-05-01: Supabase Auth 已被 iron-session 完全替代，不再使用 Auth Helpers / SSR Client。",
+        },
+      ],
+    },
+  ],
+};
+
 // Design-system consistency rules. Prevents re-drifting away from the
 // shared primitives in src/components/ui/* and src/components/shared/*.
 //
@@ -54,6 +82,12 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // Architecture rules apply project-wide (not just UI). Any TS/TSX file
+    // could try to pull in supabase-js/auth-helpers/ssr — block them all.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: architectureRules,
+  },
   {
     // Apply design-system rules only to UI source code, not to the shared
     // primitives themselves (which necessarily wrap raw HTML elements).
