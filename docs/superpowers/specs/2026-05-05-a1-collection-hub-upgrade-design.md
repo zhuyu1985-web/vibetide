@@ -5,7 +5,7 @@
 - **作者**：Zhuyu（产品） + Claude（技术方案）
 - **关联 main spec**：`/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.1
 - **状态**：Brainstorming 完成，待 plan
-- **工期估算**：4-6 天
+- **工期估算**：5-7 天（含 Path C 清理 + Day 0 数据调研 + reviewer 工期校准）
 
 ---
 
@@ -17,7 +17,8 @@
 
 ### 1.2 范围（4-6 天工期内必交付）
 
-- 新表 `media_outlet_dictionary`（org-scoped 媒体字典）
+- **清理 v1 遗留 outlet 系统**（Path C 决策）：删除 `research_media_outlets` + `research_media_outlet_aliases` + `research_media_outlet_crawl_configs` 三张表 + 167 条 demo seed + `src/lib/research/outlet-matcher.ts`（137 行）+ 9 处旧引用
+- 新表 `media_outlet_dictionary`（org-scoped 媒体字典，归属 Collection Hub 全局基础设施）
 - `collected_items` 加 5 个字段：`content_type` / `attachments` / `outlet_id` / `outlet_tier` / `outlet_region`
 - `collection_sources` 加 3 个字段：`outlet_id` / `default_outlet_tier` / `default_outlet_region`
 - Outlet Recognizer 算法集成进 Collection Hub Writer（入库时同事务自动识别）
@@ -36,6 +37,8 @@
 - ❌ 跨 org 共享字典（V1 每 org 独立维护）
 - ❌ 字典版本控制 / 审计日志（V2）
 - ❌ 视频/音频/图集**文件下载**（main spec 已确定走 attachments 外链，本 sub-spec 不重申）
+- ❌ 保留 v1 outlet 系统的 alias 正则匹配能力（v1 设计但 demo 未使用过；新 outlet 字典只用 domains[] 精确 + publicAccountNames[] 精确两种匹配，足够覆盖 113 条 V1 字典场景）
+- ❌ 保留 `research_media_outlet_crawl_configs` 子表（爬虫配置已被 Collection Hub `list_scraper` Adapter 取代，list_url_template / article_url_pattern / scheduleCron 都在 `collection_sources.config` jsonb 里）
 
 ### 1.4 与 main spec §4.1 的对应关系
 
@@ -54,10 +57,42 @@ main spec §4.1 给了 Schema 草稿和大致 UI 描述；本 sub-spec 在此基
 | A1-Q1 | 媒体字典 V1 数量 | 标准版 ~113 条（央 12 + 行业 12 + 重庆省市级 8 + 区县融媒 40 + 生态环境系统 41）|
 | A1-Q2 | 字典维护 UI 位置 | `/data-collection/outlets` 独立 tab（与 sources/content/monitoring 平级）|
 | A1-Q3 | "未分类"批量打标 UI | YAGNI 推迟；V1 只在采集项详情 drawer 提供单条修正 |
+| A1-Q4 | 已有 `research_media_outlets` 系统的处理 | **Path C 推倒重建**：删除 3 张表 + 167 条 demo seed + `outlet-matcher.ts` + 9 处旧引用，新建 `media_outlet_dictionary` + `outlet-recognizer.ts` + 113 条新 seed。理由：用户确认现有数据是 demo 可丢；Path C 一次到位，命名干净，A3 Research 模块迁移阶段不再有 outlet 相关清理工作 |
 
 ---
 
 ## 3. Schema 变更
+
+### 3.0 清理 v1 outlet 系统（Path C 前置步骤）
+
+在新建 `media_outlet_dictionary` 之前，**必须**清理以下 v1 遗产：
+
+**删除的 schema 文件**：
+- `src/db/schema/research/media-outlets.ts`（72 行，含 3 张表定义 + relations）
+
+**删除的 enum**（在 `src/db/schema/research/enums.ts` 中）：
+- `mediaTierEnum`（与新设计的 `OUTLET_TIER_VALUES` text 枚举重叠，且少 `government_self_media`）
+- `mediaOutletStatusEnum`（与新设计的 `isActive` boolean 重叠）
+- 注意：删除 enum 前确认它们不被其它 schema 文件引用
+
+**删除的代码**：
+- `src/lib/research/outlet-matcher.ts`（137 行）
+- `src/db/seed/research/media-outlets.ts`（167 行 demo seed）
+- 9 处旧引用（plan 阶段逐文件梳理；预估在 DAL `src/lib/dal/research/*` + actions `src/app/actions/research/*` + inngest 函数 + `news-articles` schema FK + 研究模块相关页面）
+
+**删除的 DB 表**（migration 内执行）：
+- `research_media_outlet_crawl_configs`（先删，因 FK to research_media_outlets）
+- `research_media_outlet_aliases`（同上）
+- `research_media_outlets`（最后删）
+
+**FK 处理**：
+- 如果 `news_articles` 表（research 模块的稿件表）有 FK 引用 `research_media_outlets.id`，先 ALTER 删 FK，再删表
+- 该 FK 在 A3（Research 模块迁移）阶段会随 `research_news_articles` 表一并删除，所以不需要保留
+
+**回归验证**：
+- `tsc --noEmit` 零错（删除 schema/matcher 后所有 import 路径要更新或删除）
+- `npm run build` 通过
+- 现有研究模块功能（`/research/admin/*` 页面）暂时不可用是预期内的（A3 阶段才会重新接通）
 
 ### 3.1 新增表 `media_outlet_dictionary`
 
@@ -562,14 +597,18 @@ batchRecognizeOutlets()      // 触发 Inngest 批量回填（对历史 collecte
 
 ## 9. 工期分解（4-6 天）
 
+**总工期：5-7 工作日**（Path C 比原 Path A 改良版多 0.5 天清理 v1 outlet 系统；reviewer 反馈 Phase 1 / Phase 2 工期偏低也额外加 0.5-1 天调研 + 测试编写时间）
+
 | Day | 任务 | 产出 |
 |---|---|---|
-| Day 1 | Schema + migration + DAL + 单测 | media_outlet_dictionary 表落地 + collected_items/sources 字段加完 + DAL 通过 |
-| Day 2 | seed 文件（113 条） + outlet_recognizer 算法 + 单测 | 字典灌入 + recognizer 通过单测 |
-| Day 3 | recognizer 集成 writer + 现有 collected-items 集成测试增强 | 入库时自动识别 + 集成测试通过 |
-| Day 4 | 新 tab `/data-collection/outlets` 列表页 + 编辑 dialog + server actions（含 version bump） | 字典维护 UI 跑通 |
-| Day 5 | `/data-collection/content` 加分级筛选 + sources 详情/新建加 outlet 字段 | 内容浏览 UI + 源配置 UI 跑通 |
-| Day 6 | drawer 加修正 outlet + Inngest 批量 recognize 函数 + 浏览器人工验收 + tsc/build + 修 review issues | Wave 1 第一块完工 |
+| Day 0（半天） | 调研 40 区县融媒 + 41 区县生态环境局公众号名 + 域名 | 数据准备好 Day 2 直接灌 |
+| Day 1（前半） | 清理 v1 outlet 系统（Path C）：删 3 张表 + 167 条 seed + 137 行 matcher + 9 处引用 | tsc/build 通过；研究页面暂不可用是预期 |
+| Day 1（后半）-Day 2 | Schema + migration + DAL + 单测 | media_outlet_dictionary 表落地 + collected_items/sources 字段加完 + DAL 通过 |
+| Day 3 | seed 文件（113 条）+ outlet_recognizer 算法 + 单测 | 字典灌入 + recognizer 通过单测 |
+| Day 4（前半）| recognizer 集成 writer + writer 集成测试增强 | 入库时自动识别 + 集成测试通过 |
+| Day 4（后半）-Day 5 | 新 tab `/data-collection/outlets` 列表页 + 编辑 dialog + server actions（含 version bump） | 字典维护 UI 跑通 |
+| Day 6 | `/data-collection/content` 加分级筛选 + DAL join + sources 详情/新建加 outlet 字段 | 内容浏览 UI + 源配置 UI 跑通 |
+| Day 7 | drawer 加修正 outlet + Inngest 批量 recognize 函数 + 浏览器人工验收 + tsc/build + 修 review issues | Wave 1 第一块完工 |
 
 ---
 
@@ -599,6 +638,14 @@ batchRecognizeOutlets()      // 触发 Inngest 批量回填（对历史 collecte
 - [ ] tsc --noEmit 零错
 - [ ] npm run build 通过
 - [ ] 新增单测全部通过
+
+### 10.3.1 v1 outlet 系统清理验收（Path C 专属）
+
+- [ ] `research_media_outlets` / `research_media_outlet_aliases` / `research_media_outlet_crawl_configs` 三张表已 DROP
+- [ ] `mediaTierEnum` / `mediaOutletStatusEnum` 两个 enum 已 DROP
+- [ ] `src/lib/research/outlet-matcher.ts` + `src/db/seed/research/media-outlets.ts` + `src/db/schema/research/media-outlets.ts` 文件已删
+- [ ] 全代码库 `grep -r "researchMediaOutlets\|outletMatcher\|mediaOutlets\b" src/` 仅剩 plan 阶段未处理引用（预期 0 条）
+- [ ] tsc --noEmit 零错（重点：研究模块的旧 DAL/actions 引用旧表要么删要么 stub）
 
 ### 10.4 UI 验收
 
