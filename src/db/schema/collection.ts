@@ -46,6 +46,9 @@ export const collectionSources = pgTable(
       .notNull()
       .default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    outletId: uuid("outlet_id"),
+    defaultOutletTier: text("default_outlet_tier"),
+    defaultOutletRegion: text("default_outlet_region"),
   },
   (t) => ({
     uniqueOrgName: unique("collection_sources_org_name_unique").on(t.organizationId, t.name),
@@ -94,6 +97,24 @@ export const collectedItems = pgTable(
     enrichmentStatus: text("enrichment_status").notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    contentType: text("content_type").notNull().default("image_text"),
+    attachments: jsonb("attachments")
+      .$type<Array<{
+        kind: "video" | "image" | "audio" | "thumbnail";
+        url: string;
+        thumbnailUrl?: string;
+        mimeType?: string;
+        durationMs?: number;
+        width?: number;
+        height?: number;
+        fileSizeBytes?: number;
+        extra?: Record<string, unknown>;
+      }>>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    outletId: uuid("outlet_id"),
+    outletTier: text("outlet_tier"),
+    outletRegion: text("outlet_region"),
   },
   (t) => ({
     uniqueFingerprint: unique("collected_items_org_fp_unique").on(
@@ -114,6 +135,9 @@ export const collectedItems = pgTable(
       "gin",
       sql`${t.content} gin_trgm_ops`,
     ),
+    contentTypeIdx: index("collected_items_content_type_idx").on(t.organizationId, t.contentType),
+    outletTierIdx: index("collected_items_outlet_tier_idx").on(t.organizationId, t.outletTier),
+    outletIdIdx: index("collected_items_outlet_id_idx").on(t.outletId),
   }),
 );
 

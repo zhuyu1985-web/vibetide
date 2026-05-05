@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   boolean,
+  integer,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -43,6 +44,9 @@ export const organizations = pgTable("organizations", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+  mediaOutletDictionaryVersion: integer("media_outlet_dictionary_version")
+    .notNull()
+    .default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

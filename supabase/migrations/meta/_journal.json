@@ -253,6 +253,13 @@
       "when": 1777950826917,
       "tag": "20260505000001_a1_drop_v1_outlet_system",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1777951693337,
+      "tag": "20260505000002_a1_collection_hub_upgrade",
+      "breakpoints": true
     }
   ]
 }

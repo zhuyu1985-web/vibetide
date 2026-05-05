@@ -78,6 +78,9 @@ export * from "./channels";
 // Collection Hub (统一数据采集, 2026-04-18)
 export * from "./collection";
 
+// Media Outlet Dictionary (A1 Phase 1, 2026-05-05)
+export * from "./media-outlet-dictionary";
+
 // CMS Adapter Phase 1 (2026-04-19) — Task 7-10 追加 4 张表
 export * from "./cms-mapping";
 // CMS Adapter Phase 1 — Task 11：article → CMS 入稿流水
