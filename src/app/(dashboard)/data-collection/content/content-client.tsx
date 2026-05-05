@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
 import {
   Sheet,
   SheetContent,
@@ -41,6 +42,8 @@ export interface ClientFilters {
   q?: string;
   enrichment?: EnrichmentStatus;
   platform?: string;
+  outletTier?: string;
+  outletRegion?: string;
 }
 
 /** Serializable subset of CollectedItemRow passed from the server page. */
@@ -62,6 +65,9 @@ export interface CollectedItemViewModel {
     runId: string;
     capturedAt: string;
   }>;
+  // Outlet info (Task 5.1 join)
+  outletName: string | null;
+  outletTier: string | null;
 }
 
 interface ContentClientProps {
@@ -119,6 +125,8 @@ export function ContentClient({
       if (initialFilters.q) sp.set("q", initialFilters.q);
       if (initialFilters.enrichment) sp.set("enrichment", initialFilters.enrichment);
       if (initialFilters.platform) sp.set("platform", initialFilters.platform);
+      if (initialFilters.outletTier) sp.set("outletTier", initialFilters.outletTier);
+      if (initialFilters.outletRegion) sp.set("outletRegion", initialFilters.outletRegion);
       if (initialView !== "card") sp.set("view", initialView);
 
       // Apply patch
@@ -173,6 +181,13 @@ export function ContentClient({
   const [draftEnrichment, setDraftEnrichment] = useState<EnrichmentStatus | "__all__">(
     initialFilters.enrichment ?? "__all__",
   );
+  // Outlet draft filters
+  const [draftOutletTier, setDraftOutletTier] = useState<string>(
+    initialFilters.outletTier ?? "__all__",
+  );
+  const [draftOutletRegion, setDraftOutletRegion] = useState<string>(
+    initialFilters.outletRegion ?? "__all__",
+  );
 
   const toggleModule = (mod: string) => {
     setDraftModules((prev) => {
@@ -191,6 +206,8 @@ export function ContentClient({
       time: draftTime === "7d" ? undefined : draftTime,
       module: moduleVal,
       enrichment: draftEnrichment === "__all__" ? undefined : draftEnrichment,
+      outletTier: draftOutletTier === "__all__" ? undefined : draftOutletTier,
+      outletRegion: draftOutletRegion === "__all__" ? undefined : draftOutletRegion,
     });
     setSheetOpen(false);
   };
@@ -201,6 +218,8 @@ export function ContentClient({
     setDraftTime("7d");
     setDraftModules(new Set());
     setDraftEnrichment("__all__");
+    setDraftOutletTier("__all__");
+    setDraftOutletRegion("__all__");
   };
 
   // Re-sync draft when sheet opens (in case URL changed externally)
@@ -211,6 +230,8 @@ export function ContentClient({
       setDraftTime(initialFilters.time ?? "7d");
       setDraftModules(new Set(initialFilters.module ? [initialFilters.module] : []));
       setDraftEnrichment(initialFilters.enrichment ?? "__all__");
+      setDraftOutletTier(initialFilters.outletTier ?? "__all__");
+      setDraftOutletRegion(initialFilters.outletRegion ?? "__all__");
     }
     setSheetOpen(open);
   };
@@ -363,6 +384,9 @@ export function ContentClient({
             <div className="flex-1 min-w-0 text-sm font-semibold text-gray-600 dark:text-gray-400">
               标题
             </div>
+            <div className="w-40 text-sm font-semibold text-gray-600 dark:text-gray-400">
+              媒体
+            </div>
             <div className="w-32 text-sm font-semibold text-gray-600 dark:text-gray-400">
               首抓源
             </div>
@@ -397,6 +421,16 @@ export function ContentClient({
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
                       {item.summary}
                     </div>
+                  )}
+                </div>
+                <div className="w-40 shrink-0 flex flex-col min-w-0">
+                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                    {item.outletName ?? "未分类"}
+                  </span>
+                  {item.outletTier && (
+                    <span className="text-xs text-muted-foreground truncate">
+                      {OUTLET_TIER_LABELS[item.outletTier as OutletTier] ?? item.outletTier}
+                    </span>
                   )}
                 </div>
                 <div className="w-32 shrink-0 text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
@@ -549,6 +583,42 @@ export function ContentClient({
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Outlet tier */}
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                媒体分级
+              </Label>
+              <Select value={draftOutletTier} onValueChange={setDraftOutletTier}>
+                <SelectTrigger>
+                  <SelectValue placeholder="全部分级" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部</SelectItem>
+                  {OUTLET_TIER_VALUES.map((t) => (
+                    <SelectItem key={t} value={t}>{OUTLET_TIER_LABELS[t]}</SelectItem>
+                  ))}
+                  <SelectItem value="unclassified">未分类</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Outlet region */}
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                区域
+              </Label>
+              <Select value={draftOutletRegion} onValueChange={setDraftOutletRegion}>
+                <SelectTrigger>
+                  <SelectValue placeholder="全部区域" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部区域</SelectItem>
+                  <SelectItem value="重庆">重庆</SelectItem>
+                  <SelectItem value="全国">全国</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

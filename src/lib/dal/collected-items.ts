@@ -6,10 +6,16 @@ import {
   collectionLogs,
   hotTopics,
 } from "@/db/schema";
+import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
 import type { InferSelectModel } from "drizzle-orm";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 export type CollectedItemRow = InferSelectModel<typeof collectedItems>;
+
+/** CollectedItemRow extended with outlet name from the dictionary (may be null). */
+export type CollectedItemWithOutlet = CollectedItemRow & {
+  outletName: string | null;
+};
 
 // ────────────────────────────────────────────────
 // 筛选 + 分页
@@ -23,6 +29,10 @@ export interface ContentFilters {
   untilMs?: number; // 可选结束
   platformAlias?: string; // 匹配 first_seen_channel 或 source_channels[*].channel
   searchText?: string; // title + content ILIKE
+  // Outlet filters (Task 5.1)
+  outletTier?: string | "unclassified"; // "unclassified" → IS NULL; any tier slug → exact match
+  outletId?: string;
+  outletRegion?: string;
 }
 
 export interface PaginationOpts {
@@ -31,7 +41,7 @@ export interface PaginationOpts {
 }
 
 export interface ListCollectedItemsResult {
-  items: CollectedItemRow[];
+  items: CollectedItemWithOutlet[];
   total: number;
 }
 
@@ -95,9 +105,53 @@ export async function listCollectedItems(
     );
   }
 
+  // Outlet filters (Task 5.1)
+  if (filters.outletTier === "unclassified") {
+    conditions.push(isNull(collectedItems.outletTier));
+  } else if (filters.outletTier) {
+    conditions.push(eq(collectedItems.outletTier, filters.outletTier));
+  }
+  if (filters.outletId) {
+    conditions.push(eq(collectedItems.outletId, filters.outletId));
+  }
+  if (filters.outletRegion) {
+    conditions.push(eq(collectedItems.outletRegion, filters.outletRegion));
+  }
+
   const rows = await db
-    .select()
+    .select({
+      // collectedItems fields
+      id: collectedItems.id,
+      organizationId: collectedItems.organizationId,
+      contentFingerprint: collectedItems.contentFingerprint,
+      canonicalUrl: collectedItems.canonicalUrl,
+      canonicalUrlHash: collectedItems.canonicalUrlHash,
+      title: collectedItems.title,
+      content: collectedItems.content,
+      summary: collectedItems.summary,
+      publishedAt: collectedItems.publishedAt,
+      firstSeenSourceId: collectedItems.firstSeenSourceId,
+      firstSeenChannel: collectedItems.firstSeenChannel,
+      firstSeenAt: collectedItems.firstSeenAt,
+      sourceChannels: collectedItems.sourceChannels,
+      category: collectedItems.category,
+      tags: collectedItems.tags,
+      language: collectedItems.language,
+      derivedModules: collectedItems.derivedModules,
+      rawMetadata: collectedItems.rawMetadata,
+      enrichmentStatus: collectedItems.enrichmentStatus,
+      createdAt: collectedItems.createdAt,
+      updatedAt: collectedItems.updatedAt,
+      contentType: collectedItems.contentType,
+      attachments: collectedItems.attachments,
+      outletId: collectedItems.outletId,
+      outletTier: collectedItems.outletTier,
+      outletRegion: collectedItems.outletRegion,
+      // joined from dictionary
+      outletName: mediaOutletDictionary.outletName,
+    })
     .from(collectedItems)
+    .leftJoin(mediaOutletDictionary, eq(collectedItems.outletId, mediaOutletDictionary.id))
     .where(and(...conditions))
     .orderBy(desc(collectedItems.firstSeenAt))
     .limit(limit)

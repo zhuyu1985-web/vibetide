@@ -35,6 +35,10 @@ const createPayloadSchema = z.object({
   targetModules: z.array(z.string()),
   defaultCategory: z.string().nullable().optional(),
   defaultTags: z.array(z.string()).nullable().optional(),
+  // Outlet fields (Task 5.3)
+  outletId: z.string().uuid().nullable().optional(),
+  defaultOutletTier: z.string().nullable().optional(),
+  defaultOutletRegion: z.string().nullable().optional(),
 });
 
 export async function createCollectionSource(payload: z.infer<typeof createPayloadSchema>) {
@@ -64,6 +68,9 @@ export async function createCollectionSource(payload: z.infer<typeof createPaylo
       defaultTags: parsed.defaultTags ?? null,
       enabled: true,
       createdBy: profile?.userId ?? null,
+      outletId: parsed.outletId ?? null,
+      defaultOutletTier: parsed.defaultOutletTier ?? null,
+      defaultOutletRegion: parsed.defaultOutletRegion ?? null,
     })
     .returning({ id: collectionSources.id });
 
@@ -93,6 +100,10 @@ export async function updateCollectionSource(payload: z.infer<typeof updatePaylo
   if (rest.targetModules !== undefined) patch.targetModules = rest.targetModules;
   if (rest.defaultCategory !== undefined) patch.defaultCategory = rest.defaultCategory;
   if (rest.defaultTags !== undefined) patch.defaultTags = rest.defaultTags;
+  // Outlet fields (Task 5.3)
+  if (rest.outletId !== undefined) patch.outletId = rest.outletId;
+  if (rest.defaultOutletTier !== undefined) patch.defaultOutletTier = rest.defaultOutletTier;
+  if (rest.defaultOutletRegion !== undefined) patch.defaultOutletRegion = rest.defaultOutletRegion;
 
   if (rest.config !== undefined) {
     // Validate config against adapter

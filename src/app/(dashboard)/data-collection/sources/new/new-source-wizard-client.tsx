@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import type { ConfigField } from "@/lib/collection/types";
 import { createCollectionSource } from "@/app/actions/collection";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
+import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 
 const CRON_PRESETS = [
   { value: "__manual__", label: "手工触发" },
@@ -31,11 +33,18 @@ const TARGET_MODULES = [
   { value: "knowledge", label: "知识库 (knowledge)" },
 ];
 
-interface NewSourceWizardClientProps {
-  adapterMetas: AdapterMeta[];
+export interface WizardOutletOption {
+  id: string;
+  outletName: string;
+  outletTier: string;
 }
 
-export function NewSourceWizardClient({ adapterMetas }: NewSourceWizardClientProps) {
+interface NewSourceWizardClientProps {
+  adapterMetas: AdapterMeta[];
+  outlets: WizardOutletOption[];
+}
+
+export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizardClientProps) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -47,6 +56,10 @@ export function NewSourceWizardClient({ adapterMetas }: NewSourceWizardClientPro
   const [defaultCategory, setDefaultCategory] = useState<string>("");
   const [defaultTagsRaw, setDefaultTagsRaw] = useState<string>("");
   const [name, setName] = useState<string>("");
+  // Outlet fields
+  const [outletId, setOutletId] = useState<string>("__none__");
+  const [defaultOutletTier, setDefaultOutletTier] = useState<string>("__none__");
+  const [defaultOutletRegion, setDefaultOutletRegion] = useState<string>("");
 
   const selectedMeta = adapterMetas.find((m) => m.type === sourceType);
 
@@ -76,6 +89,9 @@ export function NewSourceWizardClient({ adapterMetas }: NewSourceWizardClientPro
         targetModules,
         defaultCategory: defaultCategory.trim() || null,
         defaultTags: tags.length > 0 ? tags : null,
+        outletId: outletId === "__none__" ? null : outletId,
+        defaultOutletTier: defaultOutletTier === "__none__" ? null : defaultOutletTier,
+        defaultOutletRegion: defaultOutletRegion.trim() || null,
       });
       toast.success("源创建成功");
       router.push(`/data-collection/sources/${sourceId}`);
@@ -263,6 +279,55 @@ export function NewSourceWizardClient({ adapterMetas }: NewSourceWizardClientPro
                 onChange={(e) => setDefaultTagsRaw(e.target.value)}
                 placeholder="如: 热榜, 每日"
               />
+            </div>
+          </div>
+
+          {/* Outlet fields */}
+          <div className="space-y-3 pt-2 border-t">
+            <div>
+              <Label className="text-sm font-medium">媒体归属 <span className="text-muted-foreground font-normal">(可选)</span></Label>
+              <p className="text-xs text-muted-foreground mt-0.5">将该源采集的内容归属到具体媒体，可用于后续内容分级筛选。</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label>绑定媒体</Label>
+                <Select value={outletId} onValueChange={setOutletId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="未绑定" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">未绑定</SelectItem>
+                    {outlets.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.outletName}（{OUTLET_TIER_LABELS[o.outletTier as OutletTier] ?? o.outletTier}）
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>默认分级（兜底）</Label>
+                <Select value={defaultOutletTier} onValueChange={setDefaultOutletTier}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="无" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">无</SelectItem>
+                    {OUTLET_TIER_VALUES.map((t) => (
+                      <SelectItem key={t} value={t}>{OUTLET_TIER_LABELS[t]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="defaultOutletRegion">默认区域</Label>
+                <Input
+                  id="defaultOutletRegion"
+                  value={defaultOutletRegion}
+                  onChange={(e) => setDefaultOutletRegion(e.target.value)}
+                  placeholder="如: 重庆 / 全国"
+                />
+              </div>
             </div>
           </div>
         </section>

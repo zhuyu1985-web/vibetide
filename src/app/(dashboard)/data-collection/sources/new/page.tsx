@@ -1,7 +1,26 @@
+import { redirect } from "next/navigation";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
+import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
+import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { NewSourceWizardClient } from "./new-source-wizard-client";
 
-export default function NewSourcePage() {
-  const adapterMetas = listAdapterMetas();
-  return <NewSourceWizardClient adapterMetas={adapterMetas} />;
+export default async function NewSourcePage() {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) redirect("/login");
+
+  const [adapterMetas, outlets] = await Promise.all([
+    Promise.resolve(listAdapterMetas()),
+    listOutletsByOrg(orgId),
+  ]);
+
+  return (
+    <NewSourceWizardClient
+      adapterMetas={adapterMetas}
+      outlets={outlets.map((o) => ({
+        id: o.id,
+        outletName: o.outletName,
+        outletTier: o.outletTier,
+      }))}
+    />
+  );
 }

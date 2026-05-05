@@ -47,6 +47,9 @@ export default async function ContentPage({ searchParams }: PageProps) {
       ? (rawEnrichment as ContentFilters["enrichmentStatus"])
       : undefined;
 
+  const rawOutletTier = params.outletTier;
+  const rawOutletRegion = params.outletRegion;
+
   const filters: ContentFilters = {
     sourceType: params.sourceType || undefined,
     targetModule: params.module || undefined,
@@ -54,6 +57,8 @@ export default async function ContentPage({ searchParams }: PageProps) {
     searchText: params.q || undefined,
     enrichmentStatus,
     platformAlias: params.platform || undefined,
+    outletTier: rawOutletTier || undefined,
+    outletRegion: rawOutletRegion || undefined,
   };
 
   const [{ items: rawItems, total }, adapterMetas] = await Promise.all([
@@ -73,6 +78,8 @@ export default async function ContentPage({ searchParams }: PageProps) {
     derivedModules: i.derivedModules,
     enrichmentStatus: i.enrichmentStatus,
     sourceChannels: (i.sourceChannels ?? []) as CollectedItemViewModel["sourceChannels"],
+    outletName: i.outletName ?? null,
+    outletTier: i.outletTier ?? null,
   }));
 
   return (
@@ -87,6 +94,8 @@ export default async function ContentPage({ searchParams }: PageProps) {
         q: params.q,
         enrichment: rawEnrichment as "pending" | "enriched" | "failed" | undefined,
         platform: params.platform,
+        outletTier: rawOutletTier,
+        outletRegion: rawOutletRegion,
       }}
       initialView={initialView}
     />

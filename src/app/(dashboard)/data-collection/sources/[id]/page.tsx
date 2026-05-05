@@ -6,6 +6,7 @@ import {
 } from "@/lib/dal/collection";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { getAdapterMeta } from "@/lib/collection/adapter-meta";
+import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
 import { SourceDetailClient } from "./source-detail-client";
 
 export default async function SourceDetailPage({
@@ -20,9 +21,10 @@ export default async function SourceDetailPage({
   const source = await getCollectionSourceById(id, orgId);
   if (!source) notFound();
 
-  const [runs, items] = await Promise.all([
+  const [runs, items, outlets] = await Promise.all([
     listRecentRunsBySource(id, orgId, 20),
     listRecentItemsBySource(id, orgId, 20),
+    listOutletsByOrg(orgId),
   ]);
   const meta = getAdapterMeta(source.sourceType);
 
@@ -45,6 +47,9 @@ export default async function SourceDetailPage({
         lastRunStatus: source.lastRunStatus,
         totalItemsCollected: source.totalItemsCollected,
         totalRuns: source.totalRuns,
+        outletId: source.outletId ?? null,
+        defaultOutletTier: source.defaultOutletTier ?? null,
+        defaultOutletRegion: source.defaultOutletRegion ?? null,
       }}
       runs={runs.map((r) => ({
         id: r.id,
@@ -66,6 +71,11 @@ export default async function SourceDetailPage({
         firstSeenAt: i.firstSeenAt.toISOString(),
         category: i.category,
         tags: i.tags,
+      }))}
+      outlets={outlets.map((o) => ({
+        id: o.id,
+        outletName: o.outletName,
+        outletTier: o.outletTier,
       }))}
     />
   );

@@ -16,9 +16,19 @@ import {
   toggleResearchBridgeEnabled,
   deleteCollectionSource,
   getLatestRunForSource,
+  updateCollectionSource,
   type LatestRunStatus,
 } from "@/app/actions/collection";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 45;
@@ -40,6 +50,16 @@ export interface SourceDetail {
   lastRunStatus: string | null;
   totalItemsCollected: number;
   totalRuns: number;
+  // Outlet fields (Task 5.3)
+  outletId: string | null;
+  defaultOutletTier: string | null;
+  defaultOutletRegion: string | null;
+}
+
+export interface OutletOption {
+  id: string;
+  outletName: string;
+  outletTier: string;
 }
 
 export interface RunSummary {
@@ -69,14 +89,38 @@ interface SourceDetailClientProps {
   source: SourceDetail;
   runs: RunSummary[];
   items: ItemSummary[];
+  outlets: OutletOption[];
 }
 
-export function SourceDetailClient({ source, runs, items }: SourceDetailClientProps) {
+export function SourceDetailClient({ source, runs, items, outlets }: SourceDetailClientProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const baselineRunId = useRef<string | null>(null);
+
+  // Outlet edit state
+  const [outletId, setOutletId] = useState<string>(source.outletId ?? "__none__");
+  const [defaultOutletTier, setDefaultOutletTier] = useState<string>(source.defaultOutletTier ?? "__none__");
+  const [defaultOutletRegion, setDefaultOutletRegion] = useState<string>(source.defaultOutletRegion ?? "");
+
+  const handleSaveOutlet = async () => {
+    setBusy(true);
+    try {
+      await updateCollectionSource({
+        sourceId: source.id,
+        outletId: outletId === "__none__" ? null : outletId,
+        defaultOutletTier: defaultOutletTier === "__none__" ? null : defaultOutletTier,
+        defaultOutletRegion: defaultOutletRegion.trim() || null,
+      });
+      toast.success("媒体信息已保存");
+      router.refresh();
+    } catch (err) {
+      toast.error(`保存失败: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const pollUntilDone = async () => {
     let attempts = 0;
@@ -277,6 +321,54 @@ export function SourceDetailClient({ source, runs, items }: SourceDetailClientPr
                   </p>
                 </div>
               </label>
+            </div>
+            <div className="md:col-span-2 rounded-lg border bg-card p-5 space-y-4">
+              <h3 className="text-sm font-medium text-muted-foreground">媒体归属</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">绑定媒体（可选）</span>
+                  <Select value={outletId} onValueChange={setOutletId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="未绑定" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">未绑定</SelectItem>
+                      {outlets.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.outletName}（{OUTLET_TIER_LABELS[o.outletTier as OutletTier] ?? o.outletTier}）
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">默认分级（兜底）</span>
+                  <Select value={defaultOutletTier} onValueChange={setDefaultOutletTier}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="无" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">无</SelectItem>
+                      {OUTLET_TIER_VALUES.map((t) => (
+                        <SelectItem key={t} value={t}>{OUTLET_TIER_LABELS[t]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">默认区域</span>
+                  <Input
+                    value={defaultOutletRegion}
+                    onChange={(e) => setDefaultOutletRegion(e.target.value)}
+                    placeholder="如: 重庆 / 全国"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleSaveOutlet} disabled={busy}>
+                  保存媒体信息
+                </Button>
+              </div>
             </div>
             <div className="md:col-span-2 rounded-lg border bg-muted/20 p-4">
               <h3 className="text-sm font-medium text-muted-foreground mb-2">配置</h3>
