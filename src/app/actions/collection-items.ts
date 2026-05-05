@@ -6,6 +6,7 @@ import {
   getDerivedRecordsForItem,
   type DerivedRecordSummary,
 } from "@/lib/dal/collected-items";
+import { getOutletById } from "@/lib/dal/media-outlet-dictionary";
 
 async function requireOrg(): Promise<string> {
   const user = await requireAuth();
@@ -28,6 +29,11 @@ export interface ItemDetailPayload {
   derivedModules: string[];
   rawMetadata: unknown;
   enrichmentStatus: string;
+  // Outlet fields (Task 6.1)
+  outletId: string | null;
+  outletName: string | null;
+  outletTier: string | null;
+  outletRegion: string | null;
   sourceChannels: Array<{
     channel: string;
     url?: string;
@@ -50,6 +56,13 @@ export async function getCollectionItemDetailAction(
     ? (item.sourceChannels as ItemDetailPayload["sourceChannels"])
     : [];
 
+  // Look up outlet name if outletId is set
+  let outletName: string | null = null;
+  if (item.outletId) {
+    const outlet = await getOutletById(item.outletId, orgId);
+    outletName = outlet?.outletName ?? null;
+  }
+
   return {
     id: item.id,
     title: item.title,
@@ -65,6 +78,10 @@ export async function getCollectionItemDetailAction(
     derivedModules: item.derivedModules,
     rawMetadata: item.rawMetadata,
     enrichmentStatus: item.enrichmentStatus,
+    outletId: item.outletId ?? null,
+    outletName,
+    outletTier: item.outletTier ?? null,
+    outletRegion: item.outletRegion ?? null,
     sourceChannels,
     derivedRecords: derived,
   };

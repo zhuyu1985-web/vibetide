@@ -28,6 +28,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
+import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 import { ItemDetailDrawer } from "./item-detail-drawer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ interface ContentClientProps {
   items: CollectedItemViewModel[];
   total: number;
   adapterMetas: AdapterMeta[];
+  outlets: MediaOutletRow[];
   initialFilters: ClientFilters;
   initialView: "card" | "table";
 }
@@ -105,6 +107,7 @@ export function ContentClient({
   items,
   total,
   adapterMetas,
+  outlets,
   initialFilters,
   initialView,
 }: ContentClientProps) {
@@ -471,7 +474,7 @@ export function ContentClient({
       )}
 
       {/* Detail drawer */}
-      <ItemDetailDrawer itemId={detailItemId} onClose={() => setDetailItemId(null)} />
+      <ItemDetailDrawer itemId={detailItemId} onClose={() => setDetailItemId(null)} outlets={outlets} />
 
       {/* Filter Sheet */}
       <Sheet open={sheetOpen} onOpenChange={handleSheetOpenChange}>

@@ -28,6 +28,7 @@ import {
   collectionHotTopicCron,
   collectionHotTopicBridge,
   collectionResearchBridge,
+  outletBatchRecognize,
 } from "./collection";
 import {
   cmsCatalogSyncDaily,
@@ -74,6 +75,8 @@ export const functions = [
   collectionHotTopicCron,
   collectionHotTopicBridge,
   collectionResearchBridge,
+  // Outlet batch recognition (2026-05-05)
+  outletBatchRecognize,
   // CMS P1 (2026-04-18)
   cmsCatalogSyncDaily,
   cmsCatalogSyncOnDemand,

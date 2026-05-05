@@ -5,6 +5,7 @@ import {
   type ContentFilters,
 } from "@/lib/dal/collected-items";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
+import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
 import { ContentClient, type CollectedItemViewModel } from "./content-client";
 
 type TimeWindow = "24h" | "7d" | "30d" | "all";
@@ -61,9 +62,10 @@ export default async function ContentPage({ searchParams }: PageProps) {
     outletRegion: rawOutletRegion || undefined,
   };
 
-  const [{ items: rawItems, total }, adapterMetas] = await Promise.all([
+  const [{ items: rawItems, total }, adapterMetas, outlets] = await Promise.all([
     listCollectedItems(orgId, filters, { limit: 50, offset: 0 }),
     Promise.resolve(listAdapterMetas()),
+    listOutletsByOrg(orgId),
   ]);
 
   const items: CollectedItemViewModel[] = rawItems.map((i) => ({
@@ -87,6 +89,7 @@ export default async function ContentPage({ searchParams }: PageProps) {
       items={items}
       total={total}
       adapterMetas={adapterMetas}
+      outlets={outlets}
       initialFilters={{
         sourceType: params.sourceType,
         module: params.module,
