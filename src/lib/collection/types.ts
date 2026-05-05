@@ -12,6 +12,18 @@ export interface RawItem {
   /** e.g. "tophub/weibo", "rss/36kr", "tavily" */
   channel: string;
   rawMetadata?: Record<string, unknown>;
+  contentType?: "image_text" | "video" | "short_video" | "image_set" | "audio" | "live";
+  attachments?: Array<{
+    kind: "video" | "image" | "audio" | "thumbnail";
+    url: string;
+    thumbnailUrl?: string;
+    mimeType?: string;
+    durationMs?: number;
+    width?: number;
+    height?: number;
+    fileSizeBytes?: number;
+    extra?: Record<string, unknown>;
+  }>;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -85,11 +97,14 @@ export interface WriteArgs {
   sourceId: string;
   organizationId: string;
   items: RawItem[];
-  /** 源的 targetModules / defaultCategory / defaultTags */
+  /** 源的 targetModules / defaultCategory / defaultTags 及 outlet 配置 */
   source: {
     targetModules: string[];
     defaultCategory: string | null;
     defaultTags: string[] | null;
+    outletId?: string | null;
+    defaultOutletTier?: string | null;
+    defaultOutletRegion?: string | null;
   };
 }
 

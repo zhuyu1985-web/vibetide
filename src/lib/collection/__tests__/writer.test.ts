@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { db } from "@/db";
 import { collectedItems, collectionRuns, collectionSources, organizations } from "@/db/schema";
+import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
 import { eq } from "drizzle-orm";
 import { writeItems } from "../writer";
+import { bumpDictionaryVersion } from "@/lib/dal/media-outlet-dictionary";
 
 // Mock Inngest send to observe event emission without actually dispatching
 vi.mock("@/inngest/client", () => ({
@@ -35,6 +37,7 @@ afterAll(async () => {
   await db.delete(collectedItems).where(eq(collectedItems.organizationId, orgId));
   await db.delete(collectionRuns).where(eq(collectionRuns.organizationId, orgId));
   await db.delete(collectionSources).where(eq(collectionSources.organizationId, orgId));
+  await db.delete(mediaOutletDictionary).where(eq(mediaOutletDictionary.organizationId, orgId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
 });
 
@@ -139,5 +142,209 @@ describe("writeItems", () => {
         targetModules: ["hot_topics"],
       }),
     }));
+  });
+});
+
+describe("writer + outlet-recognizer 集成", () => {
+  let outletPeople: string;  // 人民日报
+  let outletCqrb: string;    // 重庆日报
+
+  beforeAll(async () => {
+    // 插入测试媒体字典条目（以 TEST_ 前缀避免与真实数据冲突）
+    const [a] = await db.insert(mediaOutletDictionary).values({
+      organizationId: orgId,
+      outletName: "TEST_人民日报",
+      outletTier: "central",
+      outletRegion: "全国",
+      domains: ["test-people.com.cn"],
+      publicAccountNames: ["TEST_人民日报"],
+    }).returning();
+    outletPeople = a!.id;
+
+    const [b] = await db.insert(mediaOutletDictionary).values({
+      organizationId: orgId,
+      outletName: "TEST_重庆日报",
+      outletTier: "provincial_municipal",
+      outletRegion: "重庆",
+      domains: ["test-cqrb.cn"],
+      publicAccountNames: ["TEST_重庆日报"],
+    }).returning();
+    outletCqrb = b!.id;
+
+    // 升版本使 writer cache 能感知到字典变化
+    await bumpDictionaryVersion(orgId);
+  });
+
+  it("source.outletId 已配置 → 写入时直接采用", async () => {
+    // 创建含 outletId 的 source
+    const [src] = await db.insert(collectionSources).values({
+      organizationId: orgId,
+      name: "src-with-outletid-" + Date.now(),
+      sourceType: "tophub",
+      config: { platforms: ["weibo"] },
+      targetModules: ["hot_topics"],
+      outletId: outletPeople,
+    }).returning();
+
+    const runId = await (async () => {
+      const [run] = await db.insert(collectionRuns).values({
+        sourceId: src.id,
+        organizationId: orgId,
+        trigger: "manual",
+        startedAt: new Date(),
+        status: "running",
+      }).returning({ id: collectionRuns.id });
+      return run.id;
+    })();
+
+    const result = await writeItems({
+      runId,
+      sourceId: src.id,
+      organizationId: orgId,
+      items: [{ title: "测试文章-outletId直接采用", url: "https://unknown-host.com/art1", channel: "tophub/weibo" }],
+      source: {
+        targetModules: ["hot_topics"],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: outletPeople,
+        defaultOutletTier: null,
+        defaultOutletRegion: null,
+      },
+    });
+
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    expect(row.outletId).toBe(outletPeople);
+    expect(row.outletTier).toBe("central");
+
+    // 清理
+    await db.delete(collectionRuns).where(eq(collectionRuns.id, runId));
+    await db.delete(collectionSources).where(eq(collectionSources.id, src.id));
+  });
+
+  it("URL host 命中字典 → 自动填 outlet_tier", async () => {
+    const runId = await makeRun();
+
+    const result = await writeItems({
+      runId,
+      sourceId,
+      organizationId: orgId,
+      items: [{ title: "测试文章-URL命中", url: "https://test-cqrb.cn/article/123", channel: "tophub/weibo" }],
+      source: {
+        targetModules: [],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: null,
+        defaultOutletTier: null,
+        defaultOutletRegion: null,
+      },
+    });
+
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    expect(row.outletId).toBe(outletCqrb);
+    expect(row.outletTier).toBe("provincial_municipal");
+    expect(row.outletRegion).toBe("重庆");
+  });
+
+  it("公众号名命中 → 自动填", async () => {
+    const runId = await makeRun();
+
+    const result = await writeItems({
+      runId,
+      sourceId,
+      organizationId: orgId,
+      items: [{
+        title: "测试文章-公众号命中",
+        url: "https://totally-unknown.com/p/999",
+        channel: "tophub/weixin",
+        rawMetadata: { publicAccountName: "TEST_人民日报" },
+      }],
+      source: {
+        targetModules: [],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: null,
+        defaultOutletTier: null,
+        defaultOutletRegion: null,
+      },
+    });
+
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    expect(row.outletId).toBe(outletPeople);
+    expect(row.outletTier).toBe("central");
+  });
+
+  it("不命中 + source.defaultOutletTier 兜底", async () => {
+    const runId = await makeRun();
+
+    const result = await writeItems({
+      runId,
+      sourceId,
+      organizationId: orgId,
+      items: [{
+        title: "测试文章-默认兜底",
+        url: "https://no-match-host.example/art",
+        channel: "tophub/weibo",
+      }],
+      source: {
+        targetModules: [],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: null,
+        defaultOutletTier: "central",
+        defaultOutletRegion: "全国",
+      },
+    });
+
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    expect(row.outletId).toBeNull();
+    expect(row.outletTier).toBe("central");
+    expect(row.outletRegion).toBe("全国");
+  });
+
+  it("version-stamp：outlet 修改后下一条写入用上新字典", async () => {
+    // 1. 先写一条（此时 TEST_人民日报 tier = central）
+    const runId1 = await makeRun();
+    await writeItems({
+      runId: runId1,
+      sourceId,
+      organizationId: orgId,
+      items: [{ title: "版本戳测试-第一条", url: "https://test-people.com.cn/v1/art1", channel: "tophub/weibo" }],
+      source: { targetModules: [], defaultCategory: null, defaultTags: null },
+    });
+
+    const rows1 = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    const first = rows1.find((r) => r.title === "版本戳测试-第一条");
+    expect(first?.outletTier).toBe("central");
+
+    // 2. 修改字典：把 TEST_人民日报 tier 改为 industry，并 bump 版本
+    await db.update(mediaOutletDictionary)
+      .set({ outletTier: "industry", updatedAt: new Date() })
+      .where(eq(mediaOutletDictionary.id, outletPeople));
+    await bumpDictionaryVersion(orgId);
+
+    // 3. 写第二条（URL 也命中 test-people.com.cn）
+    const runId2 = await makeRun();
+    await writeItems({
+      runId: runId2,
+      sourceId,
+      organizationId: orgId,
+      items: [{ title: "版本戳测试-第二条", url: "https://test-people.com.cn/v1/art2", channel: "tophub/weibo" }],
+      source: { targetModules: [], defaultCategory: null, defaultTags: null },
+    });
+
+    // 4. 第二条应该用上新 tier = industry
+    const rows2 = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    const second = rows2.find((r) => r.title === "版本戳测试-第二条");
+    expect(second?.outletTier).toBe("industry");
+
+    // 5. 恢复字典原状避免影响其他 case
+    await db.update(mediaOutletDictionary)
+      .set({ outletTier: "central", updatedAt: new Date() })
+      .where(eq(mediaOutletDictionary.id, outletPeople));
+    await bumpDictionaryVersion(orgId);
   });
 });

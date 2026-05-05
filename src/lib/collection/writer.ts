@@ -4,6 +4,21 @@ import { collectedItems, collectionRuns } from "@/db/schema";
 import { inngest } from "@/inngest/client";
 import { computeContentFingerprint, computeUrlHash, normalizeUrl } from "./normalize";
 import type { WriteArgs, WriteResult, RawItem } from "./types";
+import { recognizeOutlet } from "./outlet-recognizer";
+import { getDictionaryVersion, listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
+import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
+
+// version-stamp cache（进程级，跨请求复用）
+const dictCache = new Map<string, { version: number; outlets: MediaOutletRow[] }>();
+
+async function loadOutletDictionaryCached(orgId: string): Promise<MediaOutletRow[]> {
+  const currentVersion = await getDictionaryVersion(orgId);
+  const cached = dictCache.get(orgId);
+  if (cached && cached.version === currentVersion) return cached.outlets;
+  const outlets = await listOutletsByOrg(orgId, { includeInactive: false });
+  dictCache.set(orgId, { version: currentVersion, outlets });
+  return outlets;
+}
 
 interface WriteOutcome {
   itemId: string;
@@ -112,6 +127,17 @@ async function writeSingleItem(args: WriteArgs, raw: RawItem): Promise<WriteOutc
     }
 
     // 3. Insert new item
+    const dict = await loadOutletDictionaryCached(args.organizationId);
+    const recognized = recognizeOutlet(
+      { canonicalUrl: canonicalUrl ?? undefined, rawMetadata: raw.rawMetadata },
+      {
+        outletId: args.source.outletId ?? null,
+        defaultOutletTier: args.source.defaultOutletTier ?? null,
+        defaultOutletRegion: args.source.defaultOutletRegion ?? null,
+      },
+      dict,
+    );
+
     const [insertedRow] = await tx
       .insert(collectedItems)
       .values({
@@ -138,6 +164,11 @@ async function writeSingleItem(args: WriteArgs, raw: RawItem): Promise<WriteOutc
         category: args.source.defaultCategory,
         tags: args.source.defaultTags,
         rawMetadata: raw.rawMetadata ?? null,
+        contentType: raw.contentType ?? "image_text",
+        attachments: raw.attachments ?? [],
+        outletId: recognized?.outletId ?? null,
+        outletTier: recognized?.outletTier ?? null,
+        outletRegion: recognized?.outletRegion ?? null,
       })
       .returning({ id: collectedItems.id });
 
