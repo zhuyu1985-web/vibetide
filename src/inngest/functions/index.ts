@@ -29,6 +29,7 @@ import {
   collectionHotTopicBridge,
   collectionResearchBridge,
   outletBatchRecognize,
+  tikhubBudgetReset,
 } from "./collection";
 import {
   cmsCatalogSyncDaily,
@@ -77,6 +78,8 @@ export const functions = [
   collectionResearchBridge,
   // Outlet batch recognition (2026-05-05)
   outletBatchRecognize,
+  // tikhub 月度预算重置 cron (2026-05-05)
+  tikhubBudgetReset,
   // CMS P1 (2026-04-18)
   cmsCatalogSyncDaily,
   cmsCatalogSyncOnDemand,

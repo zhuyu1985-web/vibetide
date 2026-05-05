@@ -4,3 +4,4 @@ export { collectionHotTopicCron } from "./hot-topic-cron";
 export { collectionHotTopicBridge } from "./hot-topic-bridge";
 export { collectionResearchBridge } from "./research-bridge";
 export { outletBatchRecognize } from "./outlet-batch-recognize";
+export { tikhubBudgetReset } from "./tikhub-budget-reset";

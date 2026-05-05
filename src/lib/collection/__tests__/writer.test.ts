@@ -305,7 +305,7 @@ describe("writer + outlet-recognizer 集成", () => {
     expect(row.outletRegion).toBe("全国");
   });
 
-  it("version-stamp：outlet 修改后下一条写入用上新字典", async () => {
+  it("version-stamp：outlet 修改后下一条写入用上新字典（tikhub 集成前置测试）", async () => {
     // 1. 先写一条（此时 TEST_人民日报 tier = central）
     const runId1 = await makeRun();
     await writeItems({
@@ -346,5 +346,95 @@ describe("writer + outlet-recognizer 集成", () => {
       .set({ outletTier: "central", updatedAt: new Date() })
       .where(eq(mediaOutletDictionary.id, outletPeople));
     await bumpDictionaryVersion(orgId);
+  });
+});
+
+describe("writer + tikhub adapter 集成", () => {
+  let tikhubOutletId: string;
+
+  beforeAll(async () => {
+    // 灌一条微信公众号出口字典条目，让 recognizer 通过 publicAccountName 命中
+    const [o] = await db.insert(mediaOutletDictionary).values({
+      organizationId: orgId,
+      outletName: "TEST_重庆生态环境",
+      outletTier: "government_self_media",
+      outletRegion: "重庆",
+      domains: [],
+      publicAccountNames: ["TEST_重庆生态环境"],
+    }).returning();
+    tikhubOutletId = o!.id;
+    await bumpDictionaryVersion(orgId);
+  });
+
+  afterAll(async () => {
+    await db.delete(mediaOutletDictionary).where(eq(mediaOutletDictionary.id, tikhubOutletId));
+    await bumpDictionaryVersion(orgId);
+  });
+
+  it("微信公众号文章入库后 outlet 自动识别", async () => {
+    const runId = await makeRun();
+    const result = await writeItems({
+      runId,
+      sourceId,
+      organizationId: orgId,
+      items: [{
+        title: "test wechat 公众号文章",
+        url: "https://mp.weixin.qq.com/s/tikhub-test-wechat-001",
+        channel: "tikhub_wechat_mp",
+        contentType: "image_text",
+        attachments: [],
+        rawMetadata: { platform: "wechat_mp", publicAccountName: "TEST_重庆生态环境" },
+      }],
+      source: {
+        targetModules: [],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: null,
+        defaultOutletTier: null,
+        defaultOutletRegion: null,
+      },
+    });
+    expect(result.inserted).toBe(1);
+    const [row] = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    expect(row?.outletTier).toBe("government_self_media");
+    expect(row?.outletId).toBe(tikhubOutletId);
+    expect(row?.contentType).toBe("image_text");
+  });
+
+  it("抖音视频入库带 attachments", async () => {
+    const runId = await makeRun();
+    await writeItems({
+      runId,
+      sourceId,
+      organizationId: orgId,
+      items: [{
+        title: "test douyin 短视频",
+        url: "https://www.douyin.com/video/tikhub-test-douyin-001",
+        channel: "tikhub_douyin",
+        contentType: "short_video",
+        attachments: [
+          { kind: "video", url: "https://example.com/douyin-v.mp4", durationMs: 30000 },
+          { kind: "thumbnail", url: "https://example.com/douyin-t.jpg" },
+        ],
+        rawMetadata: { platform: "douyin", aweme_id: "tikhub-test-douyin-001" },
+      }],
+      source: {
+        targetModules: [],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: null,
+        defaultOutletTier: null,
+        defaultOutletRegion: null,
+      },
+    });
+
+    const rows = await db.select().from(collectedItems).where(eq(collectedItems.organizationId, orgId));
+    const douyinRow = rows.find((r) => r.firstSeenChannel === "tikhub_douyin");
+    expect(douyinRow).toBeDefined();
+    expect(douyinRow?.contentType).toBe("short_video");
+    const attachments = douyinRow?.attachments as Array<{ kind: string }>;
+    expect(attachments?.length).toBe(2);
+    expect(attachments?.map((a) => a.kind)).toContain("video");
+    expect(attachments?.map((a) => a.kind)).toContain("thumbnail");
   });
 });

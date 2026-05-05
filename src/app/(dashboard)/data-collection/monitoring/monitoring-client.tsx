@@ -48,12 +48,18 @@ interface SourceDistributionPoint {
   count: number;
 }
 
+interface TikhubCostSummary {
+  totalCostUsd: number;
+  runCount: number;
+}
+
 interface MonitoringClientProps {
   summary: MonitoringSummary;
   trend: CollectionTrendPoint[];
   errorSources: SerializedErrorSource[];
   recentErrors: SerializedRecentError[];
   sourceDistribution: SourceDistributionPoint[];
+  tikhubCost: TikhubCostSummary;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -87,13 +93,14 @@ export function MonitoringClient({
   errorSources,
   recentErrors,
   sourceDistribution,
+  tikhubCost,
 }: MonitoringClientProps) {
   const successPct = (summary.successRate24h * 100).toFixed(1);
 
   return (
     <div className="flex flex-col gap-6">
       {/* Section 1 — KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* 24h 采集量 */}
         <Card>
           <CardHeader>
@@ -144,6 +151,21 @@ export function MonitoringClient({
               {summary.failedRunsLast24h}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">失败运行次数</p>
+          </CardContent>
+        </Card>
+
+        {/* tikhub 月度费用 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">tikhub 月度费用</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold tabular-nums">
+              ${tikhubCost.totalCostUsd.toFixed(2)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              本月共 {tikhubCost.runCount} 次抓取
+            </p>
           </CardContent>
         </Card>
       </div>
