@@ -1,8 +1,20 @@
 {
-  "_comment": "Day 6 用 /api/v1/tikhub/user/calculate_price 实测填充。占位用 $0.005 保守估计（搜索类高于基础 $0.001）。",
-  "/api/v1/douyin/app/v3/fetch_general_search_result": { "basePrice": 0.005 },
-  "/api/v1/weibo/web/fetch_search": { "basePrice": 0.005 },
-  "/api/v1/xiaohongshu/web/search_notes": { "basePrice": 0.005 },
-  "/api/v1/wechat_channels/fetch_search_ordinary": { "basePrice": 0.005 },
-  "/api/v1/zhihu/web/fetch_article_search_v3": { "basePrice": 0.005 }
+  "_comment": "5 个 platform endpoint 的实测单价（calculate_price API 实测，2026-05-05）。注：小红书 + 微信视频号 是 $0.01（10x 基础价），抖音 + 微博 + 知乎 是 $0.001。知乎含阶梯折扣最高 50%。",
+  "/api/v1/douyin/app/v3/fetch_general_search_result": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": true },
+  "/api/v1/weibo/web/fetch_search": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": false },
+  "/api/v1/xiaohongshu/web/search_notes": { "basePrice": 0.01, "allowDiscount": false, "allowFreeCredit": false },
+  "/api/v1/wechat_channels/fetch_search_ordinary": { "basePrice": 0.01, "allowDiscount": false, "allowFreeCredit": false },
+  "/api/v1/zhihu/web/fetch_article_search_v3": {
+    "basePrice": 0.001,
+    "allowDiscount": true,
+    "allowFreeCredit": true,
+    "pricingTiers": [
+      { "minRpd": 0, "maxRpd": 1000, "discountPct": 0 },
+      { "minRpd": 1000, "maxRpd": 5000, "discountPct": 10 },
+      { "minRpd": 5000, "maxRpd": 10000, "discountPct": 20 },
+      { "minRpd": 10000, "maxRpd": 20000, "discountPct": 30 },
+      { "minRpd": 20000, "maxRpd": 30000, "discountPct": 40 },
+      { "minRpd": 30000, "discountPct": 50 }
+    ]
+  }
 }
