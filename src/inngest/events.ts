@@ -251,4 +251,13 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Media Outlet Dictionary Events (2026-05-05) ───
+
+  /** 批量回填历史采集项的媒体识别 */
+  "collection/outlet-batch-recognize.requested": {
+    data: {
+      organizationId: string;
+    };
+  };
+
 };

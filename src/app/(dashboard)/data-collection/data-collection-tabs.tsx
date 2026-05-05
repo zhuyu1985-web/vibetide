@@ -27,6 +27,11 @@ const TABS: TabDef[] = [
     label: "监控面板",
     matchPrefixes: ["/data-collection/monitoring"],
   },
+  {
+    href: "/data-collection/outlets",
+    label: "媒体字典",
+    matchPrefixes: ["/data-collection/outlets"],
+  },
 ];
 
 export function DataCollectionTabs() {
