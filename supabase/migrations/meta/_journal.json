@@ -246,6 +246,13 @@
       "when": 1777473257692,
       "tag": "0034_workable_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1777950826917,
+      "tag": "20260505000001_a1_drop_v1_outlet_system",
+      "breakpoints": true
     }
   ]
 }

@@ -1,28 +1,6 @@
 // src/db/schema/research/enums.ts
 import { pgEnum } from "drizzle-orm/pg-core";
 
-/**
- * 媒体层级（五级分类）
- *  - central: 中央级，如人民日报、新华社
- *  - provincial_municipal: 省/市级（含直辖市），如重庆日报、华龙网
- *  - industry: 行业级，如中国环境报、健康报
- *  - district_media: 区县融媒体，如涪陵发布
- *  - self_media: 自媒体/热榜平台（微博、知乎、B站等），由 collection-hub 桥接
- */
-export const mediaTierEnum = pgEnum("research_media_tier", [
-  "central",
-  "provincial_municipal",
-  "industry",
-  "district_media",
-  "self_media",
-]);
-
-/** 媒体源生命周期 */
-export const mediaOutletStatusEnum = pgEnum("research_media_outlet_status", [
-  "active",
-  "archived",
-]);
-
 /** 文章采集通道 */
 export const newsSourceChannelEnum = pgEnum("research_news_source_channel", [
   "tavily",             // Tavily 全网搜索

@@ -33,7 +33,8 @@ import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/shared/glass-card";
 import { searchArticles, advancedSearchArticles } from "@/app/actions/research/article-search";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
-import type { MediaOutletSummary } from "@/lib/dal/research/media-outlets";
+// NOTE: MediaOutletSummary removed (A1 Phase 0); outlets stub to [] until A4 redesign
+type MediaOutletSummary = { id: string; name: string };
 import type {
   ArticleSearchResult,
   ArticleSearchResponse,

@@ -1,8 +1,10 @@
 import { db } from "@/db";
 import { newsArticles } from "@/db/schema/research/news-articles";
 import { hashUrl } from "./url-hash";
-import { matchOutletForUrl } from "./outlet-matcher";
 import { eq } from "drizzle-orm";
+
+// NOTE: outlet-matcher removed in A1 Phase 0 — outletId / outletTierSnapshot columns
+// no longer exist on research_news_articles. A3 阶段迁到 collected_items 新设计。
 
 export type ArticleIngestInput = {
   url: string;
@@ -24,7 +26,6 @@ export async function ingestArticle(
   input: ArticleIngestInput,
 ): Promise<{ inserted: boolean; id: string }> {
   const urlHash = hashUrl(input.url);
-  const match = await matchOutletForUrl(input.url, input.organizationId);
 
   // content_fetch_status: done when caller already provided content; pending
   // when null (async bridge will populate via Jina Reader later).
@@ -38,9 +39,7 @@ export async function ingestArticle(
       title: input.title,
       content: input.content ?? null,
       publishedAt: input.publishedAt ?? null,
-      outletId: match?.outletId ?? null,
-      outletTierSnapshot: match?.tier ?? null,
-      districtIdSnapshot: match?.districtId ?? null,
+      districtIdSnapshot: null, // stub: A3 阶段重新从 collected_items 取
       sourceChannel: input.sourceChannel,
       firstSeenResearchTaskId: input.firstSeenResearchTaskId ?? null,
       rawMetadata: input.rawMetadata,

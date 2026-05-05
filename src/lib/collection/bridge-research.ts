@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { collectedItems, collectionSources } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ingestArticle } from "@/lib/research/article-ingest";
 
 type SourceChannelEntry = {
@@ -84,15 +84,8 @@ export async function bridgeCollectedItemToResearch(
     },
   });
 
-  // 兜底：outlet 未命中时 ingestArticle 把 tier 写成 null；这里补成 self_media
-  // 让工作台"媒体层级"筛选器可用。已命中真实 outlet 的行不动。
-  if (result.inserted) {
-    await db.execute(sql`
-      UPDATE research_news_articles
-      SET outlet_tier_snapshot = 'self_media'
-      WHERE id = ${result.id} AND outlet_tier_snapshot IS NULL
-    `);
-  }
+  // NOTE: outlet_tier_snapshot 列已在 A1 Phase 0 删除；不再更新。
+  // A3 阶段重新从 collected_items 取 tier 信息。
 
   return {
     skipped: false,

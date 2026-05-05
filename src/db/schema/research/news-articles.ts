@@ -3,12 +3,10 @@ import {
   pgTable, uuid, text, timestamp, jsonb, numeric,
   uniqueIndex, index,
 } from "drizzle-orm/pg-core";
-import { mediaOutlets } from "./media-outlets";
 import { cqDistricts } from "./cq-districts";
 import { researchTopics } from "./research-topics";
 import { researchTasks } from "./research-tasks";
 import {
-  mediaTierEnum,
   newsSourceChannelEnum,
   topicMatchTypeEnum,
   researchEmbeddingStatusEnum,
@@ -24,8 +22,6 @@ export const newsArticles = pgTable(
     content: text("content"),
     htmlSnapshotPath: text("html_snapshot_path"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
-    outletId: uuid("outlet_id").references(() => mediaOutlets.id),
-    outletTierSnapshot: mediaTierEnum("outlet_tier_snapshot"),
     districtIdSnapshot: uuid("district_id_snapshot").references(() => cqDistricts.id),
     sourceChannel: newsSourceChannelEnum("source_channel").notNull(),
     crawledAt: timestamp("crawled_at", { withTimezone: true }).defaultNow().notNull(),
@@ -41,7 +37,6 @@ export const newsArticles = pgTable(
   },
   (t) => ({
     urlHashUq: uniqueIndex("research_news_articles_url_hash_uq").on(t.urlHash),
-    outletPublishedIdx: index("research_news_articles_outlet_published_idx").on(t.outletId, t.publishedAt),
     districtPublishedIdx: index("research_news_articles_district_published_idx").on(t.districtIdSnapshot, t.publishedAt),
     embeddingStatusIdx: index("research_news_articles_embedding_status_idx").on(t.embeddingStatus),
     taskLookupIdx: index("research_news_articles_task_idx").on(t.firstSeenResearchTaskId),

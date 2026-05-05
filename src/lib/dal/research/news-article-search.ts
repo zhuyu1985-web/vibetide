@@ -1,10 +1,11 @@
 import { db } from "@/db";
 import { newsArticles } from "@/db/schema/research/news-articles";
-import { mediaOutlets } from "@/db/schema/research/media-outlets";
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import { desc, sql, ilike, or, inArray, gte, lte, and, eq } from "drizzle-orm";
 
-type MediaTier = "central" | "provincial_municipal" | "industry" | "district_media";
+// NOTE: outletTierSnapshot / outletId columns removed from newsArticles in A1 Phase 0.
+// stub: outletName / outletTier returned as NULL until A3 re-connects collected_items.
+// MediaTier kept for AdvancedSearchField compatibility.
 type SourceChannel = "tavily" | "whitelist_crawl" | "manual_url";
 
 export type ArticleSearchParams = {
@@ -67,18 +68,9 @@ export async function searchNewsArticles(
     );
   }
 
-  if (params.tiers?.length) {
-    conditions.push(
-      inArray(newsArticles.outletTierSnapshot, params.tiers as MediaTier[]),
-    );
-  }
-
+  // stub: tiers / outletId filters silently ignored until A3 reconnects outlet data
   if (params.districtIds?.length) {
     conditions.push(inArray(newsArticles.districtIdSnapshot, params.districtIds));
-  }
-
-  if (params.outletId) {
-    conditions.push(eq(newsArticles.outletId, params.outletId));
   }
 
   if (params.sourceChannels?.length) {
@@ -110,9 +102,7 @@ export async function searchNewsArticles(
       url: newsArticles.url,
       title: newsArticles.title,
       publishedAt: newsArticles.publishedAt,
-      outletTier: newsArticles.outletTierSnapshot,
       districtIdSnapshot: newsArticles.districtIdSnapshot,
-      outletId: newsArticles.outletId,
       sourceChannel: newsArticles.sourceChannel,
       crawledAt: newsArticles.crawledAt,
       rawMetadata: newsArticles.rawMetadata,
@@ -123,18 +113,13 @@ export async function searchNewsArticles(
     .limit(pageSize)
     .offset(offset);
 
-  // Resolve outlet names and district names in batch
-  const outletIds = [...new Set(rows.map((r) => r.outletId).filter(Boolean))] as string[];
+  // Resolve district names in batch
   const districtIds = [...new Set(rows.map((r) => r.districtIdSnapshot).filter(Boolean))] as string[];
 
-  const outletNames = outletIds.length > 0
-    ? await db.select({ id: mediaOutlets.id, name: mediaOutlets.name }).from(mediaOutlets).where(inArray(mediaOutlets.id, outletIds))
-    : [];
   const districtNames = districtIds.length > 0
     ? await db.select({ id: cqDistricts.id, name: cqDistricts.name }).from(cqDistricts).where(inArray(cqDistricts.id, districtIds))
     : [];
 
-  const outletMap = new Map(outletNames.map((o) => [o.id, o.name]));
   const districtMap = new Map(districtNames.map((d) => [d.id, d.name]));
 
   const articles: ArticleSearchResult[] = rows.map((r) => ({
@@ -142,8 +127,8 @@ export async function searchNewsArticles(
     url: r.url,
     title: r.title,
     publishedAt: r.publishedAt,
-    outletName: r.outletId ? (outletMap.get(r.outletId) ?? null) : null,
-    outletTier: r.outletTier,
+    outletName: null, // stub: A3 阶段接 collected_items
+    outletTier: null, // stub: A3 阶段接 collected_items
     districtName: r.districtIdSnapshot ? (districtMap.get(r.districtIdSnapshot) ?? null) : null,
     sourceChannel: r.sourceChannel,
     crawledAt: r.crawledAt,
@@ -200,18 +185,11 @@ function buildConditionExpr(c: SearchCondition) {
       break;
     }
     case "outletName":
-      if (c.operator === "contains")
-        return sql`${newsArticles.outletId} IN (SELECT id FROM research_media_outlets WHERE name ILIKE ${"%" + val + "%"})`;
-      if (c.operator === "not_contains")
-        return sql`${newsArticles.outletId} IN (SELECT id FROM research_media_outlets WHERE NOT (name ILIKE ${"%" + val + "%"}))`;
-      if (c.operator === "equals")
-        return sql`${newsArticles.outletId} IN (SELECT id FROM research_media_outlets WHERE name = ${val})`;
-      break;
+      // stub: outletName search not available until A3; silently returns no matches
+      return sql`FALSE`;
     case "tier":
-      if (c.operator === "equals") return eq(newsArticles.outletTierSnapshot, val as MediaTier);
-      if (c.operator === "not_equals")
-        return sql`${newsArticles.outletTierSnapshot} != ${val}`;
-      break;
+      // stub: tier search not available until A3; silently returns no matches
+      return sql`FALSE`;
     case "district":
       if (c.operator === "equals") return eq(newsArticles.districtIdSnapshot, val);
       if (c.operator === "not_equals")
@@ -282,9 +260,7 @@ export async function advancedSearchNewsArticles(
       url: newsArticles.url,
       title: newsArticles.title,
       publishedAt: newsArticles.publishedAt,
-      outletTier: newsArticles.outletTierSnapshot,
       districtIdSnapshot: newsArticles.districtIdSnapshot,
-      outletId: newsArticles.outletId,
       sourceChannel: newsArticles.sourceChannel,
       crawledAt: newsArticles.crawledAt,
       rawMetadata: newsArticles.rawMetadata,
@@ -295,18 +271,13 @@ export async function advancedSearchNewsArticles(
     .limit(pageSize)
     .offset(offset);
 
-  // Resolve outlet / district names
-  const outletIds = [...new Set(rows.map((r) => r.outletId).filter(Boolean))] as string[];
+  // Resolve district names
   const districtIds = [...new Set(rows.map((r) => r.districtIdSnapshot).filter(Boolean))] as string[];
 
-  const outletNames = outletIds.length > 0
-    ? await db.select({ id: mediaOutlets.id, name: mediaOutlets.name }).from(mediaOutlets).where(inArray(mediaOutlets.id, outletIds))
-    : [];
   const districtNames = districtIds.length > 0
     ? await db.select({ id: cqDistricts.id, name: cqDistricts.name }).from(cqDistricts).where(inArray(cqDistricts.id, districtIds))
     : [];
 
-  const outletMap = new Map(outletNames.map((o) => [o.id, o.name]));
   const districtMap = new Map(districtNames.map((d) => [d.id, d.name]));
 
   const articles: ArticleSearchResult[] = rows.map((r) => ({
@@ -314,8 +285,8 @@ export async function advancedSearchNewsArticles(
     url: r.url,
     title: r.title,
     publishedAt: r.publishedAt,
-    outletName: r.outletId ? (outletMap.get(r.outletId) ?? null) : null,
-    outletTier: r.outletTier,
+    outletName: null, // stub: A3 阶段接 collected_items
+    outletTier: null, // stub: A3 阶段接 collected_items
     districtName: r.districtIdSnapshot ? (districtMap.get(r.districtIdSnapshot) ?? null) : null,
     sourceChannel: r.sourceChannel,
     crawledAt: r.crawledAt,

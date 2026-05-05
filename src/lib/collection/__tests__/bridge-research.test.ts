@@ -83,7 +83,7 @@ describe("bridgeCollectedItemToResearch", () => {
       .from(newsArticles)
       .where(eq(newsArticles.id, result.articleId!));
     expect(article.sourceChannel).toBe("hot_topic_crawler");
-    expect(article.outletTierSnapshot).toBe("self_media");
+    // outletTierSnapshot 列已在 A1 Phase 0 删除；A3 阶段重新接 collected_items tier
     expect(article.contentFetchStatus).toBe("pending");
     expect(article.content).toBeNull();
     expect(article.title).toContain("测试热榜条目");

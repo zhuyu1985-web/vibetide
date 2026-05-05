@@ -59,7 +59,7 @@ export async function getResearchTaskDetail(
     title: string;
     url: string;
     publishedAt: Date | null;
-    outletTierSnapshot: string | null;
+    outletTierSnapshot: string | null; // stub: always null in A1 phase; A3 接 collected_items
     sourceChannel: string;
   }>;
 } | null> {
@@ -75,7 +75,7 @@ export async function getResearchTaskDetail(
       title: newsArticles.title,
       url: newsArticles.url,
       publishedAt: newsArticles.publishedAt,
-      outletTierSnapshot: newsArticles.outletTierSnapshot,
+      outletTierSnapshot: sql<string | null>`NULL`,
       sourceChannel: newsArticles.sourceChannel,
     })
     .from(newsArticles)

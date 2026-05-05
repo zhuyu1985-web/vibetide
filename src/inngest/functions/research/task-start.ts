@@ -2,11 +2,11 @@ import { inngest } from "@/inngest/client";
 import { db } from "@/db";
 import { researchTasks } from "@/db/schema/research/research-tasks";
 import { researchTopicKeywords } from "@/db/schema/research/research-topics";
-import {
-  mediaOutlets,
-  mediaOutletCrawlConfigs,
-} from "@/db/schema/research/media-outlets";
-import { eq, and, inArray, isNotNull } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+
+// NOTE: mediaOutlets / mediaOutletCrawlConfigs removed in A1 Phase 0.
+// Steps 4 (load-outlets) and 6 (whitelist fan-out) are stubbed.
+// A3 阶段迁到 Collection Hub Adapter 架构。
 
 export const researchTaskStart = inngest.createFunction(
   { id: "research-task-start", concurrency: { limit: 5 } },
@@ -46,49 +46,11 @@ export const researchTaskStart = inngest.createFunction(
       keywordsByTopic.set(row.topicId, arr);
     }
 
-    // 4. Load active outlets matching selected tiers — build include_domains
-    const outletsWithUrls = await step.run("load-outlets", async () =>
-      db
-        .select({
-          id: mediaOutlets.id,
-          tier: mediaOutlets.tier,
-          districtId: mediaOutlets.districtId,
-          officialUrl: mediaOutlets.officialUrl,
-        })
-        .from(mediaOutlets)
-        .where(
-          and(
-            eq(mediaOutlets.organizationId, task.organizationId),
-            eq(mediaOutlets.status, "active"),
-            inArray(
-              mediaOutlets.tier,
-              task.mediaTiers as Array<
-                "central" | "provincial_municipal" | "industry" | "district_media"
-              >,
-            ),
-            isNotNull(mediaOutlets.officialUrl),
-          ),
-        ),
-    );
-
-    const filteredOutlets = outletsWithUrls.filter((o) => {
-      if (o.tier !== "district_media") return true;
-      if (task.districtIds.length === 0) return true;
-      return o.districtId && task.districtIds.includes(o.districtId);
-    });
-
+    // 4. stub: outlet/domain include_domains 不再从 mediaOutlets 表读取
+    // A3 阶段迁到 Collection Hub list_scraper Adapter
     const includeDomains: string[] = [];
-    for (const o of filteredOutlets) {
-      try {
-        const h = new URL(o.officialUrl!)
-          .hostname.toLowerCase()
-          .replace(/^www\./, "");
-        includeDomains.push(h);
-      } catch {}
-    }
 
     // 5. Fan out — Tavily per topic
-    // Note: task.timeRangeStart/End are Date objects (loaded inline, not via step.run)
     const timeStartIso = task.timeRangeStart.toISOString();
     const timeEndIso = task.timeRangeEnd.toISOString();
 
@@ -106,27 +68,8 @@ export const researchTaskStart = inngest.createFunction(
       });
     }
 
-    // 6. Fan out — whitelist per outlet (only those with crawl config)
-    const crawlConfigs = await step.run("load-crawl-configs", async () =>
-      db
-        .select({ outletId: mediaOutletCrawlConfigs.outletId })
-        .from(mediaOutletCrawlConfigs)
-        .where(
-          and(
-            eq(mediaOutletCrawlConfigs.enabled, true),
-            inArray(
-              mediaOutletCrawlConfigs.outletId,
-              filteredOutlets.map((o) => o.id),
-            ),
-          ),
-        ),
-    );
-    for (const c of crawlConfigs) {
-      await step.sendEvent(`whitelist-${c.outletId}`, {
-        name: "research/whitelist.crawl",
-        data: { taskId, outletId: c.outletId },
-      });
-    }
+    // 6. stub: whitelist crawler fan-out 暂停；A3 阶段迁到 Collection Hub
+    // (previously fanned out research/whitelist.crawl per outlet crawl config)
 
     // 7. Fan out — manual URLs
     if (task.customUrls.length > 0) {
@@ -139,7 +82,7 @@ export const researchTaskStart = inngest.createFunction(
     return {
       dispatched: {
         tavily: keywordsByTopic.size,
-        whitelist: crawlConfigs.length,
+        whitelist: 0, // stubbed
         manual: task.customUrls.length > 0 ? 1 : 0,
       },
     };
