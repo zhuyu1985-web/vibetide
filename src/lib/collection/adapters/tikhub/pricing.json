@@ -1,0 +1,8 @@
+{
+  "_comment": "Day 6 用 /api/v1/tikhub/user/calculate_price 实测填充。占位用 $0.005 保守估计（搜索类高于基础 $0.001）。",
+  "/api/v1/douyin/app/v3/fetch_general_search_result": { "basePrice": 0.005 },
+  "/api/v1/weibo/web/fetch_search": { "basePrice": 0.005 },
+  "/api/v1/xiaohongshu/web/search_notes": { "basePrice": 0.005 },
+  "/api/v1/wechat_channels/fetch_search_ordinary": { "basePrice": 0.005 },
+  "/api/v1/zhihu/web/fetch_article_search_v3": { "basePrice": 0.005 }
+}

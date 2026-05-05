@@ -42,6 +42,7 @@ export interface AdapterContext<TConfig = unknown> {
 export interface AdapterResult {
   items: RawItem[];
   partialFailures?: { message: string; meta?: Record<string, unknown> }[];
+  runMetadata?: Record<string, unknown>;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -106,6 +107,8 @@ export interface WriteArgs {
     defaultOutletTier?: string | null;
     defaultOutletRegion?: string | null;
   };
+  /** Adapter 回报的额外运行指标（如 tikhubCostUsd），合并写入 collection_runs.metadata */
+  runMetadata?: Record<string, unknown>;
 }
 
 export interface WriteResult {

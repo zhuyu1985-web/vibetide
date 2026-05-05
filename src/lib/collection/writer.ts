@@ -63,7 +63,7 @@ export async function writeItems(args: WriteArgs): Promise<WriteResult> {
     }
   }
 
-  await updateRunCounters(args.runId, { inserted, merged, failed });
+  await updateRunCounters(args.runId, { inserted, merged, failed, runMetadata: args.runMetadata });
   return { inserted, merged, failed, insertedItemIds };
 }
 
@@ -200,7 +200,7 @@ async function appendSourceChannel(
 
 async function updateRunCounters(
   runId: string,
-  counts: { inserted: number; merged: number; failed: number },
+  counts: { inserted: number; merged: number; failed: number; runMetadata?: Record<string, unknown> },
 ): Promise<void> {
   const attempted = counts.inserted + counts.merged + counts.failed;
   await db
@@ -210,6 +210,7 @@ async function updateRunCounters(
       itemsInserted: counts.inserted,
       itemsMerged: counts.merged,
       itemsFailed: counts.failed,
+      ...(counts.runMetadata ? { metadata: counts.runMetadata } : {}),
     })
     .where(eq(collectionRuns.id, runId));
 }
