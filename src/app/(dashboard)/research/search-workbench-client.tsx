@@ -114,23 +114,24 @@ export function SearchWorkbenchClient({
   const [timeEnd, setTimeEnd] = useState("");
 
   // A4 Phase 3：新版高级检索 state（外置 AdvancedSearchBuilder + AdvancedFiltersSidebar）
+  // 默认 3 行用字面量 id（避免 SSR ↔ client hydration mismatch）；新增行由 addRow 用 crypto.randomUUID（点击后才触发，已脱离 SSR）
   const [advConditions, setAdvConditions] = useState<AdvancedSearchCondition[]>([
     {
-      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "adv-1",
+      id: "adv-row-1",
       field: "title",
       operator: "contains",
       value: "",
       logic: "and",
     },
     {
-      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "adv-2",
+      id: "adv-row-2",
       field: "topic",
       operator: "equals",
       value: "",
       logic: "and",
     },
     {
-      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "adv-3",
+      id: "adv-row-3",
       field: "publishedAt",
       operator: "between",
       value: "",
@@ -187,7 +188,7 @@ export function SearchWorkbenchClient({
 
   async function handleAdvancedSearch() {
     const filtered = advConditions.filter(
-      (c) => Boolean(c.value) || Boolean(c.valueRange),
+      (c) => Boolean(c.value?.trim()) || Boolean(c.valueRange),
     );
     try {
       const res = await searchAdvanced({
