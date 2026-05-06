@@ -8,6 +8,8 @@ export type AdvancedSearchOperator =
   | "contains" | "not_contains" | "equals" | "not_equals" | "between";
 
 export interface AdvancedSearchCondition {
+  // UI-only 稳定标识，仅用于 React key（DAL 层 buildSingleCondition switch on field，会静默忽略此字段）
+  id?: string;
   field: AdvancedSearchField;
   operator: AdvancedSearchOperator;
   value: string;                                   // 单值 (text/enum)

@@ -57,7 +57,13 @@ export function AdvancedSearchBuilder({ conditions, onChange, options }: Props) 
     if (conditions.length >= 10) return;
     onChange([
       ...conditions,
-      { field: "title", operator: "contains", value: "", logic: "and" },
+      {
+        id: crypto.randomUUID(),
+        field: "title",
+        operator: "contains",
+        value: "",
+        logic: "and",
+      },
     ]);
   }
 
@@ -70,7 +76,7 @@ export function AdvancedSearchBuilder({ conditions, onChange, options }: Props) 
     <div className="space-y-2">
       {conditions.map((row, idx) => (
         <RowEditor
-          key={idx}
+          key={row.id ?? idx}
           row={row}
           isLast={idx === conditions.length - 1}
           options={options}
@@ -335,5 +341,11 @@ function ValueInput({
           }}
         />
       );
+    default: {
+      // 编译时穷举守卫：新增 AdvancedSearchField 枚举值时这里会编译报错，提示补 case
+      const _exhaustive: never = row.field;
+      void _exhaustive;
+      return null;
+    }
   }
 }

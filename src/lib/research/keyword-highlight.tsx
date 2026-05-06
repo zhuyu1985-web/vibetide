@@ -3,6 +3,9 @@ import { Fragment } from "react";
 /**
  * 简版命中高亮：substring 匹配，命中部分包 <mark>
  * 用 React 组件分段 wrap，不用 dangerouslySetInnerHTML 避免 XSS
+ *
+ * 注：lower-case 长度假设 = 原文长度（适用于中英文与多数 Unicode；
+ * 不适用于 ß→ss 类大小写折叠改长字符 — 该场景下 keyword.length 切片会偏移）
  */
 export function highlightKeyword(
   text: string,
