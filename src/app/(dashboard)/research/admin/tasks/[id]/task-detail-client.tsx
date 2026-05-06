@@ -22,8 +22,8 @@ import { cancelResearchTask } from "@/app/actions/research/research-tasks";
 import { ResearchBreadcrumb } from "../../../research-breadcrumb";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "排队中",
-  crawling: "采集中",
+  pending: "待处理",
+  crawling: "标注中",
   analyzing: "分析中",
   done: "已完成",
   failed: "失败",
@@ -169,7 +169,7 @@ export function TaskDetailClient({
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         <GlassCard variant="default" padding="md">
-          <div className="text-xs text-gray-500 dark:text-gray-400">已采集文章</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">匹配文章</div>
           <div className="text-2xl font-semibold mt-1">{articles.length}</div>
         </GlassCard>
         <GlassCard variant="default" padding="md">
@@ -196,7 +196,7 @@ export function TaskDetailClient({
 
       {articles.length > 0 && (
         <GlassCard variant="default" padding="md">
-          <div className="text-sm font-medium mb-3">已采集文章分布</div>
+          <div className="text-sm font-medium mb-3">匹配文章分布</div>
           <div className="flex flex-wrap gap-2 text-xs">
             {Object.entries(tierCounts).map(([tier, count]) => (
               <Badge key={tier} className={TIER_BADGE_CLASS[tier] ?? "bg-gray-100 text-gray-700"}>
@@ -215,7 +215,7 @@ export function TaskDetailClient({
 
       <div>
         <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-sm font-medium">采集文章列表</h2>
+          <h2 className="text-sm font-medium">匹配文章列表</h2>
           <Input placeholder="按标题搜索..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
           <Select value={tierFilter} onValueChange={setTierFilter}>
             <SelectTrigger className="w-36">
@@ -236,8 +236,8 @@ export function TaskDetailClient({
           <GlassCard variant="default" padding="lg">
             <div className="text-center text-gray-500 dark:text-gray-400 py-10">
               {task.status === "pending" || task.status === "crawling"
-                ? "任务采集中，请稍后刷新..."
-                : "还没有采集到文章"}
+                ? "正在从 Collection Hub 匹配文章，请稍后刷新..."
+                : "该快照条件下暂无匹配文章"}
             </div>
           </GlassCard>
         ) : (
@@ -267,7 +267,7 @@ export function TaskDetailClient({
               },
               {
                 key: "channel",
-                header: "采集来源",
+                header: "来源渠道",
                 width: "w-32",
                 render: (a) => (
                   <span className="text-muted-foreground truncate block">

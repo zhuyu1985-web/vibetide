@@ -9,8 +9,8 @@ import { Plus } from "lucide-react";
 import { ResearchBreadcrumb } from "../../research-breadcrumb";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "排队中",
-  crawling: "采集中",
+  pending: "待处理",
+  crawling: "标注中",
   analyzing: "分析中",
   done: "已完成",
   failed: "失败",
@@ -39,15 +39,15 @@ export default async function TasksAdminPage() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">数据采集任务</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">管理后台采集任务，向数据库补充新闻数据</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">检索快照</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">保存检索条件快照，从 Collection Hub 统一池中按主题、区县、媒体层级过滤</p>
           </div>
           <Link
             href="/research/admin/tasks/new"
             className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
           >
             <Plus className="h-3.5 w-3.5" />
-            新建采集任务
+            新建快照
           </Link>
         </div>
         <div className="mt-3">
@@ -57,7 +57,7 @@ export default async function TasksAdminPage() {
       {tasks.length === 0 ? (
         <GlassCard variant="default" padding="lg">
           <div className="text-center text-gray-500 dark:text-gray-400 py-10">
-            还没有采集任务
+            还没有检索快照
           </div>
         </GlassCard>
       ) : (

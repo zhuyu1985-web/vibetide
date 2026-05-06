@@ -86,9 +86,9 @@ export function NewTaskClient({
   return (
     <div className="max-w-3xl mx-auto w-full space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">新建研究任务</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">新建检索快照</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          选择主题、区县、媒体层级和时间范围，系统将自动采集全网与白名单媒体数据
+          选择主题、区县、媒体层级和时间范围，系统将从 Collection Hub 统一池中过滤匹配文章
         </p>
         <div className="mt-3">
           <ResearchBreadcrumb />

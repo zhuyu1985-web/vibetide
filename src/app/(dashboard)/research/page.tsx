@@ -3,10 +3,10 @@ import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/rbac";
 import { listCqDistricts } from "@/lib/dal/research/cq-districts";
 import { searchCollectedItemsForResearch } from "@/lib/dal/research/collected-item-search";
+import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
 import { SearchWorkbenchClient } from "./search-workbench-client";
 
-// NOTE: listMediaOutlets removed in A1 Phase 0 — outlets prop stubbed to []
-// A4 阶段研究工作台 UI 重做时重新接入 Collection Hub 数据
+// A3 已接通 collected_items 数据源（outlets + districts + collected_items 全部从 Collection Hub 读取）
 
 export default async function ResearchPage() {
   const ctx = await getCurrentUserAndOrg();
@@ -14,12 +14,13 @@ export default async function ResearchPage() {
   const allowed = await hasPermission(ctx.userId, ctx.organizationId, PERMISSIONS.MENU_RESEARCH);
   if (!allowed) redirect("/home");
 
-  const [districts, rawResult] = await Promise.all([
+  const [districts, outlets, rawResult] = await Promise.all([
     listCqDistricts(),
+    listOutletsByOrg(ctx.organizationId),
     searchCollectedItemsForResearch(ctx.organizationId, {}, { limit: 50, offset: 0 }),
   ]);
 
-  // Map DAL result to the shape SearchWorkbenchClient expects (Phase 4 will fully redesign)
+  // Map DAL result to the shape SearchWorkbenchClient expects
   const initialResult = {
     articles: rawResult.items.map((item) => ({
       ...item,
@@ -35,7 +36,7 @@ export default async function ResearchPage() {
   return (
     <SearchWorkbenchClient
       districts={districts}
-      outlets={[]}
+      outlets={outlets.map((o) => ({ id: o.id, name: o.outletName }))}
       initialResult={initialResult}
     />
   );

@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/shared/glass-card";
 import { searchArticles, advancedSearchArticles } from "@/app/actions/research/collected-item-search";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
-// NOTE: MediaOutletSummary removed (A1 Phase 0); outlets stub to [] until A4 redesign
+// Outlet summary shape — id + name used for filter dropdown
 type MediaOutletSummary = { id: string; name: string };
 import type {
   ResearchItemResult as ArticleSearchResult,
@@ -399,7 +399,7 @@ export function SearchWorkbenchClient({
               className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
             >
               <Database className="h-3.5 w-3.5" />
-              采集任务
+              检索快照
             </Link>
           </div>
         </div>
@@ -619,17 +619,23 @@ export function SearchWorkbenchClient({
         ) : result.articles.length === 0 ? (
           <GlassCard variant="default" padding="lg">
             <div className="text-center text-gray-500 dark:text-gray-400 py-10 space-y-2">
-              <div>数据库中暂未检索到新闻文章</div>
+              <div>数据库中暂未检索到符合条件的文章</div>
               <div className="text-xs">
-                研究工作台的数据来自「数据采集任务」（Tavily 全网搜索 / 白名单爬取 / 手工 URL），
-                请先到{" "}
+                研究工作台的数据来自 Collection Hub 统一采集池，可到{" "}
+                <Link
+                  href="/data-collection"
+                  className="text-sky-600 dark:text-sky-400 hover:underline"
+                >
+                  数据采集
+                </Link>{" "}
+                模块补充数据，或新建{" "}
                 <Link
                   href="/research/admin/tasks/new"
                   className="text-sky-600 dark:text-sky-400 hover:underline"
                 >
-                  新建采集任务
+                  检索快照
                 </Link>{" "}
-                跑一次采集
+                保存当前筛选条件
               </div>
             </div>
           </GlassCard>
