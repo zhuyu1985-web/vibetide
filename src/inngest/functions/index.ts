@@ -21,6 +21,8 @@ import {
   researchManualUrlIngest,
   researchArticleContentFetch,
   researchBridgeBackfill,
+  annotateCollectedItem,
+  backfillAnnotate,
 } from "./research";
 import {
   runCollectionSource,
@@ -70,6 +72,9 @@ export const functions = [
   researchManualUrlIngest,
   researchArticleContentFetch,
   researchBridgeBackfill,
+  // Research auto-annotation (A3 Phase 3)
+  annotateCollectedItem,
+  backfillAnnotate,
   // Collection Hub (2026-04-18)
   runCollectionSource,
   collectionSmokeConsumer,

@@ -260,4 +260,13 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Research Annotation Events (A3 Phase 3, 2026-05-06) ───
+
+  /** 一次性手工触发：对存量 collected_items 批量回填 topic/district annotation */
+  "research/backfill-annotate.requested": {
+    data: {
+      organizationId: string;
+    };
+  };
+
 };
