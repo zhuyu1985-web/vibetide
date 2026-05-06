@@ -1,7 +1,8 @@
+// A3 Phase 1 stub — newsArticles reference removed (research_news_articles table dropped).
+// crawledCount always returns 0 until Phase 2 reconnects to collected_items annotation tables.
 import { db } from "@/db";
 import { researchTasks } from "@/db/schema/research/research-tasks";
-import { newsArticles } from "@/db/schema/research/news-articles";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 export type ResearchTaskSummary = {
   id: string;
@@ -26,15 +27,7 @@ export async function listMyResearchTasks(
     .where(and(eq(researchTasks.organizationId, orgId), eq(researchTasks.userId, userId)))
     .orderBy(desc(researchTasks.createdAt));
 
-  const counts = await db
-    .select({
-      taskId: newsArticles.firstSeenResearchTaskId,
-      count: sql<number>`count(*)::int`.as("count"),
-    })
-    .from(newsArticles)
-    .groupBy(newsArticles.firstSeenResearchTaskId);
-  const countMap = new Map(counts.map((c) => [c.taskId, c.count]));
-
+  // A3 Phase 1 stub: crawledCount always 0 — Phase 2 will count from collected_items annotation
   return tasks.map((t) => ({
     id: t.id,
     name: t.name,
@@ -45,7 +38,7 @@ export async function listMyResearchTasks(
     topicCount: t.topicIds.length,
     districtCount: t.districtIds.length,
     tierCount: t.mediaTiers.length,
-    crawledCount: countMap.get(t.id) ?? 0,
+    crawledCount: 0, // A3 Phase 1 stub: Phase 2 reconnects collected_items
   }));
 }
 
@@ -59,7 +52,7 @@ export async function getResearchTaskDetail(
     title: string;
     url: string;
     publishedAt: Date | null;
-    outletTierSnapshot: string | null; // stub: always null in A1 phase; A3 接 collected_items
+    outletTierSnapshot: string | null;
     sourceChannel: string;
   }>;
 } | null> {
@@ -69,19 +62,6 @@ export async function getResearchTaskDetail(
     .where(and(eq(researchTasks.id, id), eq(researchTasks.organizationId, orgId)));
   if (!task) return null;
 
-  const articles = await db
-    .select({
-      id: newsArticles.id,
-      title: newsArticles.title,
-      url: newsArticles.url,
-      publishedAt: newsArticles.publishedAt,
-      outletTierSnapshot: sql<string | null>`NULL`,
-      sourceChannel: newsArticles.sourceChannel,
-    })
-    .from(newsArticles)
-    .where(eq(newsArticles.firstSeenResearchTaskId, id))
-    .orderBy(desc(newsArticles.crawledAt))
-    .limit(200);
-
-  return { task, articles };
+  // A3 Phase 1 stub: articles always empty — Phase 2 reads from collected_items + annotation tables
+  return { task, articles: [] };
 }

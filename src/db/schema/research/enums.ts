@@ -1,13 +1,6 @@
 // src/db/schema/research/enums.ts
+// A3 Phase 1: newsSourceChannelEnum removed (research_news_articles table dropped)
 import { pgEnum } from "drizzle-orm/pg-core";
-
-/** 文章采集通道 */
-export const newsSourceChannelEnum = pgEnum("research_news_source_channel", [
-  "tavily",             // Tavily 全网搜索
-  "whitelist_crawl",    // 媒体白名单常态采集
-  "manual_url",         // 老师手动粘贴 URL
-  "hot_topic_crawler",  // 热榜采集（collection-hub 桥接）
-]);
 
 /** 研究任务状态机 */
 export const researchTaskStatusEnum = pgEnum("research_task_status", [

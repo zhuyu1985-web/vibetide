@@ -1,123 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { randomUUID } from "node:crypto";
-import { db } from "@/db";
-import {
-  organizations,
-  collectionSources,
-  collectedItems,
-} from "@/db/schema";
-import { newsArticles } from "@/db/schema/research/news-articles";
-import { eq } from "drizzle-orm";
-import { bridgeCollectedItemToResearch } from "../bridge-research";
+// A3 Phase 1 stub — research_news_articles table dropped.
+// bridgeCollectedItemToResearch previously wrote to research_news_articles.
+// That bridge function needs rewrite in Phase 2 (or removal in Phase 5).
+// All tests here are skipped until Phase 2/5 defines new bridge semantics.
 
-describe("bridgeCollectedItemToResearch", () => {
-  const orgId = randomUUID();
-  let sourceId: string;
-  let itemId: string;
-  let url: string;
+import { describe, it } from "vitest";
 
-  beforeEach(async () => {
-    const stamp = Date.now();
-    await db
-      .insert(organizations)
-      .values({
-        id: orgId,
-        name: "bridge-test-org",
-        slug: `bridge-${stamp}`,
-      })
-      .onConflictDoNothing();
-
-    const [src] = await db
-      .insert(collectionSources)
-      .values({
-        organizationId: orgId,
-        name: `test-hot-topic-${stamp}`,
-        sourceType: "tophub",
-        config: { platforms: ["weibo"] },
-        targetModules: ["hot_topics"],
-        researchBridgeEnabled: true,
-      })
-      .returning();
-    sourceId = src.id;
-
-    url = `https://weibo.com/test-${randomUUID()}`;
-    const [item] = await db
-      .insert(collectedItems)
-      .values({
-        organizationId: orgId,
-        contentFingerprint: `fp-${randomUUID()}`,
-        canonicalUrl: url,
-        title: "测试热榜条目 — 重庆市生态环境综合治理成效显著",
-        firstSeenSourceId: sourceId,
-        firstSeenChannel: "tophub",
-        firstSeenAt: new Date(),
-        sourceChannels: [
-          {
-            channel: "tophub/weibo",
-            url,
-            sourceId,
-            runId: "r1",
-            capturedAt: new Date().toISOString(),
-          },
-        ],
-      })
-      .returning();
-    itemId = item.id;
-  });
-
-  afterEach(async () => {
-    await db.delete(newsArticles).where(eq(newsArticles.url, url));
-    await db.delete(collectedItems).where(eq(collectedItems.id, itemId));
-    await db.delete(collectionSources).where(eq(collectionSources.id, sourceId));
-    await db.delete(organizations).where(eq(organizations.id, orgId));
-  });
-
-  it("inserts research_news_article when source flag is true", async () => {
-    const result = await bridgeCollectedItemToResearch(itemId, orgId);
-    expect(result.skipped).toBe(false);
-    expect(result.inserted).toBe(true);
-    expect(result.articleId).toBeTruthy();
-
-    const [article] = await db
-      .select()
-      .from(newsArticles)
-      .where(eq(newsArticles.id, result.articleId!));
-    expect(article.sourceChannel).toBe("hot_topic_crawler");
-    // outletTierSnapshot 列已在 A1 Phase 0 删除；A3 阶段重新接 collected_items tier
-    expect(article.contentFetchStatus).toBe("pending");
-    expect(article.content).toBeNull();
-    expect(article.title).toContain("测试热榜条目");
-    const meta = article.rawMetadata as { collectedItemId?: string; platforms?: string[] };
-    expect(meta?.collectedItemId).toBe(itemId);
-    expect(meta?.platforms).toContain("weibo");
-  });
-
-  it("skips when source flag is false", async () => {
-    await db
-      .update(collectionSources)
-      .set({ researchBridgeEnabled: false })
-      .where(eq(collectionSources.id, sourceId));
-    const result = await bridgeCollectedItemToResearch(itemId, orgId);
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toBe("flag-disabled");
-    expect(result.inserted).toBe(false);
-  });
-
-  it("is idempotent on same url_hash (second call returns existing id)", async () => {
-    const first = await bridgeCollectedItemToResearch(itemId, orgId);
-    const second = await bridgeCollectedItemToResearch(itemId, orgId);
-    expect(first.inserted).toBe(true);
-    expect(second.inserted).toBe(false);
-    expect(second.articleId).toBe(first.articleId);
-  });
-
-  it("skips when item has no canonical url", async () => {
-    await db
-      .update(collectedItems)
-      .set({ canonicalUrl: null })
-      .where(eq(collectedItems.id, itemId));
-    const result = await bridgeCollectedItemToResearch(itemId, orgId);
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toBe("no-url");
-  });
+describe("bridgeCollectedItemToResearch (A3 Phase 1 stub — table dropped)", () => {
+  it.skip("inserts research annotation when source flag is true — disabled pending Phase 2 rewrite", () => {});
+  it.skip("skips when source flag is false — disabled pending Phase 2 rewrite", () => {});
+  it.skip("is idempotent on same url_hash — disabled pending Phase 2 rewrite", () => {});
+  it.skip("skips when item has no canonical url — disabled pending Phase 2 rewrite", () => {});
 });

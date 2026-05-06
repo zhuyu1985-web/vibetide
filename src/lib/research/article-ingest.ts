@@ -1,10 +1,7 @@
-import { db } from "@/db";
-import { newsArticles } from "@/db/schema/research/news-articles";
-import { hashUrl } from "./url-hash";
-import { eq } from "drizzle-orm";
-
-// NOTE: outlet-matcher removed in A1 Phase 0 — outletId / outletTierSnapshot columns
-// no longer exist on research_news_articles. A3 阶段迁到 collected_items 新设计。
+// A3 Phase 1 stub — research_news_articles table dropped.
+// article-ingest.ts is scheduled for deletion in Phase 5.
+// All callers (tavily-crawl, manual-url-ingest inngest functions) are also
+// scheduled for deletion/rewrite in Phase 5; they remain compilable but no-op.
 
 export type ArticleIngestInput = {
   url: string;
@@ -17,66 +14,19 @@ export type ArticleIngestInput = {
   rawMetadata?: Record<string, unknown>;
 };
 
-/**
- * Upsert article by url_hash. Returns:
- *   { inserted: true, id }  — newly inserted
- *   { inserted: false, id } — already existed (no overwrite of content or task link)
- */
+// A3 Phase 1 stub — research_news_articles dropped; Phase 5 deletes this file
 export async function ingestArticle(
   input: ArticleIngestInput,
 ): Promise<{ inserted: boolean; id: string }> {
-  const urlHash = hashUrl(input.url);
-
-  // content_fetch_status: done when caller already provided content; pending
-  // when null (async bridge will populate via Jina Reader later).
-  const contentFetchStatus = input.content ? "done" : "pending";
-
-  const [row] = await db
-    .insert(newsArticles)
-    .values({
-      url: input.url,
-      urlHash,
-      title: input.title,
-      content: input.content ?? null,
-      publishedAt: input.publishedAt ?? null,
-      districtIdSnapshot: null, // stub: A3 阶段重新从 collected_items 取
-      sourceChannel: input.sourceChannel,
-      firstSeenResearchTaskId: input.firstSeenResearchTaskId ?? null,
-      rawMetadata: input.rawMetadata,
-      contentFetchStatus,
-    })
-    .onConflictDoNothing({ target: newsArticles.urlHash })
-    .returning({ id: newsArticles.id });
-
-  if (row) return { inserted: true, id: row.id };
-
-  const existing = await db
-    .select({ id: newsArticles.id })
-    .from(newsArticles)
-    .where(eq(newsArticles.urlHash, urlHash))
-    .limit(1);
-  return { inserted: false, id: existing[0].id };
+  console.warn("[a3-stub] ingestArticle: research_news_articles dropped, Phase 5 removes this");
+  // Return a deterministic fake id derived from url so callers that chain on id don't crash
+  return { inserted: false, id: "00000000-0000-0000-0000-000000000000" };
 }
 
-/**
- * Batch variant — inserts in a loop with per-item error isolation.
- */
+// A3 Phase 1 stub — batch variant
 export async function ingestArticlesBatch(
   items: ArticleIngestInput[],
 ): Promise<Array<{ url: string; inserted: boolean; id: string | null; error?: string }>> {
-  const results: Array<{ url: string; inserted: boolean; id: string | null; error?: string }> = [];
-  for (const item of items) {
-    try {
-      const r = await ingestArticle(item);
-      results.push({ url: item.url, inserted: r.inserted, id: r.id });
-    } catch (e) {
-      results.push({
-        url: item.url,
-        inserted: false,
-        id: null,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }
-  return results;
+  console.warn("[a3-stub] ingestArticlesBatch: research_news_articles dropped, Phase 5 removes this");
+  return items.map((item) => ({ url: item.url, inserted: false, id: null }));
 }

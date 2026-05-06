@@ -3,4 +3,4 @@ export * from "./enums";
 export * from "./cq-districts";
 export * from "./research-topics";
 export * from "./research-tasks";
-export * from "./news-articles";
+export * from "./annotations";
