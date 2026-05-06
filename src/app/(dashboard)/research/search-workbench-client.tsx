@@ -83,13 +83,12 @@ const CHANNEL_LABELS: Record<string, string> = {
 /* ─── Advanced search constants ─── */
 
 const FIELD_OPTIONS: { value: AdvancedSearchField; label: string }[] = [
-  { value: "keyword", label: "关键词（标题+正文）" },
   { value: "title", label: "标题" },
   { value: "content", label: "正文" },
   { value: "outletName", label: "媒体名" },
-  { value: "tier", label: "媒体层级" },
+  { value: "outletTier", label: "媒体层级" },
   { value: "district", label: "区县" },
-  { value: "channel", label: "采集来源" },
+  { value: "platform", label: "采集来源" },
   { value: "publishedAt", label: "发布时间" },
 ];
 
@@ -97,7 +96,6 @@ function getOperatorsForField(
   field: AdvancedSearchField,
 ): { value: AdvancedSearchOperator; label: string }[] {
   switch (field) {
-    case "keyword":
     case "title":
     case "content":
       return [
@@ -110,9 +108,9 @@ function getOperatorsForField(
         { value: "not_contains", label: "不含" },
         { value: "equals", label: "等于" },
       ];
-    case "tier":
+    case "outletTier":
     case "district":
-    case "channel":
+    case "platform":
       return [
         { value: "equals", label: "等于" },
         { value: "not_equals", label: "不等于" },
@@ -141,7 +139,7 @@ function newConditionId() {
 function defaultCondition(): ConditionRow {
   return {
     id: newConditionId(),
-    field: "keyword",
+    field: "title",
     operator: "contains",
     value: "",
     value2: "",
@@ -212,13 +210,24 @@ export function SearchWorkbenchClient({
           if (c.field === "publishedAt") return c.value.trim() && c.value2.trim();
           return c.value.trim();
         })
-        .map((c) => ({
-          field: c.field,
-          operator: c.operator,
-          value: c.value.trim(),
-          value2: c.value2.trim() || undefined,
-          logic: c.logic,
-        }));
+        .map((c) => {
+          if (c.field === "publishedAt") {
+            return {
+              field: c.field,
+              operator: c.operator,
+              value: c.value.trim(),
+              valueRange: { from: c.value.trim(), to: c.value2.trim() },
+              logic: c.logic,
+            };
+          }
+          return {
+            field: c.field,
+            operator: c.operator,
+            value: c.value.trim(),
+            value2: c.value2.trim() || undefined,
+            logic: c.logic,
+          };
+        });
 
       if (validConditions.length === 0) return;
 
@@ -298,7 +307,7 @@ export function SearchWorkbenchClient({
 
   function renderValueInput(row: ConditionRow) {
     switch (row.field) {
-      case "tier":
+      case "outletTier":
         return (
           <Select value={row.value} onValueChange={(v) => updateCondition(row.id, { value: v })}>
             <SelectTrigger className="w-40">
@@ -324,7 +333,7 @@ export function SearchWorkbenchClient({
             </SelectContent>
           </Select>
         );
-      case "channel":
+      case "platform":
         return (
           <Select value={row.value} onValueChange={(v) => updateCondition(row.id, { value: v })}>
             <SelectTrigger className="w-40">

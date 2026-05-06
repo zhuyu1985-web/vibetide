@@ -26,24 +26,21 @@ export type ResearchSearchResponse = {
   pageSize: number;
 };
 
-// Re-export search types (used by search-workbench-client until Phase 4 rewrite)
-export type AdvancedSearchField =
-  | "title" | "content" | "keyword" | "outletName"
-  | "tier" | "district" | "channel" | "publishedAt";
+// Re-export search types from shared module (A4 Phase 1: 11 fields + valueRange)
+export type {
+  AdvancedSearchField,
+  AdvancedSearchOperator,
+  AdvancedSearchCondition,
+  AdvancedSearchCondition as SearchCondition, // 兼容旧名
+  SidebarFilter,
+} from "@/app/(dashboard)/research/search-mode-types";
 
-export type AdvancedSearchOperator =
-  | "contains" | "not_contains" | "equals" | "not_equals" | "between";
-
-export type SearchCondition = {
-  field: AdvancedSearchField;
-  operator: AdvancedSearchOperator;
-  value: string;
-  value2?: string;
-  logic: "and" | "or";
-};
+import type {
+  AdvancedSearchCondition as _AdvancedSearchCondition,
+} from "@/app/(dashboard)/research/search-mode-types";
 
 export type AdvancedSearchParams = {
-  conditions: SearchCondition[];
+  conditions: _AdvancedSearchCondition[];
   page?: number;
   pageSize?: number;
 };
@@ -110,26 +107,29 @@ export async function advancedSearchArticles(
   for (const cond of params.conditions) {
     if (cond.operator === "contains" || cond.operator === "equals") {
       switch (cond.field) {
-        case "keyword":
-          filter.titleKeyword = cond.value;
-          break;
         case "title":
           filter.titleKeyword = cond.value;
           break;
         case "content":
           filter.contentKeyword = cond.value;
           break;
-        case "tier":
+        case "outletTier": // was "tier"
           filter.outletTier = cond.value;
           break;
         case "district":
           filter.districtIds = [cond.value];
           break;
+        case "platform": // was "channel" — filter has no platform field, skip until Phase 3 searchAdvanced
+          break;
+        // outletName / outletRegion / topic / contentType / author —
+        // 旧 advancedSearchArticles 不支持，留待 Phase 3 切到 searchAdvanced 后弃用
       }
     }
     if (cond.field === "publishedAt" && cond.operator === "between") {
-      if (cond.value) filter.publishedAtFrom = new Date(cond.value);
-      if (cond.value2) filter.publishedAtTo = new Date(cond.value2);
+      if (cond.valueRange) {
+        filter.publishedAtFrom = new Date(cond.valueRange.from);
+        filter.publishedAtTo = new Date(cond.valueRange.to);
+      }
     }
   }
 
