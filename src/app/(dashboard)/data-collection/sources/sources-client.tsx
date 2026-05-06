@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { BulkImportDialog } from "./bulk-import-dialog";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -71,6 +72,7 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
@@ -236,12 +238,17 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
             共 {filtered.length} 个源
           </span>
         </div>
-        <Button asChild className="shadow-sm">
-          <Link href="/data-collection/sources/new">
-            <Plus className="mr-1.5 h-4 w-4" />
-            新建源
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => setBulkImportOpen(true)}>
+            批量导入
+          </Button>
+          <Button asChild className="shadow-sm">
+            <Link href="/data-collection/sources/new">
+              <Plus className="mr-1.5 h-4 w-4" />
+              新建源
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Table panel */}
@@ -417,6 +424,15 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
         variant="danger"
         loading={busyId === deleteTarget?.id}
         onConfirm={confirmDelete}
+      />
+
+      <BulkImportDialog
+        open={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        onComplete={() => {
+          setBulkImportOpen(false);
+          router.refresh();
+        }}
       />
     </div>
   );
