@@ -18,8 +18,6 @@ import {
 } from "@/db/seed/excel-import-virtual-source";
 import type { RawItem } from "@/lib/collection/types";
 
-export const maxDuration = 60; // Vercel server action timeout
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Task 2.1 — previewBulkImport
 // 扫前 100 行：outlet 字典命中预测 + fingerprint 去重检查 + 错误样本

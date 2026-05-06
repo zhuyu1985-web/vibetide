@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vites
 import { db } from "@/db";
 import { collectedItems, collectionRuns, collectionSources, organizations } from "@/db/schema";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { writeItems } from "../writer";
 import { bumpDictionaryVersion } from "@/lib/dal/media-outlet-dictionary";
 
@@ -345,6 +345,84 @@ describe("writer + outlet-recognizer 集成", () => {
     await db.update(mediaOutletDictionary)
       .set({ outletTier: "central", updatedAt: new Date() })
       .where(eq(mediaOutletDictionary.id, outletPeople));
+    await bumpDictionaryVersion(orgId);
+  });
+});
+
+describe("writer + bulk-import 集成", () => {
+  it("Excel 导入的 RawItem 入库后 outlet 自动识别 + virtual source 关联", async () => {
+    const { seedExcelImportVirtualSource, EXCEL_IMPORT_SOURCE_NAME } = await import(
+      "@/db/seed/excel-import-virtual-source"
+    );
+    await seedExcelImportVirtualSource(orgId);
+    const [vsource] = await db
+      .select()
+      .from(collectionSources)
+      .where(
+        and(
+          eq(collectionSources.organizationId, orgId),
+          eq(collectionSources.name, EXCEL_IMPORT_SOURCE_NAME),
+        ),
+      )
+      .limit(1);
+
+    // 灌字典让 recognizer 命中
+    const [o] = await db
+      .insert(mediaOutletDictionary)
+      .values({
+        organizationId: orgId,
+        outletName: "TEST_BULK_重庆生态环境",
+        outletTier: "government_self_media",
+        outletRegion: "重庆",
+        publicAccountNames: ["TEST_BULK_重庆生态环境"],
+      })
+      .returning();
+    await bumpDictionaryVersion(orgId);
+
+    const runId = await makeRun();
+    await writeItems({
+      runId,
+      sourceId: vsource!.id,
+      organizationId: orgId,
+      source: {
+        targetModules: [],
+        defaultCategory: null,
+        defaultTags: null,
+        outletId: null,
+        defaultOutletTier: null,
+        defaultOutletRegion: null,
+      },
+      items: [
+        {
+          title: "test bulk-import 集成 case",
+          url: undefined,
+          channel: "excel_import",
+          contentType: "image_text",
+          attachments: [],
+          rawMetadata: {
+            importedFromExcel: true,
+            publicAccountName: "TEST_BULK_重庆生态环境",
+          },
+        },
+      ],
+    });
+
+    // 用唯一 title 查（RawItem 没有 contentFingerprint 字段，不依赖 fingerprint 实现细节）
+    const [row] = await db
+      .select()
+      .from(collectedItems)
+      .where(
+        and(
+          eq(collectedItems.organizationId, orgId),
+          eq(collectedItems.title, "test bulk-import 集成 case"),
+        ),
+      )
+      .limit(1);
+    expect(row?.outletTier).toBe("government_self_media");
+    expect(row?.firstSeenSourceId).toBe(vsource!.id);
+
+    // 清理字典条目
+    await db.delete(mediaOutletDictionary).where(eq(mediaOutletDictionary.id, o!.id));
     await bumpDictionaryVersion(orgId);
   });
 });
