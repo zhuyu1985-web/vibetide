@@ -30,6 +30,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/openai": "^3.0.48",
+    "@e965/xlsx": "^0.20.3",
     "@node-rs/argon2": "^2.0.2",
     "@tiptap/core": "^3.20.4",
     "@tiptap/extension-character-count": "^3.20.4",
@@ -90,6 +91,7 @@
   "devDependencies": {
     "@next/env": "^16.2.4",
     "@tailwindcss/postcss": "^4",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -99,6 +101,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
     "shadcn": "^3.8.5",
     "tailwindcss": "^4",
