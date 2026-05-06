@@ -157,35 +157,10 @@ export type InngestEvents = {
       taskId: string;
     };
   };
-  "research/tavily.crawl": {
-    data: {
-      taskId: string;
-      topicId: string;
-      keywords: string[];
-      timeRangeStart: string;
-      timeRangeEnd: string;
-      includeDomains: string[];
-    };
-  };
-  "research/whitelist.crawl": {
-    data: {
-      taskId: string;
-      outletId: string;
-    };
-  };
-  "research/manual-url.ingest": {
-    data: {
-      taskId: string;
-      urls: string[];
-    };
-  };
-  "research/article.ingested": {
-    data: {
-      articleId: string;
-      taskId: string;
-      outletId: string | null;
-    };
-  };
+  // research/tavily.crawl — deleted A3 Phase 5 (走 Collection Hub tavily Adapter)
+  // research/whitelist.crawl — deleted A3 Phase 5 (走 list_scraper Adapter)
+  // research/manual-url.ingest — deleted A3 Phase 5 (走 jina_url Adapter)
+  // research/article.ingested — deleted A3 Phase 5 (无消费方)
 
   // ─── Collection Hub Events (2026-04-18) ───
 

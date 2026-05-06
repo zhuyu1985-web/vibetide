@@ -2,9 +2,12 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vites
 import { db } from "@/db";
 import { collectedItems, collectionRuns, collectionSources, organizations } from "@/db/schema";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
+import { researchTopics } from "@/db/schema/research/research-topics";
 import { and, eq } from "drizzle-orm";
 import { writeItems } from "../writer";
 import { bumpDictionaryVersion } from "@/lib/dal/media-outlet-dictionary";
+import { matchTopicsForItem } from "@/lib/research/topic-matcher";
+import { matchDistrictsForItem } from "@/lib/research/district-matcher";
 
 // Mock Inngest send to observe event emission without actually dispatching
 vi.mock("@/inngest/client", () => ({
@@ -424,6 +427,61 @@ describe("writer + bulk-import 集成", () => {
     // 清理字典条目
     await db.delete(mediaOutletDictionary).where(eq(mediaOutletDictionary.id, o!.id));
     await bumpDictionaryVersion(orgId);
+  });
+});
+
+describe("writer + a3 annotate 集成", () => {
+  // 验证：writer 写入采集项后，matcher 能命中对应 topic 和 district
+  // production 路径: writer → collection/item.created 事件 → Inngest annotateCollectedItem
+  // 本 case 直接调 matcher 函数绕过 inngest event 触发，验证 matcher 逻辑正确性
+
+  it("matcher 能命中 topic + district（间接验证 annotate inngest 自动触发逻辑）", async () => {
+    // 1. 灌测试 topic（name 作主词）
+    const [t] = await db.insert(researchTopics).values({
+      organizationId: orgId,
+      name: "TEST_A3_长江生态",
+    }).returning();
+
+    // 2. 使用固定 district id（直接在 matcher 调用时构造 — 不依赖 DB 真实行）
+    const testDistrictId = "00000000-0000-0000-0000-000000000001";
+
+    try {
+      // 3. 写入采集项
+      const runId = await makeRun();
+      const result = await writeItems({
+        runId,
+        sourceId,
+        organizationId: orgId,
+        source: { targetModules: [], defaultCategory: null, defaultTags: null },
+        items: [{
+          title: "TEST_A3_长江生态 在涪陵的最新进展",
+          url: "https://a3-test.example.com/art1",
+          channel: "test_a3",
+        }],
+      });
+      expect(result.inserted).toBe(1);
+
+      // 4. 直接调 matcher — 验证 topic 命中
+      const topicMatches = matchTopicsForItem(
+        "TEST_A3_长江生态 在涪陵的最新进展",
+        [{ id: t!.id, name: "TEST_A3_长江生态", primaryKeywords: ["TEST_A3_长江生态"], otherKeywords: [] }],
+      );
+      expect(topicMatches.length).toBe(1);
+      expect(topicMatches[0]!.topicId).toBe(t!.id);
+      expect(topicMatches[0]!.matchedKeyword).toBe("TEST_A3_长江生态");
+
+      // 5. 直接调 matcher — 验证 district 命中（"涪陵" 变体命中 "涪陵区"）
+      const districtMatches = matchDistrictsForItem(
+        "TEST_A3_长江生态 在涪陵的最新进展",
+        [{ id: testDistrictId, name: "涪陵区" }],
+      );
+      expect(districtMatches.length).toBe(1);
+      expect(districtMatches[0]!.districtId).toBe(testDistrictId);
+      expect(districtMatches[0]!.matchedKeyword).toBe("涪陵");
+    } finally {
+      // 清理（topic；collectedItems 由外层 beforeEach 清理）
+      await db.delete(researchTopics).where(eq(researchTopics.id, t!.id));
+    }
   });
 });
 

@@ -16,10 +16,6 @@ import { employeeStatusGuard } from "./employee-status-guard";
 import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
 import {
   researchTaskStart,
-  researchTavilyCrawl,
-  researchWhitelistCrawl,
-  researchManualUrlIngest,
-  researchArticleContentFetch,
   researchBridgeBackfill,
   annotateCollectedItem,
   backfillAnnotate,
@@ -65,12 +61,8 @@ export const functions = [
   employeeStatusGuard,
   // Knowledge base
   knowledgeBaseVectorize,
-  // News Research (S2)
+  // News Research (S2) — A3: 自采分支已迁至 Collection Hub Adapter 架构
   researchTaskStart,
-  researchTavilyCrawl,
-  researchWhitelistCrawl,
-  researchManualUrlIngest,
-  researchArticleContentFetch,
   researchBridgeBackfill,
   // Research auto-annotation (A3 Phase 3)
   annotateCollectedItem,
