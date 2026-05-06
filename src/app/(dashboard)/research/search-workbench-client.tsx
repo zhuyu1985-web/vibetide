@@ -31,16 +31,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/shared/glass-card";
-import { searchArticles, advancedSearchArticles } from "@/app/actions/research/article-search";
+import { searchArticles, advancedSearchArticles } from "@/app/actions/research/collected-item-search";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 // NOTE: MediaOutletSummary removed (A1 Phase 0); outlets stub to [] until A4 redesign
 type MediaOutletSummary = { id: string; name: string };
 import type {
-  ArticleSearchResult,
-  ArticleSearchResponse,
+  ResearchItemResult as ArticleSearchResult,
+  ResearchSearchResponse as ArticleSearchResponse,
   AdvancedSearchField,
   AdvancedSearchOperator,
-} from "@/lib/dal/research/news-article-search";
+} from "@/app/actions/research/collected-item-search";
 
 const TIER_OPTIONS = [
   { value: "central", label: "中央级" },
@@ -744,7 +744,7 @@ export function SearchWorkbenchClient({
                   align: "right",
                   render: (a) => (
                     <a
-                      href={a.url}
+                      href={a.url ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-end text-sky-600 hover:text-sky-700"
