@@ -26,21 +26,27 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
-  Plus,
-  X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/shared/glass-card";
-import { searchArticles, advancedSearchArticles } from "@/app/actions/research/collected-item-search";
+import {
+  searchArticles,
+  searchAdvanced,
+} from "@/app/actions/research/collected-item-search";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 // Outlet summary shape — id + name used for filter dropdown
 type MediaOutletSummary = { id: string; name: string };
 import type {
   ResearchItemResult as ArticleSearchResult,
   ResearchSearchResponse as ArticleSearchResponse,
-  AdvancedSearchField,
-  AdvancedSearchOperator,
 } from "@/app/actions/research/collected-item-search";
+import { AdvancedSearchBuilder, type BuilderOptions } from "./advanced-search-builder";
+import { AdvancedFiltersSidebar } from "./advanced-filters-sidebar";
+import type {
+  AdvancedSearchCondition,
+  SidebarFilter,
+} from "./search-mode-types";
+import { highlightKeyword } from "@/lib/research/keyword-highlight";
+import type { CollectedItemWithAnnotations } from "@/lib/dal/research/collected-item-search";
 
 const TIER_OPTIONS = [
   { value: "central", label: "中央级" },
@@ -81,80 +87,19 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 /* ─── Advanced search constants ─── */
-
-const FIELD_OPTIONS: { value: AdvancedSearchField; label: string }[] = [
-  { value: "title", label: "标题" },
-  { value: "content", label: "正文" },
-  { value: "outletName", label: "媒体名" },
-  { value: "outletTier", label: "媒体层级" },
-  { value: "district", label: "区县" },
-  { value: "platform", label: "采集来源" },
-  { value: "publishedAt", label: "发布时间" },
-];
-
-function getOperatorsForField(
-  field: AdvancedSearchField,
-): { value: AdvancedSearchOperator; label: string }[] {
-  switch (field) {
-    case "title":
-    case "content":
-      return [
-        { value: "contains", label: "包含" },
-        { value: "not_contains", label: "不含" },
-      ];
-    case "outletName":
-      return [
-        { value: "contains", label: "包含" },
-        { value: "not_contains", label: "不含" },
-        { value: "equals", label: "等于" },
-      ];
-    case "outletTier":
-    case "district":
-    case "platform":
-      return [
-        { value: "equals", label: "等于" },
-        { value: "not_equals", label: "不等于" },
-      ];
-    case "publishedAt":
-      return [{ value: "between", label: "在...之间" }];
-    default:
-      return [{ value: "contains", label: "包含" }];
-  }
-}
-
-type ConditionRow = {
-  id: string;
-  field: AdvancedSearchField;
-  operator: AdvancedSearchOperator;
-  value: string;
-  value2: string;
-  logic: "and" | "or";
-};
-
-let conditionIdCounter = 0;
-function newConditionId() {
-  return `cond_${++conditionIdCounter}_${Date.now()}`;
-}
-
-function defaultCondition(): ConditionRow {
-  return {
-    id: newConditionId(),
-    field: "title",
-    operator: "contains",
-    value: "",
-    value2: "",
-    logic: "and",
-  };
-}
+// 旧版 inline advanced builder（FIELD_OPTIONS / getOperatorsForField / ConditionRow / defaultCondition / renderValueInput）
+// 已在 A4 Phase 3 移除，由 AdvancedSearchBuilder + AdvancedFiltersSidebar + searchAdvanced action 替代。
 
 export function SearchWorkbenchClient({
   districts,
   outlets,
   initialResult,
+  builderOptions,
 }: {
   districts: CqDistrict[];
   outlets: MediaOutletSummary[];
   initialResult?: ArticleSearchResponse;
+  builderOptions: BuilderOptions;
 }) {
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"simple" | "advanced">("simple");
@@ -168,8 +113,37 @@ export function SearchWorkbenchClient({
   const [timeStart, setTimeStart] = useState("");
   const [timeEnd, setTimeEnd] = useState("");
 
-  // Advanced search conditions
-  const [conditions, setConditions] = useState<ConditionRow[]>([defaultCondition()]);
+  // A4 Phase 3：新版高级检索 state（外置 AdvancedSearchBuilder + AdvancedFiltersSidebar）
+  const [advConditions, setAdvConditions] = useState<AdvancedSearchCondition[]>([
+    {
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "adv-1",
+      field: "title",
+      operator: "contains",
+      value: "",
+      logic: "and",
+    },
+    {
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "adv-2",
+      field: "topic",
+      operator: "equals",
+      value: "",
+      logic: "and",
+    },
+    {
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "adv-3",
+      field: "publishedAt",
+      operator: "between",
+      value: "",
+      logic: "and",
+    },
+  ]);
+  const [advSidebarFilter, setAdvSidebarFilter] = useState<SidebarFilter>({});
+  const [advResults, setAdvResults] = useState<{
+    items: CollectedItemWithAnnotations[];
+    total: number;
+    page: number;
+    pageSize: number;
+  } | null>(null);
 
   // Results (shared) — pre-hydrate with latest articles so 首屏 has data without manual search
   const [result, setResult] = useState<ArticleSearchResponse | null>(initialResult ?? null);
@@ -201,80 +175,31 @@ export function SearchWorkbenchClient({
     [keyword, tierFilter, districtFilter, outletFilter, channelFilter, timeStart, timeEnd],
   );
 
-  /* ─── Advanced search ─── */
-
-  const doAdvancedSearch = useCallback(
-    (page: number) => {
-      const validConditions = conditions
-        .filter((c) => {
-          if (c.field === "publishedAt") return c.value.trim() && c.value2.trim();
-          return c.value.trim();
-        })
-        .map((c) => {
-          if (c.field === "publishedAt") {
-            return {
-              field: c.field,
-              operator: c.operator,
-              value: c.value.trim(),
-              valueRange: { from: c.value.trim(), to: c.value2.trim() },
-              logic: c.logic,
-            };
-          }
-          return {
-            field: c.field,
-            operator: c.operator,
-            value: c.value.trim(),
-            value2: c.value2.trim() || undefined,
-            logic: c.logic,
-          };
-        });
-
-      if (validConditions.length === 0) return;
-
-      startTransition(async () => {
-        const res = await advancedSearchArticles({
-          conditions: validConditions,
-          page,
-          pageSize: 50,
-        });
-        setResult(res);
-        setCurrentPage(page);
-      });
-    },
-    [conditions],
-  );
-
-  const doSearch = mode === "simple" ? doSimpleSearch : doAdvancedSearch;
+  // A4 Phase 3：简单模式仍走 doSimpleSearch；高级模式由 handleAdvancedSearch 单独处理
+  const doSearch = doSimpleSearch;
 
   function handleSearch() {
     setSelected(new Set());
     doSearch(1);
   }
 
-  /* ─── Condition row helpers ─── */
+  /* ─── A4 Phase 3：新版 advanced 检索（用 searchAdvanced server action） ─── */
 
-  function updateCondition(id: string, patch: Partial<ConditionRow>) {
-    setConditions((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+  async function handleAdvancedSearch() {
+    const filtered = advConditions.filter(
+      (c) => Boolean(c.value) || Boolean(c.valueRange),
     );
-  }
-
-  function handleFieldChange(id: string, field: AdvancedSearchField) {
-    const ops = getOperatorsForField(field);
-    updateCondition(id, { field, operator: ops[0].value, value: "", value2: "" });
-  }
-
-  function addCondition() {
-    if (conditions.length >= 10) return;
-    setConditions((prev) => [...prev, defaultCondition()]);
-  }
-
-  function removeCondition(id: string) {
-    setConditions((prev) => (prev.length <= 1 ? prev : prev.filter((c) => c.id !== id)));
-  }
-
-  function resetConditions() {
-    setConditions([defaultCondition()]);
+    try {
+      const res = await searchAdvanced({
+        conditions: filtered,
+        sidebarFilter: advSidebarFilter,
+        page: 1,
+        pageSize: 50,
+      });
+      setAdvResults(res);
+    } catch (err) {
+      toast.error(`检索失败：${(err as Error).message}`);
+    }
   }
 
   /* ─── Selection helpers ─── */
@@ -302,78 +227,6 @@ export function SearchWorkbenchClient({
   }
 
   const totalPages = result ? Math.ceil(result.total / result.pageSize) : 0;
-
-  /* ─── Condition value input renderer ─── */
-
-  function renderValueInput(row: ConditionRow) {
-    switch (row.field) {
-      case "outletTier":
-        return (
-          <Select value={row.value} onValueChange={(v) => updateCondition(row.id, { value: v })}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="选择层级" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIER_OPTIONS.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      case "district":
-        return (
-          <Select value={row.value} onValueChange={(v) => updateCondition(row.id, { value: v })}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="选择区县" />
-            </SelectTrigger>
-            <SelectContent>
-              {districts.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      case "platform":
-        return (
-          <Select value={row.value} onValueChange={(v) => updateCondition(row.id, { value: v })}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="选择来源" />
-            </SelectTrigger>
-            <SelectContent>
-              {CHANNEL_OPTIONS.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      case "publishedAt":
-        return (
-          <div className="flex items-center gap-1">
-            <DatePicker
-              value={row.value ? new Date(row.value) : null}
-              onChange={(d) => updateCondition(row.id, { value: d ? format(d, "yyyy-MM-dd") : "" })}
-              placeholder="开始"
-            />
-            <span className="text-xs text-muted-foreground">至</span>
-            <DatePicker
-              value={row.value2 ? new Date(row.value2) : null}
-              onChange={(d) => updateCondition(row.id, { value2: d ? format(d, "yyyy-MM-dd") : "" })}
-              placeholder="结束"
-            />
-          </div>
-        );
-      default:
-        return (
-          <Input
-            value={row.value}
-            onChange={(e) => updateCondition(row.id, { value: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="输入搜索值..."
-            className="w-48"
-          />
-        );
-    }
-  }
 
   return (
     <div className="max-w-[1400px] mx-auto w-full space-y-6">
@@ -515,110 +368,112 @@ export function SearchWorkbenchClient({
           </>
         )}
 
-        {/* Advanced mode */}
+        {/* Advanced mode (A4 Phase 3：外置 AdvancedSearchBuilder + AdvancedFiltersSidebar) */}
         {mode === "advanced" && (
-          <div className="space-y-2">
-            {conditions.map((row, idx) => (
-              <div key={row.id}>
-                {/* Logic connector between rows */}
-                {idx > 0 && (
-                  <div className="flex items-center gap-2 my-1.5 ml-2">
-                    <div className="flex gap-1">
-                      {(["and", "or"] as const).map((logic) => (
-                        <button
-                          key={logic}
-                          type="button"
-                          onClick={() => updateCondition(row.id, { logic })}
-                          className={cn(
-                            "px-2 py-0.5 rounded-full text-[11px] font-medium transition-all",
-                            row.logic === logic
-                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                              : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5"
-                          )}
-                        >
-                          {logic.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Condition row */}
-                <div className="flex items-center gap-2">
-                  {/* Field */}
-                  <Select
-                    value={row.field}
-                    onValueChange={(v) => handleFieldChange(row.id, v as AdvancedSearchField)}
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FIELD_OPTIONS.map((f) => (
-                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Operator */}
-                  <Select
-                    value={row.operator}
-                    onValueChange={(v) =>
-                      updateCondition(row.id, { operator: v as AdvancedSearchOperator })
-                    }
-                  >
-                    <SelectTrigger className="w-28">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getOperatorsForField(row.field).map((op) => (
-                        <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Value */}
-                  {renderValueInput(row)}
-
-                  {/* Remove */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeCondition(row.id)}
-                    disabled={conditions.length <= 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+          <div className="flex gap-4">
+            <div className="flex-1 space-y-3">
+              <AdvancedSearchBuilder
+                conditions={advConditions}
+                onChange={setAdvConditions}
+                options={builderOptions}
+              />
+              <div className="flex items-center gap-2 pt-1">
+                <div className="flex-1" />
+                <Button variant="ghost" onClick={handleAdvancedSearch} disabled={pending}>
+                  <Search className="h-4 w-4 mr-1" />
+                  开始检索
+                </Button>
               </div>
-            ))}
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 pt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={addCondition}
-                disabled={conditions.length >= 10}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                添加条件
-              </Button>
-              <Button variant="ghost" size="sm" onClick={resetConditions}>
-                重置
-              </Button>
-              <div className="flex-1" />
-              <Button variant="ghost" onClick={handleSearch} disabled={pending}>
-                <Search className="h-4 w-4 mr-1" />
-                检索
-              </Button>
+              {advResults && (
+                <div className="mt-4 space-y-3">
+                  <div className="text-sm text-muted-foreground">
+                    命中 <strong className="text-foreground">{advResults.total}</strong> 条
+                  </div>
+                  <DataTable
+                    rows={advResults.items}
+                    rowKey={(r) => r.id}
+                    columns={[
+                      {
+                        key: "title",
+                        header: "标题",
+                        render: (r) => {
+                          const titleKw = advConditions.find(
+                            (c) => c.field === "title" && c.operator === "contains",
+                          )?.value;
+                          return (
+                            <span className="truncate block" title={r.title}>
+                              {highlightKeyword(r.title, titleKw)}
+                            </span>
+                          );
+                        },
+                      },
+                      {
+                        key: "outlet",
+                        header: "媒体",
+                        width: "w-40",
+                        render: (r) => (
+                          <span className="text-muted-foreground truncate block">
+                            {r.outletName ?? "未分类"}
+                            {r.outletTier ? (
+                              <span className="ml-1 text-xs">
+                                ({TIER_LABELS[r.outletTier] ?? r.outletTier})
+                              </span>
+                            ) : null}
+                          </span>
+                        ),
+                      },
+                      {
+                        key: "publishedAt",
+                        header: "时间",
+                        width: "w-28",
+                        render: (r) => (
+                          <span className="text-xs text-muted-foreground">
+                            {r.publishedAt
+                              ? new Date(r.publishedAt).toLocaleDateString("zh-CN")
+                              : "-"}
+                          </span>
+                        ),
+                      },
+                      {
+                        key: "url",
+                        header: "原文",
+                        width: "w-14",
+                        align: "right",
+                        render: (r) =>
+                          r.url ? (
+                            <a
+                              href={r.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-end text-sky-600 hover:text-sky-700"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ),
+                      },
+                    ] satisfies DataTableColumn<CollectedItemWithAnnotations>[]}
+                  />
+                </div>
+              )}
             </div>
+
+            <AdvancedFiltersSidebar
+              filter={advSidebarFilter}
+              onChange={setAdvSidebarFilter}
+              options={{
+                districts: builderOptions.districts,
+                topics: builderOptions.topics,
+              }}
+            />
           </div>
         )}
       </div>
 
-      {/* Results (shared) */}
-      <div>
+      {/* Results (shared, simple mode only — advanced has its own DataTable above) */}
+      <div hidden={mode === "advanced"}>
         {!result ? (
           <GlassCard variant="default" padding="lg">
             <div className="text-center text-gray-500 dark:text-gray-400 py-10">

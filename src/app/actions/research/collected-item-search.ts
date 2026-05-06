@@ -2,6 +2,7 @@
 
 import { requirePermission, PERMISSIONS } from "@/lib/rbac";
 import {
+  advancedSearchCollectedItems,
   searchCollectedItemsForResearch,
   type CollectedItemSearchFilter,
   type CollectedItemWithAnnotations,
@@ -37,6 +38,7 @@ export type {
 
 import type {
   AdvancedSearchCondition as _AdvancedSearchCondition,
+  SidebarFilter as _SidebarFilter,
 } from "@/app/(dashboard)/research/search-mode-types";
 
 export type AdvancedSearchParams = {
@@ -159,4 +161,30 @@ export async function searchResearchItems(
     filter,
     { limit: pageSize, offset: (page - 1) * pageSize },
   );
+}
+
+// A4 Phase 3：searchAdvanced — 直接透传 sidebarFilter 给 DAL
+// DAL 内 buildSidebarExprs 各组独立 OR-bracket → 跨组 AND → 与用户 conditions AND
+// 用户手写 conditions ≤ 10 校验；sidebar 各组 OR-bracket 不计入 10 限
+export async function searchAdvanced(payload: {
+  conditions: _AdvancedSearchCondition[];
+  sidebarFilter: _SidebarFilter;
+  page?: number;
+  pageSize?: number;
+}) {
+  const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
+
+  if (payload.conditions.length > 10) {
+    throw new Error("手动条件超过 10，请减少行数");
+  }
+
+  const page = payload.page ?? 1;
+  const pageSize = payload.pageSize ?? 50;
+  const result = await advancedSearchCollectedItems(
+    organizationId,
+    payload.conditions,
+    { limit: pageSize, offset: (page - 1) * pageSize },
+    payload.sidebarFilter,
+  );
+  return { items: result.items, total: result.total, page, pageSize };
 }
