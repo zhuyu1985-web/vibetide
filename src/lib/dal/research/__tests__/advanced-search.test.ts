@@ -15,9 +15,10 @@ import type { AdvancedSearchCondition } from "@/app/(dashboard)/research/search-
 let orgId: string;
 let topicAId: string;
 let districtAId: string;
-let item1Id: string; // "美丽中国" central / 涪陵
-let item2Id: string; // "长江保护" provincial_municipal / 重庆 / 无 district 标注
-let item3Id: string; // 无 topic / 无 district industry
+let item1Id: string; // "美丽中国" central / 涪陵 / image_text / tavily / 2025-06
+let item2Id: string; // "长江保护" provincial_municipal / 重庆 / 无 district 标注 / image_text / tavily / 2025-06
+let item3Id: string; // 无 topic / 无 district industry / contentType=video / tavily / 2025-06
+let item4Id: string; // outletTier=null（NULL-safe fixture）/ contentType=video / channel=rss / 2024-01
 
 const TEST_DISTRICT_NAME = "TEST_涪陵区_a4";
 
@@ -90,9 +91,30 @@ beforeAll(async () => {
       publishedAt: new Date("2025-06-15"),
       outletTier: "industry",
       outletRegion: null,
+      contentType: "video", // 让 contentType 有 2 个不同值，避免 equals 测试退化为"全部命中默认值"
     })
     .returning();
   item3Id = i3!.id;
+
+  // item4：NULL-safe fixture — outletTier=null / outletRegion=null
+  // 故意放在 2025-06 区间之外 + 不同 channel + 不带"美丽"/"长江"等关键字，
+  // 这样仅 not_equals/not_contains 的 NULL-OR 兜底分支会涉及它。
+  const [i4] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgId,
+      contentFingerprint: "a4-fp4-" + Date.now(),
+      title: "无 tier 测试条目",
+      content: "测试内容",
+      firstSeenChannel: "rss",
+      firstSeenAt: new Date(),
+      publishedAt: new Date("2024-01-15"),
+      outletTier: null,
+      outletRegion: null,
+      contentType: "video",
+    })
+    .returning();
+  item4Id = i4!.id;
 
   await db.insert(researchCollectedItemTopics).values({
     collectedItemId: item1Id,
@@ -141,7 +163,7 @@ describe("advancedSearchCollectedItems — 单字段", () => {
       [{ field: "title", operator: "not_contains", value: "美丽", logic: "and" }],
       { limit: 10, offset: 0 },
     );
-    expect(r.items.length).toBe(2); // item2 + item3
+    expect(r.items.length).toBe(3); // item2 + item3 + item4
   });
 
   it("outletTier equals", async () => {
@@ -256,14 +278,26 @@ describe("advancedSearchCollectedItems — 单字段补齐（content/author/outl
     expect(r.items[0]!.id).toBe(item2Id);
   });
 
-  it("contentType equals（schema 默认 image_text，全部 3 条命中）", async () => {
-    // schema collection.contentType default = "image_text"
+  it("contentType equals image_text（item1+item2 命中，item3/item4=video 排除）", async () => {
+    // 关键：种子里 item1/item2 = image_text，item3/item4 = video
+    // 这样若实现 silently 丢掉 contentType 过滤，会返回 4 条而不是 2 条 — 测试可发现 bug
     const r = await advancedSearchCollectedItems(
       orgId,
       [{ field: "contentType", operator: "equals", value: "image_text", logic: "and" }],
       { limit: 10, offset: 0 },
     );
-    expect(r.items.length).toBe(3);
+    const ids = r.items.map((i) => i.id).sort();
+    expect(ids).toEqual([item1Id, item2Id].sort());
+  });
+
+  it("contentType equals video（item3+item4 命中）", async () => {
+    const r = await advancedSearchCollectedItems(
+      orgId,
+      [{ field: "contentType", operator: "equals", value: "video", logic: "and" }],
+      { limit: 10, offset: 0 },
+    );
+    const ids = r.items.map((i) => i.id).sort();
+    expect(ids).toEqual([item3Id, item4Id].sort());
   });
 
   it("platform equals（firstSeenChannel — tavily）", async () => {
@@ -293,6 +327,19 @@ describe("advancedSearchCollectedItems — 单字段补齐（content/author/outl
       { limit: 10, offset: 0 },
     );
     expect(r.items.length).toBe(0);
+  });
+
+  it("outletTier not_equals 'central' — NULL-safe OR 兜底分支命中 outlet_tier IS NULL 的行", async () => {
+    // 种子分布：item1=central / item2=provincial_municipal / item3=industry / item4=null
+    // not_equals 'central' 期望命中 item2 + item3 + item4(null)
+    // 若实现漏掉 `OR ${col} IS NULL`，item4 会因 SQL NULL != 'central' 不为 true 而被过滤掉 → 测试失败
+    const r = await advancedSearchCollectedItems(
+      orgId,
+      [{ field: "outletTier", operator: "not_equals", value: "central", logic: "and" }],
+      { limit: 10, offset: 0 },
+    );
+    const ids = r.items.map((i) => i.id).sort();
+    expect(ids).toEqual([item2Id, item3Id, item4Id].sort());
   });
 });
 
