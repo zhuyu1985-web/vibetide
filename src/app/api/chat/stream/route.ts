@@ -4,7 +4,7 @@ import { aiEmployees, userProfiles } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { streamText, stepCountIs } from "ai";
 import { getLanguageModel } from "@/lib/agent/model-router";
-import { resolveTools, toVercelTools } from "@/lib/agent/tool-registry";
+import { resolveTools, toVercelTools, createXiaoyanChatTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import { notifyChatMessage } from "@/lib/channels/chat-notifier";
@@ -125,7 +125,19 @@ export async function POST(req: Request) {
     }
 
     // Free chat: use agent's own tools (no scenario-specific toolsHint)
-    const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
+    const baseTools = toVercelTools(agent.tools, agent.pluginConfigs);
+    // xiaoyan / xiaolei chat tools — research_query_builder（A6 Phase 3）
+    // 仅当 employee 已通过 employee_skills 绑了对应 skill 时才合并真实 execute。
+    const xiaoyanTools = createXiaoyanChatTools({
+      organizationId,
+      employeeSlug,
+    });
+    const vercelTools: typeof baseTools = { ...baseTools };
+    for (const t of agent.tools) {
+      if (t.name === "research_query_builder" && xiaoyanTools[t.name]) {
+        (vercelTools as Record<string, unknown>)[t.name] = xiaoyanTools[t.name];
+      }
+    }
 
     // Anti-hallucination addendum: intent-execute 路径已用 invokeToolDirectly
     // server 端预执行保护；free-chat 路径 LLM 自由度更高，这里至少把"禁止凭

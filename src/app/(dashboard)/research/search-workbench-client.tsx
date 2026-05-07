@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ export function SearchWorkbenchClient({
   initialResult?: ArticleSearchResponse;
   builderOptions: BuilderOptions;
 }) {
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"simple" | "advanced">("simple");
 
@@ -202,6 +204,93 @@ export function SearchWorkbenchClient({
       toast.error(`检索失败：${(err as Error).message}`);
     }
   }
+
+  /* ─── A6 Phase 3: deeplink hydrate (?apply_query_builder=<JSON>) ─── */
+  // research_query_builder tool 的 ToolActionCard "一键填入 A4 高级检索" 按钮
+  // 会跳到 /research?mode=advanced&apply_query_builder=<encoded JSON>。
+  // 这里读 searchParams 解析 → 切到 advanced 模式 + 填入 conditions / sidebarFilter
+  // → 自动触发一次检索。
+  useEffect(() => {
+    const raw = searchParams.get("apply_query_builder");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        conditions?: Array<{
+          field: string;
+          operator: string;
+          value: string | string[];
+          logic: "and" | "or";
+        }>;
+        sidebarFilter?: {
+          districtIds?: string[];
+          topicIds?: string[];
+        } | null;
+      };
+
+      if (!Array.isArray(parsed.conditions) || parsed.conditions.length === 0) {
+        toast.error("AI 检索助手返回的条件为空");
+        return;
+      }
+
+      // 把 skill 输出形态映射到 AdvancedSearchCondition：
+      //   between → 用 valueRange (from/to) 替代字符串
+      //   其他 → 字符串 value
+      const mapped: AdvancedSearchCondition[] = parsed.conditions.map(
+        (c, i) => {
+          if (
+            c.operator === "between" &&
+            Array.isArray(c.value) &&
+            c.value.length === 2
+          ) {
+            return {
+              id: `applied-${i}`,
+              field: c.field as AdvancedSearchCondition["field"],
+              operator: "between",
+              value: "",
+              valueRange: { from: c.value[0], to: c.value[1] },
+              logic: c.logic ?? "and",
+            };
+          }
+          return {
+            id: `applied-${i}`,
+            field: c.field as AdvancedSearchCondition["field"],
+            operator: c.operator as AdvancedSearchCondition["operator"],
+            value: Array.isArray(c.value) ? c.value.join(",") : c.value,
+            logic: c.logic ?? "and",
+          };
+        },
+      );
+
+      setMode("advanced");
+      setAdvConditions(mapped);
+      setAdvSidebarFilter({
+        districtIds: parsed.sidebarFilter?.districtIds,
+        topicIds: parsed.sidebarFilter?.topicIds,
+      });
+      toast.success(`已应用 AI 检索助手的 ${mapped.length} 条条件`);
+      // 自动跑一次检索；handleAdvancedSearch 自带 try/catch + toast.error
+      void (async () => {
+        try {
+          const res = await searchAdvanced({
+            conditions: mapped,
+            sidebarFilter: {
+              districtIds: parsed.sidebarFilter?.districtIds,
+              topicIds: parsed.sidebarFilter?.topicIds,
+            },
+            page: 1,
+            pageSize: 50,
+          });
+          setAdvResults(res);
+        } catch (err) {
+          toast.error(`AI 助手填入后检索失败：${(err as Error).message}`);
+        }
+      })();
+    } catch (err) {
+      toast.error(`AI 检索助手参数解析失败：${(err as Error).message}`);
+    }
+    // 仅在 mount 时跑一次（searchParams 引用稳定，看 next/navigation 文档）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ─── Selection helpers ─── */
 

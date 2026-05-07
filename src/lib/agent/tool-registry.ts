@@ -1737,6 +1737,40 @@ export function createKnowledgeBaseTools(context: {
   return tools;
 }
 
+// ---------------------------------------------------------------------------
+// xiaoyan / xiaolei chat tools — research_query_builder (+ data_pivoter Phase 4)
+// orgId-scoped — injected at chat-stream time, not in static ALL_TOOLS.
+// 与 createMissionTools / createKnowledgeBaseTools 同模式（lazy factory）。
+// ---------------------------------------------------------------------------
+
+export function createXiaoyanChatTools(context: {
+  organizationId: string;
+  employeeSlug?: string;
+}): ToolSet {
+  // 仅 xiaoyan / xiaolei 注入；其他员工返回空集
+  if (
+    context.employeeSlug &&
+    context.employeeSlug !== "xiaoyan" &&
+    context.employeeSlug !== "xiaolei"
+  ) {
+    return {};
+  }
+
+  // 动态 import 避免循环依赖（research-query-builder.ts → assembly.ts → tool-registry.ts）
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const {
+    createResearchQueryBuilderTool,
+  } = require("./skills/research-query-builder") as typeof import("./skills/research-query-builder");
+
+  const tools: ToolSet = {
+    research_query_builder: createResearchQueryBuilderTool(
+      context.organizationId,
+    ),
+  };
+  // Phase 4 will add: tools.data_pivoter = createDataPivoterTool(...)
+  return tools;
+}
+
 export function toVercelTools(
   agentTools: AgentTool[],
   pluginConfigs?: Map<string, { description: string; config: PluginConfig }>,
