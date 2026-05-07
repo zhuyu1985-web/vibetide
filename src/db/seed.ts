@@ -138,6 +138,25 @@ const employeesData = [
     satisfaction: 95,
   },
   {
+    slug: "xiaoyan",
+    name: "学术研究员",
+    nickname: "学术研究员",
+    title: "学术研究员",
+    motto: "客观中立的研究分析，论文级别的报告产出",
+    roleType: "research_analyst",
+    // 注：spec §2.2 / plan §1.2 原写 "assistant"，但 authority_level enum 仅含
+    // observer/advisor/executor/coordinator。学术研究员定位偏建议 + 报告产出，
+    // 与 xiaoshu(数据分析师) 一致用 advisor。如后续要单独 assistant 等级，
+    // 需独立 spec + enum 迁移。
+    authorityLevel: "advisor" as const,
+    status: "idle" as const,
+    currentTask: null,
+    tasksCompleted: 0,
+    accuracy: 0,
+    avgResponseTime: "0s",
+    satisfaction: 0,
+  },
+  {
     slug: "leader",
     name: "任务总监",
     nickname: "小领",
@@ -287,6 +306,34 @@ async function seed() {
     }
   }
   console.log(`   ${empsCreated} new / ${employeesData.length - empsCreated} existing employees\n`);
+
+  // xiaoyan 是 A6 新员工，单独写 workPreferences / autoActions / needApprovalActions
+  // （其他 8 员工沿用 NULL/默认）。idempotent — 反复跑不会冲突。
+  const xiaoyanId = employeeMap.get("xiaoyan");
+  if (xiaoyanId) {
+    await db
+      .update(schema.aiEmployees)
+      .set({
+        workPreferences: {
+          proactivity: "balanced",
+          reportingFrequency: "on_demand",
+          autonomyLevel: 60,
+          communicationStyle: "formal_academic",
+          workingHours: "09:00-22:00",
+        },
+        autoActions: [
+          "draft_research_report",
+          "build_research_query",
+          "compute_data_pivot",
+        ],
+        needApprovalActions: [
+          "publish_report",
+          "delete_report",
+          "export_to_external_system",
+        ],
+      })
+      .where(eq(schema.aiEmployees.id, xiaoyanId));
+  }
 
   // 2026-04-23: app_channels 已下线（CMS 推送目标改为 article-mapper 硬编码）
 

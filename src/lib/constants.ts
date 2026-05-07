@@ -10,6 +10,7 @@ import {
   Brain,
   Crown,
   FileSearch,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ export type EmployeeId =
   | "xiaoshen"
   | "xiaofa"
   | "xiaoshu"
+  | "xiaoyan"
   | "xiaotan"
   | "advisor"
   | "leader";
@@ -118,6 +120,16 @@ export const EMPLOYEE_META: Record<EmployeeId, EmployeeMeta> = {
     color: "#f97316",
     bgColor: "rgba(249,115,22,0.12)",
   },
+  xiaoyan: {
+    id: "xiaoyan",
+    name: "学术研究员",
+    nickname: "学术研究员",
+    title: "学术研究员",
+    description: "客观中立的研究分析，论文级别的报告产出",
+    icon: BookOpen,
+    color: "#4f46e5",
+    bgColor: "rgba(79,70,229,0.12)",
+  },
   xiaotan: {
     id: "xiaotan",
     name: "深度调查员",
@@ -159,6 +171,7 @@ export const EMPLOYEE_SHORT_DESC: Record<EmployeeId, string> = {
   xiaoshen: "多维事实核查，质量合规全面把关",
   xiaofa: "多平台策略制定，精准分发与投放",
   xiaoshu: "实时数据洞察，追踪效果深度复盘",
+  xiaoyan: "数据驱动学术研究，论文级研报产出",
   xiaotan: "深度调查专题追踪，挖掘事件真相",
   advisor: "频道运营策略咨询，内容方向建议",
   leader: "智能项目管理，多员工协同调度",
@@ -324,6 +337,9 @@ export const BUILTIN_SKILL_NAMES: Record<string, string> = {
   media_search: "媒资检索",
   case_reference: "案例参考",
   data_report: "数据报告",
+  report_drafter: "学术报告草拟",
+  research_query_builder: "研究检索构建",
+  data_pivoter: "数据透视分析",
 };
 
 // ---------------------------------------------------------------------------
@@ -431,6 +447,7 @@ export const EMPLOYEE_CORE_SKILLS: Record<string, string[]> = {
   xiaoshen: ["quality_review", "compliance_check", "fact_check", "sentiment_analysis"],
   xiaofa: ["publish_strategy", "style_rewrite", "translation", "audience_analysis"],
   xiaoshu: ["data_report", "competitor_analysis", "audience_analysis", "heat_scoring"],
+  xiaoyan: ["report_drafter", "research_query_builder", "data_pivoter"],
 };
 
 // Read-only tool names for advisor authority level
