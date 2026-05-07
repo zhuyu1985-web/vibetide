@@ -24,6 +24,7 @@ import {
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import { researchTopics } from "@/db/schema/research/research-topics";
 import type { ReportSearchSnapshot } from "@/db/schema/research/reports";
+import type { ExcelAppendixRow } from "@/lib/research/report-excel-builder";
 
 import { computeReportAggregates } from "@/lib/research/report-aggregator";
 import { renderTemplateBrief } from "@/lib/research/report-template";
@@ -422,7 +423,160 @@ export const researchReportGenerate = inngest.createFunction(
       }
     });
 
-    // TODO(Phase 7): step-6-generate-excel — @e965/xlsx + Supabase Storage upload
+    // ─── Step 6: generate Excel ─────────────────────────────────────
+    // Spec §4.2: Excel 失败不阻塞主流程，仅 disable 导出按钮。
+    // 失败仅 logger.error + 跳过 excelFileUrl 写入，不抛错。
+    // 附录 join 重新跑（跨 step 不能共享变量；性能影响 < 100ms 可接受）。
+    await step.run("step-6-excel", async () => {
+      await updateReportStatus(reportId, { currentStep: "生成 Excel" });
+      try {
+        const { buildReportXlsx } = await import("@/lib/research/report-excel-builder");
+        const { uploadFile, getSignedUrl, buildObjectPath } = await import(
+          "@/lib/research/report-storage"
+        );
+
+        const hitItemIds = step1.snapshot.hitItemIds;
+
+        // 附录基础数据（leftJoin outlet）
+        const appendixBase = await db
+          .select({
+            id: collectedItems.id,
+            title: collectedItems.title,
+            outletName: mediaOutletDictionary.outletName,
+            outletTier: collectedItems.outletTier,
+            outletRegion: collectedItems.outletRegion,
+            publishedAt: collectedItems.publishedAt,
+            firstSeenAt: collectedItems.firstSeenAt,
+            url: collectedItems.canonicalUrl,
+            contentType: collectedItems.contentType,
+          })
+          .from(collectedItems)
+          .leftJoin(
+            mediaOutletDictionary,
+            and(
+              eq(mediaOutletDictionary.id, collectedItems.outletId),
+              eq(
+                mediaOutletDictionary.organizationId,
+                collectedItems.organizationId,
+              ),
+            ),
+          )
+          .where(
+            and(
+              eq(collectedItems.organizationId, organizationId),
+              inArray(collectedItems.id, hitItemIds),
+            ),
+          );
+
+        // join 命中区县（多对多）→ Map<itemId, Set<districtName>>
+        const districtRows = hitItemIds.length
+          ? await db
+              .select({
+                itemId: researchCollectedItemDistricts.collectedItemId,
+                districtName: cqDistricts.name,
+              })
+              .from(researchCollectedItemDistricts)
+              .leftJoin(
+                cqDistricts,
+                eq(researchCollectedItemDistricts.districtId, cqDistricts.id),
+              )
+              .where(
+                inArray(
+                  researchCollectedItemDistricts.collectedItemId,
+                  hitItemIds,
+                ),
+              )
+          : [];
+        const districtsByItem = new Map<string, Set<string>>();
+        for (const r of districtRows) {
+          if (!r.districtName) continue;
+          const slot = districtsByItem.get(r.itemId) ?? new Set<string>();
+          slot.add(r.districtName);
+          districtsByItem.set(r.itemId, slot);
+        }
+
+        // join 命中主题（多对多）→ Map<itemId, Set<topicName>>
+        const topicRows = hitItemIds.length
+          ? await db
+              .select({
+                itemId: researchCollectedItemTopics.collectedItemId,
+                topicName: researchTopics.name,
+              })
+              .from(researchCollectedItemTopics)
+              .leftJoin(
+                researchTopics,
+                eq(researchCollectedItemTopics.topicId, researchTopics.id),
+              )
+              .where(
+                inArray(
+                  researchCollectedItemTopics.collectedItemId,
+                  hitItemIds,
+                ),
+              )
+          : [];
+        const topicsByItem = new Map<string, Set<string>>();
+        for (const r of topicRows) {
+          if (!r.topicName) continue;
+          const slot = topicsByItem.get(r.itemId) ?? new Set<string>();
+          slot.add(r.topicName);
+          topicsByItem.set(r.itemId, slot);
+        }
+
+        // 按 publishedAt 升序（null 放后），与 Word 附录顺序一致
+        const sortedAppendix = [...appendixBase].sort((a, b) => {
+          const aTime = a.publishedAt ? a.publishedAt.getTime() : Number.MAX_SAFE_INTEGER;
+          const bTime = b.publishedAt ? b.publishedAt.getTime() : Number.MAX_SAFE_INTEGER;
+          return aTime - bTime;
+        });
+
+        const excelAppendix: ExcelAppendixRow[] = sortedAppendix.map((r) => ({
+          title: r.title || "(无标题)",
+          outletName: r.outletName,
+          outletTier: r.outletTier,
+          outletRegion: r.outletRegion,
+          districtNames: Array.from(districtsByItem.get(r.id) ?? []),
+          topicNames: Array.from(topicsByItem.get(r.id) ?? []),
+          publishedAt: r.publishedAt
+            ? r.publishedAt.toISOString().slice(0, 10)
+            : null,
+          firstSeenAt: r.firstSeenAt
+            ? r.firstSeenAt.toISOString().slice(0, 10)
+            : null,
+          url: r.url,
+          contentType: r.contentType,
+        }));
+
+        const aggregatesWithFlag = {
+          ...step1.aggregates,
+          isAiFallback: step3.isAiFallback,
+        };
+
+        const buf = buildReportXlsx({
+          aggregates: aggregatesWithFlag,
+          appendix: excelAppendix,
+        });
+
+        const objectPath = buildObjectPath(organizationId, reportId, "report.xlsx");
+        await uploadFile(
+          objectPath,
+          buf,
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
+        const signed = await getSignedUrl(objectPath);
+        // 仅写 excelFileUrl；fileExpiresAt 由 Step 5 已写入（两文件共用 24h TTL，
+        // 同 step run 时间近似一致；如 Step 5 因故未写则 Step 6 也补一份）。
+        await updateReportStatus(reportId, {
+          excelFileUrl: signed.url,
+          fileExpiresAt: signed.expiresAt,
+        });
+      } catch (err) {
+        // Spec §4.2: Excel 失败不阻塞主流程，仅 disable 导出按钮 + tooltip "Excel 生成失败"
+        logger.error(
+          `[a5][step-6-excel] 失败（不阻塞主流程）: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        // excelFileUrl 保持 null（schema 默认），前端通过缺值 disable 按钮
+      }
+    });
 
     // ─── Step 7: finalize ───────────────────────────────────────────
     await step.run("step-7-finalize", async () => {
