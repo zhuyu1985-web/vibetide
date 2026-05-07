@@ -5,7 +5,10 @@
 
 import { notFound } from "next/navigation";
 
-import { getReportById } from "@/lib/dal/research/reports";
+import {
+  getReportById,
+  listSnapshotsByParent,
+} from "@/lib/dal/research/reports";
 import { PERMISSIONS, requirePermission } from "@/lib/rbac";
 import type { AggregatesJson } from "@/db/schema/research/reports";
 
@@ -24,6 +27,11 @@ export default async function ReportPage({ params }: Props) {
 
   const agg = (report.aggregatesJson as AggregatesJson | null) ?? null;
 
+  // Phase 9：仅母版报告加载快照列表（spec：快照不能再创建快照）
+  const snapshots = report.isSnapshot
+    ? []
+    : await listSnapshotsByParent(report.id, organizationId);
+
   return (
     <ReportClient
       reportId={report.id}
@@ -39,6 +47,11 @@ export default async function ReportPage({ params }: Props) {
       initialExcelFileUrl={report.excelFileUrl}
       initialAggregates={agg}
       initialIsAiFallback={agg?.isAiFallback ?? false}
+      snapshots={snapshots.map((s) => ({
+        id: s.id,
+        snapshotName: s.snapshotName ?? "(未命名快照)",
+        createdAt: s.createdAt.toISOString(),
+      }))}
     />
   );
 }

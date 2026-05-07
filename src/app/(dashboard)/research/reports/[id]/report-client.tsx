@@ -16,9 +16,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { History, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { GlassCard } from "@/components/shared/glass-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { BarChartCard } from "@/components/charts/bar-chart-card";
@@ -26,11 +29,26 @@ import { DonutChartCard } from "@/components/charts/donut-chart-card";
 import { HorizontalBarChartCard } from "@/components/charts/horizontal-bar-chart-card";
 import { LineChartCard } from "@/components/charts/line-chart-card";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  getSignedUrlForReport,
   pollReport,
   regenerateReport,
+  saveAsSnapshot,
   type ReportPollStatus,
 } from "@/app/actions/research/reports";
 import type { AggregatesJson } from "@/db/schema/research/reports";
+
+interface SnapshotSummary {
+  id: string;
+  snapshotName: string;
+  createdAt: string;
+}
 
 interface Props {
   reportId: string;
@@ -44,6 +62,8 @@ interface Props {
   initialExcelFileUrl: string | null;
   initialAggregates: AggregatesJson | null;
   initialIsAiFallback: boolean;
+  // Phase 9：母版报告加载的快照列表（快照报告恒为空数组）
+  snapshots: SnapshotSummary[];
 }
 
 const POLL_INTERVAL_MS = 3000;
@@ -73,6 +93,17 @@ export function ReportClient(props: Props) {
   );
   const [regenerating, setRegenerating] = useState(false);
 
+  // Phase 9：另存为快照 dialog 状态
+  const [snapshotDialogOpen, setSnapshotDialogOpen] = useState(false);
+  const [snapshotName, setSnapshotName] = useState("");
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
+
+  // Phase 9：快照列表展开 / 折叠
+  const [snapshotsExpanded, setSnapshotsExpanded] = useState(false);
+
+  // Phase 9：导出 / 分享 loading
+  const [exporting, setExporting] = useState<"word" | "excel" | null>(null);
+
   // Polling — 仅在 pending/generating 时跑
   useEffect(() => {
     if (status !== "pending" && status !== "generating") return;
@@ -96,6 +127,7 @@ export function ReportClient(props: Props) {
 
   async function handleRegenerate() {
     if (regenerating) return;
+    if (!confirm("确认重新生成？现有报告内容将被覆盖。")) return;
     setRegenerating(true);
     try {
       await regenerateReport(props.reportId);
@@ -108,12 +140,70 @@ export function ReportClient(props: Props) {
       setWordFileUrl(null);
       setExcelFileUrl(null);
       setIsAiFallback(false);
+      toast.success("已提交重新生成，请稍候...");
     } catch (err) {
       console.error("[report-client] regenerate failed", err);
       const msg = err instanceof Error ? err.message : "重新生成失败";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setRegenerating(false);
+    }
+  }
+
+  // Phase 9：保存为快照
+  async function handleSaveSnapshot() {
+    const name = snapshotName.trim();
+    if (!name || savingSnapshot) return;
+    setSavingSnapshot(true);
+    try {
+      await saveAsSnapshot({
+        parentReportId: props.reportId,
+        snapshotName: name,
+      });
+      toast.success("快照已保存");
+      setSnapshotDialogOpen(false);
+      setSnapshotName("");
+      // revalidatePath 已由 server action 触发；刷新当前页拿到最新 snapshots prop
+      window.location.reload();
+    } catch (err) {
+      console.error("[report-client] saveAsSnapshot failed", err);
+      const msg = err instanceof Error ? err.message : "保存快照失败";
+      toast.error(msg);
+    } finally {
+      setSavingSnapshot(false);
+    }
+  }
+
+  // Phase 9：复制分享链接
+  async function handleCopyShareLink() {
+    const url = `${window.location.origin}/research/reports/${props.reportId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(
+        "已复制分享链接 — vibetide 内部用户可直接访问；非 vibetide 用户请通过 Word/Excel 文件链接查看",
+      );
+    } catch (err) {
+      console.error("[report-client] copy share link failed", err);
+      toast.error("复制失败，请手动复制地址栏 URL");
+    }
+  }
+
+  // Phase 9：导出（Word / Excel）走 server action 重签 24h URL
+  async function handleExport(kind: "word" | "excel") {
+    if (exporting) return;
+    setExporting(kind);
+    try {
+      const { url } = await getSignedUrlForReport(props.reportId, kind);
+      window.open(url, "_blank");
+    } catch (err) {
+      console.error(`[report-client] export ${kind} failed`, err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : `${kind === "word" ? "Word" : "Excel"} 文件未生成或已失效，请重新生成`;
+      toast.error(msg);
+    } finally {
+      setExporting(null);
     }
   }
 
@@ -143,10 +233,17 @@ export function ReportClient(props: Props) {
       <div className="p-6">
         <PageHeader title={props.title} description="生成失败" />
         <GlassCard className="p-8">
-          <p className="text-sm text-red-600 dark:text-red-400 mb-4">
-            {errorMessage ?? "未知错误"}
-          </p>
-          {!props.isSnapshot && (
+          <div className="mb-4 p-3 rounded-md bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 text-sm">
+            <div className="font-medium mb-1">报告生成失败</div>
+            <div className="text-xs opacity-90">
+              {errorMessage ?? "未知错误，请重试或联系管理员"}
+            </div>
+          </div>
+          {props.isSnapshot ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              快照报告不支持重新生成。
+            </p>
+          ) : (
             <Button
               variant="ghost"
               onClick={handleRegenerate}
@@ -196,47 +293,108 @@ export function ReportClient(props: Props) {
           description={props.isSnapshot ? "快照" : "母版"}
           actions={
             <div className="flex items-center gap-2">
-              {wordFileUrl && (
-                <Button
-                  variant="ghost"
-                  onClick={() => window.open(wordFileUrl, "_blank")}
-                >
-                  导出 Word
-                </Button>
-              )}
-              {excelFileUrl && (
-                <Button
-                  variant="ghost"
-                  onClick={() => window.open(excelFileUrl, "_blank")}
-                >
-                  导出 Excel
-                </Button>
-              )}
-              {!props.isSnapshot && (
-                <Button
-                  variant="ghost"
-                  onClick={handleRegenerate}
-                  disabled={regenerating}
-                >
-                  {regenerating ? "提交中..." : "重新生成"}
-                </Button>
-              )}
-              {/* Phase 9 接入：另存为快照 / 分享链接 */}
-              <Button variant="ghost" disabled title="Phase 9 接入">
-                另存为快照
+              <Button
+                variant="ghost"
+                onClick={() => handleExport("word")}
+                disabled={!wordFileUrl || exporting !== null}
+                title={
+                  wordFileUrl
+                    ? "下载 Word 文件"
+                    : "Word 文件未生成或已失效，请重新生成"
+                }
+              >
+                {exporting === "word" ? "导出中..." : "导出 Word"}
               </Button>
-              <Button variant="ghost" disabled title="Phase 9 接入">
+              <Button
+                variant="ghost"
+                onClick={() => handleExport("excel")}
+                disabled={!excelFileUrl || exporting !== null}
+                title={
+                  excelFileUrl
+                    ? "下载 Excel 文件"
+                    : "Excel 文件未生成或已失效，请重新生成"
+                }
+              >
+                {exporting === "excel" ? "导出中..." : "导出 Excel"}
+              </Button>
+              <Button variant="ghost" onClick={handleCopyShareLink}>
                 分享链接
               </Button>
+              {!props.isSnapshot && (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSnapshotDialogOpen(true)}
+                  >
+                    另存为快照
+                  </Button>
+                  {props.snapshots.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSnapshotsExpanded((v) => !v)}
+                    >
+                      <History className="mr-1 h-4 w-4" />
+                      快照 ({props.snapshots.length})
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    onClick={handleRegenerate}
+                    disabled={regenerating}
+                  >
+                    {regenerating ? "提交中..." : "重新生成"}
+                  </Button>
+                </>
+              )}
             </div>
           }
         />
 
         {isAiFallback && (
-          <div className="mb-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-sm">
-            AI 段落降级，已使用模板兜底。可点击「重新生成」重试。
+          <div className="mb-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-sm flex items-center justify-between gap-3">
+            <span>
+              AI 段落降级，已使用模板兜底。可点击「重新生成」重试。
+            </span>
+            {!props.isSnapshot && (
+              <Button
+                variant="ghost"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="shrink-0"
+              >
+                {regenerating ? "提交中..." : "重新生成"}
+              </Button>
+            )}
           </div>
         )}
+
+        {!props.isSnapshot &&
+          snapshotsExpanded &&
+          props.snapshots.length > 0 && (
+            <GlassCard className="mb-4 p-4">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                历史快照 ({props.snapshots.length})
+              </div>
+              <ul className="space-y-1 text-sm">
+                {props.snapshots.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <Link
+                      href={`/research/reports/${s.id}`}
+                      className="text-sky-600 dark:text-sky-400 hover:underline truncate"
+                    >
+                      {s.snapshotName}
+                    </Link>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                      {new Date(s.createdAt).toLocaleString("zh-CN")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </GlassCard>
+          )}
 
         <ReportHtmlBody html={reportHtml ?? ""} />
 
@@ -293,6 +451,53 @@ export function ReportClient(props: Props) {
           </div>
         )}
       </div>
+
+      {/* Phase 9：另存为快照 dialog（仅母版报告挂载） */}
+      {!props.isSnapshot && (
+        <Dialog
+          open={snapshotDialogOpen}
+          onOpenChange={(open) => {
+            setSnapshotDialogOpen(open);
+            if (!open) setSnapshotName("");
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>另存为快照</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                快照名称
+              </label>
+              <Input
+                value={snapshotName}
+                onChange={(e) => setSnapshotName(e.target.value)}
+                placeholder="例如：导师 v1 反馈版"
+                disabled={savingSnapshot}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                快照会复制当前报告内容，方便保留多个版本对比。
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setSnapshotDialogOpen(false)}
+                disabled={savingSnapshot}
+              >
+                取消
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleSaveSnapshot}
+                disabled={!snapshotName.trim() || savingSnapshot}
+              >
+                {savingSnapshot ? "保存中..." : "保存"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
