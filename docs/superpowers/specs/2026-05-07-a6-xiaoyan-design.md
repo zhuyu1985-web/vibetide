@@ -158,14 +158,21 @@ xiaoyan 与 xiaolei 的关键差异（主 spec §4.7）：xiaolei 偏产品/爆�
 ```ts
 import { generateText, Output } from "ai";
 import { assembleAgent } from "@/lib/agent/assembly";
+import { getLanguageModel } from "@/lib/agent/model-router";
 
-const agent = await assembleAgent("xiaoyan", undefined, {
+// 1) 先按 orgId+slug 查 xiaoyan 的 employee row（拿 employeeId）
+const xiaoyan = await db.query.aiEmployees.findFirst({
+  where: and(eq(aiEmployees.organizationId, orgId), eq(aiEmployees.slug, "xiaoyan")),
+});
+if (!xiaoyan) throw new Error("xiaoyan employee not seeded in this org (依赖 A6)");
+
+// 2) assembleAgent 真实签名：(employeeId: string, modelOverride?, context?)
+const agent = await assembleAgent(xiaoyan.id, undefined, {
   skillOverrides: ["report_drafter"],
-  organizationId: orgId,
 });
 
 const { output } = await generateText({
-  model: agent.model,
+  model: getLanguageModel(agent.modelConfig),
   system: agent.systemPrompt,
   prompt: JSON.stringify(payload),
   output: Output.object({ schema: ReportParagraphsSchema }),
@@ -173,6 +180,8 @@ const { output } = await generateText({
   maxOutputTokens: 4000,
 });
 ```
+
+注：`assembleAgent` 真实签名为 `(employeeId: string, modelOverride?: Partial<ModelConfig>, context?: { sensitiveTopics?, skillOverrides? })` —— 第 1 参数是 employee UUID（不是 row），第 2 参数为 modelOverride（不需要时传 `undefined`），第 3 参数才是 context。orgId 在内部通过查 employee row 自动绑定。
 
 **不**进 chat tool registry（不是 chat tool，是 backend Inngest job）。
 
@@ -313,7 +322,10 @@ A6 仅做**增量加法**，不重写。两个新 chat tool 通过扩展 `resolv
 import { tool, generateText, Output } from "ai";
 import { z } from "zod/v4";
 import { assembleAgent } from "../assembly";
-import { routeModel } from "../model-router";
+import { getLanguageModel } from "../model-router";
+import { db } from "@/db";
+import { aiEmployees } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import type { AgentTool } from "../types";
 
 const ResearchQueryBuilderOutputSchema = z.object({
@@ -329,22 +341,28 @@ export function createResearchQueryBuilderTool(orgId: string): AgentTool {
     execute: async ({ user_intent }) => {
       const districts = await listDistricts(orgId);
       const topics = await listTopics(orgId);
-      
-      // 用 assembleAgent 拿到 xiaoyan 的 7-layer system prompt + 选定模型
-      const agent = await assembleAgent("xiaoyan", undefined, {
-        skillOverrides: ["research_query_builder"],
-        organizationId: orgId,
+
+      // 拿 xiaoyan 在当前 org 下的 employee row（id + slug）
+      const xiaoyan = await db.query.aiEmployees.findFirst({
+        where: and(eq(aiEmployees.organizationId, orgId), eq(aiEmployees.slug, "xiaoyan")),
       });
-      
+      if (!xiaoyan) throw new Error("xiaoyan employee not seeded in this org");
+
+      // 用 assembleAgent 拿到 7-layer system prompt + tools + modelConfig
+      // 真实签名：(employeeId: string, modelOverride?, context?) — 3 个位置参数
+      const agent = await assembleAgent(xiaoyan.id, undefined, {
+        skillOverrides: ["research_query_builder"],
+      });
+
       const { output } = await generateText({
-        model: agent.model,
+        model: getLanguageModel(agent.modelConfig),
         system: agent.systemPrompt,
         prompt: JSON.stringify({ user_intent, available_districts: districts, available_topics: topics }),
         output: Output.object({ schema: ResearchQueryBuilderOutputSchema }),
         temperature: 0.2,
         maxOutputTokens: 1500,
       });
-      
+
       return {
         ...output,
         applyUrl: `/research?mode=advanced&apply_query_builder=${encodeURIComponent(JSON.stringify(output))}`,
@@ -354,7 +372,7 @@ export function createResearchQueryBuilderTool(orgId: string): AgentTool {
 }
 ```
 
-注册到 `tool-registry.ts:assembleAgentTools()`：xiaoyan / xiaolei 在场时注入。
+注册到 `tool-registry.ts:resolveTools(skillNames)` 的 builtin skill 映射，xiaoyan / xiaolei 在场时（即 employee 已绑此 skill）自动注入。
 
 ### 4.3 `data_pivoter` tool 注册
 
@@ -483,10 +501,19 @@ if (targetEmployee && targetEmployee !== currentEmployee) {
   // 给前端发 system 提示："已切换到 @{nickname}"（通过 streamText 的 onChunk 注入或单独 SSE event）
 }
 
-// 后续走既有逻辑
-const agent = await assembleAgent(activeEmployeeId, undefined, { organizationId });
-const tools = resolveTools(agent.skillNames);
-const result = streamText({ model: agent.model, system: agent.systemPrompt, messages, tools: toVercelTools(tools), ... });
+// 后续走既有逻辑（chat stream 当前模式：先按 orgId+slug 查 employee row 拿到 id，再 assembleAgent）
+const employee = await db.query.aiEmployees.findFirst({
+  where: and(eq(aiEmployees.organizationId, orgId), eq(aiEmployees.slug, activeEmployeeId)),
+});
+if (!employee) throw new Error(`employee ${activeEmployeeId} not seeded`);
+const agent = await assembleAgent(employee.id);
+const result = streamText({
+  model: getLanguageModel(agent.modelConfig),
+  system: agent.systemPrompt,
+  messages,
+  tools: toVercelTools(agent.tools, agent.pluginConfigs),
+  // ...
+});
 ```
 
 历史 message 上下文：chat stream 现有 `messages[]` 数组直接传给 streamText，最近 N 条上下文已在用户 chat history 中。无需额外 token budget 控制（streamText 内部按 model 上下文窗口截断）。

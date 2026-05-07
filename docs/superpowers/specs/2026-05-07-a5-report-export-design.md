@@ -509,14 +509,26 @@ const ReportParagraphsSchema = z.object({
 // AI SDK v6: 用 generateText + Output.object() 拿结构化输出（v6 移除了 generateObject）
 import { generateText, Output } from "ai";
 import { assembleAgent } from "@/lib/agent/assembly";
+import { getLanguageModel } from "@/lib/agent/model-router";
+import { db } from "@/db";
+import { aiEmployees } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 
-const agent = await assembleAgent("xiaoyan", undefined, {
+// 1) 查 xiaoyan 在当前 org 下的 employee row（拿 employeeId UUID 给 assembleAgent 第 1 参数）
+const xiaoyan = await db.query.aiEmployees.findFirst({
+  where: and(eq(aiEmployees.organizationId, orgId), eq(aiEmployees.slug, "xiaoyan")),
+});
+if (!xiaoyan) throw new Error("xiaoyan employee not seeded in this org (依赖 A6)");
+
+// 2) 装载 7-layer system prompt + tools + modelConfig
+//    真实签名：assembleAgent(employeeId: string, modelOverride?, context?) — 3 个位置参数
+const agent = await assembleAgent(xiaoyan.id, undefined, {
   skillOverrides: ["report_drafter"],
-  organizationId: orgId,
 });
 
+// 3) v6 结构化输出：generateText + Output.object()
 const { output } = await generateText({
-  model: agent.model,
+  model: getLanguageModel(agent.modelConfig),
   system: agent.systemPrompt,
   prompt: JSON.stringify(payload),
   output: Output.object({ schema: ReportParagraphsSchema }),
