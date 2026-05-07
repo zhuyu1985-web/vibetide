@@ -12,7 +12,8 @@ import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
 import { EmployeeProfileClient } from "./employee-profile-client";
 
-function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 15000): Promise<T> {
+// 60s — 同 /ai-employees/page.tsx：适配 Supabase pooler 跨区冷启动慢
+function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 60000): Promise<T> {
   return Promise.race([
     promise.catch(() => fallback),
     new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
