@@ -15,6 +15,7 @@
 import { useRouter } from "next/navigation";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
+import type { ResearchQueryBuilderResult } from "@/lib/agent/skills/research-query-builder";
 
 const FIELD_LABELS: Record<string, string> = {
   title: "标题",
@@ -37,18 +38,6 @@ const OPERATOR_LABELS: Record<string, string> = {
   not_equals: "≠",
   between: "在",
 };
-
-interface ResearchQueryBuilderResult {
-  conditions: {
-    field: string;
-    operator: string;
-    value: string | string[];
-    logic: "and" | "or";
-  }[];
-  sidebarFilter?: { districtIds?: string[]; topicIds?: string[] } | null;
-  reasoning: string;
-  applyUrl: string;
-}
 
 type ToolName = "research_query_builder";
 

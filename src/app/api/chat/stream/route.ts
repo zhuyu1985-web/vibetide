@@ -132,6 +132,10 @@ export async function POST(req: Request) {
       organizationId,
       employeeSlug,
     });
+    // Why this conditional gate works:
+    // - agent.tools 由 resolveTools 构建，包含 employee 绑定的全部 skill 名（不限于静态 ALL_TOOLS 白名单）
+    // - 对于不在 ALL_TOOLS 中的 entry（如 research_query_builder），toVercelTools 会生成 placeholder execute
+    // - 下面的循环用 xiaoyanTools 的真实 execute 实现去覆盖那些 placeholder
     const vercelTools: typeof baseTools = { ...baseTools };
     for (const t of agent.tools) {
       if (t.name === "research_query_builder" && xiaoyanTools[t.name]) {
