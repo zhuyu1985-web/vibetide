@@ -4,7 +4,9 @@ displayName: 研究检索构建
 description: 把用户口语化的研究检索需求（如"2025 上半年重庆乡村振兴的省级及以上媒体报道"）翻译成 vibetide A4 高级检索的 AdvancedSearchCondition[] + SidebarFilter JSON。
 version: "1.0"
 category: data_collection
-compatibleRoles: ["xiaoyan", "xiaolei"]
+# compatibleRoles 必须用 ai_employees.role_type 的值（如 research_analyst / trending_scout / data_analyst），
+# 不是 employee slug（xiaoyan / xiaolei …）；src/lib/dal/skills.ts:519 按 roleType 匹配。
+compatibleRoles: ["research_analyst", "trending_scout"]
 
 metadata:
   skill_kind: data_collection

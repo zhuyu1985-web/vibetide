@@ -4,7 +4,9 @@ displayName: 学术报告草拟
 description: 把模板插值的数据简报草稿 + 命中文章统计聚合输入，转写成学术中性、第三人称、引用具体数字的研究背景 / 数据简报学术润色 / 研究发现段落（A5 Inngest 报告导出 Step 3 调用）。
 version: "1.0"
 category: content_gen
-compatibleRoles: ["xiaoyan"]
+# compatibleRoles 必须用 ai_employees.role_type 的值（如 research_analyst / trending_scout / data_analyst），
+# 不是 employee slug（xiaoyan / xiaolei …）；src/lib/dal/skills.ts:519 按 roleType 匹配。
+compatibleRoles: ["research_analyst"]
 
 metadata:
   skill_kind: content_generation

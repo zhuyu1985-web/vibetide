@@ -3,7 +3,7 @@
  * Run: npx tsx scripts/verify-skill-refactor.ts
  *
  * Checks:
- * 1. skill-loader scan returns exactly 31 builtin skills
+ * 1. skill-loader scan returns exactly 42 builtin skills
  * 2. Every skill has slug, name, category, description, content
  * 3. Every skill's content is non-empty
  * 4. Every skills SKILL.md has a category field in frontmatter
@@ -32,7 +32,7 @@ import { BUILTIN_SKILL_NAMES } from "../src/lib/constants";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const EXPECTED_COUNT = 31;
+const EXPECTED_COUNT = 42;
 let passCount = 0;
 let failCount = 0;
 
