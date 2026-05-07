@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { missions } from "@/db/schema/missions";
 import { savedConversations } from "@/db/schema/saved-conversations";
 import { desc, eq } from "drizzle-orm";
-import { getEmployees } from "@/lib/dal/employees";
 import { getCurrentUserProfile } from "@/lib/dal/auth";
 import {
   listTemplatesForHomepageByTab,
@@ -44,7 +43,9 @@ export default async function HomePage() {
     updatedAt: string;
   }> = [];
   const scenarioMap: Record<string, ScenarioCardData[]> = {};
-  let employeeDbIdMap: Record<string, string> = {};
+  // employeeDbIdMap removed 2026-05-08 — HomeClient never used it (`void _employeeDbIdMap`)，
+  // 但每次首页加载都跑一份完整 getEmployees()（13 行 + skills join，慢网下 6-24s）
+  // 完全是浪费 + 与 layout / 其他页面并发跑 employees 竞争 DB pooler。
   let templatesByTab: Record<
     string,
     (WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[]
@@ -119,15 +120,8 @@ export default async function HomePage() {
     // scenarioMap stays as an empty record; per-employee "chip" scenarios in
     // the chat input are sourced elsewhere now.
 
-    // Fetch employees to build slug → dbId map for scenario execution
-    try {
-      const employees = await getEmployees();
-      employeeDbIdMap = Object.fromEntries(
-        employees.map((e) => [e.id, e.dbId])
-      );
-    } catch {
-      // Graceful degradation
-    }
+    // 2026-05-08 删除 getEmployees() — HomeClient 不再使用 employeeDbIdMap，
+    // 每次首页加载多查一份慢 query（13 行 + skills join）实际是死代码。
 
     // Task 4 — 判定当前用户是否可管理首页（admin / owner / 超级管理员）。
     // 失败时落到 false（普通用户视图），不阻断首页加载。
@@ -152,7 +146,6 @@ export default async function HomePage() {
         recentMissions={recentMissions}
         recentConversations={recentConversations}
         scenarioMap={scenarioMap}
-        employeeDbIdMap={employeeDbIdMap}
         templatesByTab={templatesByTab}
         canManageHomepage={canManageHomepage}
       />
