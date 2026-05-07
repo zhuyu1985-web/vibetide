@@ -417,7 +417,7 @@ Step 7  finalize                   (~50ms)
 
 - `Document.styles.paragraphStyles` 定义 5 个样式：Title / Subtitle / Heading1 / Heading2 / Normal
 - 表格用 `Table + TableRow + TableCell`，单元格 padding / 边框 / 表头加粗
-- TOC 用 `TableOfContents({ hyperlink: true, headingStyleRange: "1-3" })` —— Word 打开后自动渲染（首次需"右键 → 更新域"）
+- TOC 用 `TableOfContents` 配置 hyperlink=true + heading style range 收集 Heading 1 至 Heading 3（具体参数 `headingStyleRange` 取 `"1 3"` 形式）—— Word 打开后自动渲染（首次需"右键 → 更新域"）
 - 文件大小预估：500 行附录 + 全报告 ≈ 50-150 KB
 
 ### 5.2 HTML 报告页面
@@ -426,7 +426,7 @@ Step 7  finalize                   (~50ms)
 
 **关键交互细节**：
 
-- **章节锚点**：`<section id="chapter-1">` / `<section id="chapter-2-1">` 等
+- **章节锚点**：`<section id="chapter1">` / `<section id="chapter2_1">` 等（id 用驼峰或下划线分隔，不用连字符避免与可能的模型 slug 工具误判）
 - **数据表"复制 CSV"按钮**：客户端 navigator.clipboard.writeText(csvString)
 - **图表 PNG 下载**：用 Recharts `<ResponsiveContainer>` 包裹，提供 `<button>` 触发 toBlob → download
 - **导出 Word/Excel 按钮**：点击 → server action `getReportSignedUrl(reportId, "word"|"excel")` → 检查/重签 → 返回 URL → `window.open(url)` 或 `<a download>`
@@ -506,15 +506,28 @@ const ReportParagraphsSchema = z.object({
     .describe("第三章 研究发现，3-5 段，约 800-1500 字。基于 aggregates 数据特征写结论，每段一个观点，必须有数据引用"),
 });
 
-const result = await generateObject({
-  model: routeModel({ employeeId: "xiaoyan", skillId: "research_drafter" }),
-  system: assembledSystemPrompt,  // 7-layer + skill content
+// AI SDK v6: 用 generateText + Output.object() 拿结构化输出（v6 移除了 generateObject）
+import { generateText, Output } from "ai";
+import { assembleAgent } from "@/lib/agent/assembly";
+
+const agent = await assembleAgent("xiaoyan", undefined, {
+  skillOverrides: ["report_drafter"],
+  organizationId: orgId,
+});
+
+const { output } = await generateText({
+  model: agent.model,
+  system: agent.systemPrompt,
   prompt: JSON.stringify(payload),
-  schema: ReportParagraphsSchema,
+  output: Output.object({ schema: ReportParagraphsSchema }),
   temperature: 0.3,
   maxOutputTokens: 4000,
 });
+
+// output 即 ReportParagraphsSchema 解析后的结构（注意 v6 是 result.output 而非 result.object）
 ```
+
+> **AI SDK v6 迁移备注**：本 spec 早先版本写的 `generateObject` 已在 2026-05-07 修订为 `generateText + Output.object()`（项目运行 AI SDK v6，`generateObject` 已被移除）。三段输出 schema 不变，迁移影响仅限 import + 调用语法 + 结果属性名（`result.object` → `result.output`）。
 
 ### 6.4 `research_drafter` skill prompt（A6 入库到 skills 表，A5 通过 employee_skills 关联）
 
