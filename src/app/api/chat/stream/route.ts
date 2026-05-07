@@ -6,8 +6,10 @@ import { streamText, stepCountIs } from "ai";
 import { getLanguageModel } from "@/lib/agent/model-router";
 import { resolveTools, toVercelTools, createXiaoyanChatTools } from "@/lib/agent/tool-registry";
 import { assembleAgent } from "@/lib/agent/assembly";
+import { detectMentionSwitch } from "@/lib/agent/mention-switch";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import { notifyChatMessage } from "@/lib/channels/chat-notifier";
+import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -87,10 +89,40 @@ export async function POST(req: Request) {
     }
     const organizationId = profile.organizationId;
 
-    // Find employee by slug + org
+    // ─── A6 Phase 5: `@employee` 切换协作 ───────────────────────────────
+    // 在 aiEmployees.findFirst 之前预处理用户最新消息：
+    //   1. 检测 `^@<slug>\s+(.+)` 前缀
+    //   2. 若 targetEmployee 与当前 employeeSlug 不同 → 切换 activeEmployeeSlug
+    //   3. 把最后一条 user message 的 content 改写成 cleanMessage（去掉 @prefix，避免 LLM 看到无关 token）
+    // 后续 employee 查询、assembleAgent、tool 解析都使用 activeEmployeeSlug。
+    let activeEmployeeSlug = employeeSlug;
+    let switchedFrom: string | null = null;
+    if (conversationHistory.length > 0) {
+      const last = conversationHistory[conversationHistory.length - 1];
+      if (last.role === "user") {
+        const { targetEmployee, cleanMessage } = detectMentionSwitch(
+          last.content
+        );
+        if (
+          targetEmployee &&
+          targetEmployee !== (employeeSlug as EmployeeId) &&
+          EMPLOYEE_META[targetEmployee]
+        ) {
+          switchedFrom = employeeSlug;
+          activeEmployeeSlug = targetEmployee;
+          // 改写原 array（streamText 拿到的 messages 不会带 @prefix）
+          conversationHistory[conversationHistory.length - 1] = {
+            ...last,
+            content: cleanMessage,
+          };
+        }
+      }
+    }
+
+    // Find employee by (active) slug + org
     const employeeRecord = await db.query.aiEmployees.findFirst({
       where: and(
-        eq(aiEmployees.slug, employeeSlug),
+        eq(aiEmployees.slug, activeEmployeeSlug),
         eq(aiEmployees.organizationId, profile.organizationId)
       ),
     });
@@ -202,6 +234,19 @@ export async function POST(req: Request) {
         };
 
         try {
+          // A6 Phase 5: 若 `@employee` 切换发生过，先 emit 一条系统提示事件
+          // 让前端可以渲染 "已切换到 @{nickname}" 的 toast / 内联系统消息
+          if (switchedFrom) {
+            send("employee-switched", {
+              from: switchedFrom,
+              to: activeEmployeeSlug,
+              nickname:
+                employeeRecord.nickname ||
+                employeeRecord.name ||
+                activeEmployeeSlug,
+            });
+          }
+
           for await (const part of result.fullStream) {
             switch (part.type) {
               case "tool-call": {
