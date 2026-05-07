@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Sparkles, Mail, Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn } from "@/app/actions/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -22,12 +24,36 @@ export default function LoginPage() {
     formData.set("email", email);
     formData.set("password", password);
 
-    // signIn redirects on success; only returns when there's an error
-    const result = await signIn(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
+    // signIn server action 成功时会 redirect("/home")（throw NEXT_REDIRECT），
+    // 失败时返回 { error }。但在国内访问 Supabase ap-northeast-2 慢网下，
+    // server action 整体耗时 30+s 时偶发：cookie 已写入但 NEXT_REDIRECT 信号
+    // 未能被 dev server 正确传给 client navigation —— 表现为登录后页面卡在
+    // /login，必须手动刷新才能进 /home（cookie 已就位，proxy.ts 直接放行）。
+    // 兜底：成功后主动 router.push + refresh，与 NEXT_REDIRECT 双保险。
+    try {
+      const result = await signIn(formData);
+      if (result?.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+    } catch (err: unknown) {
+      // NEXT_REDIRECT 是 Next.js 内部的"假错误"，不应中断流程；其它错才显示
+      if (
+        err instanceof Error &&
+        (err.message === "NEXT_REDIRECT" ||
+          (err as Error & { digest?: string }).digest?.startsWith("NEXT_REDIRECT"))
+      ) {
+        // fallthrough
+      } else {
+        setError("登录失败，请稍后重试");
+        setLoading(false);
+        return;
+      }
     }
+    // 兜底主动跳转 + 刷新（让 server-side cache 在新 session 下重新求值）
+    router.push("/home");
+    router.refresh();
   }
 
   return (

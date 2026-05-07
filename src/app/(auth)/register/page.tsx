@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Sparkles, Mail, Lock, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signUp } from "@/app/actions/auth";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,11 +26,30 @@ export default function RegisterPage() {
     formData.set("email", email);
     formData.set("password", password);
 
-    const result = await signUp(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
+    // 同 login/page.tsx 兜底：慢网下 NEXT_REDIRECT 信号偶发丢失，
+    // cookie 已写入但 client navigation 不触发。主动 router.push 兜底。
+    try {
+      const result = await signUp(formData);
+      if (result?.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+    } catch (err: unknown) {
+      if (
+        err instanceof Error &&
+        (err.message === "NEXT_REDIRECT" ||
+          (err as Error & { digest?: string }).digest?.startsWith("NEXT_REDIRECT"))
+      ) {
+        // fallthrough
+      } else {
+        setError("注册失败，请稍后重试");
+        setLoading(false);
+        return;
+      }
     }
+    router.push("/home");
+    router.refresh();
   }
 
   return (
