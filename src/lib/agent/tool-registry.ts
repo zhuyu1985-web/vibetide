@@ -1747,27 +1747,44 @@ export function createXiaoyanChatTools(context: {
   organizationId: string;
   employeeSlug?: string;
 }): ToolSet {
-  // 仅 xiaoyan / xiaolei 注入；其他员工返回空集
-  if (
-    context.employeeSlug &&
-    context.employeeSlug !== "xiaoyan" &&
-    context.employeeSlug !== "xiaolei"
-  ) {
+  // 路由表（与 spec §3.2 compatibleRoles 一致）：
+  // - research_query_builder：xiaoyan + xiaolei（research_analyst + trending_scout）
+  // - data_pivoter：xiaoyan + xiaoshu（research_analyst + data_analyst）
+  // 其他 employee 返回空集
+  const allowsResearchQuery =
+    !context.employeeSlug ||
+    context.employeeSlug === "xiaoyan" ||
+    context.employeeSlug === "xiaolei";
+  const allowsDataPivoter =
+    !context.employeeSlug ||
+    context.employeeSlug === "xiaoyan" ||
+    context.employeeSlug === "xiaoshu";
+
+  if (!allowsResearchQuery && !allowsDataPivoter) {
     return {};
   }
 
-  // 动态 import 避免循环依赖（research-query-builder.ts → assembly.ts → tool-registry.ts）
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const {
-    createResearchQueryBuilderTool,
-  } = require("./skills/research-query-builder") as typeof import("./skills/research-query-builder");
+  const tools: ToolSet = {};
 
-  const tools: ToolSet = {
-    research_query_builder: createResearchQueryBuilderTool(
+  if (allowsResearchQuery) {
+    // 动态 import 避免循环依赖（skill file → assembly.ts → tool-registry.ts）
+    const {
+      createResearchQueryBuilderTool,
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+    } = require("./skills/research-query-builder") as typeof import("./skills/research-query-builder");
+    tools.research_query_builder = createResearchQueryBuilderTool(
       context.organizationId,
-    ),
-  };
-  // Phase 4 will add: tools.data_pivoter = createDataPivoterTool(...)
+    );
+  }
+
+  if (allowsDataPivoter) {
+    const {
+      createDataPivoterTool,
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+    } = require("./skills/data-pivoter") as typeof import("./skills/data-pivoter");
+    tools.data_pivoter = createDataPivoterTool(context.organizationId);
+  }
+
   return tools;
 }
 

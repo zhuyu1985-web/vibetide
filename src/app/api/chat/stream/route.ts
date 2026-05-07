@@ -126,7 +126,7 @@ export async function POST(req: Request) {
 
     // Free chat: use agent's own tools (no scenario-specific toolsHint)
     const baseTools = toVercelTools(agent.tools, agent.pluginConfigs);
-    // xiaoyan / xiaolei chat tools — research_query_builder（A6 Phase 3）
+    // xiaoyan / xiaolei / xiaoshu chat tools — research_query_builder + data_pivoter（A6 Phase 3+4）
     // 仅当 employee 已通过 employee_skills 绑了对应 skill 时才合并真实 execute。
     const xiaoyanTools = createXiaoyanChatTools({
       organizationId,
@@ -134,11 +134,14 @@ export async function POST(req: Request) {
     });
     // Why this conditional gate works:
     // - agent.tools 由 resolveTools 构建，包含 employee 绑定的全部 skill 名（不限于静态 ALL_TOOLS 白名单）
-    // - 对于不在 ALL_TOOLS 中的 entry（如 research_query_builder），toVercelTools 会生成 placeholder execute
+    // - 对于不在 ALL_TOOLS 中的 entry（如 research_query_builder / data_pivoter），toVercelTools 会生成 placeholder execute
     // - 下面的循环用 xiaoyanTools 的真实 execute 实现去覆盖那些 placeholder
     const vercelTools: typeof baseTools = { ...baseTools };
     for (const t of agent.tools) {
-      if (t.name === "research_query_builder" && xiaoyanTools[t.name]) {
+      if (
+        (t.name === "research_query_builder" || t.name === "data_pivoter") &&
+        xiaoyanTools[t.name]
+      ) {
         (vercelTools as Record<string, unknown>)[t.name] = xiaoyanTools[t.name];
       }
     }
