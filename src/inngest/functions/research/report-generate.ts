@@ -299,8 +299,129 @@ export const researchReportGenerate = inngest.createFunction(
       });
     });
 
-    // ─── Step 5/6: Word + Excel — 留 Phase 6/7 接入 ───────────────────
-    // TODO(Phase 6): step-5-generate-word — docx + Supabase Storage upload
+    // ─── Step 5: generate Word ─────────────────────────────────────
+    // Spec §4.2: Word 失败不阻塞主流程，仅 disable 导出按钮。
+    // 失败仅 console.error + 跳过 wordFileUrl 写入，不抛错。
+    await step.run("step-5-word", async () => {
+      await updateReportStatus(reportId, { currentStep: "生成 Word" });
+      try {
+        const { buildReportDocx } = await import("@/lib/research/report-word-builder");
+        const { uploadFile, getSignedUrl, buildObjectPath } = await import(
+          "@/lib/research/report-storage"
+        );
+
+        const hitItemIds = step1.snapshot.hitItemIds;
+
+        // 附录基础数据（leftJoin outlet）
+        const appendix = await db
+          .select({
+            id: collectedItems.id,
+            title: collectedItems.title,
+            outletName: mediaOutletDictionary.outletName,
+            outletTier: collectedItems.outletTier,
+            publishedAt: collectedItems.publishedAt,
+          })
+          .from(collectedItems)
+          .leftJoin(
+            mediaOutletDictionary,
+            and(
+              eq(mediaOutletDictionary.id, collectedItems.outletId),
+              eq(
+                mediaOutletDictionary.organizationId,
+                collectedItems.organizationId,
+              ),
+            ),
+          )
+          .where(
+            and(
+              eq(collectedItems.organizationId, organizationId),
+              inArray(collectedItems.id, hitItemIds),
+            ),
+          );
+
+        // join 命中区县（多对多）→ Map<itemId, Set<districtName>>
+        // 多区县时折叠成 "name1、name2"（A5 Plan Phase 6 Task 6.3.1 B-1 修复）
+        const districtRows = hitItemIds.length
+          ? await db
+              .select({
+                itemId: researchCollectedItemDistricts.collectedItemId,
+                districtName: cqDistricts.name,
+              })
+              .from(researchCollectedItemDistricts)
+              .leftJoin(
+                cqDistricts,
+                eq(researchCollectedItemDistricts.districtId, cqDistricts.id),
+              )
+              .where(
+                inArray(
+                  researchCollectedItemDistricts.collectedItemId,
+                  hitItemIds,
+                ),
+              )
+          : [];
+        const districtsByItem = new Map<string, Set<string>>();
+        for (const r of districtRows) {
+          if (!r.districtName) continue;
+          const slot = districtsByItem.get(r.itemId) ?? new Set<string>();
+          slot.add(r.districtName);
+          districtsByItem.set(r.itemId, slot);
+        }
+
+        const sortedAppendix = [...appendix].sort((a, b) => {
+          const aTime = a.publishedAt ? a.publishedAt.getTime() : Number.MAX_SAFE_INTEGER;
+          const bTime = b.publishedAt ? b.publishedAt.getTime() : Number.MAX_SAFE_INTEGER;
+          return aTime - bTime;
+        });
+
+        const aggregatesWithFlag = {
+          ...step1.aggregates,
+          isAiFallback: step3.isAiFallback,
+        };
+
+        const buf = await buildReportDocx({
+          title: step1.title,
+          topicDescription: step1.topicDescription ?? undefined,
+          timeRangeStart: pickRangeStart(step1.snapshot),
+          timeRangeEnd: pickRangeEnd(step1.snapshot),
+          completedAt: new Date().toISOString(),
+          paragraphs: step3.paragraphs,
+          aggregates: aggregatesWithFlag,
+          appendix: sortedAppendix.map((r) => {
+            const set = districtsByItem.get(r.id);
+            const districtName =
+              set && set.size > 0 ? Array.from(set).join("、") : null;
+            return {
+              title: r.title || "(无标题)",
+              outletName: r.outletName,
+              outletTier: r.outletTier,
+              districtName,
+              publishedAt: r.publishedAt
+                ? r.publishedAt.toISOString().slice(0, 10)
+                : null,
+            };
+          }),
+        });
+
+        const objectPath = buildObjectPath(organizationId, reportId, "report.docx");
+        await uploadFile(
+          objectPath,
+          buf,
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        );
+        const signed = await getSignedUrl(objectPath);
+        await updateReportStatus(reportId, {
+          wordFileUrl: signed.url,
+          fileExpiresAt: signed.expiresAt,
+        });
+      } catch (err) {
+        // Spec §4.2: Word 失败不阻塞主流程，仅 disable 导出按钮 + tooltip "Word 生成失败"
+        logger.error(
+          `[a5][step-5-word] 失败（不阻塞主流程）: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        // wordFileUrl 保持 null（schema 默认），前端通过缺值 disable 按钮
+      }
+    });
+
     // TODO(Phase 7): step-6-generate-excel — @e965/xlsx + Supabase Storage upload
 
     // ─── Step 7: finalize ───────────────────────────────────────────
