@@ -19,6 +19,7 @@ import {
   researchBridgeBackfill,
   annotateCollectedItem,
   backfillAnnotate,
+  researchReportGenerate,
 } from "./research";
 import {
   runCollectionSource,
@@ -67,6 +68,8 @@ export const functions = [
   // Research auto-annotation (A3 Phase 3)
   annotateCollectedItem,
   backfillAnnotate,
+  // A5 报告生成 (Phase 4)
+  researchReportGenerate,
   // Collection Hub (2026-04-18)
   runCollectionSource,
   collectionSmokeConsumer,

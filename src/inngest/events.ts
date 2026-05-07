@@ -244,4 +244,14 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Research Report Events (A5 Phase 4, 2026-05-07) ───
+
+  /** 报告生成入口：A5 7-step Inngest pipeline */
+  "research/report.generate": {
+    data: {
+      reportId: string;
+      organizationId: string;
+    };
+  };
+
 };
