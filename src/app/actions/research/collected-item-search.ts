@@ -3,6 +3,7 @@
 import { requirePermission, PERMISSIONS } from "@/lib/rbac";
 import {
   advancedSearchCollectedItems,
+  fetchAllHitItemIdsForReport,
   searchCollectedItemsForResearch,
   type CollectedItemSearchFilter,
   type CollectedItemWithAnnotations,
@@ -161,6 +162,30 @@ export async function searchResearchItems(
     filter,
     { limit: pageSize, offset: (page - 1) * pageSize },
   );
+}
+
+/**
+ * A5 Phase 8 入口 2 — "生成报告"按钮专用：用当前高级检索条件预拿全量
+ * hitItemIds（≤ 500），交给 createReportFromSearch 触发报告生成。
+ *
+ * 不分页 / 仅 SELECT id；前端只需要 conditions + sidebarFilter，无需依赖
+ * 列表分页态。后端硬限制 500 条；超出抛错让前端提示用户缩小范围。
+ */
+export async function fetchHitItemIdsForReport(payload: {
+  conditions: _AdvancedSearchCondition[];
+  sidebarFilter: _SidebarFilter;
+}): Promise<{ hitItemIds: string[] }> {
+  const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
+  if (payload.conditions.length > 10) {
+    throw new Error("手动条件超过 10，请减少行数");
+  }
+  const ids = await fetchAllHitItemIdsForReport(
+    organizationId,
+    payload.conditions,
+    payload.sidebarFilter,
+    500,
+  );
+  return { hitItemIds: ids };
 }
 
 // A4 Phase 3：searchAdvanced — 直接透传 sidebarFilter 给 DAL

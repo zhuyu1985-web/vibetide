@@ -2,30 +2,42 @@
 
 // src/app/actions/research/reports.ts
 //
-// A5 Phase 5 — Report server actions (最小 stub；createReportFromSearch /
-// saveAsSnapshot / getSignedUrl 留 Phase 8/9 完整化)
-//
-// Phase 5 范围：
-//   - pollReport         → client polling (3s 间隔) 拉取最新状态
-//   - regenerateReport   → 母版重新生成 (reset → enqueue Inngest)
-//   - _placeholderCreateReport → Phase 8 才接入双入口 (UI 不调用此 stub)
+// A5 Phase 8 — Report server actions（完整化）
 //
 // 全部走 requirePermission(MENU_RESEARCH) 鉴权 + getReportById 双键 (reportId, orgId)
-// 防跨 org 访问。
+// 防跨 org 访问。createReportFromTask / createReportFromSearch 双入口；
+// regenerateReport 拒绝快照；saveAsSnapshot 复制 parent 内容（不再触发 Inngest）；
+// getSignedUrlForReport 跨 org 校验 + 临过期 1h 重签。
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 
 import { inngest } from "@/inngest/client";
+import { db } from "@/db";
+import { researchTasks } from "@/db/schema/research/research-tasks";
+import { researchReports } from "@/db/schema/research/reports";
 import {
   createReport as dalCreate,
+  deleteReport as dalDelete,
   getReportById,
   resetReportForRegeneration,
 } from "@/lib/dal/research/reports";
+import {
+  buildObjectPath,
+  resignUrl as storageResignUrl,
+} from "@/lib/research/report-storage";
 import { PERMISSIONS, requirePermission } from "@/lib/rbac";
 import type {
   AggregatesJson,
   ReportSearchSnapshot,
 } from "@/db/schema/research/reports";
+import type {
+  AdvancedSearchCondition,
+  SidebarFilter,
+} from "@/app/(dashboard)/research/search-mode-types";
+
+const MAX_HIT_ITEMS = 500;
 
 export type ReportPollStatus = "pending" | "generating" | "ready" | "failed";
 
@@ -64,6 +76,123 @@ export async function pollReport(reportId: string): Promise<ReportPollResult> {
 }
 
 /**
+ * 入口 1 — 从 research_task 创建报告。
+ * 由 task 详情页"生成报告"按钮调用；hitItemIds 由 Server Component 端
+ * 用 Drizzle 查询 collected_items + annotations 计算后传入（≤ 500 条）。
+ *
+ * 安全性：
+ *   - requirePermission(MENU_RESEARCH) 鉴权
+ *   - taskId + organizationId 双键校验（跨 org 访问任务直接抛错）
+ *   - hitItemIds.length > 500 拒绝（spec §3.2 数据漂移上限）
+ */
+export async function createReportFromTask(input: {
+  taskId: string;
+  title: string;
+  topicDescription?: string;
+  hitItemIds: string[];
+}): Promise<{ reportId: string }> {
+  const { organizationId, userId } = await requirePermission(
+    PERMISSIONS.MENU_RESEARCH,
+  );
+  if (!input.title.trim()) throw new Error("报告标题不能为空");
+  if (input.hitItemIds.length === 0) {
+    throw new Error("没有命中数据可生成报告");
+  }
+  if (input.hitItemIds.length > MAX_HIT_ITEMS) {
+    throw new Error(`命中数据超过 ${MAX_HIT_ITEMS} 条，请缩小研究任务范围`);
+  }
+
+  const [task] = await db
+    .select()
+    .from(researchTasks)
+    .where(
+      and(
+        eq(researchTasks.id, input.taskId),
+        eq(researchTasks.organizationId, organizationId),
+      ),
+    );
+  if (!task) throw new Error("研究任务不存在或无访问权限");
+
+  const snapshot: ReportSearchSnapshot = {
+    kind: "research_task",
+    taskId: task.id,
+    timeRange: {
+      start: task.timeRangeStart.toISOString(),
+      end: task.timeRangeEnd.toISOString(),
+    },
+    topicIds: task.topicIds,
+    districtIds: task.districtIds,
+    mediaTiers: task.mediaTiers,
+    hitItemIds: input.hitItemIds,
+  };
+
+  const r = await dalCreate({
+    organizationId,
+    sourceType: "research_task",
+    researchTaskId: task.id,
+    searchSnapshot: snapshot,
+    title: input.title.trim(),
+    topicDescription: input.topicDescription?.trim() || undefined,
+    generatedBy: userId,
+  });
+  await inngest.send({
+    name: "research/report.generate",
+    data: { reportId: r.id, organizationId },
+  });
+
+  revalidatePath(`/research/admin/tasks/${task.id}`);
+  return { reportId: r.id };
+}
+
+/**
+ * 入口 2 — 从高级检索快照创建报告。
+ * 由 search-workbench-client "生成报告"按钮调用；hitItemIds 通过
+ * fetchAllHitItemIdsForReport DAL helper 一次性预拿（≤ 500 条），
+ * 不依赖前端列表分页态。
+ */
+export async function createReportFromSearch(input: {
+  conditions: AdvancedSearchCondition[];
+  sidebarFilter: SidebarFilter;
+  hitItemIds: string[];
+  title: string;
+  topicDescription?: string;
+}): Promise<{ reportId: string }> {
+  const { organizationId, userId } = await requirePermission(
+    PERMISSIONS.MENU_RESEARCH,
+  );
+  if (!input.title.trim()) throw new Error("报告标题不能为空");
+  if (input.hitItemIds.length === 0) {
+    throw new Error("没有命中数据可生成报告");
+  }
+  if (input.hitItemIds.length > MAX_HIT_ITEMS) {
+    throw new Error(`命中数据超过 ${MAX_HIT_ITEMS} 条，请缩小检索条件`);
+  }
+
+  const snapshot: ReportSearchSnapshot = {
+    kind: "advanced_search",
+    conditions: input.conditions,
+    sidebarFilter: input.sidebarFilter,
+    hitItemIds: input.hitItemIds,
+    capturedAt: new Date().toISOString(),
+  };
+
+  const r = await dalCreate({
+    organizationId,
+    sourceType: "advanced_search",
+    searchSnapshot: snapshot,
+    title: input.title.trim(),
+    topicDescription: input.topicDescription?.trim() || undefined,
+    generatedBy: userId,
+  });
+  await inngest.send({
+    name: "research/report.generate",
+    data: { reportId: r.id, organizationId },
+  });
+
+  return { reportId: r.id };
+}
+
+/**
  * 重新生成（covering write） — 母版报告允许，快照报告拒绝。
  * 1. assert 报告存在 + 非快照 + 非 generating
  * 2. resetReportForRegeneration 清空所有产出物 + 回到 pending
@@ -88,31 +217,110 @@ export async function regenerateReport(
 }
 
 /**
- * Phase 8 才完整启用 — 报告创建入口。
- * Phase 5 提供 stub 仅为类型完整性；UI 不调用。
+ * 保存为快照（仅 ready 状态母版可用）。
+ * 快照不重新生成 Inngest pipeline — 直接复制 parent 的 reportHtml /
+ * aggregatesJson / fileUrls 等到新 row，status=ready，completedAt=now。
+ *
+ * 拒绝：
+ *   - parent 不存在
+ *   - parent 已是快照（不允许 snapshot of snapshot）
+ *   - parent 状态非 ready（生成中 / 失败的母版不能保存）
  */
-export async function _placeholderCreateReport(input: {
-  sourceType: "research_task" | "advanced_search";
-  title: string;
-  topicDescription?: string;
-  researchTaskId?: string;
-  searchSnapshot: ReportSearchSnapshot;
-}): Promise<{ reportId: string }> {
+export async function saveAsSnapshot(input: {
+  parentReportId: string;
+  snapshotName: string;
+}): Promise<{ snapshotId: string }> {
   const { organizationId, userId } = await requirePermission(
     PERMISSIONS.MENU_RESEARCH,
   );
-  const r = await dalCreate({
-    organizationId,
-    sourceType: input.sourceType,
-    researchTaskId: input.researchTaskId,
-    searchSnapshot: input.searchSnapshot,
-    title: input.title,
-    topicDescription: input.topicDescription,
-    generatedBy: userId,
-  });
-  await inngest.send({
-    name: "research/report.generate",
-    data: { reportId: r.id, organizationId },
-  });
-  return { reportId: r.id };
+  if (!input.snapshotName.trim()) throw new Error("快照名称不能为空");
+
+  const parent = await getReportById(input.parentReportId, organizationId);
+  if (!parent) throw new Error("母版报告不存在");
+  if (parent.isSnapshot) throw new Error("快照不能再被保存为快照");
+  if (parent.status !== "ready") {
+    throw new Error("仅 ready 状态的报告可保存快照");
+  }
+
+  // 复制 row（reportHtml / aggregatesJson / fileUrls 一并复制）
+  const [snapshot] = await db
+    .insert(researchReports)
+    .values({
+      organizationId,
+      sourceType: parent.sourceType,
+      researchTaskId: parent.researchTaskId,
+      searchSnapshot: parent.searchSnapshot,
+      title: parent.title,
+      topicDescription: parent.topicDescription,
+      reportHtml: parent.reportHtml,
+      aggregatesJson: parent.aggregatesJson,
+      wordFileUrl: parent.wordFileUrl,
+      excelFileUrl: parent.excelFileUrl,
+      fileExpiresAt: parent.fileExpiresAt,
+      parentReportId: parent.id,
+      isSnapshot: true,
+      snapshotName: input.snapshotName.trim(),
+      status: "ready",
+      completedAt: new Date(),
+      generatedBy: userId,
+    })
+    .returning({ id: researchReports.id });
+  if (!snapshot) throw new Error("快照创建失败");
+
+  revalidatePath(`/research/reports/${parent.id}`);
+  return { snapshotId: snapshot.id };
+}
+
+/**
+ * 拿报告下载文件签名 URL。临过期 1h 内自动重签 + 写回 DB。
+ *
+ * 跨 org 校验已在 getReportById 双键查询内部保证；
+ * 但仍显式 assert r.organizationId === organizationId 作为深度防御。
+ */
+export async function getSignedUrlForReport(
+  reportId: string,
+  kind: "word" | "excel",
+): Promise<{ url: string }> {
+  const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
+  const r = await getReportById(reportId, organizationId);
+  if (!r) throw new Error("报告不存在");
+  if (r.organizationId !== organizationId) {
+    throw new Error("无权访问该报告");
+  }
+
+  const fileUrl = kind === "word" ? r.wordFileUrl : r.excelFileUrl;
+  if (!fileUrl) {
+    throw new Error(kind === "word" ? "Word 文件未生成" : "Excel 文件未生成");
+  }
+
+  // 临过期 1h 内重签
+  const now = Date.now();
+  const exp = r.fileExpiresAt?.getTime() ?? 0;
+  const needRefresh = exp - now < 60 * 60 * 1000;
+  if (!needRefresh) return { url: fileUrl };
+
+  const fileName = kind === "word" ? "report.docx" : "report.xlsx";
+  const path = buildObjectPath(organizationId, reportId, fileName);
+  const signed = await storageResignUrl(path);
+
+  await db
+    .update(researchReports)
+    .set(
+      kind === "word"
+        ? { wordFileUrl: signed.url, fileExpiresAt: signed.expiresAt }
+        : { excelFileUrl: signed.url, fileExpiresAt: signed.expiresAt },
+    )
+    .where(eq(researchReports.id, reportId));
+
+  return { url: signed.url };
+}
+
+/**
+ * 删除报告（含级联快照 — schema 自带 onDelete cascade）。
+ * 删后跳回 /research 列表（详情页删除按钮调用）。
+ */
+export async function deleteReport(reportId: string): Promise<never> {
+  const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
+  await dalDelete(reportId, organizationId);
+  redirect("/research");
 }

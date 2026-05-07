@@ -291,3 +291,50 @@ function buildSingleCondition(c: AdvancedSearchCondition): SQL {
     }
   }
 }
+
+/**
+ * Phase 8 Task 8.3 — "生成报告"入口专用：
+ * 仅 SELECT id + 全量返回（≤ limit 条），不分页，不带 outlet/title/content。
+ *
+ * 复用 advancedSearchCollectedItems 内部相同的 expr composition 逻辑
+ * （buildSidebarExprs + buildSingleCondition），保证检索语义一致。
+ *
+ * 用于把当前高级检索条件命中的全量 itemIds（最多 500）一次性回传给
+ * createReportFromSearch；前端只需要 conditions + sidebarFilter，无需依赖
+ * 列表分页态。
+ */
+export async function fetchAllHitItemIdsForReport(
+  orgId: string,
+  conditions: AdvancedSearchCondition[],
+  sidebarFilter: SidebarFilter | undefined,
+  limit: number = 500,
+): Promise<string[]> {
+  if (conditions.length > 10) throw new Error("conditions exceed max 10");
+
+  const sidebarExprs = buildSidebarExprs(sidebarFilter);
+  if (conditions.length === 0 && sidebarExprs.length === 0) return [];
+
+  const orgScope: SQL = eq(collectedItems.organizationId, orgId);
+
+  let userExpr: SQL | undefined;
+  if (conditions.length > 0) {
+    userExpr = buildSingleCondition(conditions[0]!);
+    for (let i = 1; i < conditions.length; i++) {
+      const op = conditions[i - 1]!.logic;
+      const next = buildSingleCondition(conditions[i]!);
+      userExpr = op === "and" ? and(userExpr!, next)! : or(userExpr!, next)!;
+    }
+  }
+
+  const allParts: SQL[] = [orgScope, ...sidebarExprs];
+  if (userExpr) allParts.push(userExpr);
+  const finalExpr: SQL = and(...allParts)!;
+
+  const rows = await db
+    .select({ id: collectedItems.id })
+    .from(collectedItems)
+    .where(finalExpr)
+    .orderBy(sql`${collectedItems.publishedAt} DESC NULLS LAST`)
+    .limit(limit);
+  return rows.map((r) => r.id);
+}

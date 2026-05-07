@@ -2,11 +2,12 @@
 
 import { useState, useTransition, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/shared/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -18,6 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Search,
   ExternalLink,
@@ -32,7 +40,9 @@ import { GlassCard } from "@/components/shared/glass-card";
 import {
   searchArticles,
   searchAdvanced,
+  fetchHitItemIdsForReport,
 } from "@/app/actions/research/collected-item-search";
+import { createReportFromSearch } from "@/app/actions/research/reports";
 import type { CqDistrict } from "@/lib/dal/research/cq-districts";
 // Outlet summary shape — id + name used for filter dropdown
 type MediaOutletSummary = { id: string; name: string };
@@ -102,9 +112,16 @@ export function SearchWorkbenchClient({
   initialResult?: ArticleSearchResponse;
   builderOptions: BuilderOptions;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"simple" | "advanced">("simple");
+
+  // A5 Phase 8 — "生成报告"入口 2 dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportDesc, setReportDesc] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   // Simple search filters
   const [keyword, setKeyword] = useState("");
@@ -477,8 +494,36 @@ export function SearchWorkbenchClient({
 
               {advResults && (
                 <div className="mt-4 space-y-3">
-                  <div className="text-sm text-muted-foreground">
-                    命中 <strong className="text-foreground">{advResults.total}</strong> 条
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="text-sm text-muted-foreground">
+                      命中{" "}
+                      <strong className="text-foreground">
+                        {advResults.total}
+                      </strong>{" "}
+                      条
+                      {advResults.total > 500 && (
+                        <span className="ml-2 text-amber-600 dark:text-amber-400 text-xs">
+                          超 500 条，无法生成报告，请缩小条件
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={
+                        advResults.total === 0 ||
+                        advResults.total > 500 ||
+                        pending
+                      }
+                      onClick={() => {
+                        setReportTitle("高级检索研究报告");
+                        setReportDesc("");
+                        setReportDialogOpen(true);
+                      }}
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1" />
+                      生成报告
+                    </Button>
                   </div>
                   <DataTable
                     rows={advResults.items}
@@ -718,6 +763,99 @@ export function SearchWorkbenchClient({
           </div>
         )}
       </div>
+
+      {/* A5 Phase 8 — "生成报告"入口 2 dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>生成研究报告</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">报告标题</label>
+              <Input
+                value={reportTitle}
+                onChange={(e) => setReportTitle(e.target.value)}
+                placeholder="自定义报告标题"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">
+                主题描述（可选）
+              </label>
+              <Textarea
+                value={reportDesc}
+                onChange={(e) => setReportDesc(e.target.value)}
+                placeholder="给 AI 写背景段提供线索"
+                rows={3}
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              将基于当前高级检索条件命中的{" "}
+              <strong className="text-foreground">
+                {advResults?.total ?? 0}
+              </strong>{" "}
+              条数据生成报告（最多 500 条）。
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setReportDialogOpen(false)}
+              disabled={reportSubmitting}
+            >
+              取消
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={reportSubmitting || !reportTitle.trim()}
+              onClick={async () => {
+                const t = reportTitle.trim();
+                if (!t) {
+                  toast.error("请输入报告标题");
+                  return;
+                }
+                setReportSubmitting(true);
+                try {
+                  // 1) 用 conditions + sidebarFilter 预拿全量 hitItemIds（≤ 500）
+                  const filtered = advConditions.filter(
+                    (c) => Boolean(c.value?.trim()) || Boolean(c.valueRange),
+                  );
+                  const { hitItemIds } = await fetchHitItemIdsForReport({
+                    conditions: filtered,
+                    sidebarFilter: advSidebarFilter,
+                  });
+                  if (hitItemIds.length === 0) {
+                    toast.error("没有命中数据可生成报告");
+                    return;
+                  }
+                  if (hitItemIds.length > 500) {
+                    toast.error("命中数据超过 500 条，请缩小检索条件");
+                    return;
+                  }
+                  // 2) 创建报告 + 触发 Inngest
+                  const r = await createReportFromSearch({
+                    conditions: filtered,
+                    sidebarFilter: advSidebarFilter,
+                    hitItemIds,
+                    title: t,
+                    topicDescription: reportDesc.trim() || undefined,
+                  });
+                  setReportDialogOpen(false);
+                  toast.success("报告生成已启动，正在分析数据…");
+                  router.push(`/research/reports/${r.reportId}`);
+                } catch (err) {
+                  toast.error(`生成报告失败：${(err as Error).message}`);
+                } finally {
+                  setReportSubmitting(false);
+                }
+              }}
+            >
+              {reportSubmitting ? "提交中…" : "确认生成"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bottom action bar (shared) */}
       {selected.size > 0 && (
