@@ -162,7 +162,7 @@ export async function POST(req: Request) {
     // 仅当 employee 已通过 employee_skills 绑了对应 skill 时才合并真实 execute。
     const xiaoyanTools = createXiaoyanChatTools({
       organizationId,
-      employeeSlug,
+      employeeSlug: activeEmployeeSlug,
     });
     // Why this conditional gate works:
     // - agent.tools 由 resolveTools 构建，包含 employee 绑定的全部 skill 名（不限于静态 ALL_TOOLS 白名单）
@@ -311,11 +311,11 @@ export async function POST(req: Request) {
             void notifyChatMessage({
               organizationId,
               userId: user.id,
-              employeeSlug,
+              employeeSlug: activeEmployeeSlug,
               employeeName:
                 employeeRecord.nickname ||
                 employeeRecord.name ||
-                employeeSlug,
+                activeEmployeeSlug,
               userMessage: lastUserMessage,
               assistantMessage: assistantText,
               skillsUsed: usedSkills.map((s) => s.skillName),
