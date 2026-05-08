@@ -76,11 +76,30 @@
 
 ## 2. 前置准备（一次性 / 已配置可跳过）
 
-### 2.1 登录系统
+### 2.1 启动 dev server + Inngest dev CLI（**两个终端缺一不可**）
+
+vibetide 的所有"采集 / 报告生成 / 自动打标"都是**异步任务**，跑在 Inngest 上。点"立即运行"只是发个事件到队列，**真正执行**靠 Inngest dev CLI 消费这些事件。
+
+```bash
+# 终端 1：Next.js dev
+cd /Users/zhuyu/dev/chinamcloud/vibetide
+pnpm run dev
+# → http://localhost:3000
+
+# 终端 2（新开）：Inngest dev CLI（监听 :8288）
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+# → http://localhost:8288 (Inngest Dashboard)
+```
+
+> 🚨 **这是最常见的"采集超时"根因**：用户只开了 dev server 没开 Inngest CLI，点"立即运行"后事件没人消费，UI polling 等不到结果就报"采集超时"。
+
+打开 `http://localhost:8288` 应看到所有注册函数（含 `collection/source.run-requested`、`research/report.generate`、`research-annotate-collected-item` 等）。Stream tab 能实时看每次 event 触发 + 每个 step 耗时 + 错误堆栈，是排查后台异步任务最有用的工具。
+
+### 2.2 登录系统
 
 访问 `http://localhost:3000`（开发环境）→ 用学校账号登录。
 
-### 2.2 验证基础数据已就绪
+### 2.3 验证基础数据已就绪
 
 打开侧栏 → 展开"研究"菜单 → 依次点开 3 个 admin 页面，**确认数据齐全**：
 
@@ -92,7 +111,7 @@
 
 > ⚠️ 如果某项是空 → DB seed 没跑完。在终端跑 `pnpm run db:seed`，然后 `pnpm tsx scripts/run-seed-media-outlets.ts`。
 
-### 2.3 检查"乡村振兴"主题的关键词
+### 2.4 检查"乡村振兴"主题的关键词
 
 进 `/research/admin/topics` → 点击"乡村振兴" → 应看到关键词列表（如：乡村振兴 / 农业现代化 / 脱贫攻坚 / 美丽乡村 / 农村人居环境 ...）
 
@@ -527,14 +546,19 @@ Word / WPS 打开 .docx 后**目录是空的**。这是 docx lib 的 field code 
 | 主题匹配率低 | `/research/admin/topics` 给该主题加更多关键词 |
 | 自动打标历史回填没跑 | 终端跑 `pnpm tsx scripts/research-backfill-annotate.ts` |
 
-### 11.2 报告卡在"生成中"超过 5 分钟
+### 11.2 报告卡在"生成中"超过 5 分钟 / 数据源"立即运行"显示采集超时
+
+> 🚨 **最常见根因（80%+ 案例）**：Inngest dev CLI 没启动 — 见 §2.1。点"立即运行"只是发事件到队列，**没有 Inngest CLI 消费 = 任务永远不跑**，UI polling 自然超时。
 
 | 排查 | 操作 |
 |---|---|
-| Inngest dev server 没启动 | 终端跑 `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` |
-| LLM API key 错 | 看 `.env.local` 的 `OPENAI_API_KEY` 是否正确（项目用 DeepSeek API） |
-| Inngest 内部错 | 打开 `http://localhost:8288` Inngest dashboard 看 `research/report-generate` function 的 run 状态 |
+| **Inngest dev server 没启动** | 新终端跑 `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest`，等"Connected to dev server"输出 |
+| **检查 Inngest 是否在跑** | `ps aux \| grep inngest \| grep -v grep` 应有输出；OR `lsof -iTCP:8288 -sTCP:LISTEN` 应有 node 进程 |
+| LLM API key 错 | 看 `.env.local` 的 `OPENAI_API_KEY` 是否正确（项目用 DeepSeek 或 DashScope/Qwen API） |
+| Inngest 内部错 | 打开 `http://localhost:8288` Inngest dashboard 看具体 function 的 run 状态 + 失败 step 堆栈 |
 | 网络断 | LLM 重试 3 次都失败 → 自动降级到模板段落 + isAiFallback banner |
+| RSS Feed URL 不可达 | dev log 看 `[adapter rss] HTTP 4xx/5xx`，换 URL 或检查国内访问 |
+| Jina API 慢 | RSS 勾"深读正文"会对每条文章再调 1 次 Jina（10s timeout），20+ 条文章会让 server action 整体超时；可暂取消勾选先验证抓取链路 |
 
 ### 11.3 Word 打开报"未知错误"
 
