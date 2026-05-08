@@ -3,7 +3,11 @@ import type { SourceAdapter, RawItem } from "../types";
 import { fetchViaJinaReader } from "@/lib/web-fetch";
 
 const configSchema = z.object({
-  url: z.string().url("请填写合法的 URL"),
+  // trim + 剥离粘贴时常带的反引号/引号 — 与 rss.ts / list-scraper.ts 同模式
+  url: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().replace(/^[`'"\s]+|[`'"\s]+$/g, "") : v),
+    z.string().url("请填写合法的 URL"),
+  ),
 });
 
 type JinaUrlConfig = z.infer<typeof configSchema>;

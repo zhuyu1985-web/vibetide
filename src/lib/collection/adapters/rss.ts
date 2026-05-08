@@ -4,8 +4,16 @@ import type { SourceAdapter, RawItem } from "../types";
 import { fetchWithPolicy, DEFAULT_FETCH_POLICY } from "../fetch-layer";
 import { fetchViaJinaReader } from "@/lib/web-fetch";
 
+// 用户粘贴 URL 时常带 markdown 反引号 / 全/半角引号 / 前后空白 — 自动清掉。
+// 否则 zod .url() 报"请填写合法的 URL"，体验差。
+const trimmedUrl = (msg: string) =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().replace(/^[`'"\s]+|[`'"\s]+$/g, "") : v),
+    z.string().url(msg),
+  );
+
 const configSchema = z.object({
-  feedUrl: z.string().url("请填写合法的 feed URL"),
+  feedUrl: trimmedUrl("请填写合法的 feed URL"),
   fetchFullContent: z.boolean().default(false),
 });
 

@@ -14,7 +14,11 @@ const selectorsSchema = z.object({
 
 const configSchema = z
   .object({
-    listUrl: z.string().url("请填写合法的列表页 URL"),
+    // trim + 剥离粘贴时常带的反引号/引号 — 与 rss.ts / jina-url.ts 同模式
+    listUrl: z.preprocess(
+      (v) => (typeof v === "string" ? v.trim().replace(/^[`'"\s]+|[`'"\s]+$/g, "") : v),
+      z.string().url("请填写合法的列表页 URL"),
+    ),
     extractMode: z.enum(["regex", "css"]),
     articleUrlPattern: z.string().optional(),
     selectors: selectorsSchema.optional(),

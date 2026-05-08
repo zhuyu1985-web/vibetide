@@ -134,11 +134,15 @@ RSS 订阅      ──→ 抓人民日报、新华社、央视、重庆日报等
 **Step 1 选源类型**：点 **「RSS / Atom 订阅」** 卡片
 
 **Step 2 配置参数**：
-- **Feed URL**：填央媒 RSS 地址，例如：
-  - 人民日报：`http://www.people.com.cn/rss/politics.xml`
-  - 新华网：`http://www.xinhuanet.com/politics/news_politics.xml`
-  - 重庆日报：（需要找官方 RSS 入口）
+- **Feed URL**：填央媒 RSS 地址（**复制时不要带反引号 ` 或引号**），例如：
+  ```
+  http://www.people.com.cn/rss/politics.xml      ← 人民日报政治频道
+  http://www.xinhuanet.com/politics/news_politics.xml  ← 新华网政治
+  ```
+  重庆日报需要找官方 RSS 入口（部分省市媒体未提供 RSS，用 §3.3 列表抓取代替）
 - **深读正文 (Jina)**：建议**勾选** — RSS 通常只给摘要，勾选后会对每条链接再调一次 Jina Reader 抓全文（重要！否则正文匹配率低）
+
+> 💡 **从 markdown 文档复制 URL 注意**：本手册的 ` `…` ` 反引号是 markdown inline code 标记，复制时不要选中反引号本身。如不慎带入，2026-05-08 后系统会自动剥离（rss/jina_url/list_scraper 三种 adapter 的 URL 字段都加了 `preprocess` 自动 trim）。
 
 **Step 3 调度与分类**：
 - **调度频率**：选 "每天一次"（央媒发文有节奏，无需高频）
