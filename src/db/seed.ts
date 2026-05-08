@@ -643,6 +643,19 @@ async function seed() {
   }
   console.log(`   Bound knowledge bases to employees\n`);
 
+  // 6.5 Seed media outlet dictionary (113 央/省/市/区县/行业 白名单)
+  // 历史 bug：A1 Phase 1 (commit 852eca1) 时定义了 src/db/seed/media-outlet-dictionary
+  // 但漏接到 seed.ts，导致每次 fresh setup 后 media_outlet_dictionary 空，
+  // /research/admin/media-outlets 页面无数据。2026-05-08 修补到此处，幂等。
+  console.log("6.5 Seeding media outlet dictionary (113 white-listed outlets)...");
+  try {
+    const { seedMediaOutletDictionary } = await import("./seed/media-outlet-dictionary");
+    const result = await seedMediaOutletDictionary(org.id);
+    console.log(`   inserted=${result.inserted} / skipped=${result.skipped} / total=${result.total}`);
+  } catch (err) {
+    console.warn("   Media outlet seed failed (non-fatal):", err instanceof Error ? err.message : err);
+  }
+
   // 7. Insert workflow templates
   console.log("7. Inserting workflow templates...");
   const templatesData = [
