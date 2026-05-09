@@ -236,7 +236,7 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
           </div>
           <div className="space-y-1.5">
             <Label>归属模块</Label>
-            <p className="text-xs text-muted-foreground">采集到的内容会派生到这些模块,后续可在内容浏览页按此筛选。</p>
+            <p className="text-xs text-muted-foreground">采集到的内容会派生到这些模块,后续可在采集池按此筛选。</p>
             <div className="grid grid-cols-2 gap-2 pt-1">
               {TARGET_MODULES.map((m) => {
                 const on = targetModules.includes(m.value);

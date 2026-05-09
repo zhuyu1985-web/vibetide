@@ -19,7 +19,7 @@ const TABS: TabDef[] = [
   },
   {
     href: "/data-collection/content",
-    label: "内容浏览",
+    label: "采集池",
     matchPrefixes: ["/data-collection/content"],
   },
   {

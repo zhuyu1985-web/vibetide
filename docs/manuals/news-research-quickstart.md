@@ -30,8 +30,8 @@
   │ 区县字典      │  自动匹配                         │
   │ 39 区县      │ ◄────────────                    ▼
   │ (自动 seed) │                          ┌──────────────┐
-  └──────────────┘                          │collected_items│
-                                            │（中央内容池）│
+  └──────────────┘                          │ 采集池 tab       │
+                                            │ /data-collection │
                                             └──────┬───────┘
                                                    │ Inngest 自动打标
                                                    ▼
@@ -665,7 +665,7 @@ pnpm tsx scripts/check-db-schema-sync.ts
 | `/data-collection/sources` | 数据源列表 |
 | `/data-collection/sources/new` | 新建数据源 wizard |
 | `/data-collection/sources/[id]` | 数据源详情 + 立即运行 |
-| `/data-collection/items` | 已采集内容浏览 |
+| `/data-collection/content` | 采集池（所有抓回内容的底座） |
 | `/research` | 研究检索工作台（高级检索）|
 | `/research/admin/topics` | 主题词库管理 |
 | `/research/admin/media-outlets` | 媒体字典管理 |
@@ -694,7 +694,7 @@ vibetide 的研究模块是**三层解耦设计**：
 - 报告 / 检索 / 后续分析都基于同一份打标结果，**单一真相源**
 
 **所以遇到问题的排查顺序应该是**：
-1. 数据有进 collected_items 吗？（看 /data-collection/items）
+1. 数据有进 collected_items 吗？（看 `/data-collection/content` "采集池" tab）
 2. 打标跑了吗？（看任意一条 item 的 topics / districts 字段）
 3. 检索能命中吗？（用宽松条件试一下 /research）
 4. 报告能生成吗？（看 Inngest dashboard）
