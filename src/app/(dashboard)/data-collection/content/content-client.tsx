@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -379,44 +380,18 @@ export function ContentClient({
         </div>
       )}
 
-      {/* Table view — missions-style */}
+      {/* Table view — 采用 DataTable 与 /topic-compare 等保持统一玻璃边框 */}
       {initialView === "table" && items.length > 0 && (
-        <GlassCard variant="panel" padding="none">
-          {/* Header row */}
-          <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/60 dark:bg-gray-800/30 border-b border-gray-300 dark:border-gray-600/70">
-            <div className="flex-1 min-w-0 text-sm font-semibold text-gray-600 dark:text-gray-400">
-              标题
-            </div>
-            <div className="w-40 text-sm font-semibold text-gray-600 dark:text-gray-400">
-              媒体
-            </div>
-            <div className="w-32 text-sm font-semibold text-gray-600 dark:text-gray-400">
-              首抓源
-            </div>
-            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">
-              时间
-            </div>
-            <div className="w-14 text-sm font-semibold text-gray-600 dark:text-gray-400 text-center">
-              渠道
-            </div>
-            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">
-              分类
-            </div>
-            <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">
-              富化
-            </div>
-          </div>
-          {/* Body */}
-          {items.map((item) => {
-            const channels = Array.isArray(item.sourceChannels) ? item.sourceChannels.length : 1;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setDetailItemId(item.id)}
-                className="w-full flex items-center gap-3 px-5 py-3.5 border-b border-gray-300 dark:border-gray-600/70 last:border-b-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors duration-200 text-left"
-              >
-                <div className="flex-1 min-w-0">
+        <DataTable
+          rows={items}
+          rowKey={(item) => item.id}
+          onRowClick={(item) => setDetailItemId(item.id)}
+          columns={[
+            {
+              key: "title",
+              header: "标题",
+              render: (item) => (
+                <div className="min-w-0">
                   <div className="text-sm text-gray-900 dark:text-gray-100 truncate">
                     {item.title}
                   </div>
@@ -426,7 +401,14 @@ export function ContentClient({
                     </div>
                   )}
                 </div>
-                <div className="w-40 shrink-0 flex flex-col min-w-0">
+              ),
+            },
+            {
+              key: "outlet",
+              header: "媒体",
+              width: "w-40",
+              render: (item) => (
+                <div className="flex flex-col min-w-0">
                   <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
                     {item.outletName ?? "未分类"}
                   </span>
@@ -436,30 +418,65 @@ export function ContentClient({
                     </span>
                   )}
                 </div>
-                <div className="w-32 shrink-0 text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+              ),
+            },
+            {
+              key: "firstSeenChannel",
+              header: "首抓源",
+              width: "w-32",
+              render: (item) => (
+                <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                   {item.firstSeenChannel}
                 </div>
-                <div
-                  className="w-20 shrink-0 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+              ),
+            },
+            {
+              key: "firstSeenAt",
+              header: "时间",
+              width: "w-20",
+              render: (item) => (
+                <span
+                  className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
                   title={formatAbsoluteTime(item.firstSeenAt)}
                 >
                   {formatRelativeTime(item.firstSeenAt)}
-                </div>
-                <div className="w-14 shrink-0 text-center">
+                </span>
+              ),
+            },
+            {
+              key: "channels",
+              header: "渠道",
+              width: "w-14",
+              align: "center",
+              render: (item) => {
+                const channels = Array.isArray(item.sourceChannels)
+                  ? item.sourceChannels.length
+                  : 1;
+                return (
                   <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs">
                     {channels}
                   </span>
-                </div>
-                <div className="w-20 shrink-0 text-xs text-gray-600 dark:text-gray-300 truncate">
+                );
+              },
+            },
+            {
+              key: "category",
+              header: "分类",
+              width: "w-20",
+              render: (item) => (
+                <div className="text-xs text-gray-600 dark:text-gray-300 truncate">
                   {item.category ?? "—"}
                 </div>
-                <div className="w-20 shrink-0">
-                  <EnrichmentChip status={item.enrichmentStatus} />
-                </div>
-              </button>
-            );
-          })}
-        </GlassCard>
+              ),
+            },
+            {
+              key: "enrichment",
+              header: "富化",
+              width: "w-20",
+              render: (item) => <EnrichmentChip status={item.enrichmentStatus} />,
+            },
+          ]}
+        />
       )}
 
       {/* Empty state */}

@@ -39,8 +39,8 @@ export default async function ContentPage({ searchParams }: PageProps) {
     ? (rawTime as TimeWindow)
     : "7d";
 
-  const rawView = params.view ?? "card";
-  const initialView: "card" | "table" = rawView === "table" ? "table" : "card";
+  const rawView = params.view ?? "table";
+  const initialView: "card" | "table" = rawView === "card" ? "card" : "table";
 
   const rawEnrichment = params.enrichment;
   const enrichmentStatus =
