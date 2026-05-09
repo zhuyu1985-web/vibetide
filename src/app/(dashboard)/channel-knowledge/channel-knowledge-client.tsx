@@ -10,6 +10,7 @@ import type {
 } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { StatCard } from "@/components/shared/stat-card";
 import { KPIComparisonBar } from "@/components/shared/kpi-comparison-bar";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
@@ -485,42 +486,54 @@ export default function ChannelKnowledgeClient({ sources, items, dna, syncLogs, 
             <RealTimeIndicator label="知识源" count={10} />
           </div>
 
-          <GlassCard>
-            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">同步日志</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/25">
-                    <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">时间</th>
-                    <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">操作</th>
-                    <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">状态</th>
-                    <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">详情</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {syncLogs.map((log) => {
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300">同步日志</h4>
+            <DataTable
+              rows={syncLogs}
+              rowKey={(log) => log.id}
+              columns={[
+                {
+                  key: "timestamp",
+                  header: "时间",
+                  width: "w-40",
+                  render: (log) => (
+                    <span className="text-xs font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {log.timestamp}
+                    </span>
+                  ),
+                },
+                {
+                  key: "action",
+                  header: "操作",
+                  width: "w-32",
+                  render: (log) => (
+                    <span className="text-xs font-medium text-gray-800 dark:text-gray-100">
+                      {log.action}
+                    </span>
+                  ),
+                },
+                {
+                  key: "status",
+                  header: "状态",
+                  width: "w-20",
+                  align: "center",
+                  render: (log) => {
                     const cfg = logStatusConfig[log.status];
-                    return (
-                      <tr key={log.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-blue-50/30 dark:hover:bg-blue-900/20 transition-colors">
-                        <td className="py-2.5 px-3 text-xs font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          {log.timestamp}
-                        </td>
-                        <td className="py-2.5 px-3 text-xs font-medium text-gray-800 dark:text-gray-100">
-                          {log.action}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <Badge className={`text-[10px] ${cfg.color}`}>{cfg.label}</Badge>
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-gray-500 dark:text-gray-400">
-                          {log.detail}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </GlassCard>
+                    return <Badge className={`text-[10px] ${cfg.color}`}>{cfg.label}</Badge>;
+                  },
+                },
+                {
+                  key: "detail",
+                  header: "详情",
+                  render: (log) => (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {log.detail}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

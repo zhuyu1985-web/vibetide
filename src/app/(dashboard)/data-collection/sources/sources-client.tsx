@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { SearchInput } from "@/components/shared/search-input";
 import { toast } from "sonner";
 import {
@@ -251,128 +252,147 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
         </div>
       </div>
 
-      {/* Table panel */}
-      <GlassCard variant="panel" padding="none">
-        {/* Header row (missions style) */}
-        <div className="flex items-center gap-3 px-5 py-3 bg-gray-50/60 dark:bg-gray-800/30 border-b border-gray-300 dark:border-gray-600/70">
-          <div className="flex-1 min-w-0 text-sm font-semibold text-gray-600 dark:text-gray-400">名称</div>
-          <div className="w-24 text-sm font-semibold text-gray-600 dark:text-gray-400">类型</div>
-          <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">调度</div>
-          <div className="w-36 text-sm font-semibold text-gray-600 dark:text-gray-400">归属模块</div>
-          <div className="w-24 text-sm font-semibold text-gray-600 dark:text-gray-400">最近运行</div>
-          <div className="w-16 text-sm font-semibold text-gray-600 dark:text-gray-400 text-right">已采集</div>
-          <div className="w-20 text-sm font-semibold text-gray-600 dark:text-gray-400">状态</div>
-          <div className="w-24 text-sm font-semibold text-gray-600 dark:text-gray-400 text-right">操作</div>
-        </div>
-
-        {/* Body */}
-        {filtered.length === 0 ? (
-          <div className="px-5">
-            {initialSources.length === 0 ? (
-              <EmptyState
-                icon={Radar}
-                title="还没有采集源"
-                description="点击右上角「新建源」开始配置第一个采集源。支持 RSS / 站点列表 / 热榜聚合 / 关键词搜索等多种方式。"
-                action={
-                  <Button asChild size="sm">
-                    <Link href="/data-collection/sources/new">
-                      <Plus className="mr-1.5 h-4 w-4" />新建源
-                    </Link>
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState
-                title="没有匹配的记录"
-                description="尝试调整搜索或筛选条件。"
-              />
-            )}
-          </div>
-        ) : (
-          filtered.map((s) => {
-            const isRunning = runningIds.has(s.id);
-            const typeChip = SOURCE_TYPE_COLOR[s.sourceType] ?? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
-            return (
-              <div
-                key={s.id}
+      {/* Sources table — 与 /topic-compare 同款 DataTable 玻璃边框 */}
+      <DataTable
+        rows={filtered}
+        rowKey={(s) => s.id}
+        emptyMessage={
+          initialSources.length === 0 ? (
+            <EmptyState
+              icon={Radar}
+              title="还没有采集源"
+              description="点击右上角「新建源」开始配置第一个采集源。支持 RSS / 站点列表 / 热榜聚合 / 关键词搜索等多种方式。"
+              action={
+                <Button asChild size="sm">
+                  <Link href="/data-collection/sources/new">
+                    <Plus className="mr-1.5 h-4 w-4" />新建源
+                  </Link>
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="没有匹配的记录"
+              description="尝试调整搜索或筛选条件。"
+            />
+          )
+        }
+        columns={[
+          {
+            key: "name",
+            header: "名称",
+            render: (s) => (
+              <Link
+                href={`/data-collection/sources/${s.id}`}
+                className="text-sm text-gray-900 dark:text-gray-100 hover:text-primary transition-colors truncate block"
+              >
+                {s.name}
+              </Link>
+            ),
+          },
+          {
+            key: "type",
+            header: "类型",
+            width: "w-24",
+            render: (s) => {
+              const typeChip = SOURCE_TYPE_COLOR[s.sourceType] ?? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+              return (
+                <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px]", typeChip)}>
+                  {typeLabel(s.sourceType)}
+                </span>
+              );
+            },
+          },
+          {
+            key: "schedule",
+            header: "调度",
+            width: "w-20",
+            render: (s) => (
+              <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                {s.scheduleCron ?? (
+                  <span className="text-gray-400 dark:text-gray-500 font-sans">手工</span>
+                )}
+              </span>
+            ),
+          },
+          {
+            key: "modules",
+            header: "归属模块",
+            width: "w-36",
+            render: (s) => (
+              <div className="flex flex-wrap gap-1 overflow-hidden">
+                {s.targetModules.length === 0 ? (
+                  <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                ) : (
+                  s.targetModules.slice(0, 2).map((m) => (
+                    <span
+                      key={m}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                    >
+                      {m}
+                    </span>
+                  ))
+                )}
+                {s.targetModules.length > 2 && (
+                  <span className="text-[10px] text-gray-400">+{s.targetModules.length - 2}</span>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: "lastRun",
+            header: "最近运行",
+            width: "w-24",
+            render: (s) => (
+              <span
+                className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                title={s.lastRunAt ? formatAbsoluteTime(s.lastRunAt) : ""}
+              >
+                {s.lastRunAt ? formatRelativeTime(s.lastRunAt) : (
+                  <span className="text-gray-400 dark:text-gray-500">未运行</span>
+                )}
+              </span>
+            ),
+          },
+          {
+            key: "items",
+            header: "已采集",
+            width: "w-16",
+            align: "right",
+            render: (s) => (
+              <span
                 className={cn(
-                  "group flex items-center gap-3 px-5 py-4 border-b border-gray-300 dark:border-gray-600/70 last:border-b-0 transition-colors duration-200",
-                  isRunning ? "bg-blue-50/60 dark:bg-blue-950/20" : "hover:bg-gray-50/50 dark:hover:bg-gray-800/20",
+                  "text-sm tabular-nums",
+                  s.totalItemsCollected > 0
+                    ? "text-gray-700 dark:text-gray-200"
+                    : "text-gray-300 dark:text-gray-600",
                 )}
               >
-                {/* Name */}
-                <div className="flex-1 min-w-0">
-                  <Link
-                    href={`/data-collection/sources/${s.id}`}
-                    className="text-sm text-gray-900 dark:text-gray-100 hover:text-primary transition-colors truncate block"
-                  >
-                    {s.name}
-                  </Link>
-                </div>
-                {/* Type chip */}
-                <div className="w-24 shrink-0">
-                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px]", typeChip)}>
-                    {typeLabel(s.sourceType)}
-                  </span>
-                </div>
-                {/* Schedule */}
-                <div className="w-20 shrink-0 text-xs font-mono text-gray-500 dark:text-gray-400">
-                  {s.scheduleCron ?? (
-                    <span className="text-gray-400 dark:text-gray-500 font-sans">手工</span>
-                  )}
-                </div>
-                {/* Target modules */}
-                <div className="w-36 shrink-0 overflow-hidden">
-                  <div className="flex flex-wrap gap-1">
-                    {s.targetModules.length === 0 ? (
-                      <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
-                    ) : (
-                      s.targetModules.slice(0, 2).map((m) => (
-                        <span
-                          key={m}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                        >
-                          {m}
-                        </span>
-                      ))
-                    )}
-                    {s.targetModules.length > 2 && (
-                      <span className="text-[10px] text-gray-400">+{s.targetModules.length - 2}</span>
-                    )}
-                  </div>
-                </div>
-                {/* Last run */}
-                <div
-                  className="w-24 shrink-0 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
-                  title={s.lastRunAt ? formatAbsoluteTime(s.lastRunAt) : ""}
-                >
-                  {s.lastRunAt ? formatRelativeTime(s.lastRunAt) : (
-                    <span className="text-gray-400 dark:text-gray-500">未运行</span>
-                  )}
-                </div>
-                {/* Items */}
-                <div className="w-16 shrink-0 text-right">
-                  <span
-                    className={cn(
-                      "text-sm tabular-nums",
-                      s.totalItemsCollected > 0
-                        ? "text-gray-700 dark:text-gray-200"
-                        : "text-gray-300 dark:text-gray-600",
-                    )}
-                  >
-                    {formatNumber(s.totalItemsCollected)}
-                  </span>
-                </div>
-                {/* Status */}
-                <div className="w-20 shrink-0">
-                  <StatusIndicator
-                    enabled={s.enabled}
-                    lastRunStatus={s.lastRunStatus}
-                    isRunning={isRunning}
-                  />
-                </div>
-                {/* Actions */}
-                <div className="w-24 shrink-0 flex justify-end gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                {formatNumber(s.totalItemsCollected)}
+              </span>
+            ),
+          },
+          {
+            key: "status",
+            header: "状态",
+            width: "w-20",
+            render: (s) => (
+              <StatusIndicator
+                enabled={s.enabled}
+                lastRunStatus={s.lastRunStatus}
+                isRunning={runningIds.has(s.id)}
+              />
+            ),
+          },
+          {
+            key: "actions",
+            header: "操作",
+            width: "w-24",
+            align: "right",
+            render: (s) => {
+              const isRunning = runningIds.has(s.id);
+              return (
+                <div className="flex justify-end gap-0.5">
                   <button
                     type="button"
                     disabled={busyId === s.id || !s.enabled || isRunning}
@@ -409,11 +429,11 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
                     <Trash2 className="h-4 w-4 text-gray-600 dark:text-gray-400 group-hover/del:text-red-600 dark:group-hover/del:text-red-400" />
                   </button>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </GlassCard>
+              );
+            },
+          },
+        ]}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}

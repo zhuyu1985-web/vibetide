@@ -14,6 +14,7 @@ import type {
 } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { StatCard } from "@/components/shared/stat-card";
 import { KPIComparisonBar } from "@/components/shared/kpi-comparison-bar";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
@@ -655,45 +656,71 @@ export default function AssetReviveClient({
           </div>
 
           {/* Records table */}
-          <GlassCard>
-            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">盘活记录</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/25">
-                    <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">资产名称</th>
-                    <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">场景</th>
-                    <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">匹配分</th>
-                    <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">状态</th>
-                    <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">日期</th>
-                    <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">覆盖量</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reviveRecords.map((record) => {
-                    const scenario = scenarioBadge[record.scenario];
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300">盘活记录</h4>
+            <DataTable
+              rows={reviveRecords}
+              rowKey={(r) => r.id}
+              columns={[
+                {
+                  key: "asset",
+                  header: "资产名称",
+                  render: (record) => (
+                    <span className="text-xs font-medium text-gray-800 dark:text-gray-100">
+                      {record.asset}
+                    </span>
+                  ),
+                },
+                {
+                  key: "scenario",
+                  header: "场景",
+                  width: "w-24",
+                  align: "center",
+                  render: (record) => {
+                    const s = scenarioBadge[record.scenario];
+                    return <Badge className={`text-[10px] ${s.color}`}>{s.label}</Badge>;
+                  },
+                },
+                {
+                  key: "matchScore",
+                  header: "匹配分",
+                  width: "w-20",
+                  align: "center",
+                  render: (record) => <AIScoreBadge score={record.matchScore} size={28} />,
+                },
+                {
+                  key: "status",
+                  header: "状态",
+                  width: "w-20",
+                  align: "center",
+                  render: (record) => {
                     const st = recordStatusConfig[record.status];
-                    return (
-                      <tr key={record.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-blue-50/30 dark:hover:bg-blue-900/20 transition-colors">
-                        <td className="py-2.5 px-3 text-xs font-medium text-gray-800 dark:text-gray-100">{record.asset}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <Badge className={`text-[10px] ${scenario.color}`}>{scenario.label}</Badge>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <AIScoreBadge score={record.matchScore} size={28} />
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <Badge className={`text-[10px] ${st.color}`}>{st.label}</Badge>
-                        </td>
-                        <td className="py-2.5 px-3 text-center text-xs text-gray-500 dark:text-gray-400">{record.date}</td>
-                        <td className="py-2.5 px-3 text-center text-xs font-mono text-gray-600 dark:text-gray-400">{record.reach}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </GlassCard>
+                    return <Badge className={`text-[10px] ${st.color}`}>{st.label}</Badge>;
+                  },
+                },
+                {
+                  key: "date",
+                  header: "日期",
+                  width: "w-20",
+                  align: "center",
+                  render: (record) => (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{record.date}</span>
+                  ),
+                },
+                {
+                  key: "reach",
+                  header: "覆盖量",
+                  width: "w-20",
+                  align: "center",
+                  render: (record) => (
+                    <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                      {record.reach}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

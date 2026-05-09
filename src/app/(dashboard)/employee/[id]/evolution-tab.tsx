@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -490,95 +491,86 @@ export function EvolutionTab({
           </span>
         </h3>
 
-        {attributions.length === 0 ? (
-          <GlassCard>
-            <p className="text-center text-sm text-gray-400 dark:text-gray-500">
-              暂无效果归因数据
-            </p>
-          </GlassCard>
-        ) : (
-          <GlassCard padding="none">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-700/50 text-left text-xs text-gray-500 dark:text-gray-400">
-                    <th className="px-4 py-2.5 font-medium">时间</th>
-                    <th className="px-4 py-2.5 font-medium">传播数据</th>
-                    <th className="px-4 py-2.5 font-medium">互动数据</th>
-                    <th className="px-4 py-2.5 font-medium">质量评分</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attributions.map((a) => (
-                    <tr
-                      key={a.id}
-                      className="border-b border-gray-50 dark:border-gray-800 last:border-0"
-                    >
-                      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {a.attributedAt
-                          ? new Date(a.attributedAt).toLocaleDateString(
-                              "zh-CN"
-                            )
-                          : "-"}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {a.reach ? (
-                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                            <span className="inline-flex items-center gap-0.5">
-                              <Eye className="size-3" />
-                              {a.reach.views ?? 0}
-                            </span>
-                            <span className="inline-flex items-center gap-0.5">
-                              <Share2 className="size-3" />
-                              {a.reach.shares ?? 0}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {a.engagement ? (
-                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                            <span className="inline-flex items-center gap-0.5">
-                              <Heart className="size-3" />
-                              {a.engagement.likes ?? 0}
-                            </span>
-                            <span className="inline-flex items-center gap-0.5">
-                              <MessageCircle className="size-3" />
-                              {a.engagement.comments ?? 0}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {a.qualityScore ? (
-                          <Badge
-                            variant="secondary"
-                            className={cn(
-                              "text-xs",
-                              (a.qualityScore.overall ?? 0) >= 80
-                                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
-                                : (a.qualityScore.overall ?? 0) >= 60
-                                  ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                                  : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
-                            )}
-                          >
-                            {a.qualityScore.overall ?? "-"}
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </GlassCard>
-        )}
+        <DataTable
+          rows={attributions}
+          rowKey={(a) => a.id}
+          emptyMessage="暂无效果归因数据"
+          columns={[
+            {
+              key: "attributedAt",
+              header: "时间",
+              width: "w-32",
+              render: (a) => (
+                <span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                  {a.attributedAt
+                    ? new Date(a.attributedAt).toLocaleDateString("zh-CN")
+                    : "-"}
+                </span>
+              ),
+            },
+            {
+              key: "reach",
+              header: "传播数据",
+              render: (a) =>
+                a.reach ? (
+                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="inline-flex items-center gap-0.5">
+                      <Eye className="size-3" />
+                      {a.reach.views ?? 0}
+                    </span>
+                    <span className="inline-flex items-center gap-0.5">
+                      <Share2 className="size-3" />
+                      {a.reach.shares ?? 0}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-gray-300">-</span>
+                ),
+            },
+            {
+              key: "engagement",
+              header: "互动数据",
+              render: (a) =>
+                a.engagement ? (
+                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="inline-flex items-center gap-0.5">
+                      <Heart className="size-3" />
+                      {a.engagement.likes ?? 0}
+                    </span>
+                    <span className="inline-flex items-center gap-0.5">
+                      <MessageCircle className="size-3" />
+                      {a.engagement.comments ?? 0}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-gray-300">-</span>
+                ),
+            },
+            {
+              key: "qualityScore",
+              header: "质量评分",
+              width: "w-24",
+              render: (a) =>
+                a.qualityScore ? (
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "text-xs",
+                      (a.qualityScore.overall ?? 0) >= 80
+                        ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                        : (a.qualityScore.overall ?? 0) >= 60
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                          : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
+                    )}
+                  >
+                    {a.qualityScore.overall ?? "-"}
+                  </Badge>
+                ) : (
+                  <span className="text-gray-300">-</span>
+                ),
+            },
+          ]}
+        />
       </div>
     </div>
   );

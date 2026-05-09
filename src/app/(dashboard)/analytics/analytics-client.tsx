@@ -2,6 +2,7 @@
 
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { StatCard } from "@/components/shared/stat-card";
 import { AreaChartCard } from "@/components/charts/area-chart-card";
 import { BarChartCard } from "@/components/charts/bar-chart-card";
@@ -262,101 +263,109 @@ export default function AnalyticsClient({
                 TOP内容排行 (F3.1.18 内容效果评分)
               </h3>
             </div>
-            {topContent.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 dark:border-gray-700/50">
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        排名
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        标题
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        渠道
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        阅读量
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        点赞
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        效果评分
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        日期
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topContent.map((item, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-gray-50 dark:border-gray-800 hover:bg-blue-50/30 dark:hover:bg-blue-900/20 transition-colors"
+            <DataTable
+              framed={false}
+              rows={topContent.map((item, i) => ({ ...item, _rank: i }))}
+              rowKey={(item) => `${item._rank}`}
+              emptyMessage="暂无已发布内容数据"
+              columns={[
+                {
+                  key: "rank",
+                  header: "排名",
+                  width: "w-16",
+                  render: (item) => (
+                    <span
+                      className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold ${
+                        item._rank === 0
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                          : item._rank === 1
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                          : item._rank === 2
+                          ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                          : "text-gray-400 dark:text-gray-500"
+                      }`}
+                    >
+                      {item._rank + 1}
+                    </span>
+                  ),
+                },
+                {
+                  key: "title",
+                  header: "标题",
+                  render: (item) => (
+                    <span className="font-medium text-gray-800 dark:text-gray-100 truncate block">
+                      {item.title}
+                    </span>
+                  ),
+                },
+                {
+                  key: "channel",
+                  header: "渠道",
+                  width: "w-24",
+                  render: (item) => (
+                    <Badge variant="secondary" className="text-xs">
+                      {item.channel}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: "views",
+                  header: "阅读量",
+                  width: "w-20",
+                  align: "right",
+                  render: (item) => (
+                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                      {item.views >= 10000
+                        ? `${(item.views / 10000).toFixed(1)}万`
+                        : item.views.toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  key: "likes",
+                  header: "点赞",
+                  width: "w-20",
+                  align: "right",
+                  render: (item) => (
+                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                      {item.likes >= 10000
+                        ? `${(item.likes / 10000).toFixed(1)}万`
+                        : item.likes.toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  key: "score",
+                  header: "效果评分",
+                  width: "w-24",
+                  align: "right",
+                  render: (item) =>
+                    item.score !== undefined ? (
+                      <span
+                        className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-bold ${
+                          item.score >= 80
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                            : item.score >= 60
+                            ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        }`}
                       >
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold ${
-                              i === 0
-                                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                                : i === 1
-                                ? "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                                : i === 2
-                                ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
-                                : "text-gray-400 dark:text-gray-500"
-                            }`}
-                          >
-                            {i + 1}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 font-medium text-gray-800 dark:text-gray-100">
-                          {item.title}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <Badge variant="secondary" className="text-xs">
-                            {item.channel}
-                          </Badge>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-gray-700 dark:text-gray-300">
-                          {item.views >= 10000
-                            ? `${(item.views / 10000).toFixed(1)}万`
-                            : item.views.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-gray-700 dark:text-gray-300">
-                          {item.likes >= 10000
-                            ? `${(item.likes / 10000).toFixed(1)}万`
-                            : item.likes.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          {item.score !== undefined && (
-                            <span
-                              className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-bold ${
-                                item.score >= 80
-                                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                                  : item.score >= 60
-                                  ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                              }`}
-                            >
-                              {item.score}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-gray-400 dark:text-gray-500">
-                          {item.date}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                暂无已发布内容数据
-              </div>
-            )}
+                        {item.score}
+                      </span>
+                    ) : null,
+                },
+                {
+                  key: "date",
+                  header: "日期",
+                  width: "w-24",
+                  render: (item) => (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {item.date}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </GlassCard>
         </div>
       </div>

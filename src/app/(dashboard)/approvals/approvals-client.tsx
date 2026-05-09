@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { GlassCard } from "@/components/shared/glass-card";
+import { DataTable } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -404,89 +405,82 @@ export function ApprovalsClient({
           </Badge>
         </div>
 
-        {history.length === 0 ? (
-          <GlassCard padding="md">
-            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-              暂无审批记录
-            </p>
-          </GlassCard>
-        ) : (
-          <GlassCard padding="none">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-700/50">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      工作流
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      步骤
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      执行者
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      团队
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      状态
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      完成时间
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((item) => (
-                    <tr
-                      key={item.stepId}
-                      className="border-b border-gray-50 dark:border-gray-800 hover:bg-blue-50/30 dark:hover:bg-blue-900/20 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
-                        {item.workflowName}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {item.stepLabel}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {item.employeeSlug && (
-                            <EmployeeAvatar
-                              employeeId={item.employeeSlug as EmployeeId}
-                              size="xs"
-                            />
-                          )}
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {item.employeeNickname || "-"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                        {item.teamName || "-"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {item.status === "completed" ? (
-                          <Badge className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                            已通过
-                          </Badge>
-                        ) : (
-                          <Badge className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
-                            已驳回
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
-                        {item.completedAt
-                          ? timeAgo(item.completedAt)
-                          : "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </GlassCard>
-        )}
+        <DataTable
+          rows={history}
+          rowKey={(item) => item.stepId}
+          emptyMessage="暂无审批记录"
+          columns={[
+            {
+              key: "workflowName",
+              header: "工作流",
+              render: (item) => (
+                <span className="text-gray-900 dark:text-gray-100">
+                  {item.workflowName}
+                </span>
+              ),
+            },
+            {
+              key: "stepLabel",
+              header: "步骤",
+              render: (item) => (
+                <span className="text-gray-600 dark:text-gray-400">
+                  {item.stepLabel}
+                </span>
+              ),
+            },
+            {
+              key: "executor",
+              header: "执行者",
+              render: (item) => (
+                <div className="flex items-center gap-1.5">
+                  {item.employeeSlug && (
+                    <EmployeeAvatar
+                      employeeId={item.employeeSlug as EmployeeId}
+                      size="xs"
+                    />
+                  )}
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {item.employeeNickname || "-"}
+                  </span>
+                </div>
+              ),
+            },
+            {
+              key: "teamName",
+              header: "团队",
+              render: (item) => (
+                <span className="text-gray-500 dark:text-gray-400">
+                  {item.teamName || "-"}
+                </span>
+              ),
+            },
+            {
+              key: "status",
+              header: "状态",
+              width: "w-20",
+              render: (item) =>
+                item.status === "completed" ? (
+                  <Badge className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                    已通过
+                  </Badge>
+                ) : (
+                  <Badge className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                    已驳回
+                  </Badge>
+                ),
+            },
+            {
+              key: "completedAt",
+              header: "完成时间",
+              width: "w-28",
+              render: (item) => (
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {item.completedAt ? timeAgo(item.completedAt) : "-"}
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
     </div>
   );
