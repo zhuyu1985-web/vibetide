@@ -13,24 +13,24 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   {
-    href: "/data-collection/sources",
-    label: "源管理",
-    matchPrefixes: ["/data-collection/sources"],
-  },
-  {
     href: "/data-collection/content",
     label: "采集池",
     matchPrefixes: ["/data-collection/content"],
   },
   {
-    href: "/data-collection/monitoring",
-    label: "监控面板",
-    matchPrefixes: ["/data-collection/monitoring"],
+    href: "/data-collection/sources",
+    label: "源管理",
+    matchPrefixes: ["/data-collection/sources"],
   },
   {
     href: "/data-collection/outlets",
     label: "媒体字典",
     matchPrefixes: ["/data-collection/outlets"],
+  },
+  {
+    href: "/data-collection/monitoring",
+    label: "监控面板",
+    matchPrefixes: ["/data-collection/monitoring"],
   },
 ];
 
