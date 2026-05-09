@@ -1,7 +1,7 @@
 ---
 name: web_search
 displayName: 全网搜索
-description: 面向新闻策划、热点追踪、事实核查、竞品调研四大场景的实时全网检索能力。通过 Tavily API 进行跨全网精准搜索，Tavily 不可用时自动降级到 Google News / Bing News RSS 聚合通道，保证检索链路不中断。对召回结果做 URL 规范化去重、标题相似度合并、来源六级可信度分级（央媒 / 官方 / 行业垂直 / 主流新闻 / 社交 UGC / 营销水军）、时效性+权威性+关键词匹配度综合排序，并对高频标题做热点聚类。支持按时间范围（1h / 24h / 7d / 30d）、来源类型、黑名单域、话题类型（general / news / finance）多维筛选。当用户提及"搜一下""查最新""某话题全网怎么说""最近有什么动态""找相关报道"等关键词时调用；不用于单 URL 正文抓取或平台热榜主动发现。
+description: 面向新闻策划、热点追踪、事实核查、竞品调研四大场景的实时全网检索能力。通过博查（默认）/ Tavily（可选）API 进行跨全网精准搜索，主通道不可用时自动降级到 Google News / Bing News RSS 聚合通道，保证检索链路不中断。对召回结果做 URL 规范化去重、标题相似度合并、来源六级可信度分级（央媒 / 官方 / 行业垂直 / 主流新闻 / 社交 UGC / 营销水军）、时效性+权威性+关键词匹配度综合排序，并对高频标题做热点聚类。支持按时间范围（1h / 24h / 7d / 30d）、来源类型、黑名单域、话题类型（general / news / finance）多维筛选。当用户提及"搜一下""查最新""某话题全网怎么说""最近有什么动态""找相关报道"等关键词时调用；不用于单 URL 正文抓取或平台热榜主动发现。
 version: "3.2"
 category: data_collection
 
@@ -11,7 +11,7 @@ metadata:
   compatibleEmployees: [xiaolei, xiaoce, xiaowen, xiaoshen, xiaozi]
   modelDependency: none
   requires:
-    env: [TAVILY_API_KEY]
+    env: [SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY]
     knowledgeBases: []
     dependencies: [web_deep_read]
   implementation:
@@ -42,9 +42,10 @@ metadata:
 - 需要结构化去重新闻列表 → `news_aggregation`（更专业的聚合与评分）
 
 **前置条件**：
-- 优先使用 `TAVILY_API_KEY`（通用 / news / finance 三种 topic）；未配置时降级为 Google News / Bing News RSS
+- 联网搜索 provider 由 `SEARCH_PROVIDER` 控制：`bocha`（默认，国内可直连）或 `tavily`（海外通道，需对应 key）；都未配置时降级为 Google News / Bing News RSS
 - 单次调用 `maxResults` 默认 8，最大 20，超过应拆多次调用
 - `timeRange` 默认 24h，追热点推荐 1h / 6h，做背景调研用 7d / 30d
+- 博查无 1h 粒度，`1h` 会被映射成 `oneDay`；`includeDomains` 在博查走客户端过滤
 
 ## 输入 / 输出
 
@@ -56,7 +57,7 @@ metadata:
 | timeRange | enum | ✗ | `1h` / `24h` / `7d` / `30d` / `all`，默认 `24h` |
 | sources | string[] | ✗ | 来源过滤：`央媒` / `官方` / `行业媒体` / `新闻媒体` / `社交` |
 | maxResults | int | ✗ | 返回条数，默认 8，最大 20 |
-| topic | enum | ✗ | `general` / `news` / `finance`（仅 Tavily 通道） |
+| topic | enum | ✗ | `general` / `news` / `finance`（Tavily 通道用；博查通道忽略） |
 | excludeDomains | string[] | ✗ | 黑名单域名，过滤劣质站点 |
 
 **输出简要表：**
@@ -65,7 +66,7 @@ metadata:
 |------|------|------|
 | summary | string | 查询摘要 + 核心结论（60-120 字） |
 | generatedAt | string | ISO 时间戳 |
-| channel | enum | `tavily` / `rss` |
+| channel | enum | `bocha` / `tavily` / `rss` |
 | returnedCount | int | 实际返回条数（去重后） |
 | hotTopics | `{topic, level, representativeTitle, sources[]}[]` | 从多条结果聚类的热点主题 |
 | results | `{title, snippet, url, source, sourceType, credibility, publishedAt, score}[]` | 详细结果列表 |
@@ -77,8 +78,8 @@ metadata:
 
 - [ ] Step 0: `query` 非空校验 + 长度限制（≤ 150 字符）
 - [ ] Step 1: 意图识别 —— 判断是「找最新动态」「热点聚类」还是「具体事实情报」
-- [ ] Step 2: 选通道 —— Tavily 优先；配额不足 / 超时 → Google / Bing News RSS
-- [ ] Step 3: 多源并发检索（Tavily 单次；RSS 可并发 3 源）
+- [ ] Step 2: 选通道 —— `SEARCH_PROVIDER`（博查 / Tavily）优先；配额不足 / 超时 → Google / Bing News RSS
+- [ ] Step 3: 多源并发检索（主通道单次；RSS 可并发 3 源）
 - [ ] Step 4: 结果去重 —— 基于 URL 规范化 + 标题 80% 相似度合并
 - [ ] Step 5: 来源分级 + 可信度打分（见 §5）
 - [ ] Step 6: 热点聚类 —— 标题 Jaccard 相似 > 0.4 聚为一组，≥ 3 组视为"热点"
@@ -204,7 +205,9 @@ min_credibility: 40
 
 ## 参考资料
 
-- 代码实现：[src/lib/agent/tools/web-search.ts](../../src/lib/agent/tools/web-search.ts)（Tavily + RSS 双通道）
+- 代码实现：[src/lib/agent/tools/web-search.ts](../../src/lib/agent/tools/web-search.ts)（调 `searchWeb()` 路由）
+- Provider 路由：[src/lib/search/index.ts](../../src/lib/search/index.ts)（按 `SEARCH_PROVIDER` 选 bocha / tavily）
+- 博查文档：<https://open.bochaai.com> —— `/v1/web-search` 端点，支持 freshness / summary / count
 - Tavily 文档：<https://tavily.com/docs> —— `/search` 端点，支持 topic / time_range / exclude_domains
 - 历史版本：`git log --follow skills/web_search/SKILL.md`
 

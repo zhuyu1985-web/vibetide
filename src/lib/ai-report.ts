@@ -3,21 +3,21 @@
 // Used by topic comparison (section 2.2) and missed topic AI summary (section 3.3).
 // ---------------------------------------------------------------------------
 
-import { searchViaTavily } from "@/lib/web-fetch";
+import { searchWeb } from "@/lib/search";
 import { generateText } from "ai";
 import { resolveModelConfig, getLanguageModel } from "@/lib/agent/model-router";
 import type { BenchmarkAISummary } from "@/lib/types";
 
 /**
  * Generate a structured AI report for a given topic.
- * Searches Tavily for internet-wide coverage, then asks the LLM to summarize
- * into 4 structured sections (central media, other media, highlights, overall).
+ * Runs the active web search provider for internet-wide coverage, then asks the LLM
+ * to summarize into 4 structured sections (central media, other media, highlights, overall).
  */
 export async function generateTopicAIReport(
   topicTitle: string,
   options?: { maxResults?: number }
 ): Promise<BenchmarkAISummary> {
-  const { items } = await searchViaTavily(topicTitle, {
+  const { items } = await searchWeb(topicTitle, {
     maxResults: options?.maxResults ?? 15,
     topic: "news",
   });

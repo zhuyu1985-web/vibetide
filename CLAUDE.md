@@ -226,7 +226,9 @@ OPENAI_API_BASE_URL       # https://api.deepseek.com/v1
 OPENAI_MODEL              # deepseek-chat
 
 # Web Search & Content Reading
-TAVILY_API_KEY            # Tavily Search API (全网搜索)
+SEARCH_PROVIDER           # 联网搜索 provider: bocha | tavily (默认 bocha,国内可直连)
+BOCHA_API_KEY             # 博查 Web Search API (国内主通道,与 SEARCH_PROVIDER=bocha 配合)
+TAVILY_API_KEY            # Tavily Search API (海外通道,与 SEARCH_PROVIDER=tavily 配合;Collection Hub tavilyAdapter 强制使用)
 JINA_API_KEY              # Jina Reader API (网页深读)
 
 # Trending Topics (热榜聚合)

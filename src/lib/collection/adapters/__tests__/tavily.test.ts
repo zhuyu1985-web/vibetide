@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { tavilyAdapter } from "../tavily";
 
-vi.mock("@/lib/web-fetch", () => ({
-  searchViaTavily: vi.fn(),
+vi.mock("@/lib/search", () => ({
+  searchWeb: vi.fn(),
 }));
 
-import { searchViaTavily } from "@/lib/web-fetch";
+import { searchWeb } from "@/lib/search";
 
 describe("tavilyAdapter", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -27,7 +27,7 @@ describe("tavilyAdapter", () => {
   });
 
   it("normalizes NewsFeedItem to RawItem with channel=tavily", async () => {
-    vi.mocked(searchViaTavily).mockResolvedValue({
+    vi.mocked(searchWeb).mockResolvedValue({
       items: [
         {
           title: "A 国 AI 新政策",
@@ -42,6 +42,7 @@ describe("tavilyAdapter", () => {
         },
       ],
       responseTime: 123,
+      provider: "tavily",
     });
 
     const result = await tavilyAdapter.execute({
@@ -67,8 +68,8 @@ describe("tavilyAdapter", () => {
     });
   });
 
-  it("passes includeDomains as include_domains (snake_case) to searchViaTavily", async () => {
-    vi.mocked(searchViaTavily).mockResolvedValue({ items: [], responseTime: 10 });
+  it("forces tavily provider and forwards includeDomains", async () => {
+    vi.mocked(searchWeb).mockResolvedValue({ items: [], responseTime: 10, provider: "tavily" });
     await tavilyAdapter.execute({
       config: {
         keywords: ["x"],
@@ -81,16 +82,17 @@ describe("tavilyAdapter", () => {
       runId: "r",
       log: vi.fn(),
     });
-    expect(searchViaTavily).toHaveBeenCalledWith("x", expect.objectContaining({
+    expect(searchWeb).toHaveBeenCalledWith("x", expect.objectContaining({
+      forceProvider: "tavily",
       timeRange: "24h",
-      include_domains: ["xinhuanet.com"],
+      includeDomains: ["xinhuanet.com"],
       maxResults: 5,
     }));
   });
 
   it("records partialFailures on per-keyword errors", async () => {
-    vi.mocked(searchViaTavily)
-      .mockResolvedValueOnce({ items: [], responseTime: 10 })
+    vi.mocked(searchWeb)
+      .mockResolvedValueOnce({ items: [], responseTime: 10, provider: "tavily" })
       .mockRejectedValueOnce(new Error("Tavily 429"));
 
     const log = vi.fn();

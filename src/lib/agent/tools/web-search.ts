@@ -1,16 +1,29 @@
+import { searchWeb, isSearchProviderConfigured } from "@/lib/search";
+
 /**
- * Web search tool stub.
- * In production, this should connect to a real search API
- * (e.g., Tavily, SerpAPI, or Bing Search).
+ * Web search tool — runs against the configured provider (SEARCH_PROVIDER env: bocha | tavily).
+ * Falls back to an explanatory empty result when no provider is configured.
  */
 export async function webSearch(query: string, maxResults: number = 5) {
+  if (!isSearchProviderConfigured()) {
+    return {
+      query,
+      results: [],
+      warning: "No web search provider configured (set SEARCH_PROVIDER and BOCHA_API_KEY or TAVILY_API_KEY).",
+    };
+  }
+
+  const { items, provider } = await searchWeb(query, { maxResults, topic: "news" });
+
   return {
     query,
-    results: Array.from({ length: Math.min(maxResults, 3) }, (_, i) => ({
-      title: `[模拟] 搜索结果 ${i + 1}: ${query}`,
-      snippet: `这是关于「${query}」的模拟搜索结果 #${i + 1}。`,
-      url: `https://example.com/result/${i + 1}`,
-      publishedAt: new Date().toISOString(),
+    provider,
+    results: items.map((it) => ({
+      title: it.title,
+      snippet: it.snippet,
+      url: it.url,
+      source: it.source,
+      publishedAt: it.publishedAt,
     })),
   };
 }

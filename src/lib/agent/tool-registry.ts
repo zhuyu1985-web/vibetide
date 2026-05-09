@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
 import { getBuiltinSkillNameToSlug } from "@/lib/skill-loader";
 import {
-  searchViaTavily,
   fetchViaJinaReader,
   fetchViaCheerio,
   truncateContent,
@@ -14,6 +13,7 @@ import {
   type NewsFeedItem,
   type SourceType,
 } from "@/lib/web-fetch";
+import { searchWeb, isSearchProviderConfigured, getActiveSearchProvider } from "@/lib/search";
 import { ilike, sql } from "drizzle-orm";
 import type { AgentTool } from "./types";
 import { decrypt } from "@/lib/crypto";
@@ -403,18 +403,19 @@ function createToolDefinitions(): ToolSet {
         let fetchedItems: NewsFeedItem[] = [];
         let tavilyAnswer: string | undefined;
 
-        // --- Primary channel: Tavily API ---
-        if (process.env.TAVILY_API_KEY) {
+        // --- Primary channel: configured web search provider (Bocha / Tavily) ---
+        if (isSearchProviderConfigured()) {
+          const providerId = getActiveSearchProvider();
           try {
-            const tavilyResult = await searchViaTavily(trimmedQuery, {
+            const searchResult = await searchWeb(trimmedQuery, {
               timeRange,
               maxResults: limitedResults,
               topic,
             });
-            fetchedItems = tavilyResult.items;
-            tavilyAnswer = tavilyResult.answer;
+            fetchedItems = searchResult.items;
+            tavilyAnswer = searchResult.answer;
           } catch (err) {
-            warnings.push(`Tavily 通道失败: ${err instanceof Error ? err.message : String(err)}，回退到 RSS`);
+            warnings.push(`${providerId} 通道失败: ${err instanceof Error ? err.message : String(err)}，回退到 RSS`);
           }
         }
 
@@ -640,22 +641,23 @@ function createToolDefinitions(): ToolSet {
         topic: z.enum(["general", "news", "finance"]).optional().default("news"),
       }),
       execute: async ({ query, maxResults = 10, timeRange, topic = "news" }) => {
-        if (!process.env.TAVILY_API_KEY) {
+        const providerId = getActiveSearchProvider();
+        if (!isSearchProviderConfigured()) {
           return {
             query,
             generatedAt: new Date().toISOString(),
             results: [],
-            warnings: ["未配置 TAVILY_API_KEY，无法聚合新闻"],
+            warnings: [`未配置 ${providerId.toUpperCase()}_API_KEY，无法聚合新闻`],
           };
         }
-        const tavily = await searchViaTavily(query.trim(), {
+        const searchRes = await searchWeb(query.trim(), {
           timeRange,
           maxResults: Math.min(maxResults, 20),
           topic,
         });
         // 字段命名沿用 web_search 的 `results` —— 下游 mission-executor
         // 统一按 `results` 检测 0 / 稀疏结果并注入强约束警示。
-        const results = tavily.items.map((it) => ({
+        const results = searchRes.items.map((it) => ({
           title: it.title,
           source: it.source,
           sourceType: SOURCE_TYPE_LABELS[it.sourceType],
@@ -668,10 +670,10 @@ function createToolDefinitions(): ToolSet {
           query,
           generatedAt: new Date().toISOString(),
           timeRange: timeRange ?? "unset",
-          totalFetched: tavily.items.length,
+          totalFetched: searchRes.items.length,
           results,
-          summary: tavily.answer ?? null,
-          warnings: results.length === 0 ? ["Tavily 未命中任何条目，建议放宽 timeRange 或换关键词"] : [],
+          summary: searchRes.answer ?? null,
+          warnings: results.length === 0 ? [`${providerId} 未命中任何条目，建议放宽 timeRange 或换关键词`] : [],
         };
       },
     }),
@@ -690,27 +692,28 @@ function createToolDefinitions(): ToolSet {
         const warnings: string[] = [];
         const q = query.trim();
 
-        // 并行：Tavily 新闻 + 多平台热榜搜索
-        const [tavilyRes, trendingRes] = await Promise.allSettled([
-          process.env.TAVILY_API_KEY
-            ? searchViaTavily(q, { timeRange, maxResults: 8, topic: "news" })
-            : Promise.reject(new Error("TAVILY_API_KEY 未配置")),
+        // 并行：联网搜索新闻 + 多平台热榜搜索
+        const activeProvider = getActiveSearchProvider();
+        const [searchRes, trendingRes] = await Promise.allSettled([
+          isSearchProviderConfigured()
+            ? searchWeb(q, { timeRange, maxResults: 8, topic: "news" })
+            : Promise.reject(new Error(`${activeProvider.toUpperCase()}_API_KEY 未配置`)),
           process.env.TRENDING_API_KEY
             ? fetchTrendingFromApi("search", { query: q, limit: 20 })
             : Promise.reject(new Error("TRENDING_API_KEY 未配置")),
         ]);
 
         const newsItems =
-          tavilyRes.status === "fulfilled"
-            ? tavilyRes.value.items.slice(0, 8).map((it) => ({
+          searchRes.status === "fulfilled"
+            ? searchRes.value.items.slice(0, 8).map((it) => ({
                 title: it.title,
                 source: it.source,
                 url: it.url,
                 publishedAt: it.publishedAt,
               }))
             : [];
-        if (tavilyRes.status === "rejected") {
-          warnings.push(`Tavily: ${tavilyRes.reason instanceof Error ? tavilyRes.reason.message : String(tavilyRes.reason)}`);
+        if (searchRes.status === "rejected") {
+          warnings.push(`${activeProvider}: ${searchRes.reason instanceof Error ? searchRes.reason.message : String(searchRes.reason)}`);
         }
 
         const trendingItems =
@@ -823,10 +826,11 @@ function createToolDefinitions(): ToolSet {
         const q = query.trim();
         const warnings: string[] = [];
 
+        const activeProvider = getActiveSearchProvider();
         const [newsRes, trendingRes] = await Promise.allSettled([
-          process.env.TAVILY_API_KEY
-            ? searchViaTavily(q, { timeRange, maxResults: 20, topic: "news" })
-            : Promise.reject(new Error("TAVILY_API_KEY 未配置")),
+          isSearchProviderConfigured()
+            ? searchWeb(q, { timeRange, maxResults: 20, topic: "news" })
+            : Promise.reject(new Error(`${activeProvider.toUpperCase()}_API_KEY 未配置`)),
           process.env.TRENDING_API_KEY
             ? fetchTrendingFromApi("search", { query: q, limit: 30 })
             : Promise.reject(new Error("TRENDING_API_KEY 未配置")),
@@ -834,7 +838,7 @@ function createToolDefinitions(): ToolSet {
 
         const newsItems = newsRes.status === "fulfilled" ? newsRes.value.items : [];
         if (newsRes.status === "rejected") {
-          warnings.push(`Tavily: ${newsRes.reason instanceof Error ? newsRes.reason.message : String(newsRes.reason)}`);
+          warnings.push(`${activeProvider}: ${newsRes.reason instanceof Error ? newsRes.reason.message : String(newsRes.reason)}`);
         }
         const trendingItems = trendingRes.status === "fulfilled" ? trendingRes.value : [];
         if (trendingRes.status === "rejected") {

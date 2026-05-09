@@ -11,7 +11,7 @@ metadata:
   compatibleEmployees: [xiaoshen, xiaoce, xiaozi]
   modelDependency: deepseek:deepseek-chat
   requires:
-    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, TAVILY_API_KEY, JINA_API_KEY]
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY, JINA_API_KEY]
     knowledgeBases: [官方信源白名单, 新华社译名表]
     dependencies: [web_search, web_deep_read]
   implementation:
@@ -58,7 +58,7 @@ compatibleRoles:
 
 **前置条件**：
 - `content` 长度 ≥ 500
-- web_search + web_deep_read 可用（`TAVILY_API_KEY`、`JINA_API_KEY` 配置）
+- web_search + web_deep_read 可用（`SEARCH_PROVIDER` + `BOCHA_API_KEY` 或 `TAVILY_API_KEY`、`JINA_API_KEY` 配置）
 - KB「官方信源白名单」「新华社译名表」已绑定
 
 ## 2. 4 大核查类型

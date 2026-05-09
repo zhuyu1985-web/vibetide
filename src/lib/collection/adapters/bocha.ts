@@ -9,12 +9,12 @@ const configSchema = z.object({
   maxResults: z.number().int().min(1).max(20).default(8),
 });
 
-type TavilyConfig = z.infer<typeof configSchema>;
+type BochaConfig = z.infer<typeof configSchema>;
 
-export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
-  type: "tavily",
-  displayName: "关键词搜索 (Tavily)",
-  description: "通过 Tavily 搜索全网新闻,支持时间窗和站点过滤",
+export const bochaAdapter: SourceAdapter<BochaConfig> = {
+  type: "bocha",
+  displayName: "关键词搜索 (博查)",
+  description: "通过博查搜索全网新闻,国内可直连,支持时间窗和站点过滤(站点过滤为客户端二次筛选)",
   category: "search",
   configSchema,
   configFields: [
@@ -31,7 +31,7 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
         { value: "all", label: "不限" },
       ],
     },
-    { key: "includeDomains", label: "限定站点(可选)", type: "multiselect", help: "如 xinhuanet.com" },
+    { key: "includeDomains", label: "限定站点(可选)", type: "multiselect", help: "如 xinhuanet.com,客户端筛选" },
     { key: "maxResults", label: "每关键词最大条数", type: "number", validation: { min: 1, max: 20 } },
   ],
 
@@ -42,7 +42,7 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
     for (const keyword of config.keywords) {
       try {
         const response = await searchWeb(keyword, {
-          forceProvider: "tavily",
+          forceProvider: "bocha",
           timeRange: config.timeRange,
           includeDomains: config.includeDomains,
           maxResults: config.maxResults,
@@ -53,7 +53,7 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
             url: r.url,
             summary: r.snippet,
             publishedAt: r.publishedAtMs ? new Date(r.publishedAtMs) : undefined,
-            channel: "tavily",
+            channel: "bocha",
             rawMetadata: {
               keyword,
               source: r.source,
@@ -66,7 +66,7 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         partialFailures.push({ message, meta: { keyword } });
-        log("error", `Tavily search failed for "${keyword}": ${message}`, { keyword });
+        log("error", `Bocha search failed for "${keyword}": ${message}`, { keyword });
       }
     }
 

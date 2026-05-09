@@ -11,7 +11,7 @@ metadata:
   compatibleEmployees: [xiaolei, xiaoce, xiaoshu, xiaozi]
   modelDependency: deepseek:deepseek-chat
   requires:
-    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, TAVILY_API_KEY]
+    env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY]
     knowledgeBases: []
     dependencies: [web_search, web_deep_read]
   implementation:
@@ -41,7 +41,7 @@ metadata:
 - 社交媒体舆情（走 `social_listening`）
 - 组织内部知识库检索（走 `knowledge_retrieval`）
 
-**前置条件**：`topic` 非空；LLM 可用（做摘要 + 五维评分）；Tavily 可用或 RSS 降级通道可用；单次聚合耗时 ~8-15s，不适合实时触发场景。
+**前置条件**：`topic` 非空；LLM 可用（做摘要 + 五维评分）；联网搜索主通道（博查 / Tavily 由 `SEARCH_PROVIDER` 切换）可用或 RSS 降级通道可用；单次聚合耗时 ~8-15s，不适合实时触发场景。
 
 ## 输入 / 输出
 
@@ -72,7 +72,7 @@ metadata:
 
 - [ ] Step 0: `topic` 提取 —— 识别主体（机构 / 政策 / 产品）+ 动作 + 时间点
 - [ ] Step 1: 查询扩展 —— 用同义词 / 缩写 / 关联实体扩成 3-5 条查询
-- [ ] Step 2: 多源并发检索（Tavily + RSS + 白名单央媒站点），单源上限 30 条
+- [ ] Step 2: 多源并发检索（联网搜索主通道 + RSS + 白名单央媒站点），单源上限 30 条
 - [ ] Step 3: 语义去重 —— 标题 + 正文前 300 字向量化，cosine ≥ 0.85 合并
 - [ ] Step 4: 合并策略 —— 保留**来源权威度最高** + **字数最多**的版本，其他计入 `reportCount`
 - [ ] Step 5: 五维价值评分（时效 25% + 影响力 25% + 相关性 20% + 独家 15% + 深度 15%）
