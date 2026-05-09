@@ -146,10 +146,10 @@ export function ItemDetailDrawer({ itemId, onClose, outlets }: ItemDetailDrawerP
                   className="ml-auto"
                 >
                   {detail.enrichmentStatus === "enriched"
-                    ? "已富化"
+                    ? "已解析"
                     : detail.enrichmentStatus === "failed"
-                      ? "富化失败"
-                      : "待富化"}
+                      ? "解析失败"
+                      : "待解析"}
                 </Badge>
               </div>
 

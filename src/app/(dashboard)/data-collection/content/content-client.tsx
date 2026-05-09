@@ -97,8 +97,8 @@ const MODULE_OPTIONS = [
 
 const ENRICHMENT_OPTIONS: { value: EnrichmentStatus | "__all__"; label: string }[] = [
   { value: "__all__", label: "全部" },
-  { value: "pending", label: "待富化" },
-  { value: "enriched", label: "已富化" },
+  { value: "pending", label: "待解析" },
+  { value: "enriched", label: "已解析" },
   { value: "failed", label: "失败" },
 ];
 
@@ -471,7 +471,7 @@ export function ContentClient({
             },
             {
               key: "enrichment",
-              header: "富化",
+              header: "AI解析",
               width: "w-20",
               render: (item) => <EnrichmentChip status={item.enrichmentStatus} />,
             },
@@ -582,7 +582,7 @@ export function ContentClient({
             {/* Enrichment status */}
             <div className="flex flex-col gap-2">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                富化状态
+                AI解析状态
               </Label>
               <div className="flex flex-col gap-2">
                 {ENRICHMENT_OPTIONS.map((opt) => (
@@ -663,11 +663,11 @@ function EnrichmentChip({ status }: { status: string }) {
   const config: Record<string, { cls: string; label: string }> = {
     enriched: {
       cls: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400",
-      label: "已富化",
+      label: "已解析",
     },
     pending: {
       cls: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
-      label: "待富化",
+      label: "待解析",
     },
     failed: {
       cls: "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400",
