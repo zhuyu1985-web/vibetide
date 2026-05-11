@@ -70,7 +70,7 @@ Wave 2（独立立项，本 spec 仅留接口）：
 |---|---|
 | `2026-04-14-news-research-module-design.md`（v1） | **修订**（不 supersede）。保留所有已交付内容（40 区县字典、16 主题词库、5 级媒体分类、`/research/admin/*` 后台）；废弃 v1 的 F1（媒体源管理独立模块）合并到 Collection Hub；废弃 v1 的 `research_news_articles` 数据存储设计；F4 采集通道扩展（加 tikhub + Excel 导入）；F7-F11 检索/报告升级到本 spec 的 A4/A5 设计 |
 | `2026-04-18-unified-collection-module-design.md`（Collection Hub V1） | **扩展**。本 spec 的 A1+A2+A2.5 是 Collection Hub 的增量升级：加 2 个 Adapter（tikhub / excel_import）+ `collected_items` 加 `content_type` + `attachments` 字段 + `collection_sources` 加 `outlet_tier` / `outlet_region` 字段；同时完成 Collection Hub 一直未做的 Phase 5「研究 3 分支迁移」 |
-| `2026-04-21-hot-topic-research-bridge-design.md` | **不冲突**。本 spec 的 A3 不动热榜桥接 |
+| `2026-04-21-hot-topic-research-bridge-design.md` | **已 supersede (2026-05-11, commit 123b623)**。原 spec 的"桥接到 research_news_articles"方案已废弃,新架构改为采集池单一真相源 + `/research` 侧栏采集源多选过滤。 |
 
 ---
 

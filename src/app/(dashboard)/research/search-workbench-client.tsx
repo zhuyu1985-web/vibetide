@@ -101,14 +101,23 @@ const CHANNEL_LABELS: Record<string, string> = {
 // 旧版 inline advanced builder（FIELD_OPTIONS / getOperatorsForField / ConditionRow / defaultCondition / renderValueInput）
 // 已在 A4 Phase 3 移除，由 AdvancedSearchBuilder + AdvancedFiltersSidebar + searchAdvanced action 替代。
 
+export interface ResearchSourceOption {
+  id: string;
+  name: string;
+  sourceType: string;
+  sourceTypeLabel: string;
+}
+
 export function SearchWorkbenchClient({
   districts,
   outlets,
+  sources,
   initialResult,
   builderOptions,
 }: {
   districts: CqDistrict[];
   outlets: MediaOutletSummary[];
+  sources: ResearchSourceOption[];
   initialResult?: ArticleSearchResponse;
   builderOptions: BuilderOptions;
 }) {
@@ -601,6 +610,7 @@ export function SearchWorkbenchClient({
               options={{
                 districts: builderOptions.districts,
                 topics: builderOptions.topics,
+                sources,
               }}
             />
           </div>

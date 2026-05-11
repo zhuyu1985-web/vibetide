@@ -235,8 +235,14 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
             <p className="text-xs text-muted-foreground">选择"手工触发"后源只能手动运行。</p>
           </div>
           <div className="space-y-1.5">
-            <Label>归属模块</Label>
-            <p className="text-xs text-muted-foreground">采集到的内容会派生到这些模块,后续可在采集池按此筛选。</p>
+            <Label>归属模块（标签,不复制数据）</Label>
+            <p className="text-xs text-muted-foreground">
+              给这个采集源贴上"服务于哪些下游模块"的标签 — 仅用于在采集池/研究工作台里按此过滤,
+              <strong className="text-foreground">不会把数据再复制一份到任何业务表</strong>。
+              所有研究/检索/报告都直接读采集池(collected_items),单一真相源。
+              <br />
+              热点(hot_topics)是特例:勾选后会额外触发 LLM 富化流水线写 hot_topics 表。
+            </p>
             <div className="grid grid-cols-2 gap-2 pt-1">
               {TARGET_MODULES.map((m) => {
                 const on = targetModules.includes(m.value);

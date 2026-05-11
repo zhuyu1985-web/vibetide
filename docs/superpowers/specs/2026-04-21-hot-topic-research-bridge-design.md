@@ -1,8 +1,22 @@
 # 热榜采集 → 新闻研究工作台桥接设计
 
+> ⚠️ **SUPERSEDED — 2026-05-11 单一真相源化重构（commit 123b623）**
+>
+> 本设计提出的"把采集数据桥接复制到 `research_news_articles`"方案已被废弃。
+> 新架构判断：**采集池 `collected_items` 是单一真相源，研究/检索/报告都直接读它**，
+> 不复制数据。原因：双写会让采集源越多容量越大、schema 漂移、UX 必须懂"哪些源开了同步"。
+>
+> 已落地的清理（commit 123b623）：
+> - DROP TABLE `research_news_articles`（A3 phase）
+> - DROP COLUMN `collection_sources.research_bridge_enabled`
+> - 删除 `bridge-research.ts` / `bridge-backfill.ts` / `article-ingest.ts` / `content-fetch.ts` / `collection-research-bridge` Inngest 函数
+>
+> 本文档保留为 **historical record**，不要按这份 spec 写新代码。
+> 新的"研究只看某几个采集源"方案：`/research` 侧栏多选采集源 → SQL `firstSeenSourceId IN (...)`，不复制数据。
+
 - Date: 2026-04-21
 - Author: zhuyu
-- Status: Draft (pending review)
+- Status: ~~Draft (pending review)~~ **Superseded 2026-05-11**
 - Related: `docs/superpowers/specs/2026-04-14-news-research-module-design.md`, `docs/superpowers/plans/2026-04-21-news-research-s2-crawl.md`
 
 ## 背景

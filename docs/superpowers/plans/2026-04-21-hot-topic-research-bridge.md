@@ -1,11 +1,23 @@
 # 热榜采集 → 新闻研究工作台桥接 实施计划
 
+> ⚠️ **SUPERSEDED — 2026-05-11 单一真相源化重构（commit 123b623）**
+>
+> 本计划已**整篇过时**。所述的 schema 字段（`research_bridge_enabled`）、
+> 整张表（`research_news_articles`）、Inngest 函数（`collection-research-bridge` /
+> `research-bridge-backfill`）、辅助库（`bridge-research.ts` / `article-ingest.ts` /
+> `content-fetch.ts`）**全部已在 commit 123b623 删除**。
+>
+> 新方案：`/research` 侧栏"采集源"多选过滤 → SQL `firstSeenSourceId IN (...)`，
+> 不复制数据，单一真相源 = `collected_items` 采集池。
+>
+> 本文档保留为 historical record，**不要按 checkbox 执行**。
+
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking.
 > 本仓库强制单分支开发（CLAUDE.md）—— 所有 commit 直接落在 `main`，每个 Phase 必须保持 build 可通过。
 
-**Goal:** 让 collection-hub 的热榜采集数据（`__system_hot_topic_crawler__` / 微博等）按源级别开关桥接到 `research_news_articles`，供新闻研究工作台全文检索。
+**Goal:** ~~让 collection-hub 的热榜采集数据按源级别开关桥接到 `research_news_articles`，供新闻研究工作台全文检索。~~ → **已废弃**。新架构直接读采集池，无需桥接。
 
-**Architecture:** 订阅现有 `collection/item.created` 事件 → 独立 Inngest 函数按 `research_bridge_enabled` flag 过滤 → 走 `ingestArticle()` upsert → 发 `research/article.content-fetch` 事件 → 异步 Jina Reader 拉正文回填。历史数据由一次性 backfill 函数分批派事件复用主链路。
+**Architecture:** ~~订阅 collection/item.created → research_bridge_enabled flag → ingestArticle upsert → Jina 拉正文回填。~~ → **已废弃**。研究工作台直接 SELECT collected_items + EXISTS(annotations) + firstSeenSourceId IN(...)。
 
 **Tech Stack:** Drizzle + Supabase Postgres · Inngest · Jina Reader · Vitest · Next.js 16 App Router
 

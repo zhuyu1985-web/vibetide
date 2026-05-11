@@ -24,6 +24,10 @@ export interface SidebarFilter {
   topicIds?: string[];
   contentTypes?: string[];
   publishedAtRange?: { from: string; to: string };
+  /** 采集源绑定 — 把研究检索范围限定为某几个 collection_sources。
+   *  与历史的 research_news_articles 双写方案不同:不复制数据,
+   *  只在 SQL 上把 firstSeenSourceId 限制到所选集合。 */
+  sourceIds?: string[];
 }
 
 // 字段 → 操作符可选列表（UI 联动）

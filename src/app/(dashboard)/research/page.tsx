@@ -8,6 +8,8 @@ import { listCqDistricts } from "@/lib/dal/research/cq-districts";
 import { searchCollectedItemsForResearch } from "@/lib/dal/research/collected-item-search";
 import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
 import { listResearchTopics } from "@/lib/dal/research/research-topics";
+import { listCollectionSources } from "@/lib/dal/collection";
+import { listAdapterMetas } from "@/lib/collection/adapter-meta";
 import {
   CONTENT_TYPE_LABELS,
   CONTENT_TYPE_VALUES,
@@ -57,7 +59,7 @@ export default async function ResearchPage() {
         .filter((p): p is string => Boolean(p)),
     );
 
-  const [districts, outlets, topicSummaries, rawResult, regions, platforms] =
+  const [districts, outlets, topicSummaries, rawResult, regions, platforms, sources] =
     await Promise.all([
       listCqDistricts(),
       listOutletsByOrg(orgId),
@@ -65,9 +67,20 @@ export default async function ResearchPage() {
       searchCollectedItemsForResearch(orgId, {}, { limit: 50, offset: 0 }),
       regionsPromise,
       platformsPromise,
+      listCollectionSources(orgId, { enabled: undefined }),
     ]);
 
   const topics = topicSummaries.map((t) => ({ id: t.id, name: t.name }));
+
+  const adapterTypeLabel = new Map(
+    listAdapterMetas().map((m) => [m.type, m.displayName]),
+  );
+  const sourceOptions = sources.map((s) => ({
+    id: s.id,
+    name: s.name,
+    sourceType: s.sourceType,
+    sourceTypeLabel: adapterTypeLabel.get(s.sourceType) ?? s.sourceType,
+  }));
 
   // Map DAL result to the shape SearchWorkbenchClient expects
   const initialResult = {
@@ -101,6 +114,7 @@ export default async function ResearchPage() {
     <SearchWorkbenchClient
       districts={districts}
       outlets={outlets.map((o) => ({ id: o.id, name: o.outletName }))}
+      sources={sourceOptions}
       initialResult={initialResult}
       builderOptions={builderOptions}
     />

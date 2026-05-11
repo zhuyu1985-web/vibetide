@@ -1,4 +1,4 @@
-import { and, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { collectedItems } from "@/db/schema/collection";
 import {
@@ -22,6 +22,8 @@ export interface CollectedItemSearchFilter {
   districtIds?: string[];
   titleKeyword?: string;
   contentKeyword?: string;
+  /** 限定 firstSeenSourceId ∈ sourceIds (取代历史的 research_news_articles 双写方案) */
+  sourceIds?: string[];
 }
 
 export interface CollectedItemWithAnnotations {
@@ -75,6 +77,9 @@ export async function searchCollectedItemsForResearch(
     conditions.push(
       sql`${collectedItems.publishedAt} <= ${filter.publishedAtTo}`,
     );
+  }
+  if (filter.sourceIds?.length) {
+    conditions.push(inArray(collectedItems.firstSeenSourceId, filter.sourceIds));
   }
 
   // topic / district 过滤 — 用 EXISTS 子查询避免 leftJoin 引起重复行
@@ -237,6 +242,9 @@ function buildSidebarExprs(s?: SidebarFilter): SQL[] {
     out.push(
       sql`${collectedItems.publishedAt} BETWEEN ${new Date(s.publishedAtRange.from).toISOString()}::timestamptz AND ${new Date(s.publishedAtRange.to).toISOString()}::timestamptz`,
     );
+  }
+  if (s.sourceIds?.length) {
+    out.push(inArray(collectedItems.firstSeenSourceId, s.sourceIds));
   }
   return out;
 }

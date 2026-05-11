@@ -24,6 +24,8 @@ interface Props {
   options: {
     districts: { id: string; name: string }[];
     topics: { id: string; name: string }[];
+    /** 当前 org 下可绑定的采集源(用于"按采集源缩小研究范围") */
+    sources: { id: string; name: string; sourceTypeLabel: string }[];
   };
 }
 
@@ -40,6 +42,7 @@ export function AdvancedFiltersSidebar({ filter, onChange, options }: Props) {
     (filter.districtIds?.length ?? 0) > 0 ||
     (filter.topicIds?.length ?? 0) > 0 ||
     (filter.contentTypes?.length ?? 0) > 0 ||
+    (filter.sourceIds?.length ?? 0) > 0 ||
     Boolean(filter.publishedAtRange);
 
   return (
@@ -154,6 +157,48 @@ export function AdvancedFiltersSidebar({ filter, onChange, options }: Props) {
             </Button>
           ))}
         </div>
+      </FilterSection>
+
+      <FilterSection label="采集源">
+        {options.sources.length === 0 ? (
+          <div className="text-xs text-muted-foreground">
+            还没有采集源,先去{" "}
+            <a
+              href="/data-collection/sources/new"
+              className="text-sky-600 dark:text-sky-400 hover:underline"
+            >
+              新建采集源
+            </a>
+          </div>
+        ) : (
+          <Select
+            value=""
+            onValueChange={(v) =>
+              onChange({ ...filter, sourceIds: toggle(filter.sourceIds, v) })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue
+                placeholder={
+                  filter.sourceIds?.length
+                    ? `已选 ${filter.sourceIds.length} 个`
+                    : "全部采集源"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {options.sources.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {filter.sourceIds?.includes(s.id) ? "✓ " : ""}
+                  {s.name}
+                  <span className="ml-2 text-[10px] text-muted-foreground">
+                    {s.sourceTypeLabel}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </FilterSection>
 
       {hasAny ? (
