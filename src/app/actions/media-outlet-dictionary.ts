@@ -10,14 +10,21 @@ import { OUTLET_TIER_VALUES } from "@/lib/collection/constants";
 import { bumpDictionaryVersion } from "@/lib/dal/media-outlet-dictionary";
 import { seedMediaOutletDictionary } from "@/db/seed/media-outlet-dictionary";
 import { inngest } from "@/inngest/client";
+import { channelsArraySchema } from "@/lib/media-outlet/channels";
 
 const outletInputSchema = z.object({
   outletName: z.string().min(1).max(100),
+  /** M1 新增:集团聚合,如"人民日报社" → 旗下"人民日报"/"人民网"/"人民视频"... */
+  groupName: z.string().nullable().optional(),
   outletTier: z.enum(OUTLET_TIER_VALUES),
   outletRegion: z.string().nullable().optional(),
   outletDistrict: z.string().nullable().optional(),
   industryTag: z.string().nullable().optional(),
+  /** M1 新增:平台账号矩阵 discriminated union */
+  channels: channelsArraySchema.default([]),
+  /** @deprecated 旧字段保留兼容,新表单填充 channels 即可 */
   domains: z.array(z.string()).default([]),
+  /** @deprecated */
   publicAccountNames: z.array(z.string()).default([]),
   description: z.string().nullable().optional(),
 });

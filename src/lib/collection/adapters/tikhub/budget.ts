@@ -5,7 +5,13 @@ const PRICING = pricingJson as unknown as Record<string, { basePrice: number }>;
 
 export function estimateCost(config: TikhubConfig, endpoint: string): number {
   const pricePerCall = PRICING[endpoint]?.basePrice ?? 0.005;
-  return config.keywords.length * config.maxPagesPerRun * pricePerCall;
+  // keyword 模式: keywords.length × maxPagesPerRun;
+  // account 模式: 1 个账号 × maxPagesPerRun
+  const callsPerRun =
+    config.mode === "keyword"
+      ? config.keywords.length * config.maxPagesPerRun
+      : config.maxPagesPerRun;
+  return callsPerRun * pricePerCall;
 }
 
 export interface BudgetCheckResult {

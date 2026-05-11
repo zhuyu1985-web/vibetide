@@ -37,12 +37,21 @@ export interface WizardOutletOption {
   id: string;
   outletName: string;
   outletTier: string;
+  /** M4: 该 outlet 在各平台的账号矩阵(从 channels jsonb)。tikhub account 模式联动用 */
+  channels: Array<{ type: string; nickname?: string; name?: string }>;
 }
 
 interface NewSourceWizardClientProps {
   adapterMetas: AdapterMeta[];
   outlets: WizardOutletOption[];
 }
+
+const TIKHUB_ACCOUNT_PLATFORMS = [
+  { value: "douyin", label: "抖音" },
+  { value: "weibo", label: "微博" },
+  { value: "kuaishou", label: "快手" },
+  { value: "wechat_oa", label: "微信公众号" },
+] as const;
 
 export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizardClientProps) {
   const router = useRouter();
@@ -65,12 +74,22 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
 
   const canAdvance = () => {
     if (step === 1) return Boolean(sourceType);
-    if (step === 2) return selectedMeta?.configFields.every((f) => {
-      if (!f.required) return true;
-      const v = config[f.key];
-      if (Array.isArray(v)) return v.length > 0;
-      return v !== undefined && v !== null && v !== "";
-    });
+    if (step === 2) {
+      // tikhub 走自定义校验:keyword 模式需 platform+keywords;account 模式需 accountPlatform+outletId
+      if (selectedMeta?.type === "tikhub") {
+        const mode = (config.mode as string) ?? "keyword";
+        if (mode === "keyword") {
+          return Boolean(config.platform) && Array.isArray(config.keywords) && (config.keywords as string[]).length > 0;
+        }
+        return Boolean(config.accountPlatform) && Boolean(config.outletId);
+      }
+      return selectedMeta?.configFields.every((f) => {
+        if (!f.required) return true;
+        const v = config[f.key];
+        if (Array.isArray(v)) return v.length > 0;
+        return v !== undefined && v !== null && v !== "";
+      });
+    }
     if (step === 3) return true;
     if (step === 4) return name.trim().length > 0;
     return false;
@@ -201,16 +220,24 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
             <h3 className="text-base font-medium">配置 {selectedMeta.displayName}</h3>
             <p className="text-xs text-muted-foreground mt-1">{selectedMeta.description}</p>
           </div>
-          <div className="flex flex-col gap-6">
-            {selectedMeta.configFields.map((f) => (
-              <ConfigFieldInput
-                key={f.key}
-                field={f}
-                value={config[f.key]}
-                onChange={(v) => setConfig({ ...config, [f.key]: v })}
-              />
-            ))}
-          </div>
+          {selectedMeta.type === "tikhub" ? (
+            <TikhubConfigPanel
+              config={config}
+              setConfig={setConfig}
+              outlets={outlets}
+            />
+          ) : (
+            <div className="flex flex-col gap-6">
+              {selectedMeta.configFields.map((f) => (
+                <ConfigFieldInput
+                  key={f.key}
+                  field={f}
+                  value={config[f.key]}
+                  onChange={(v) => setConfig({ ...config, [f.key]: v })}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -553,5 +580,229 @@ function MultiSelectInput({ field, value, onChange }: MultiSelectInputProps) {
       placeholder="逗号分隔多个值"
       onChange={(e) => onChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
     />
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// TikhubConfigPanel — M4: tikhub 专用配置面板,支持 keyword / account 双模式
+// ───────────────────────────────────────────────────────────────────────
+
+interface TikhubConfigPanelProps {
+  config: Record<string, unknown>;
+  setConfig: (next: Record<string, unknown>) => void;
+  outlets: WizardOutletOption[];
+}
+
+function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProps) {
+  const mode = (config.mode as string) ?? "keyword";
+  const accountPlatform = (config.accountPlatform as string) ?? "";
+
+  function patch(p: Record<string, unknown>) {
+    setConfig({ ...config, ...p });
+  }
+
+  // 按平台过滤"在该平台有 channel 的 outlets"
+  const eligibleOutlets = accountPlatform
+    ? outlets.filter((o) => o.channels.some((c) => c.type === accountPlatform))
+    : [];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Mode 切换 */}
+      <div className="space-y-1.5">
+        <Label>采集模式</Label>
+        <div className="flex rounded-md border overflow-hidden w-fit">
+          <button
+            type="button"
+            onClick={() => patch({ mode: "keyword" })}
+            className={`px-4 py-2 text-sm transition-colors ${
+              mode === "keyword"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            关键词搜索
+          </button>
+          <button
+            type="button"
+            onClick={() => patch({ mode: "account" })}
+            className={`px-4 py-2 text-sm transition-colors border-l ${
+              mode === "account"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            按账号抓取
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {mode === "keyword"
+            ? "用关键词搜索 5 平台(抖音/微博/小红书/视频号/知乎)的公开内容"
+            : "按媒体字典里录入的账号 ID 拉取该账号的最新发布(4 平台:抖音/微博/快手/公众号)"}
+        </p>
+      </div>
+
+      {mode === "keyword" ? (
+        <>
+          <div className="space-y-1.5">
+            <Label>平台 *</Label>
+            <Select
+              value={(config.platform as string) ?? ""}
+              onValueChange={(v) => patch({ platform: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="请选择" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="douyin">抖音</SelectItem>
+                <SelectItem value="weibo">微博</SelectItem>
+                <SelectItem value="xiaohongshu">小红书</SelectItem>
+                <SelectItem value="wechat_channels">微信视频号</SelectItem>
+                <SelectItem value="zhihu">知乎</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>关键词 *</Label>
+            <Textarea
+              value={
+                Array.isArray(config.keywords)
+                  ? (config.keywords as string[]).join("\n")
+                  : ""
+              }
+              onChange={(e) =>
+                patch({
+                  keywords: e.target.value
+                    .split("\n")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={4}
+              placeholder="一行一个关键词,1-20 个"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>时间窗</Label>
+            <Select
+              value={(config.timeWindow as string) ?? "halfYear"}
+              onValueChange={(v) => patch({ timeWindow: v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">一天内</SelectItem>
+                <SelectItem value="week">一周内</SelectItem>
+                <SelectItem value="halfYear">半年内</SelectItem>
+                <SelectItem value="all">全部(如平台支持)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <Label>平台 *</Label>
+            <Select
+              value={accountPlatform}
+              onValueChange={(v) => patch({ accountPlatform: v, outletId: undefined })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="请选择" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIKHUB_ACCOUNT_PLATFORMS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>选择媒体(必须该平台已配账号) *</Label>
+            <Select
+              value={(config.outletId as string) ?? ""}
+              onValueChange={(v) => patch({ outletId: v })}
+              disabled={!accountPlatform}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={!accountPlatform ? "请先选平台" : "选择媒体"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleOutlets.length === 0 ? (
+                  <div className="px-2 py-4 text-xs text-muted-foreground">
+                    {accountPlatform
+                      ? `没有任何媒体在"${TIKHUB_ACCOUNT_PLATFORMS.find((p) => p.value === accountPlatform)?.label}"平台配置了账号,请先到 媒体字典 补全`
+                      : "请先选平台"}
+                  </div>
+                ) : (
+                  eligibleOutlets.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.outletName}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {accountPlatform && eligibleOutlets.length === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ 请去{" "}
+                <Link href="/data-collection/outlets" className="underline">
+                  媒体字典
+                </Link>{" "}
+                给目标媒体补全{" "}
+                {TIKHUB_ACCOUNT_PLATFORMS.find((p) => p.value === accountPlatform)?.label}{" "}
+                平台账号后再回来。
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* 共享字段 */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1.5">
+          <Label>每次最大页数</Label>
+          <Input
+            type="number"
+            min={1}
+            max={10}
+            value={(config.maxPagesPerRun as number | undefined) ?? ""}
+            onChange={(e) =>
+              patch({ maxPagesPerRun: e.target.value ? Number(e.target.value) : undefined })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>每页条数</Label>
+          <Input
+            type="number"
+            min={10}
+            max={50}
+            value={(config.resultsPerPage as number | undefined) ?? ""}
+            onChange={(e) =>
+              patch({ resultsPerPage: e.target.value ? Number(e.target.value) : undefined })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>月预算 USD</Label>
+          <Input
+            type="number"
+            min={0}
+            step={0.1}
+            value={(config.monthlyBudgetUsd as number | undefined) ?? ""}
+            onChange={(e) =>
+              patch({ monthlyBudgetUsd: e.target.value ? Number(e.target.value) : undefined })
+            }
+          />
+        </div>
+      </div>
+    </div>
   );
 }

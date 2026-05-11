@@ -20,6 +20,8 @@ export default async function NewSourcePage() {
         id: o.id,
         outletName: o.outletName,
         outletTier: o.outletTier,
+        // M4 新增:供 tikhub account 模式过滤"哪些 outlets 在某平台有 channel"
+        channels: (o.channels ?? []) as Array<{ type: string; nickname?: string; name?: string }>,
       }))}
     />
   );
