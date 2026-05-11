@@ -42,9 +42,6 @@ export const collectionSources = pgTable(
       .notNull()
       .default(0),
     totalRuns: bigint("total_runs", { mode: "number" }).notNull().default(0),
-    researchBridgeEnabled: boolean("research_bridge_enabled")
-      .notNull()
-      .default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     outletId: uuid("outlet_id"),
     defaultOutletTier: text("default_outlet_tier"),

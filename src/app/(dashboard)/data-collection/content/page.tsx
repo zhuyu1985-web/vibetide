@@ -82,6 +82,7 @@ export default async function ContentPage({ searchParams }: PageProps) {
     sourceChannels: (i.sourceChannels ?? []) as CollectedItemViewModel["sourceChannels"],
     outletName: i.outletName ?? null,
     outletTier: i.outletTier ?? null,
+    sourceType: i.sourceType ?? null,
   }));
 
   return (

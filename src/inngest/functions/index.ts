@@ -16,7 +16,6 @@ import { employeeStatusGuard } from "./employee-status-guard";
 import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
 import {
   researchTaskStart,
-  researchBridgeBackfill,
   annotateCollectedItem,
   backfillAnnotate,
   researchReportGenerate,
@@ -26,7 +25,6 @@ import {
   collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
-  collectionResearchBridge,
   outletBatchRecognize,
   tikhubBudgetReset,
 } from "./collection";
@@ -64,8 +62,7 @@ export const functions = [
   knowledgeBaseVectorize,
   // News Research (S2) — A3: 自采分支已迁至 Collection Hub Adapter 架构
   researchTaskStart,
-  researchBridgeBackfill,
-  // Research auto-annotation (A3 Phase 3)
+  // Research auto-annotation (A3 Phase 3) — 直接读 collected_items,不再走 research_news_articles 桥接
   annotateCollectedItem,
   backfillAnnotate,
   // A5 报告生成 (Phase 4)
@@ -75,7 +72,6 @@ export const functions = [
   collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
-  collectionResearchBridge,
   // Outlet batch recognition (2026-05-05)
   outletBatchRecognize,
   // tikhub 月度预算重置 cron (2026-05-05)

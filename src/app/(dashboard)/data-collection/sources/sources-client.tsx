@@ -38,6 +38,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { formatRelativeTime, formatAbsoluteTime, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SOURCE_TYPE_COLOR } from "@/lib/collection/constants";
 
 export interface SourceListItem {
   id: string;
@@ -58,15 +59,6 @@ interface SourcesClientProps {
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 45;
-
-// Source-type color palette — consistent with missions scenario colors
-const SOURCE_TYPE_COLOR: Record<string, string> = {
-  tophub: "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400",
-  tavily: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400",
-  jina_url: "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400",
-  list_scraper: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400",
-  rss: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400",
-};
 
 export function SourcesClient({ initialSources, adapterMetas }: SourcesClientProps) {
   const router = useRouter();

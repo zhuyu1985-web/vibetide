@@ -2,18 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, LayoutGrid, Table2, FileText } from "lucide-react";
+import { LayoutGrid, Table2, FileText } from "lucide-react";
 import { formatRelativeTime, formatAbsoluteTime } from "@/lib/format";
 import { EmptyState } from "@/components/shared/empty-state";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
-import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
 import { DataTable } from "@/components/shared/data-table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { SearchInput } from "@/components/shared/search-input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,14 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, SOURCE_TYPE_COLOR, type OutletTier } from "@/lib/collection/constants";
 import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 import { ItemDetailDrawer } from "./item-detail-drawer";
 
@@ -70,6 +60,8 @@ export interface CollectedItemViewModel {
   // Outlet info (Task 5.1 join)
   outletName: string | null;
   outletTier: string | null;
+  /** Source type slug (rss / tophub / jina_url / list_scraper / tavily / tikhub / bocha). Null if source was deleted. */
+  sourceType: string | null;
 }
 
 interface ContentClientProps {
@@ -170,97 +162,153 @@ export function ContentClient({
   // ── Detail drawer ───────────────────────────────────────────────────────────
   const [detailItemId, setDetailItemId] = useState<string | null>(null);
 
-  // ── Filter Sheet state ──────────────────────────────────────────────────────
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // ── Inline filters: 直接 URL apply,不缓存 draft 状态 ─────────────────────────
+  const currentSourceType = initialFilters.sourceType ?? "__all__";
+  const currentTime: TimeWindow = initialFilters.time ?? "7d";
+  const currentEnrichment: EnrichmentStatus | "__all__" =
+    initialFilters.enrichment ?? "__all__";
+  const currentOutletTier = initialFilters.outletTier ?? "__all__";
+  const currentOutletRegion = initialFilters.outletRegion ?? "__all__";
 
-  // Local draft state inside the sheet — only applied when "应用" is pressed
-  const [draftSourceType, setDraftSourceType] = useState<string>(
-    initialFilters.sourceType ?? "__all__",
-  );
-  const [draftPlatform, setDraftPlatform] = useState<string>(initialFilters.platform ?? "");
-  const [draftTime, setDraftTime] = useState<TimeWindow>(initialFilters.time ?? "7d");
-  const [draftModules, setDraftModules] = useState<Set<string>>(
-    new Set(initialFilters.module ? [initialFilters.module] : []),
-  );
-  const [draftEnrichment, setDraftEnrichment] = useState<EnrichmentStatus | "__all__">(
-    initialFilters.enrichment ?? "__all__",
-  );
-  // Outlet draft filters
-  const [draftOutletTier, setDraftOutletTier] = useState<string>(
-    initialFilters.outletTier ?? "__all__",
-  );
-  const [draftOutletRegion, setDraftOutletRegion] = useState<string>(
-    initialFilters.outletRegion ?? "__all__",
-  );
+  const hasActiveFilter =
+    currentSourceType !== "__all__" ||
+    currentTime !== "7d" ||
+    currentEnrichment !== "__all__" ||
+    currentOutletTier !== "__all__" ||
+    currentOutletRegion !== "__all__" ||
+    Boolean(initialFilters.q);
 
-  const toggleModule = (mod: string) => {
-    setDraftModules((prev) => {
-      const next = new Set(prev);
-      if (next.has(mod)) next.delete(mod);
-      else next.add(mod);
-      return next;
-    });
-  };
-
-  const handleApply = () => {
-    const moduleVal = draftModules.size === 1 ? [...draftModules][0] : undefined;
+  const handleResetAll = () => {
+    setSearchValue("");
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     updateUrl({
-      sourceType: draftSourceType === "__all__" ? undefined : draftSourceType,
-      platform: draftPlatform || undefined,
-      time: draftTime === "7d" ? undefined : draftTime,
-      module: moduleVal,
-      enrichment: draftEnrichment === "__all__" ? undefined : draftEnrichment,
-      outletTier: draftOutletTier === "__all__" ? undefined : draftOutletTier,
-      outletRegion: draftOutletRegion === "__all__" ? undefined : draftOutletRegion,
+      sourceType: undefined,
+      time: undefined,
+      enrichment: undefined,
+      outletTier: undefined,
+      outletRegion: undefined,
+      module: undefined,
+      platform: undefined,
+      q: undefined,
     });
-    setSheetOpen(false);
-  };
-
-  const handleReset = () => {
-    setDraftSourceType("__all__");
-    setDraftPlatform("");
-    setDraftTime("7d");
-    setDraftModules(new Set());
-    setDraftEnrichment("__all__");
-    setDraftOutletTier("__all__");
-    setDraftOutletRegion("__all__");
-  };
-
-  // Re-sync draft when sheet opens (in case URL changed externally)
-  const handleSheetOpenChange = (open: boolean) => {
-    if (open) {
-      setDraftSourceType(initialFilters.sourceType ?? "__all__");
-      setDraftPlatform(initialFilters.platform ?? "");
-      setDraftTime(initialFilters.time ?? "7d");
-      setDraftModules(new Set(initialFilters.module ? [initialFilters.module] : []));
-      setDraftEnrichment(initialFilters.enrichment ?? "__all__");
-      setDraftOutletTier(initialFilters.outletTier ?? "__all__");
-      setDraftOutletRegion(initialFilters.outletRegion ?? "__all__");
-    }
-    setSheetOpen(open);
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Top bar */}
-      <div className="flex items-center gap-2">
+      {/* Top bar — inline filters */}
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Search */}
         <SearchInput
-          className="flex-1 max-w-sm"
+          className="w-64"
           placeholder="搜索标题或内容…"
           value={searchValue}
           onChange={(e) => handleSearchChange(e.target.value)}
         />
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Filter sheet trigger */}
-          <Button variant="outline" onClick={() => handleSheetOpenChange(true)}>
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            筛选
-          </Button>
+        {/* Source type */}
+        <Select
+          value={currentSourceType}
+          onValueChange={(v) =>
+            updateUrl({ sourceType: v === "__all__" ? undefined : v })
+          }
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="源类型" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">全部源类型</SelectItem>
+            {adapterMetas.map((m) => (
+              <SelectItem key={m.type} value={m.type}>
+                {m.displayName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
+        {/* Time */}
+        <Select
+          value={currentTime}
+          onValueChange={(v) => updateUrl({ time: v === "7d" ? undefined : v })}
+        >
+          <SelectTrigger className="w-24">
+            <SelectValue placeholder="时间" />
+          </SelectTrigger>
+          <SelectContent>
+            {TIME_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* AI 解析状态 */}
+        <Select
+          value={currentEnrichment}
+          onValueChange={(v) =>
+            updateUrl({ enrichment: v === "__all__" ? undefined : v })
+          }
+        >
+          <SelectTrigger className="w-28">
+            <SelectValue placeholder="AI解析" />
+          </SelectTrigger>
+          <SelectContent>
+            {ENRICHMENT_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Outlet tier */}
+        <Select
+          value={currentOutletTier}
+          onValueChange={(v) =>
+            updateUrl({ outletTier: v === "__all__" ? undefined : v })
+          }
+        >
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="媒体分级" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">全部分级</SelectItem>
+            {OUTLET_TIER_VALUES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {OUTLET_TIER_LABELS[t]}
+              </SelectItem>
+            ))}
+            <SelectItem value="unclassified">未分类</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Outlet region */}
+        <Select
+          value={currentOutletRegion}
+          onValueChange={(v) =>
+            updateUrl({ outletRegion: v === "__all__" ? undefined : v })
+          }
+        >
+          <SelectTrigger className="w-24">
+            <SelectValue placeholder="区域" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">全部区域</SelectItem>
+            <SelectItem value="重庆">重庆</SelectItem>
+            <SelectItem value="全国">全国</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Reset — only when any filter active */}
+        {hasActiveFilter && (
+          <Button variant="ghost" size="sm" onClick={handleResetAll}>
+            清空
+          </Button>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
           {/* View toggle */}
           <div className="flex items-center rounded-md border overflow-hidden">
             <button
@@ -421,14 +469,25 @@ export function ContentClient({
               ),
             },
             {
-              key: "firstSeenChannel",
-              header: "首抓源",
+              key: "sourceType",
+              header: "源类型",
               width: "w-32",
-              render: (item) => (
-                <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
-                  {item.firstSeenChannel}
-                </div>
-              ),
+              render: (item) => {
+                if (!item.sourceType) {
+                  return <span className="text-xs text-gray-400 dark:text-gray-500">—</span>;
+                }
+                const meta = adapterMetas.find((m) => m.type === item.sourceType);
+                const label = meta?.displayName ?? item.sourceType;
+                const chip = SOURCE_TYPE_COLOR[item.sourceType] ?? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+                return (
+                  <span
+                    className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] truncate max-w-full", chip)}
+                    title={item.firstSeenChannel}
+                  >
+                    {label}
+                  </span>
+                );
+              },
             },
             {
               key: "firstSeenAt",
@@ -492,166 +551,6 @@ export function ContentClient({
 
       {/* Detail drawer */}
       <ItemDetailDrawer itemId={detailItemId} onClose={() => setDetailItemId(null)} outlets={outlets} />
-
-      {/* Filter Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={handleSheetOpenChange}>
-        <SheetContent side="right" className="w-80 sm:max-w-xs overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>筛选条件</SheetTitle>
-          </SheetHeader>
-
-          <div className="flex flex-col gap-6 px-4 py-2">
-            {/* Source type */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                源类型
-              </Label>
-              <Select value={draftSourceType} onValueChange={setDraftSourceType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="全部类型" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">全部</SelectItem>
-                  {adapterMetas.map((m) => (
-                    <SelectItem key={m.type} value={m.type}>
-                      {m.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Platform alias */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                平台别名
-              </Label>
-              <Input
-                placeholder="如 weibo / zhihu / douyin"
-                value={draftPlatform}
-                onChange={(e) => setDraftPlatform(e.target.value)}
-              />
-            </div>
-
-            {/* Time window */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                时间范围
-              </Label>
-              <div className="flex rounded-md border overflow-hidden">
-                {TIME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setDraftTime(opt.value)}
-                    className={`flex-1 py-1.5 text-xs transition-colors ${
-                      draftTime === opt.value
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    } ${opt.value !== "24h" ? "border-l" : ""}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Target module checkboxes */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                归属模块
-              </Label>
-              <div className="flex flex-col gap-2">
-                {MODULE_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex items-center gap-2 cursor-pointer text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-input accent-primary"
-                      checked={draftModules.has(opt.value)}
-                      onChange={() => toggleModule(opt.value)}
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Enrichment status */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                AI解析状态
-              </Label>
-              <div className="flex flex-col gap-2">
-                {ENRICHMENT_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex items-center gap-2 cursor-pointer text-sm"
-                  >
-                    <input
-                      type="radio"
-                      className="h-4 w-4 accent-primary"
-                      name="enrichment"
-                      checked={draftEnrichment === opt.value}
-                      onChange={() =>
-                        setDraftEnrichment(opt.value as EnrichmentStatus | "__all__")
-                      }
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Outlet tier */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                媒体分级
-              </Label>
-              <Select value={draftOutletTier} onValueChange={setDraftOutletTier}>
-                <SelectTrigger>
-                  <SelectValue placeholder="全部分级" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">全部</SelectItem>
-                  {OUTLET_TIER_VALUES.map((t) => (
-                    <SelectItem key={t} value={t}>{OUTLET_TIER_LABELS[t]}</SelectItem>
-                  ))}
-                  <SelectItem value="unclassified">未分类</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Outlet region */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                区域
-              </Label>
-              <Select value={draftOutletRegion} onValueChange={setDraftOutletRegion}>
-                <SelectTrigger>
-                  <SelectValue placeholder="全部区域" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">全部区域</SelectItem>
-                  <SelectItem value="重庆">重庆</SelectItem>
-                  <SelectItem value="全国">全国</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <SheetFooter className="flex flex-row gap-2 px-4 pb-4">
-            <Button variant="outline" className="flex-1" onClick={handleReset}>
-              重置
-            </Button>
-            <Button className="flex-1" onClick={handleApply}>
-              应用
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

@@ -41,7 +41,6 @@ export default async function SourceDetailPage({
         defaultCategory: source.defaultCategory,
         defaultTags: source.defaultTags,
         enabled: source.enabled,
-        researchBridgeEnabled: source.researchBridgeEnabled,
         createdAt: source.createdAt.toISOString(),
         lastRunAt: source.lastRunAt?.toISOString() ?? null,
         lastRunStatus: source.lastRunStatus,

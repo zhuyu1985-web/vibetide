@@ -196,12 +196,12 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
       )}
 
       {step === 2 && selectedMeta && (
-        <section className="flex flex-col gap-5">
+        <section className="flex flex-col gap-6">
           <div>
             <h3 className="text-base font-medium">配置 {selectedMeta.displayName}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{selectedMeta.description}</p>
+            <p className="text-xs text-muted-foreground mt-1">{selectedMeta.description}</p>
           </div>
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             {selectedMeta.configFields.map((f) => (
               <ConfigFieldInput
                 key={f.key}
@@ -407,14 +407,40 @@ interface ConfigFieldInputProps {
 }
 
 function ConfigFieldInput({ field, value, onChange }: ConfigFieldInputProps) {
+  // Boolean: label 与 checkbox 平排 (左 checkbox / 右 label),help 放下面
+  if (field.type === "boolean") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor={field.key}
+          className="flex items-center gap-2 cursor-pointer text-sm"
+        >
+          <Checkbox
+            id={field.key}
+            checked={Boolean(value)}
+            onCheckedChange={(c) => onChange(Boolean(c))}
+          />
+          <span>
+            {field.label}
+            {field.required && <span className="text-destructive ml-1">*</span>}
+          </span>
+        </label>
+        {field.help && (
+          <p className="text-xs text-muted-foreground pl-6">{field.help}</p>
+        )}
+      </div>
+    );
+  }
+
+  // 其余: label / input / help 上下三段,组内 8px,组间靠外层 gap 控制
   return (
-    <div>
+    <div className="flex flex-col gap-2">
       <Label htmlFor={field.key}>
         {field.label}
         {field.required && <span className="text-destructive ml-1">*</span>}
       </Label>
       {renderInput(field, value, onChange)}
-      {field.help && <p className="text-xs text-muted-foreground mt-1">{field.help}</p>}
+      {field.help && <p className="text-xs text-muted-foreground">{field.help}</p>}
     </div>
   );
 }
@@ -451,15 +477,8 @@ function renderInput(field: ConfigField, value: unknown, onChange: (v: unknown) 
         />
       );
     case "boolean":
-      return (
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id={field.key}
-            checked={Boolean(value)}
-            onCheckedChange={(c) => onChange(Boolean(c))}
-          />
-        </div>
-      );
+      // boolean 在 ConfigFieldInput 自己渲染(label+checkbox 同行),不会走到这里
+      return null;
     case "select":
       return (
         <Select value={(value as string) ?? ""} onValueChange={onChange}>

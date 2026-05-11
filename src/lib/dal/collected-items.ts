@@ -12,9 +12,11 @@ import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 export type CollectedItemRow = InferSelectModel<typeof collectedItems>;
 
-/** CollectedItemRow extended with outlet name from the dictionary (may be null). */
+/** CollectedItemRow extended with outlet name + source type joined. */
 export type CollectedItemWithOutlet = CollectedItemRow & {
   outletName: string | null;
+  /** Source type slug (rss / tophub / jina_url / list_scraper / tavily / tikhub / bocha) from collection_sources, joined via firstSeenSourceId. May be null if source was deleted. */
+  sourceType: string | null;
 };
 
 // ────────────────────────────────────────────────
@@ -149,9 +151,12 @@ export async function listCollectedItems(
       outletRegion: collectedItems.outletRegion,
       // joined from dictionary
       outletName: mediaOutletDictionary.outletName,
+      // joined from collection_sources (firstSeenSourceId)
+      sourceType: collectionSources.sourceType,
     })
     .from(collectedItems)
     .leftJoin(mediaOutletDictionary, eq(collectedItems.outletId, mediaOutletDictionary.id))
+    .leftJoin(collectionSources, eq(collectedItems.firstSeenSourceId, collectionSources.id))
     .where(and(...conditions))
     .orderBy(desc(collectedItems.firstSeenAt))
     .limit(limit)

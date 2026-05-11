@@ -48,7 +48,6 @@ export async function ensureHotTopicSystemSource(organizationId: string): Promis
         deletedAt: null,
         updatedAt: new Date(),
         targetModules: ["hot_topics"],
-        researchBridgeEnabled: true,
       })
       .where(eq(collectionSources.id, existing.id));
     return existing.id;
@@ -64,7 +63,6 @@ export async function ensureHotTopicSystemSource(organizationId: string): Promis
       targetModules: ["hot_topics"],
       enabled: true,
       scheduleCron: "0 * * * *",
-      researchBridgeEnabled: true,
     })
     .returning({ id: collectionSources.id });
 
