@@ -49,3 +49,6 @@ next-env.d.ts
 # 数据库 dump / 备份文件（不入仓）
 *.sql
 !supabase/migrations/*.sql
+
+# tikhub 探针脚本输出(含真实账号响应,可能包含个人信息)
+scripts/tikhub-probe-output/
