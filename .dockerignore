@@ -1,0 +1,39 @@
+# dependencies & build output
+node_modules
+.next
+out
+.turbo
+
+# git & IDE
+.git
+.github
+.cursor
+.vscode
+.idea
+
+# env & secrets（构建/运行时由 compose 或 -e 注入）
+.env
+.env.*
+!.env.example
+
+# tests
+coverage
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+vitest.config.ts
+vitest.setup.ts
+
+# 文档与开发杂项（不参与 next build；若运行时需要某目录请从本列表移除）
+docs
+openspec
+.husky
+.playwright-mcp
+.superpowers
+.claude
+*.skill
+
+# 数据库 dump
+*.sql
+!supabase/migrations/**/*.sql
