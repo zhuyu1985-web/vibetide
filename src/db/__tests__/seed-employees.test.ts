@@ -32,10 +32,14 @@ describe("xiaoyan employee seed", () => {
       .where(eq(employeeSkills.employeeId, xiaoyan!.id));
 
     const slugs = bound.map((r) => r.slug).sort();
+    // A6 Phase 1 三件套 + 后续扩展的 web/news 通用技能 = 6 个 core skills
     expect(slugs).toEqual([
       "data_pivoter",
+      "news_aggregation",
       "report_drafter",
       "research_query_builder",
+      "web_deep_read",
+      "web_search",
     ]);
     expect(bound.every((r) => r.bindingType === "core")).toBe(true);
   });

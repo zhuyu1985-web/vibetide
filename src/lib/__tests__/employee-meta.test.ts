@@ -19,11 +19,15 @@ describe("EMPLOYEE_META xiaoyan registration", () => {
     expect(EMPLOYEE_SHORT_DESC.xiaoyan).toBeDefined();
     expect(EMPLOYEE_SHORT_DESC.xiaoyan.length).toBeGreaterThan(0);
 
-    // CORE_SKILLS — 三件套
+    // CORE_SKILLS — A6 Phase 1 三件套 + 后续扩展的 web/news 技能(共 6 个)
+    // 顺序与 src/lib/constants.ts EMPLOYEE_CORE_SKILLS.xiaoyan 源码声明一致
     expect(EMPLOYEE_CORE_SKILLS.xiaoyan).toEqual([
+      "data_pivoter",
+      "news_aggregation",
       "report_drafter",
       "research_query_builder",
-      "data_pivoter",
+      "web_deep_read",
+      "web_search",
     ]);
 
     // BUILTIN_SKILL_NAMES — 三件套 slug→中文名映射

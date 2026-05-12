@@ -128,13 +128,13 @@ function buildAccountFetchPlan(
     case "wechat_oa": {
       if (channel.type !== "wechat_oa") throw new Error("channel type mismatch");
       if (!channel.ghid) throw new Error("wechat_oa channel missing ghid");
-      return {
-        endpoint,
-        params: {
-          ghid: channel.ghid,
-          offset: pageIndex * cfg.resultsPerPage,
-        },
-      };
+      // 实测发现:tikhub fetch_mp_article_list 传 offset=0 会 400,只传 ghid 才能 200。
+      // 翻页时(pageIndex > 0)再传 offset。首页(pageIndex=0)只传 ghid。
+      const params: Record<string, string | number> = { ghid: channel.ghid };
+      if (pageIndex > 0) {
+        params.offset = pageIndex * cfg.resultsPerPage;
+      }
+      return { endpoint, params };
     }
   }
 }

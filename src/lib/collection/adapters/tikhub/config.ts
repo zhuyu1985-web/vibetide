@@ -37,16 +37,18 @@ export const TIKHUB_ACCOUNT_PLATFORM_LABELS: Record<TikhubAccountPlatform, strin
   wechat_oa: "微信公众号",
 };
 
-/** Account 模式各平台 endpoint(已通过 explore-tikhub-endpoints.ts 实测验证):
+/** Account 模式各平台 endpoint(已通过实测验证):
  *  - douyin: /web/fetch_user_post_videos → data.aweme_list[]
- *  - weibo: /web_v2/fetch_user_posts → data.data.list[]  (/web/ 路径需登录态返回 ok=-100)
- *  - kuaishou: 待实测确认精确路径
- *  - wechat_oa: /web/fetch_mp_article_list → 待实测真实响应
+ *  - weibo: /web_v2/fetch_user_posts → data.data.list[]  (/web/ 路径需登录态)
+ *  - wechat_oa: /web/fetch_mp_article_list → data.list[] (字段大写驼峰;首页不能传 offset)
+ *  - kuaishou: /web/fetch_user_post → 实测可达但需 tikhub 控制台预先配置 kuaishou
+ *              cookies(响应 result=109 = login required),代码层无法绕过。
+ *              生产前在 tikhub.io 后台配 Kuaishou Web Cookies 后该平台才能用。
  */
 export const TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS: Record<TikhubAccountPlatform, string> = {
   douyin: "/api/v1/douyin/web/fetch_user_post_videos",
   weibo: "/api/v1/weibo/web_v2/fetch_user_posts",
-  kuaishou: "/api/v1/kuaishou/web/fetch_user_feed",
+  kuaishou: "/api/v1/kuaishou/web/fetch_user_post",
   wechat_oa: "/api/v1/wechat_mp/web/fetch_mp_article_list",
 };
 

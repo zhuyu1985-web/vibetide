@@ -208,49 +208,59 @@ export function mapKuaishouAccountResponse(resp: unknown): RawItem[] {
 }
 
 // ─── 微信公众号文章列表 ──────────────────────────────────────────────
+// 实测响应(commit XXX):
+//   data.list[] 每项字段是大写驼峰:
+//   { Title, Digest, ContentUrl, ItemIndex, ItemShowType, ItemUpdateTime,
+//     CoverImgUrl, IsContinueRead, ... }
+// ⚠️  请求参数:不要传 offset=0(会 400),首页用纯 ghid 即可。
 interface WechatMpArticleListResponse {
   data?: {
-    article_list?: unknown[];
     list?: unknown[];
-    /** tikhub 实际字段名可能是 articles / app_msg_list */
-    articles?: unknown[];
-    app_msg_list?: unknown[];
   };
 }
 
+interface WechatMpArticle {
+  Title?: string;
+  Digest?: string;
+  ContentUrl?: string;
+  ItemIndex?: number;
+  ItemUpdateTime?: number; // Unix 秒
+  CoverImgUrl?: string;
+  Author?: string;
+  /** 兼容老字段名(以防 tikhub 后续改 schema) */
+  title?: string;
+  digest?: string;
+  url?: string;
+}
+
 export function mapWechatMpAccountResponse(resp: unknown): RawItem[] {
-  const r = (resp as WechatMpArticleListResponse).data;
-  const list =
-    r?.article_list ?? r?.articles ?? r?.app_msg_list ?? r?.list ?? [];
+  const list = (resp as WechatMpArticleListResponse).data?.list ?? [];
   const items: RawItem[] = [];
 
   for (const raw of list) {
     if (!raw || typeof raw !== "object") continue;
-    const art = raw as Record<string, unknown>;
-    const url = (art.url as string) ?? (art.link as string);
-    const title = (art.title as string) ?? "";
-    if (!url || !title) continue;
+    const art = raw as WechatMpArticle;
+    const title = art.Title ?? art.title ?? "";
+    const url = art.ContentUrl ?? art.url ?? "";
+    if (!title || !url) continue;
 
     items.push({
       title,
       url,
-      summary: (art.digest as string) ?? (art.summary as string) ?? title.slice(0, 200),
-      publishedAt:
-        parseTimestampSec(art.create_time as number | undefined) ??
-        parseTimestampSec(art.publish_time as number | undefined) ??
-        (art.update_time ? new Date(String(art.update_time)) : undefined),
+      summary: art.Digest ?? art.digest ?? title.slice(0, 200),
+      publishedAt: art.ItemUpdateTime
+        ? parseTimestampSec(art.ItemUpdateTime)
+        : undefined,
       channel: "tikhub_wechat_mp_account",
       contentType: "image_text",
-      attachments: art.cover
-        ? [{ kind: "thumbnail" as const, url: art.cover as string }]
+      attachments: art.CoverImgUrl
+        ? [{ kind: "thumbnail" as const, url: art.CoverImgUrl }]
         : [],
       rawMetadata: {
         platform: "wechat_oa",
         mode: "account",
-        article_id: art.article_id ?? art.msgid,
-        author: art.author,
-        read_count: art.read_num,
-        like_count: art.like_num,
+        item_index: art.ItemIndex,
+        author: art.Author,
       },
     });
   }
