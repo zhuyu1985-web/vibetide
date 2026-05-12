@@ -83,45 +83,64 @@ export function mapDouyinAccountResponse(resp: unknown): RawItem[] {
 }
 
 // ─── 微博用户微博列表 ────────────────────────────────────────────────
+// 实测验证(commit XXX):web_v2/fetch_user_posts 响应结构
+//   data: { data: { list: [...], since_id, total }, ok: 1 }
+//   list[] 每项: { mid, mblogid, text_raw, text, created_at, user: {screen_name,idstr},
+//                  reposts_count, comments_count, attitudes_count, pic_ids[], pic_num }
 interface WeiboUserPostsResponse {
-  data?: { list?: unknown[]; cards?: unknown[] };
+  data?: {
+    data?: {
+      list?: unknown[];
+    };
+    ok?: number;
+  };
 }
 
 export function mapWeiboAccountResponse(resp: unknown): RawItem[] {
-  const r = (resp as WeiboUserPostsResponse).data;
-  // tikhub 文档显示有 list 字段;部分 endpoint 用 cards;两者都尝试
-  const list = r?.list ?? r?.cards ?? [];
+  const list = (resp as WeiboUserPostsResponse).data?.data?.list ?? [];
   const items: RawItem[] = [];
 
   for (const raw of list) {
     if (!raw || typeof raw !== "object") continue;
-    const mb = raw as Record<string, unknown>;
-    // weibo: post 直接挂在 raw,也可能在 raw.mblog
-    const post = (mb.mblog as Record<string, unknown> | undefined) ?? mb;
-    const id = (post.id as string) ?? (post.mid as string);
-    if (!id) continue;
+    const post = raw as Record<string, unknown>;
+    const mblogid = post.mblogid as string | undefined; // base62 短 ID,用于 URL
+    const mid = post.mid as string | undefined; // 数字 ID
+    if (!mblogid && !mid) continue;
 
-    const text =
-      ((post.text_raw as string) ?? "") ||
-      stripHtml((post.text as string) ?? "");
-    const user = post.user as { screen_name?: string; id?: number | string } | undefined;
+    // text_raw 已经是干净文本(没有 HTML),优先用
+    const text = (post.text_raw as string) ?? stripHtml((post.text as string) ?? "");
+    const user = post.user as
+      | { screen_name?: string; idstr?: string; id?: number }
+      | undefined;
+    const uid = user?.idstr ?? String(user?.id ?? "");
+
+    // 主页 URL: https://weibo.com/{uid}/{mblogid} (mblogid 短码)
+    const url = mblogid && uid
+      ? `https://weibo.com/${uid}/${mblogid}`
+      : `https://weibo.com/${uid}/${mid}`;
+
+    // 图片(weibo CDN url 模板:从 pic_ids 拼,但 tikhub 没直接提供 wb_pic_url,先存 raw)
+    const picIds = Array.isArray(post.pic_ids) ? (post.pic_ids as string[]) : [];
 
     items.push({
       title: text.slice(0, 80) || "(无标题)",
-      url: `https://weibo.com/${user?.id}/${id}`,
+      url,
       summary: text.slice(0, 200),
-      publishedAt: post.created_at ? new Date(String(post.created_at)) : undefined,
+      publishedAt: post.created_at ? parseWeiboDate(String(post.created_at)) : undefined,
       channel: "tikhub_weibo_account",
-      contentType: "image_text",
+      contentType: picIds.length > 0 ? "image_set" : "image_text",
       rawMetadata: {
         platform: "weibo",
         mode: "account",
-        post_id: id,
+        mid,
+        mblogid,
         author: user?.screen_name,
-        uid: user?.id,
+        uid,
         reposts: post.reposts_count,
         comments: post.comments_count,
         likes: post.attitudes_count,
+        pic_count: post.pic_num,
+        text_length: post.textLength,
       },
     });
   }
@@ -130,6 +149,12 @@ export function mapWeiboAccountResponse(resp: unknown): RawItem[] {
 
 function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, "").trim();
+}
+
+/** 解析 weibo "Tue May 12 00:00:00 +0800 2026" 格式 */
+function parseWeiboDate(s: string): Date | undefined {
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? undefined : d;
 }
 
 // ─── 快手用户视频 feed ────────────────────────────────────────────────

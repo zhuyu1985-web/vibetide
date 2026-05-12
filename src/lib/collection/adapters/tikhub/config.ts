@@ -37,10 +37,15 @@ export const TIKHUB_ACCOUNT_PLATFORM_LABELS: Record<TikhubAccountPlatform, strin
   wechat_oa: "微信公众号",
 };
 
-/** Account 模式各平台 endpoint。kuaishou 实测占位,M3 实施时确认精确路径。 */
+/** Account 模式各平台 endpoint(已通过 explore-tikhub-endpoints.ts 实测验证):
+ *  - douyin: /web/fetch_user_post_videos → data.aweme_list[]
+ *  - weibo: /web_v2/fetch_user_posts → data.data.list[]  (/web/ 路径需登录态返回 ok=-100)
+ *  - kuaishou: 待实测确认精确路径
+ *  - wechat_oa: /web/fetch_mp_article_list → 待实测真实响应
+ */
 export const TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS: Record<TikhubAccountPlatform, string> = {
   douyin: "/api/v1/douyin/web/fetch_user_post_videos",
-  weibo: "/api/v1/weibo/web/fetch_user_posts",
+  weibo: "/api/v1/weibo/web_v2/fetch_user_posts",
   kuaishou: "/api/v1/kuaishou/web/fetch_user_feed",
   wechat_oa: "/api/v1/wechat_mp/web/fetch_mp_article_list",
 };
