@@ -4,14 +4,68 @@ import { requireAuth } from "@/lib/auth";
 import {
   getCollectedItemDetail,
   getDerivedRecordsForItem,
+  listCollectedItems,
+  type ContentFilters,
   type DerivedRecordSummary,
 } from "@/lib/dal/collected-items";
 import { getOutletById } from "@/lib/dal/media-outlet-dictionary";
+import type { CollectedItemViewModel } from "@/app/(dashboard)/data-collection/content/content-client";
 
 async function requireOrg(): Promise<string> {
   const user = await requireAuth();
   if (!user.organizationId) throw new Error("无法获取组织信息");
   return user.organizationId;
+}
+
+// ────────────────────────────────────────────────
+// 采集池分页加载（无限滚动）
+// ────────────────────────────────────────────────
+
+/** 与 ContentFilters 同 shape,但只暴露 client 真正会传的字段,且全部 JSON 可序列化 */
+export interface LoadCollectedItemsFilters {
+  sourceType?: string;
+  targetModule?: string;
+  sinceMs?: number;
+  searchText?: string;
+  enrichmentStatus?: "pending" | "enriched" | "failed";
+  platformAlias?: string;
+  outletTier?: string;
+  outletRegion?: string;
+}
+
+export interface LoadCollectedItemsResult {
+  items: CollectedItemViewModel[];
+  total: number;
+}
+
+export async function loadCollectedItemsAction(
+  filters: LoadCollectedItemsFilters,
+  offset: number,
+  limit = 50,
+): Promise<LoadCollectedItemsResult> {
+  const orgId = await requireOrg();
+  const { items: rawItems, total } = await listCollectedItems(
+    orgId,
+    filters as ContentFilters,
+    { limit, offset },
+  );
+  const items: CollectedItemViewModel[] = rawItems.map((i) => ({
+    id: i.id,
+    title: i.title,
+    summary: i.summary,
+    firstSeenChannel: i.firstSeenChannel,
+    firstSeenAt: i.firstSeenAt.toISOString(),
+    publishedAt: i.publishedAt?.toISOString() ?? null,
+    category: i.category,
+    tags: i.tags,
+    derivedModules: i.derivedModules,
+    enrichmentStatus: i.enrichmentStatus,
+    sourceChannels: (i.sourceChannels ?? []) as CollectedItemViewModel["sourceChannels"],
+    outletName: i.outletName ?? null,
+    outletTier: i.outletTier ?? null,
+    sourceType: i.sourceType ?? null,
+  }));
+  return { items, total };
 }
 
 export interface ItemDetailPayload {

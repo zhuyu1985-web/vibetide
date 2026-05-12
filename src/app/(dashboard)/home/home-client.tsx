@@ -188,6 +188,7 @@ export function HomeClient({
     const text = inputValue;
     setInputValue("");
     setChatOpen(true);
+    setInlineScenario(null);
     // Send message after state update
     setTimeout(() => {
       chat.sendMessage(text);
@@ -196,6 +197,7 @@ export function HomeClient({
 
   const handleSelectEmployee = useCallback((slug: EmployeeId) => {
     setActiveEmployee(slug);
+    setInlineScenario(null);
     // If already in chat, clear messages for new employee
     if (chatOpen) {
       chat.clearMessages();
@@ -204,6 +206,7 @@ export function HomeClient({
 
   const handleSwitchEmployee = useCallback((slug: EmployeeId) => {
     setActiveEmployee(slug);
+    setInlineScenario(null);
     chat.clearMessages();
   }, [chat]);
 
@@ -304,6 +307,7 @@ export function HomeClient({
   const handleCloseChat = useCallback(() => {
     setChatOpen(false);
     setChatInput("");
+    setInlineScenario(null);
     chat.clearMessages();
     try {
       sessionStorage.removeItem(HOME_CHAT_STATE_KEY);
@@ -317,6 +321,7 @@ export function HomeClient({
     if (!chatInput.trim() || chat.isStreaming) return;
     const text = chatInput;
     setChatInput("");
+    setInlineScenario(null);
     // Reset textarea height
     if (chatTextareaRef.current) {
       chatTextareaRef.current.style.height = "auto";

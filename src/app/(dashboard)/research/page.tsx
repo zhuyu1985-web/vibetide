@@ -11,6 +11,7 @@ import { listResearchTopics } from "@/lib/dal/research/research-topics";
 import { listCollectionSources } from "@/lib/dal/collection";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
 import {
+  CHANNEL_FILTER_LABELS,
   CONTENT_TYPE_LABELS,
   CONTENT_TYPE_VALUES,
   OUTLET_TIER_LABELS,
@@ -82,12 +83,14 @@ export default async function ResearchPage() {
     sourceTypeLabel: adapterTypeLabel.get(s.sourceType) ?? s.sourceType,
   }));
 
-  // Map DAL result to the shape SearchWorkbenchClient expects
+  // Map DAL result to the shape SearchWorkbenchClient expects.
+  // sourceChannel 用 firstSeenChannel 暴露出去,与 action.mapToResult 对齐,
+  // 让 client 可以用 formatChannelLabel 渲染中文渠道名。
   const initialResult = {
     articles: rawResult.items.map((item) => ({
       ...item,
       districtName: null as string | null,
-      sourceChannel: item.outletTier ?? "unknown",
+      sourceChannel: item.firstSeenChannel,
       platformFallback: item.outletName ?? null,
     })),
     total: rawResult.total,
@@ -115,8 +118,10 @@ export default async function ResearchPage() {
       districts={districts}
       outlets={outlets.map((o) => ({ id: o.id, name: o.outletName }))}
       sources={sourceOptions}
+      topics={topicSummaries}
       initialResult={initialResult}
       builderOptions={builderOptions}
+      channelLabels={[...CHANNEL_FILTER_LABELS]}
     />
   );
 }

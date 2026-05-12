@@ -56,6 +56,7 @@ import {
   Wrench,
   Pencil,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 import {
   unbindSkillFromEmployee,
@@ -310,6 +311,15 @@ export function EmployeeProfileClient({
               <Badge variant="secondary" className="text-xs ml-1">
                 {authorityLabels[employee.authorityLevel]}
               </Badge>
+              <Button
+                size="sm"
+                variant="default"
+                className="ml-auto"
+                onClick={() => router.push(`/chat?employee=${employee.id}`)}
+              >
+                <MessageSquare size={14} className="mr-1.5" />
+                进入对话
+              </Button>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 italic mb-4">
               &ldquo;{employee.motto}&rdquo;

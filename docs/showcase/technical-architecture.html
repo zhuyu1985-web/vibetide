@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Media 智媒体 · 技术架构方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== CSS Custom Properties ===== */
+:root {
+  --bg: #f8f9fb;
+  --card-bg: #ffffff;
+  --card-border: rgba(0,0,0,0.06);
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  --text: #1a1a2e;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --heading: #0f172a;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: rgba(0,0,0,0.06);
+  --sidebar-hover: rgba(99,102,241,0.06);
+  --sidebar-active-bg: rgba(99,102,241,0.08);
+  --callout-bg: rgba(99,102,241,0.05);
+  --callout-border: rgba(99,102,241,0.2);
+  --scenario-bg: rgba(245,158,11,0.05);
+  --scenario-border: rgba(245,158,11,0.3);
+  --table-header-bg: #f1f5f9;
+  --table-alt-bg: #f8fafc;
+  --table-border: #e2e8f0;
+  --code-bg: #f1f5f9;
+  --divider: #e2e8f0;
+  --chip-bg: rgba(0,0,0,0.04);
+  --chip-text: #475569;
+  --toggle-bg: #e2e8f0;
+  --indigo: #6366f1;
+  --cyan: #06b6d4;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --pink: #ec4899;
+  --red: #ef4444;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --card-bg: rgba(255,255,255,0.04);
+  --card-border: rgba(255,255,255,0.08);
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --text: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --heading: #f1f5f9;
+  --sidebar-bg: rgba(255,255,255,0.02);
+  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-hover: rgba(99,102,241,0.1);
+  --sidebar-active-bg: rgba(99,102,241,0.15);
+  --callout-bg: rgba(99,102,241,0.08);
+  --callout-border: rgba(99,102,241,0.3);
+  --scenario-bg: rgba(245,158,11,0.08);
+  --scenario-border: rgba(245,158,11,0.3);
+  --table-header-bg: rgba(255,255,255,0.06);
+  --table-alt-bg: rgba(255,255,255,0.02);
+  --table-border: rgba(255,255,255,0.08);
+  --code-bg: rgba(255,255,255,0.06);
+  --divider: rgba(255,255,255,0.08);
+  --chip-bg: rgba(255,255,255,0.08);
+  --chip-text: #cbd5e1;
+  --toggle-bg: #1e293b;
+}
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  transition: background 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Theme Toggle ===== */
+.theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 1000;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: var(--card-shadow);
+  transition: all 0.2s;
+}
+.theme-toggle:hover { transform: scale(1.05); }
+.theme-toggle .icon-light, [data-theme="dark"] .theme-toggle .icon-dark { display: none; }
+[data-theme="dark"] .theme-toggle .icon-light { display: inline; }
+.theme-toggle .icon-dark { display: inline; }
+[data-theme="dark"] .theme-toggle .icon-dark { display: none; }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  height: 100vh;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  overflow-y: auto;
+  z-index: 100;
+  padding: 24px 0;
+  transition: transform 0.3s, background 0.3s;
+}
+
+.sidebar-brand {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--divider);
+  margin-bottom: 12px;
+}
+
+.sidebar-brand h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--indigo);
+  letter-spacing: -0.02em;
+}
+
+.sidebar-brand p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.toc-list {
+  list-style: none;
+}
+
+.toc-chapter {
+  padding: 6px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 12px;
+}
+
+.toc-item a {
+  display: block;
+  padding: 6px 20px 6px 28px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+  line-height: 1.4;
+}
+
+.toc-item a:hover {
+  color: var(--indigo);
+  background: var(--sidebar-hover);
+}
+
+.toc-item.active a {
+  color: var(--indigo);
+  border-left-color: var(--indigo);
+  background: var(--sidebar-active-bg);
+  font-weight: 500;
+}
+
+/* Mobile menu button */
+.menu-btn {
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 16px;
+  z-index: 1001;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: var(--card-shadow);
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 99;
+}
+
+/* ===== Main Content ===== */
+.main {
+  margin-left: 260px;
+  padding: 48px 48px 80px;
+  max-width: calc(820px + 260px + 96px);
+  transition: margin 0.3s;
+}
+
+.content {
+  max-width: 820px;
+}
+
+/* ===== Header ===== */
+.hero {
+  text-align: center;
+  padding: 48px 0 40px;
+  margin-bottom: 48px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.hero h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+}
+
+.hero h1 span {
+  background: linear-gradient(135deg, var(--indigo), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero .subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-top: 12px;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+/* ===== Typography ===== */
+.chapter-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--heading);
+  margin-top: 48px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--indigo);
+  letter-spacing: -0.02em;
+  scroll-margin-top: 24px;
+}
+
+.section-title {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-top: 36px;
+  margin-bottom: 16px;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 24px;
+}
+
+p {
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--card-shadow);
+  transition: background 0.3s, border 0.3s;
+}
+
+/* ===== Chips ===== */
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  white-space: nowrap;
+}
+
+.chip.highlight {
+  background: rgba(99,102,241,0.1);
+  color: var(--indigo);
+}
+
+/* ===== Architecture Diagram ===== */
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 24px 0;
+}
+
+.arch-layer {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  position: relative;
+  box-shadow: var(--card-shadow);
+}
+
+.arch-layer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.arch-layer-bar {
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.arch-layer-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.arch-connector {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.arch-connector::before,
+.arch-connector::after {
+  content: '';
+  width: 1px;
+  height: 10px;
+  background: var(--divider);
+}
+
+/* ===== Callout ===== */
+.callout {
+  background: var(--callout-bg);
+  border: 1px solid var(--callout-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.callout-label {
+  font-weight: 600;
+  color: var(--indigo);
+}
+
+/* ===== Scenario Box ===== */
+.scenario {
+  border-left: 3px solid var(--amber);
+  background: var(--scenario-bg);
+  border-radius: 0 10px 10px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.scenario-label {
+  font-weight: 600;
+  color: var(--amber);
+  margin-bottom: 4px;
+}
+
+/* ===== Tables ===== */
+.table-wrap {
+  overflow-x: auto;
+  margin: 16px 0;
+  border-radius: 10px;
+  border: 1px solid var(--table-border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+thead th {
+  background: var(--table-header-bg);
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--heading);
+  border-bottom: 1px solid var(--table-border);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--table-border);
+  color: var(--text);
+}
+
+tbody tr:nth-child(even) { background: var(--table-alt-bg); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ===== Comparison Cards ===== */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.compare-card {
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+.compare-card h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.compare-card ul {
+  list-style: none;
+  font-size: 14px;
+}
+
+.compare-card li {
+  padding: 4px 0;
+  padding-left: 18px;
+  position: relative;
+  color: var(--text-secondary);
+}
+
+.compare-card li::before {
+  content: '·';
+  position: absolute;
+  left: 4px;
+  font-weight: 700;
+}
+
+.compare-card .analogy {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-top: 10px;
+  border-top: 1px solid var(--divider);
+}
+
+/* ===== Flowchart ===== */
+.flowchart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  margin: 24px 0;
+}
+
+.flow-node {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--heading);
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  max-width: 280px;
+  width: 100%;
+}
+
+.flow-arrow {
+  width: 1px;
+  height: 20px;
+  background: var(--divider);
+  position: relative;
+}
+
+.flow-arrow::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--text-muted);
+  border-bottom: 1px solid var(--text-muted);
+  transform: rotate(45deg);
+}
+
+.flow-fork {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.flow-fork .flow-node {
+  max-width: 160px;
+}
+
+/* ===== Pipeline ===== */
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 24px 0;
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+.pipeline-step {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  min-width: 120px;
+  flex-shrink: 0;
+  box-shadow: var(--card-shadow);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+.pipeline-step.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pipeline-step small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+.pipeline-arrow {
+  font-size: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+
+/* ===== Cognitive Loop Ring ===== */
+.cognitive-ring-container {
+  position: relative;
+  width: 420px;
+  height: 420px;
+  margin: 32px auto;
+}
+
+.cognitive-ring {
+  position: absolute;
+  inset: 30px;
+  border: 2px dashed var(--divider);
+  border-radius: 50%;
+  animation: spin 60s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.cognitive-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 2;
+}
+
+.cognitive-center strong {
+  display: block;
+  font-size: 15px;
+  color: var(--heading);
+}
+
+.cognitive-center span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cognitive-node {
+  position: absolute;
+  width: 100px;
+  text-align: center;
+  z-index: 3;
+}
+
+.cognitive-node .node-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.cognitive-node .node-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+/* Node positions (6 nodes around circle) */
+.cognitive-node:nth-child(3) { top: -10px; left: 50%; transform: translateX(-50%); }
+.cognitive-node:nth-child(4) { top: 60px; right: -20px; }
+.cognitive-node:nth-child(5) { bottom: 60px; right: -20px; }
+.cognitive-node:nth-child(6) { bottom: -10px; left: 50%; transform: translateX(-50%); }
+.cognitive-node:nth-child(7) { bottom: 60px; left: -20px; }
+.cognitive-node:nth-child(8) { top: 60px; left: -20px; }
+
+/* ===== DAG Diagram ===== */
+.dag-diagram {
+  margin: 24px 0;
+}
+
+.dag-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dag-node {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-width: 160px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.dag-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.dag-info {
+  font-size: 13px;
+}
+
+.dag-info strong {
+  display: block;
+  color: var(--heading);
+  font-size: 13px;
+}
+
+.dag-info .dag-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dag-info .dag-skill {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  margin-top: 4px;
+}
+
+.dag-connector {
+  text-align: center;
+  padding: 8px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ===== 7-Layer Prompt ===== */
+.prompt-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 24px 0;
+}
+
+.prompt-layer {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.prompt-layer-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--indigo);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.prompt-layer-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.prompt-layer-content strong {
+  font-size: 14px;
+  color: var(--heading);
+}
+
+.prompt-layer-content p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge-static { background: var(--chip-bg); color: var(--text-muted); }
+.badge-semi { background: rgba(245,158,11,0.12); color: var(--amber); }
+.badge-dynamic {
+  background: rgba(16,185,129,0.12);
+  color: var(--emerald);
+  position: relative;
+  padding-left: 18px;
+}
+.badge-dynamic::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--emerald);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ===== Verify Flow ===== */
+.verify-flow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.verify-col {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--card-shadow);
+}
+
+.verify-col h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.verify-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.verify-step .step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.verify-step-arrow {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+/* ===== Tech Grid ===== */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.tech-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+}
+
+.tech-card .tech-category {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.tech-card .tech-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 6px;
+}
+
+.tech-card .tech-reason {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ===== Status Badges ===== */
+.status-done {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(16,185,129,0.12);
+  color: var(--emerald);
+}
+
+.status-soon {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(245,158,11,0.12);
+  color: var(--amber);
+}
+
+/* ===== Layer desc list ===== */
+.layer-desc {
+  margin: 16px 0;
+}
+
+.layer-desc-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.layer-desc-item:last-child { border-bottom: none; }
+
+.layer-desc-item strong {
+  color: var(--heading);
+  font-size: 14px;
+}
+
+.layer-desc-item p {
+  font-size: 14px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+/* ===== Scroll Animations ===== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.1); }
+  .sidebar-overlay.open { display: block; }
+  .menu-btn { display: flex; }
+  .main { margin-left: 0; padding: 24px 20px 60px; }
+  .theme-toggle { right: 16px; top: 20px; }
+  .compare-grid { grid-template-columns: 1fr; }
+  .verify-flow { grid-template-columns: 1fr; }
+  .cognitive-ring-container { width: 320px; height: 320px; }
+  .pipeline { flex-wrap: wrap; justify-content: center; }
+  .pipeline-arrow { display: none; }
+  .hero h1 { font-size: 24px; }
+}
+
+@media (max-width: 600px) {
+  .dag-row { flex-direction: column; align-items: center; }
+  .tech-grid { grid-template-columns: 1fr; }
+  .cognitive-ring-container { width: 280px; height: 280px; }
+  .cognitive-node { width: 80px; }
+  .cognitive-node .node-circle { width: 36px; height: 36px; font-size: 14px; }
+  .cognitive-node .node-label { font-size: 11px; }
+}
+
+/* ===== Separator line between subsections ===== */
+.section-sep {
+  border: none;
+  border-top: 1px solid var(--divider);
+  margin: 24px 0;
+}
+
+/* ===== Three-item list ===== */
+.limitations-list {
+  list-style: none;
+  margin: 12px 0;
+}
+
+.limitations-list li {
+  padding: 8px 0 8px 24px;
+  position: relative;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.limitations-list li::before {
+  content: attr(data-num);
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+  color: var(--red);
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<!-- Theme Toggle -->
+<button class="theme-toggle" onclick="toggleTheme()" aria-label="切换主题">
+  <span class="icon-light">&#9728;</span>
+  <span class="icon-dark">&#9790;</span>
+</button>
+
+<!-- Mobile Menu Button -->
+<button class="menu-btn" onclick="toggleSidebar()" aria-label="菜单">&#9776;</button>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <h2>Vibe Media</h2>
+    <p>技术架构方案</p>
+  </div>
+  <ul class="toc-list">
+    <li class="toc-chapter">第一章</li>
+    <li class="toc-item" data-target="ch1"><a href="#ch1">系统分层架构</a></li>
+    <li class="toc-item" data-target="s1-1"><a href="#s1-1">1.1 架构总览</a></li>
+    <li class="toc-item" data-target="s1-2"><a href="#s1-2">1.2 各层职责</a></li>
+    <li class="toc-item" data-target="s1-3"><a href="#s1-3">1.3 核心模块关系图</a></li>
+
+    <li class="toc-chapter">第二章</li>
+    <li class="toc-item" data-target="ch2"><a href="#ch2">核心设计哲学</a></li>
+    <li class="toc-item" data-target="s2-1"><a href="#s2-1">2.1 为什么需要「技能」</a></li>
+    <li class="toc-item" data-target="s2-2"><a href="#s2-2">2.2 AI员工 vs 工作流</a></li>
+
+    <li class="toc-chapter">第三章</li>
+    <li class="toc-item" data-target="ch3"><a href="#ch3">知识库体系</a></li>
+    <li class="toc-item" data-target="s3-1"><a href="#s3-1">3.1 为什么需要知识库</a></li>
+    <li class="toc-item" data-target="s3-2"><a href="#s3-2">3.2 全链路流程图</a></li>
+    <li class="toc-item" data-target="s3-3"><a href="#s3-3">3.3 绑定机制</a></li>
+
+    <li class="toc-chapter">第四章</li>
+    <li class="toc-item" data-target="ch4"><a href="#ch4">认知进化闭环</a></li>
+    <li class="toc-item" data-target="s4-1"><a href="#s4-1">4.1 闭环全景</a></li>
+    <li class="toc-item" data-target="s4-2"><a href="#s4-2">4.2 意图理解</a></li>
+    <li class="toc-item" data-target="s4-3"><a href="#s4-3">4.3 技能学习与发现</a></li>
+    <li class="toc-item" data-target="s4-4"><a href="#s4-4">4.4 动态流程创建</a></li>
+    <li class="toc-item" data-target="s4-5"><a href="#s4-5">4.5 智能执行</a></li>
+    <li class="toc-item" data-target="s4-6"><a href="#s4-6">4.6 结果验证</a></li>
+    <li class="toc-item" data-target="s4-7"><a href="#s4-7">4.7 学习引擎</a></li>
+    <li class="toc-item" data-target="s4-8"><a href="#s4-8">4.8 飞轮效应</a></li>
+
+    <li class="toc-chapter">第五章</li>
+    <li class="toc-item" data-target="ch5"><a href="#ch5">技术实现要点</a></li>
+
+    <li class="toc-chapter">附录</li>
+    <li class="toc-item" data-target="appendix"><a href="#appendix">术语表</a></li>
+  </ul>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+<div class="content">
+
+<!-- Hero -->
+<header class="hero">
+  <h1>Vibe Media <span>智媒体</span> · 技术架构方案</h1>
+  <p class="subtitle">多智能体协同内容生产引擎的架构设计、核心机制与设计哲学</p>
+</header>
+
+<!-- ============================================================ -->
+<!-- Chapter 1 -->
+<!-- ============================================================ -->
+<h2 class="chapter-title" id="ch1">第一章 · 系统分层架构</h2>
+
+<h3 class="section-title" id="s1-1">1.1 架构总览</h3>
+<p class="animate-on-scroll">系统采用四层架构，从底向上分别是：基础设施层、能力基座层、智能体层、业务应用层。每一层只依赖下层提供的接口，上层变化不影响下层稳定性。</p>
+
+<!-- Four-Layer Architecture Diagram -->
+<div class="arch-diagram animate-on-scroll">
+  <!-- Business Layer -->
+  <div class="arch-layer">
+    <div class="arch-layer-header">
+      <div class="arch-layer-bar" style="background:var(--pink)"></div>
+      <div class="arch-layer-label">业务应用层</div>
+    </div>
+    <div class="chip-group">
+      <span class="chip">灵感池</span>
+      <span class="chip">超级创作</span>
+      <span class="chip">视频批量</span>
+      <span class="chip">全渠道发布</span>
+      <span class="chip">竞品分析</span>
+      <span class="chip">数据分析</span>
+      <span class="chip">智能媒资</span>
+      <span class="chip">审批中心</span>
+      <span class="chip">排行榜</span>
+      <span class="chip">事件自动化</span>
+    </div>
+  </div>
+  <div class="arch-connector">&#8595; 调用</div>
+
+  <!-- Agent Layer -->
+  <div class="arch-layer">
+    <div class="arch-layer-header">
+      <div class="arch-layer-bar" style="background:var(--indigo)"></div>
+      <div class="arch-layer-label">智能体层</div>
+    </div>
+    <div class="chip-group">
+      <span class="chip highlight">AI 员工</span>
+      <span class="chip highlight">工作流引擎</span>
+      <span class="chip highlight">对话中心</span>
+      <span class="chip highlight">意图识别</span>
+      <span class="chip highlight">任务中心</span>
+    </div>
+  </div>
+  <div class="arch-connector">&#8595; 驱动</div>
+
+  <!-- Capability Layer -->
+  <div class="arch-layer">
+    <div class="arch-layer-header">
+      <div class="arch-layer-bar" style="background:var(--cyan)"></div>
+      <div class="arch-layer-label">能力基座层</div>
+    </div>
+    <div class="chip-group">
+      <span class="chip highlight">技能系统</span>
+      <span class="chip highlight">知识库</span>
+      <span class="chip highlight">记忆系统</span>
+      <span class="chip highlight">工具注册表</span>
+      <span class="chip highlight">7层提示词引擎</span>
+    </div>
+  </div>
+  <div class="arch-connector">&#8595; 依赖</div>
+
+  <!-- Infrastructure Layer -->
+  <div class="arch-layer">
+    <div class="arch-layer-header">
+      <div class="arch-layer-bar" style="background:var(--emerald)"></div>
+      <div class="arch-layer-label">基础设施层</div>
+    </div>
+    <div class="chip-group">
+      <span class="chip">Supabase PostgreSQL</span>
+      <span class="chip">AI SDK + LLM</span>
+      <span class="chip">Jina Embeddings</span>
+      <span class="chip">Inngest 事件调度</span>
+      <span class="chip">Tavily 搜索</span>
+      <span class="chip">Next.js 16</span>
+    </div>
+  </div>
+</div>
+
+<h3 class="section-title" id="s1-2">1.2 各层职责</h3>
+
+<div class="layer-desc animate-on-scroll">
+  <div class="layer-desc-item">
+    <strong style="color:var(--emerald)">基础设施层</strong>
+    <p>提供数据库存储、大语言模型调用、向量嵌入、事件调度和搜索等底层能力。每个组件可独立替换（如从 Tavily 切换到博查搜索），上层代码无需修改，对业务完全透明。</p>
+  </div>
+  <div class="layer-desc-item">
+    <strong style="color:var(--cyan)">能力基座层</strong>
+    <p>系统的「零件库」。技能、知识库、记忆和工具以模块化方式注册，可自由组合。新增一个技能，就像往工具箱里放一把新扳手——无需修改引擎本身。</p>
+  </div>
+  <div class="layer-desc-item">
+    <strong style="color:var(--indigo)">智能体层</strong>
+    <p>系统核心。AI 员工负责垂类深度任务，工作流引擎负责跨员工编排，对话中心负责人机交互。三者互补协作，由意图识别引擎统一调度。</p>
+  </div>
+  <div class="layer-desc-item">
+    <strong style="color:var(--pink)">业务应用层</strong>
+    <p>面向最终用户的功能页面。每个应用不直接调用 LLM，而是通过智能体层间接驱动——这保证了 AI 能力的统一治理和一致体验。</p>
+  </div>
+</div>
+
+<div class="callout animate-on-scroll">
+  <span class="callout-label">&#128273; 核心设计原则：</span>上层应用不直接调用 LLM，而是通过智能中枢层间接驱动。AI 员工是最小执行单元。
+</div>
+
+<h3 class="section-title" id="s1-3">1.3 核心模块关系图</h3>
+<p class="animate-on-scroll">从用户消息到最终输出，系统经历以下核心路径：</p>
+
+<div class="flowchart animate-on-scroll">
+  <div class="flow-node" style="border-left:3px solid var(--indigo)">对话中心</div>
+  <div class="flow-arrow"></div>
+  <div class="flow-node" style="border-left:3px solid var(--indigo)">意图识别引擎</div>
+  <div class="flow-arrow"></div>
+  <div class="flow-fork">
+    <div class="flow-node" style="border-left:3px solid var(--cyan)">AI 员工</div>
+    <div class="flow-node" style="border-left:3px solid var(--pink)">工作流引擎</div>
+  </div>
+  <div class="flow-arrow"></div>
+  <div class="flow-node" style="border-left:3px solid var(--emerald)">Agent Assembly 组装</div>
+  <div class="flow-arrow"></div>
+  <div class="flow-fork">
+    <div class="flow-node">技能系统</div>
+    <div class="flow-node">知识库</div>
+    <div class="flow-node">记忆系统</div>
+  </div>
+  <div class="flow-arrow"></div>
+  <div class="flow-node" style="border-left:3px solid var(--amber)">7层提示词组装</div>
+  <div class="flow-arrow"></div>
+  <div class="flow-node" style="border-left:3px solid var(--amber)">LLM 执行</div>
+  <div class="flow-arrow"></div>
+  <div class="flow-fork">
+    <div class="flow-node" style="border-left:3px solid var(--red)">自我评估 → 记忆沉淀</div>
+    <div class="flow-node" style="border-left:3px solid var(--pink)">用户反馈 → 学习引擎</div>
+  </div>
+  <div class="flow-arrow"></div>
+  <div class="flow-node" style="border-left:3px solid var(--emerald); border-style:dashed">&#8635; 回到 Agent Assembly（进化循环）</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Chapter 2 -->
+<!-- ============================================================ -->
+<h2 class="chapter-title" id="ch2">第二章 · 核心设计哲学</h2>
+
+<h3 class="section-title" id="s2-1">2.1 为什么需要「技能」</h3>
+<p class="animate-on-scroll">如果 AI 员工只是「角色扮演 + 全能提示词」，系统很快会遇到三个瓶颈：能力复用困难、能力无法量化、能力扩展不可控。技能系统正是为了解决这三个问题。</p>
+
+<div class="table-wrap animate-on-scroll">
+<table>
+  <thead>
+    <tr><th>维度</th><th>没有技能系统</th><th>有技能系统</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>能力复用</strong></td><td>每个员工独立实现相似功能，重复开发</td><td>技能独立注册，多员工共享同一技能，按权限绑定</td></tr>
+    <tr><td><strong>能力量化</strong></td><td>无法衡量员工在特定任务上的水平</td><td>每个技能有熟练度评分（0-100），随执行自动更新</td></tr>
+    <tr><td><strong>能力扩展</strong></td><td>添加新能力需修改员工核心代码</td><td>注册新技能即可，Agent 组装时自动加载</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="animate-on-scroll">技能熟练度的更新遵循以下规则：</p>
+
+<div class="table-wrap animate-on-scroll">
+<table>
+  <thead>
+    <tr><th>质量评分</th><th>熟练度变化</th><th>规则</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>&ge; 80</td><td>+3 ~ +5</td><td>基础+3，每超10分额外+1</td></tr>
+    <tr><td>60 - 79</td><td>不变</td><td>合格区间，维持当前水平</td></tr>
+    <tr><td>&lt; 60</td><td>-2</td><td>不达标，熟练度下降</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="animate-on-scroll">熟练度直接影响 AI 员工的行为倾向：</p>
+
+<div class="table-wrap animate-on-scroll">
+<table>
+  <thead>
+    <tr><th>熟练度区间</th><th>行为指导</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>&le; 30 新手</td><td>严格执行模板和规范，不做自由发挥</td></tr>
+    <tr><td>31 - 70 中级</td><td>允许适当发挥，在规范框架内灵活调整</td></tr>
+    <tr><td>&gt; 70 专家</td><td>鼓励自由发挥，突破常规寻找最优方案</td></tr>
+  </tbody>
+</table>
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s2-2">2.2 AI 员工 vs 工作流</h3>
+<p class="animate-on-scroll">系统提供两种执行模式，分别适用于不同场景。它们不是对立关系，而是互补协作。</p>
+
+<div class="compare-grid animate-on-scroll">
+  <div class="compare-card" style="border-top:3px solid var(--indigo)">
+    <h4 style="color:var(--indigo)">AI 员工（垂类深度智能体）</h4>
+    <ul>
+      <li>适用于单一领域的深度任务</li>
+      <li>支持多轮交互对话</li>
+      <li>即时性需求，日常高频使用</li>
+      <li>绑定专属知识库和记忆</li>
+      <li>持续进化，预设技能组合</li>
+    </ul>
+    <div class="analogy">类比：直接找同事聊一件事</div>
+  </div>
+  <div class="compare-card" style="border-top:3px solid var(--pink)">
+    <h4 style="color:var(--pink)">工作流（灵活编排引擎）</h4>
+    <ul>
+      <li>适用于多专业协作的复合任务</li>
+      <li>标准化流程，审批节点</li>
+      <li>支持步骤间数据传递</li>
+      <li>自定义步骤，DAG 依赖</li>
+      <li>Leader 动态分配员工和技能</li>
+    </ul>
+    <div class="analogy">类比：启动一个项目流程</div>
+  </div>
+</div>
+
+<div class="callout animate-on-scroll">
+  <span class="callout-label">&#128273; 关键关系：</span>AI 员工可以被工作流调度——每个工作流步骤本质上就是调用某个 AI 员工的某个技能。两种模式统一在同一个 Agent Assembly 管道中。
+</div>
+
+<!-- ============================================================ -->
+<!-- Chapter 3 -->
+<!-- ============================================================ -->
+<h2 class="chapter-title" id="ch3">第三章 · 知识库体系</h2>
+
+<h3 class="section-title" id="s3-1">3.1 为什么需要知识库</h3>
+<p class="animate-on-scroll">大语言模型本身存在三个固有局限：</p>
+
+<ul class="limitations-list animate-on-scroll">
+  <li data-num="1.">训练截止日期后的信息完全不可知——它不知道昨天发生了什么</li>
+  <li data-num="2.">无法访问企业私有数据——组织的风格指南、发稿规范、历史案例全部缺失</li>
+  <li data-num="3.">输出容易偏离组织调性——没有参考样本的 AI 只能给出通用回答</li>
+</ul>
+
+<div class="callout animate-on-scroll">
+  <span class="callout-label">&#128273; 知识库的本质是 RAG（检索增强生成）：</span>不是把所有资料塞进提示词，而是在执行时按需检索最相关的片段注入上下文，让 AI 既有通识能力，又有领域精准度。
+</div>
+
+<h3 class="section-title" id="s3-2">3.2 全链路流程图</h3>
+
+<div class="pipeline animate-on-scroll" id="kb-pipeline">
+  <div class="pipeline-step" style="animation-delay:0s"><strong>三通道入库</strong><small>手动 / 上传 / URL</small></div>
+  <span class="pipeline-arrow">&#8594;</span>
+  <div class="pipeline-step" style="animation-delay:0.15s"><strong>智能分块</strong><small>500-800 字/块</small></div>
+  <span class="pipeline-arrow">&#8594;</span>
+  <div class="pipeline-step" style="animation-delay:0.3s"><strong>向量化</strong><small>Jina 1024 维</small></div>
+  <span class="pipeline-arrow">&#8594;</span>
+  <div class="pipeline-step" style="animation-delay:0.45s"><strong>员工绑定</strong><small>多对多关联</small></div>
+  <span class="pipeline-arrow">&#8594;</span>
+  <div class="pipeline-step" style="animation-delay:0.6s"><strong>执行时检索</strong><small>余弦相似度 Top-K</small></div>
+</div>
+
+<h3 class="section-title" id="s3-3">3.3 绑定机制</h3>
+<p class="animate-on-scroll">知识库与 AI 员工之间是多对多关系：一个员工可以绑定多个知识库（如新闻规范库 + 历史选题库），一个知识库也可以被多个员工共享。系统在 Agent Assembly 阶段会检查绑定关系和 <code>vectorization_status</code>，只有状态为 <code>done</code> 的知识库才会注入 <code>kb_search</code> 工具。</p>
+
+<div class="callout animate-on-scroll">
+  <span class="callout-label">&#128273; 检索时机由 AI 自主决定，而非硬编码。</span>系统将 <code>kb_search</code> 作为工具注册到 AI 员工的工具列表中，AI 在执行过程中根据任务需要自主调用——这比硬编码检索更灵活，也更符合实际使用场景。
+</div>
+
+<!-- ============================================================ -->
+<!-- Chapter 4 -->
+<!-- ============================================================ -->
+<h2 class="chapter-title" id="ch4">第四章 · 认知进化闭环</h2>
+
+<p class="animate-on-scroll">这是 Vibe Media 与传统 AI 应用最根本的区别：系统不仅执行任务，还在每次执行中学习、记忆、进化。以下用一个贯穿性的真实场景来展示完整闭环。</p>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 贯穿示例</div>
+  用户需求：「今天 AI + 教育话题很火，帮我规划选题方案，生成三平台稿件」
+</div>
+
+<h3 class="section-title" id="s4-1">4.1 闭环全景</h3>
+
+<div class="cognitive-ring-container animate-on-scroll">
+  <div class="cognitive-ring"></div>
+  <div class="cognitive-center">
+    <strong>认知进化闭环</strong>
+    <span>越用越好</span>
+  </div>
+  <!-- 6 nodes positioned around the ring -->
+  <div class="cognitive-node">
+    <div class="node-circle" style="background:var(--indigo)">&#9312;</div>
+    <div class="node-label">意图理解</div>
+  </div>
+  <div class="cognitive-node">
+    <div class="node-circle" style="background:var(--cyan)">&#9313;</div>
+    <div class="node-label">技能学习<br>与发现</div>
+  </div>
+  <div class="cognitive-node">
+    <div class="node-circle" style="background:var(--emerald)">&#9314;</div>
+    <div class="node-label">动态流程<br>创建</div>
+  </div>
+  <div class="cognitive-node">
+    <div class="node-circle" style="background:var(--amber)">&#9315;</div>
+    <div class="node-label">智能执行</div>
+  </div>
+  <div class="cognitive-node">
+    <div class="node-circle" style="background:var(--red)">&#9316;</div>
+    <div class="node-label">结果验证</div>
+  </div>
+  <div class="cognitive-node">
+    <div class="node-circle" style="background:var(--pink)">&#9317;</div>
+    <div class="node-label">学习引擎</div>
+  </div>
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-2">4.2 第一环 · 意图理解</h3>
+<p class="animate-on-scroll">意图识别引擎是系统的「前台接待」。当用户输入一段自然语言时，引擎通过 LLM 解析出意图类型、关键信息和路由决策。系统支持五种意图类型：直接回答（<code>direct_answer</code>）、单技能调用（<code>single_skill</code>）、多步骤任务（<code>multi_step_task</code>）、闲聊（<code>chitchat</code>）和不确定（<code>uncertain</code>）。</p>
+<p class="animate-on-scroll">解析过程不是简单的关键词匹配，而是 LLM 理解语义后做出的结构化判断。如果判定为 <code>multi_step_task</code>，系统会自动路由到工作流引擎而非单个 AI 员工。</p>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 场景示例</div>
+  用户输入被识别为 <code>multi_step_task</code>（包含选题规划 + 三平台写作），系统路由到工作流引擎，而非直接交给某个 AI 员工。意图引擎同时提取出关键实体：话题=「AI + 教育」，平台=[微信公众号, 抖音, 微博]。
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-3">4.3 第二环 · 技能学习与发现</h3>
+<p class="animate-on-scroll">系统中的每个技能都有一个持续更新的「熟练度」评分。每次任务执行后，自我评估模块会对输出质量打分，该分数自动更新对应技能的熟练度。这意味着经常使用且效果好的技能会变得越来越「擅长」。</p>
+<p class="animate-on-scroll">同时，系统会积累「已学习模式」（<code>learnedPatterns</code>），记录什么场景下哪个员工+技能组合效果最好。Leader 在分配任务时会参考这些模式，优先选择最合适的员工。</p>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 场景示例</div>
+  Leader 根据历史模式匹配，分配任务：小雷（热点搜索技能，熟练度82）负责 AI+教育热点调研，小策（选题规划技能，熟练度75）负责选题方案设计，小文（长文写作技能，熟练度88）负责三平台稿件，小发（内容审核技能，熟练度71）负责最终审核。
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-4">4.4 第三环 · 动态流程创建</h3>
+<p class="animate-on-scroll">工作流引擎使用 DAG（有向无环图）来编排任务。每个任务节点声明自己的依赖关系——只有所有前置任务完成后，当前任务才会启动。这使得系统可以自动发现并行执行机会。</p>
+<p class="animate-on-scroll">Leader 会根据任务分析结果动态生成 DAG 结构，而非依赖预定义模板。这意味着同一类需求在不同上下文下可能产生不同的流程编排。</p>
+
+<!-- DAG Diagram -->
+<div class="dag-diagram animate-on-scroll">
+  <div class="dag-row">
+    <div class="dag-node">
+      <div class="dag-num" style="background:var(--indigo)">1</div>
+      <div class="dag-info">
+        <strong>AI+教育热点调研</strong>
+        <div class="dag-meta">小雷</div>
+        <span class="dag-skill">热点搜索</span>
+      </div>
+    </div>
+  </div>
+  <div class="dag-connector">&#8595;</div>
+  <div class="dag-row">
+    <div class="dag-node">
+      <div class="dag-num" style="background:var(--cyan)">2</div>
+      <div class="dag-info">
+        <strong>选题方案设计</strong>
+        <div class="dag-meta">小策</div>
+        <span class="dag-skill">选题规划</span>
+      </div>
+    </div>
+  </div>
+  <div class="dag-connector">&#8595;</div>
+  <div class="dag-row">
+    <div class="dag-node">
+      <div class="dag-num" style="background:var(--emerald)">3</div>
+      <div class="dag-info">
+        <strong>长文初稿撰写</strong>
+        <div class="dag-meta">小文</div>
+        <span class="dag-skill">长文写作</span>
+      </div>
+    </div>
+  </div>
+  <div class="dag-connector">&#8595; 并行展开</div>
+  <div class="dag-row">
+    <div class="dag-node">
+      <div class="dag-num" style="background:var(--amber)">4</div>
+      <div class="dag-info">
+        <strong>微信公众号适配</strong>
+        <div class="dag-meta">小文</div>
+        <span class="dag-skill">平台适配</span>
+      </div>
+    </div>
+    <div class="dag-node">
+      <div class="dag-num" style="background:var(--pink)">5</div>
+      <div class="dag-info">
+        <strong>抖音文案适配</strong>
+        <div class="dag-meta">小文</div>
+        <span class="dag-skill">短视频脚本</span>
+      </div>
+    </div>
+    <div class="dag-node">
+      <div class="dag-num" style="background:var(--red)">6</div>
+      <div class="dag-info">
+        <strong>微博内容适配</strong>
+        <div class="dag-meta">小文</div>
+        <span class="dag-skill">社交媒体写作</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 场景示例</div>
+  Leader 生成 6 步 DAG：任务 1→2→3 串行（因为后者依赖前者的输出），任务 4/5/6 并行（三个平台适配互不依赖，依赖任务 3 的初稿）。系统自动调度并行执行，总耗时约等于最长单条路径的时间。
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-5">4.5 第四环 · 智能执行</h3>
+<p class="animate-on-scroll">每次执行一个任务步骤时，Agent Assembly 管道会动态组装一个完整的 AI Agent。这个组装过程是系统的核心——它将员工身份、技能、知识库、记忆和工具融合为一个统一的 7 层提示词结构。</p>
+<p class="animate-on-scroll">7 层提示词从静态到高度动态排列，确保 AI 在每次执行中都能获得最完整、最精准的上下文。</p>
+
+<!-- 7-Layer Prompt Visualization -->
+<div class="prompt-layers animate-on-scroll">
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L1</div>
+    <div class="prompt-layer-content">
+      <strong>身份与角色</strong>
+      <p>员工姓名、职责定位、性格特征</p>
+    </div>
+    <span class="badge badge-static">静态</span>
+  </div>
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L2</div>
+    <div class="prompt-layer-content">
+      <strong>技能与熟练度</strong>
+      <p>当前任务技能列表 + 各技能熟练度分数</p>
+    </div>
+    <span class="badge badge-semi">半动态</span>
+  </div>
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L3</div>
+    <div class="prompt-layer-content">
+      <strong>工具权限</strong>
+      <p>根据技能过滤的可用工具清单</p>
+    </div>
+    <span class="badge badge-semi">半动态</span>
+  </div>
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L4</div>
+    <div class="prompt-layer-content">
+      <strong>敏感话题规则</strong>
+      <p>内容安全边界和合规要求</p>
+    </div>
+    <span class="badge badge-static">静态</span>
+  </div>
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L5</div>
+    <div class="prompt-layer-content">
+      <strong>知识库上下文</strong>
+      <p>从绑定知识库检索的相关片段</p>
+    </div>
+    <span class="badge badge-dynamic">高度动态</span>
+  </div>
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L6</div>
+    <div class="prompt-layer-content">
+      <strong>历史记忆</strong>
+      <p>员工最近的 Top-10 记忆（用户偏好、历史学习）</p>
+    </div>
+    <span class="badge badge-dynamic">高度动态</span>
+  </div>
+  <div class="prompt-layer">
+    <div class="prompt-layer-num">L7</div>
+    <div class="prompt-layer-content">
+      <strong>输出规范与自评</strong>
+      <p>输出格式要求 + 质量自检清单</p>
+    </div>
+    <span class="badge badge-static">静态</span>
+  </div>
+</div>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 场景示例</div>
+  执行任务 4「微信公众号适配」时，小文的 Agent 被组装：L1 注入写作员工身份，L2 注入「长文写作(88)」和「平台适配(72)」技能，L5 从微信公众号规范知识库检索格式要求，L6 注入「用户偏好：标题控制在20字内、多用数据论证」的历史记忆，L7 要求输出后进行结构完整性和原创度自检。
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-6">4.6 第五环 · 结果验证</h3>
+<p class="animate-on-scroll">系统采用双通道验证机制：LLM 自我评估和用户反馈。两个通道独立工作，各自产生学习信号。</p>
+
+<div class="verify-flow animate-on-scroll">
+  <div class="verify-col" style="border-top:3px solid var(--indigo)">
+    <h4 style="color:var(--indigo)">LLM 自评通道</h4>
+    <div class="verify-step"><span class="step-dot" style="background:var(--indigo)"></span>执行结果输出</div>
+    <div class="verify-step-arrow">&#8595;</div>
+    <div class="verify-step"><span class="step-dot" style="background:var(--cyan)"></span>评估器四维打分</div>
+    <div class="verify-step-arrow">&#8595;</div>
+    <div class="verify-step"><span class="step-dot" style="background:var(--emerald)"></span>自动更新技能熟练度</div>
+    <div class="verify-step-arrow">&#8595;</div>
+    <div class="verify-step"><span class="step-dot" style="background:var(--amber)"></span>生成执行记忆</div>
+  </div>
+  <div class="verify-col" style="border-top:3px solid var(--pink)">
+    <h4 style="color:var(--pink)">用户反馈通道</h4>
+    <div class="verify-step"><span class="step-dot" style="background:var(--pink)"></span>对话即时反馈</div>
+    <div class="verify-step-arrow">&#8595;</div>
+    <div class="verify-step"><span class="step-dot" style="background:var(--red)"></span>记录为即时记忆</div>
+    <div class="verify-step-arrow" style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--divider)">&#8595;</div>
+    <div class="verify-step"><span class="step-dot" style="background:var(--amber)"></span>工作流完成后聚合反馈</div>
+    <div class="verify-step-arrow">&#8595;</div>
+    <div class="verify-step"><span class="step-dot" style="background:var(--emerald)"></span>提取学习模式</div>
+  </div>
+</div>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 场景示例</div>
+  小文的微信公众号稿件经 LLM 自评得到 87 分（结构85 + 深度90 + 原创88 + 可读85），熟练度从 88 提升到 91。用户在收到三平台稿件后反馈：「微信版很好，抖音文案太长了，微博语气不够活泼」——系统分别记录正面和负面反馈，作为下次执行的记忆参考。
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-7">4.7 第六环 · 学习引擎</h3>
+<p class="animate-on-scroll">学习引擎是闭环的「最后一公里」，负责将验证阶段的信号转化为持久化的系统进化。它有两条学习路径：</p>
+<p class="animate-on-scroll"><strong>即时记忆路径：</strong>每次对话或任务执行后，系统自动提取关键信息生成记忆条目（如用户偏好、有效方法、失败教训），存入员工的记忆系统。下次 Agent Assembly 时，这些记忆会被检索并注入 L6 层。</p>
+<p class="animate-on-scroll"><strong>聚合学习路径：</strong>工作流完成后，学习引擎会汇总所有步骤的执行数据和用户反馈，提取可复用的模式（<code>learnedPatterns</code>）。这些模式会影响 Leader 未来的任务分配决策。</p>
+
+<div class="scenario animate-on-scroll">
+  <div class="scenario-label">&#128204; 场景示例</div>
+  即时记忆生成：「用户 zhuyu 对抖音文案的偏好是短小精悍，300字以内，开头3秒抓眼球」。聚合学习提取：「AI+教育 类选题，最优路径为 小雷热点→小策规划→小文写作，三平台并行适配效率最高，微信稿件满意度最高」。这些都成为系统下次处理类似需求时的决策依据。
+</div>
+
+<hr class="section-sep">
+
+<h3 class="section-title" id="s4-8">4.8 飞轮效应</h3>
+<p class="animate-on-scroll">认知进化闭环不是线性的一次性过程，而是一个持续加速的飞轮：</p>
+
+<div class="layer-desc animate-on-scroll">
+  <div class="layer-desc-item">
+    <strong>第一圈</strong>
+    <p>系统按默认配置执行，输出质量中等，积累第一批执行数据和用户反馈。</p>
+  </div>
+  <div class="layer-desc-item">
+    <strong>第二圈</strong>
+    <p>记忆系统开始起效——AI 员工「记住」了用户偏好和有效方法，输出更贴合需求。</p>
+  </div>
+  <div class="layer-desc-item">
+    <strong>第三圈</strong>
+    <p>技能熟练度分化——擅长的技能越来越强，Leader 的分配决策越来越精准。</p>
+  </div>
+  <div class="layer-desc-item">
+    <strong>第 N 圈</strong>
+    <p>系统形成了组织级的「AI 团队默契」——每个 AI 员工都深度理解自己的角色定位、用户期望和最佳实践。</p>
+  </div>
+</div>
+
+<div class="callout animate-on-scroll">
+  <span class="callout-label">&#128273; 与传统 AI 应用的根本区别：</span>传统 AI 应用是无状态的——每次调用都是全新开始，效果永远不变。Vibe Media 是有状态、持续进化的——使用越多，效果越好，这是一个正向复利过程。
+</div>
+
+<!-- ============================================================ -->
+<!-- Chapter 5 -->
+<!-- ============================================================ -->
+<h2 class="chapter-title" id="ch5">第五章 · 技术实现要点</h2>
+
+<p class="animate-on-scroll">系统基于以下核心技术栈构建，每个选择都有明确的架构理由：</p>
+
+<div class="tech-grid animate-on-scroll">
+  <div class="tech-card">
+    <div class="tech-category">框架</div>
+    <div class="tech-name">Next.js 16</div>
+    <div class="tech-reason">App Router + Server Components，SSR/SSG 灵活切换，API Routes 内聚</div>
+  </div>
+  <div class="tech-card">
+    <div class="tech-category">数据库</div>
+    <div class="tech-name">Supabase PostgreSQL</div>
+    <div class="tech-reason">145+ 表的关系模型，多租户隔离，支持自托管部署</div>
+  </div>
+  <div class="tech-card">
+    <div class="tech-category">ORM</div>
+    <div class="tech-name">Drizzle ORM</div>
+    <div class="tech-reason">类型安全 SQL 构建器，零运行时开销，Schema 即文档</div>
+  </div>
+  <div class="tech-card">
+    <div class="tech-category">AI 集成</div>
+    <div class="tech-name">AI SDK v6</div>
+    <div class="tech-reason">Vercel 官方 AI 框架，Tool Calling + Streaming，多 Provider 支持</div>
+  </div>
+  <div class="tech-card">
+    <div class="tech-category">向量嵌入</div>
+    <div class="tech-name">Jina Embeddings</div>
+    <div class="tech-reason">1024 维向量，中文语义理解优秀，批量处理 + 重试机制</div>
+  </div>
+  <div class="tech-card">
+    <div class="tech-category">事件调度</div>
+    <div class="tech-name">Inngest</div>
+    <div class="tech-reason">事件驱动工作流，自动重试，DAG 依赖管理，可观测性</div>
+  </div>
+  <div class="tech-card">
+    <div class="tech-category">搜索引擎</div>
+    <div class="tech-name">Tavily / 博查</div>
+    <div class="tech-reason">双通道搜索（海外+国内），按需切换，AI 优化的搜索结果</div>
+  </div>
+</div>
+
+<p class="animate-on-scroll" style="margin-top:24px"><strong>模块实现状态</strong></p>
+
+<div class="table-wrap animate-on-scroll">
+<table>
+  <thead>
+    <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>四层分层架构</td><td><span class="status-done">&#10003; 已完成</span></td><td>路由、DAL、Agent、基础设施分层清晰</td></tr>
+    <tr><td>AI 员工系统（8 名员工）</td><td><span class="status-done">&#10003; 已完成</span></td><td>身份、技能、知识库、记忆全链路打通</td></tr>
+    <tr><td>技能系统 + 熟练度</td><td><span class="status-done">&#10003; 已完成</span></td><td>技能注册、绑定、熟练度自动更新</td></tr>
+    <tr><td>知识库 RAG 全链路</td><td><span class="status-done">&#10003; 已完成</span></td><td>三通道入库、分块、向量化、检索</td></tr>
+    <tr><td>7层提示词引擎</td><td><span class="status-done">&#10003; 已完成</span></td><td>Agent Assembly 管道完整运行</td></tr>
+    <tr><td>意图识别引擎</td><td><span class="status-done">&#10003; 已完成</span></td><td>5 种意图类型，AI 驱动路由</td></tr>
+    <tr><td>工作流 DAG 引擎</td><td><span class="status-done">&#10003; 已完成</span></td><td>Leader 分配、并行执行、依赖管理</td></tr>
+    <tr><td>记忆系统</td><td><span class="status-done">&#10003; 已完成</span></td><td>执行记忆 + 对话记忆，Top-10 检索</td></tr>
+    <tr><td>自我评估 + VerifyLearner</td><td><span class="status-done">&#10003; 已完成</span></td><td>四维打分、记忆生成、熟练度更新</td></tr>
+    <tr><td>工作流模板统一</td><td><span class="status-done">&#10003; 已完成</span></td><td>workflow_templates 单一真相源</td></tr>
+    <tr><td>CMS 入库（华栖云对接）</td><td><span class="status-done">&#10003; 已完成</span></td><td>9 APP 栏目、自动入库、状态轮询</td></tr>
+    <tr><td>技能发现（自动推荐新技能）</td><td><span class="status-soon">&#128284; 规划中</span></td><td>基于执行模式分析，推荐缺失技能</td></tr>
+    <tr><td>跨组织学习模式共享</td><td><span class="status-soon">&#128284; 规划中</span></td><td>脱敏后的模式在组织间流转</td></tr>
+    <tr><td>聚合学习引擎</td><td><span class="status-soon">&#128284; 规划中</span></td><td>工作流级别的模式提取和复用</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<!-- Appendix -->
+<!-- ============================================================ -->
+<h2 class="chapter-title" id="appendix">附录 · 术语表</h2>
+
+<div class="table-wrap animate-on-scroll">
+<table>
+  <thead>
+    <tr><th>术语</th><th>解释</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Agent Assembly</strong></td><td>Agent 组装管道。将员工身份、技能、知识库、记忆、工具融合为完整的 AI 执行体。每次任务执行前动态组装。</td></tr>
+    <tr><td><strong>DAG</strong></td><td>有向无环图（Directed Acyclic Graph）。工作流中任务的依赖关系结构，确保正确的执行顺序和最大化并行。</td></tr>
+    <tr><td><strong>RAG</strong></td><td>检索增强生成（Retrieval-Augmented Generation）。在 LLM 调用前从知识库检索相关片段注入上下文，提高回答的准确性和领域相关性。</td></tr>
+    <tr><td><strong>Mission</strong></td><td>任务实例。由用户需求触发，关联一个工作流模板，包含多个按 DAG 编排的步骤。</td></tr>
+    <tr><td><strong>VerifyLearner</strong></td><td>验证学习器。在 AI 执行完成后进行四维质量评估（结构、深度、原创、可读），并将评估结果转化为记忆和熟练度更新。</td></tr>
+    <tr><td><strong>learnedPatterns</strong></td><td>已学习模式。系统从历史执行数据中提取的可复用决策规则，如「某类话题用某员工+技能组合效果最佳」。</td></tr>
+    <tr><td><strong>7层提示词</strong></td><td>Agent Assembly 输出的分层提示词结构。L1 身份→L2 技能→L3 工具→L4 合规→L5 知识→L6 记忆→L7 输出规范，从静态到高度动态。</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center; padding:48px 0 0; color:var(--text-muted); font-size:13px; border-top:1px solid var(--divider); margin-top:48px;">
+  Vibe Media 智媒体 &middot; 技术架构方案 &middot; 2026
+</div>
+
+</div>
+</div>
+
+<script>
+// ===== Theme Toggle =====
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+}
+
+// ===== Mobile Sidebar =====
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.querySelector('.sidebar-overlay').classList.toggle('open');
+}
+
+// ===== Scroll-spy for TOC =====
+(function() {
+  const tocItems = document.querySelectorAll('.toc-item');
+  const targets = [];
+
+  tocItems.forEach(item => {
+    const id = item.getAttribute('data-target');
+    const el = document.getElementById(id);
+    if (el) targets.push({ id, el, tocItem: item });
+  });
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        tocItems.forEach(i => i.classList.remove('active'));
+        const match = targets.find(t => t.el === entry.target);
+        if (match) match.tocItem.classList.add('active');
+      }
+    });
+  }, {
+    rootMargin: '-10% 0px -80% 0px',
+    threshold: 0
+  });
+
+  targets.forEach(t => observer.observe(t.el));
+})();
+
+// ===== Scroll Animations =====
+(function() {
+  const animElements = document.querySelectorAll('.animate-on-scroll');
+  const pipelineSteps = document.querySelectorAll('.pipeline-step');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+
+        // If this is the pipeline container, animate children with stagger
+        if (entry.target.classList.contains('pipeline')) {
+          const steps = entry.target.querySelectorAll('.pipeline-step');
+          steps.forEach((step, i) => {
+            setTimeout(() => step.classList.add('visible'), i * 150);
+          });
+        }
+
+        observer.unobserve(entry.target);
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  animElements.forEach(el => observer.observe(el));
+})();
+
+// ===== Close sidebar on link click (mobile) =====
+document.querySelectorAll('.toc-item a').forEach(a => {
+  a.addEventListener('click', () => {
+    if (window.innerWidth <= 900) {
+      document.getElementById('sidebar').classList.remove('open');
+      document.querySelector('.sidebar-overlay').classList.remove('open');
+    }
+  });
+});
+</script>
+</body>
+</html>

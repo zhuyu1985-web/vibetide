@@ -1,10 +1,12 @@
 // src/db/schema/research/reports.ts
 //
 // A5 Phase 1 — researchReports schema
+// 2026-05-13: researchTaskId 列 + research_task source_type 已下线
+// (/research/admin/tasks 整体废弃,采集任务统一到 Collection Hub);
+// 仅保留 advanced_search 报告路径。
 //
 // FK onDelete strategy:
 //   - organizationId  cascade   (multi-tenant standard: org 删 → report 级联删)
-//   - researchTaskId  set null  (任务删后保留报告，研究痕迹不丢)
 //   - parentReportId  cascade   (self-FK, 母版删 → 快照级联删)
 //   - generatedBy     set null  (用户离职后保留报告，仅丢审计署名)
 
@@ -19,7 +21,6 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { organizations, userProfiles } from "../users";
-import { researchTasks } from "./research-tasks";
 
 export const researchReports = pgTable(
   "research_reports",
@@ -29,11 +30,8 @@ export const researchReports = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" })
       .notNull(),
 
-    // 来源
-    sourceType: text("source_type").notNull(), // "research_task" | "advanced_search"
-    researchTaskId: uuid("research_task_id").references(() => researchTasks.id, {
-      onDelete: "set null",
-    }),
+    // 来源 — 目前仅有 advanced_search 一种(research_task 已于 2026-05-13 下线)
+    sourceType: text("source_type").notNull().default("advanced_search"),
     searchSnapshot: jsonb("search_snapshot").notNull(),
 
     // 元数据
@@ -72,33 +70,21 @@ export const researchReports = pgTable(
   },
   (t) => ({
     orgIdx: index("research_reports_org_idx").on(t.organizationId, t.createdAt),
-    taskIdx: index("research_reports_task_idx").on(t.researchTaskId),
     parentIdx: index("research_reports_parent_idx").on(t.parentReportId),
   }),
 );
 
 // === Discriminated union: searchSnapshot ===
-//
-// 反规范化任务/检索入参 → 任务被删后报告仍可重生（部分数据漂移已在 spec §3.2 处理）。
-// 注意：使用类型 import 引用 A4 高级检索的 condition / filter 类型，避免运行时循环依赖。
+// 仅保留 advanced_search 一种(2026-05-13 起 research_task 已废弃)。
+// 类型 import 引用 A4 高级检索的 condition / filter 类型，避免运行时循环依赖。
 
-export type ReportSearchSnapshot =
-  | {
-      kind: "research_task";
-      taskId: string;
-      timeRange: { start: string; end: string }; // ISO timestamps
-      topicIds: string[];
-      districtIds: string[];
-      mediaTiers: string[];
-      hitItemIds: string[]; // ≤ 500
-    }
-  | {
-      kind: "advanced_search";
-      conditions: import("@/app/(dashboard)/research/search-mode-types").AdvancedSearchCondition[];
-      sidebarFilter: import("@/app/(dashboard)/research/search-mode-types").SidebarFilter;
-      hitItemIds: string[]; // ≤ 500
-      capturedAt: string; // ISO timestamp
-    };
+export type ReportSearchSnapshot = {
+  kind: "advanced_search";
+  conditions: import("@/app/(dashboard)/research/search-mode-types").AdvancedSearchCondition[];
+  sidebarFilter: import("@/app/(dashboard)/research/search-mode-types").SidebarFilter;
+  hitItemIds: string[]; // ≤ 500
+  capturedAt: string; // ISO timestamp
+};
 
 // === aggregatesJson shape ===
 

@@ -1,4 +1,5 @@
 import { searchWeb, isSearchProviderConfigured } from "@/lib/search";
+import { DEFAULT_INCLUDE_DOMAINS, DEFAULT_EXCLUDE_DOMAINS } from "@/lib/search/types";
 
 /**
  * Web search tool — runs against the configured provider (SEARCH_PROVIDER env: bocha | tavily).
@@ -13,7 +14,12 @@ export async function webSearch(query: string, maxResults: number = 5) {
     };
   }
 
-  const { items, provider } = await searchWeb(query, { maxResults, topic: "news" });
+  const { items, provider } = await searchWeb(query, {
+    maxResults,
+    topic: "news",
+    includeDomains: DEFAULT_INCLUDE_DOMAINS,
+    excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
+  });
 
   return {
     query,

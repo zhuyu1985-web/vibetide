@@ -1,12 +1,14 @@
 import { z } from "zod";
 import type { SourceAdapter, RawItem } from "../types";
 import { searchWeb } from "@/lib/search";
+import { DEFAULT_EXCLUDE_DOMAINS } from "@/lib/search/types";
 
 const configSchema = z.object({
   keywords: z.array(z.string().min(1)).min(1, "至少一个关键词"),
   timeRange: z.enum(["1h", "24h", "7d", "30d", "all"]).default("7d"),
   includeDomains: z.array(z.string()).optional(),
-  maxResults: z.number().int().min(1).max(20).default(8),
+  excludeDomains: z.array(z.string()).optional(),
+  maxResults: z.number().int().min(1).max(20).default(20),
 });
 
 type TavilyConfig = z.infer<typeof configSchema>;
@@ -31,20 +33,23 @@ export const tavilyAdapter: SourceAdapter<TavilyConfig> = {
         { value: "all", label: "不限" },
       ],
     },
-    { key: "includeDomains", label: "限定站点(可选)", type: "multiselect", help: "如 xinhuanet.com" },
+    { key: "includeDomains", label: "限定站点(可选)", type: "multiselect", help: "如 xinhuanet.com,只抓这些站点;留空=全网" },
+    { key: "excludeDomains", label: "屏蔽站点(可选)", type: "multiselect", help: "追加屏蔽的站点;系统已默认屏蔽图片素材/模板/百科等垃圾源" },
     { key: "maxResults", label: "每关键词最大条数", type: "number", validation: { min: 1, max: 20 } },
   ],
 
   async execute({ config, log }) {
     const items: RawItem[] = [];
     const partialFailures: { message: string; meta?: Record<string, unknown> }[] = [];
+    const mergedExclude = [...(config.excludeDomains ?? []), ...DEFAULT_EXCLUDE_DOMAINS];
 
     for (const keyword of config.keywords) {
       try {
         const response = await searchWeb(keyword, {
           forceProvider: "tavily",
           timeRange: config.timeRange,
-          includeDomains: config.includeDomains,
+          includeDomains: config.includeDomains ?? [],
+          excludeDomains: mergedExclude,
           maxResults: config.maxResults,
         });
         for (const r of response.items) {

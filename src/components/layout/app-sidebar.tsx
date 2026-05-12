@@ -148,8 +148,6 @@ const NAV_ITEMS: NavItem[] = [
     label: "研究", href: "/research", icon: Compass,
     children: [
       { label: "检索工作台", href: "/research", icon: Telescope },
-      { label: "采集任务", href: "/research/admin/tasks", icon: FileText },
-      { label: "媒体源管理", href: "/research/admin/media-outlets", icon: Radio },
       { label: "主题词库", href: "/research/admin/topics", icon: BookMarked },
     ],
   },

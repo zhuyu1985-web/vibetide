@@ -78,6 +78,9 @@ export const runCollectionSource = inngest.createFunction(
             targetModules: source.targetModules,
             defaultCategory: source.defaultCategory,
             defaultTags: source.defaultTags,
+            outletId: source.outletId,
+            defaultOutletTier: source.defaultOutletTier,
+            defaultOutletRegion: source.defaultOutletRegion,
           },
         });
 

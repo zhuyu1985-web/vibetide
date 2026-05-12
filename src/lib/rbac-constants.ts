@@ -50,11 +50,9 @@ export const PERMISSIONS = {
   // Menu visibility — news research
   MENU_RESEARCH: "menu:research",
   // News research module
-  RESEARCH_TASK_CREATE: "research:task_create",
-  RESEARCH_TASK_VIEW_OWN: "research:task_view_own",
-  RESEARCH_TASK_VIEW_ORG: "research:task_view_org",
-  RESEARCH_TASK_EXPORT: "research:task_export",
-  RESEARCH_MEDIA_OUTLET_MANAGE: "research:media_outlet_manage",
+  // 2026-05-13: RESEARCH_TASK_* + RESEARCH_MEDIA_OUTLET_MANAGE 已下线
+  // (/research/admin/tasks + /research/admin/media-outlets 整体废弃,
+  //  采集任务和媒体源管理统一到 Collection Hub)
   RESEARCH_TOPIC_MANAGE: "research:topic_manage",
 } as const;
 
@@ -105,8 +103,6 @@ export const MENU_PERMISSION_MAP: Record<string, string | undefined> = {
   "/content-excellence": PERMISSIONS.MENU_CONTENT_EXCELLENCE,
   // News research
   "/research": PERMISSIONS.MENU_RESEARCH,
-  "/research/admin/tasks": PERMISSIONS.RESEARCH_TASK_CREATE,
-  "/research/admin/media-outlets": PERMISSIONS.RESEARCH_MEDIA_OUTLET_MANAGE,
   "/research/admin/topics": PERMISSIONS.RESEARCH_TOPIC_MANAGE,
 };
 
@@ -152,10 +148,6 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.CONTENT_WRITE,
       PERMISSIONS.ANALYTICS_READ,
       PERMISSIONS.AI_USE,
-      // News research (editor role can operate the module)
-      PERMISSIONS.RESEARCH_TASK_CREATE,
-      PERMISSIONS.RESEARCH_TASK_VIEW_OWN,
-      PERMISSIONS.RESEARCH_TASK_EXPORT,
       // Editor can see most menus
       ...ALL_MENU_PERMISSIONS,
     ],
@@ -261,11 +253,6 @@ export const PERMISSION_GROUPS = [
     label: "研究",
     permissions: [
       { key: PERMISSIONS.MENU_RESEARCH, label: "查看新闻研究模块" },
-      { key: PERMISSIONS.RESEARCH_TASK_CREATE, label: "创建研究任务" },
-      { key: PERMISSIONS.RESEARCH_TASK_VIEW_OWN, label: "查看自己的研究任务" },
-      { key: PERMISSIONS.RESEARCH_TASK_VIEW_ORG, label: "查看组织内所有研究任务" },
-      { key: PERMISSIONS.RESEARCH_TASK_EXPORT, label: "导出研究结果" },
-      { key: PERMISSIONS.RESEARCH_MEDIA_OUTLET_MANAGE, label: "管理媒体源" },
       { key: PERMISSIONS.RESEARCH_TOPIC_MANAGE, label: "管理主题词库" },
     ],
   },

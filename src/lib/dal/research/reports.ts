@@ -4,7 +4,6 @@
 //
 // Cross-org safety contract:
 //   - getReportById        → 用 (reportId, orgId) 双键过滤；mismatch 返 null（不抛）
-//   - listReportsByTask    → 用 (taskId, orgId) 双键过滤；其它 org 永远空数组
 //   - listSnapshotsByParent→ 用 (parentReportId, orgId) 双键过滤
 //   - listReportsByOrg     → 显式 orgId 过滤
 //   - deleteReport         → 用 (reportId, orgId) 双键过滤；其它 org delete 不会命中
@@ -26,8 +25,6 @@ export type ReportStatus = "pending" | "generating" | "ready" | "failed";
 /** 创建一份新报告（initial status=pending；Inngest 触发后转 generating）。 */
 export async function createReport(input: {
   organizationId: string;
-  sourceType: "research_task" | "advanced_search";
-  researchTaskId?: string;
   searchSnapshot: ReportSearchSnapshot;
   title: string;
   topicDescription?: string;
@@ -40,8 +37,7 @@ export async function createReport(input: {
     .insert(researchReports)
     .values({
       organizationId: input.organizationId,
-      sourceType: input.sourceType,
-      researchTaskId: input.researchTaskId,
+      sourceType: "advanced_search",
       searchSnapshot: input.searchSnapshot,
       title: input.title,
       topicDescription: input.topicDescription,
@@ -72,23 +68,6 @@ export async function getReportById(
     )
     .limit(1);
   return row ?? null;
-}
-
-/** 列出某任务下所有报告（含母版+快照），按创建时间降序。 */
-export async function listReportsByTask(
-  taskId: string,
-  orgId: string,
-): Promise<ResearchReportRow[]> {
-  return db
-    .select()
-    .from(researchReports)
-    .where(
-      and(
-        eq(researchReports.researchTaskId, taskId),
-        eq(researchReports.organizationId, orgId),
-      ),
-    )
-    .orderBy(desc(researchReports.createdAt));
 }
 
 /** 列出某 org 下最近 N 份报告（默认 50），按创建时间降序。 */

@@ -645,8 +645,10 @@ async function seed() {
 
   // 6.5 Seed media outlet dictionary (113 央/省/市/区县/行业 白名单)
   // 历史 bug：A1 Phase 1 (commit 852eca1) 时定义了 src/db/seed/media-outlet-dictionary
-  // 但漏接到 seed.ts，导致每次 fresh setup 后 media_outlet_dictionary 空，
-  // /research/admin/media-outlets 页面无数据。2026-05-08 修补到此处，幂等。
+  // 但漏接到 seed.ts，导致每次 fresh setup 后 media_outlet_dictionary 空,
+  // 媒体源列表无数据。2026-05-08 修补到此处，幂等。
+  // 媒体源管理统一到 Collection Hub (/data-collection/outlets),
+  // 原 /research/admin/media-outlets 已于 2026-05-13 下线。
   console.log("6.5 Seeding media outlet dictionary (113 white-listed outlets)...");
   try {
     const { seedMediaOutletDictionary } = await import("./seed/media-outlet-dictionary");

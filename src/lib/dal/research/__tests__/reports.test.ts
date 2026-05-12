@@ -10,7 +10,6 @@ import { organizations } from "@/db/schema/users";
 import {
   createReport,
   getReportById,
-  listReportsByTask,
   listSnapshotsByParent,
   updateReportStatus,
 } from "../reports";
@@ -50,7 +49,6 @@ describe("research-reports DAL", () => {
   it("createReport returns row with status=pending + id + createdAt", async () => {
     const row = await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "测试报告 — create",
     });
@@ -68,7 +66,6 @@ describe("research-reports DAL", () => {
   it("getReportById is cross-org safe (returns null on mismatch, row on match)", async () => {
     const row = await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "测试报告 — cross-org",
     });
@@ -82,44 +79,9 @@ describe("research-reports DAL", () => {
     expect(fromOwn!.organizationId).toBe(orgA);
   });
 
-  it("listReportsByTask filters by taskId scoped to org (desc by createdAt)", async () => {
-    // taskId 用一个固定 UUID（不需要真实 task row，因为 onDelete=set null
-    // 表示 FK 允许悬空；插入时 task 不存在会被 FK 拒绝。所以这里改用 null 测试
-    // 即：不带 taskId 时 listReportsByTask 不应命中）
-    const fakeTaskId = "00000000-0000-0000-0000-000000000000";
-
-    // 同 org 但不同（不存在）的 task → 应空
-    const empty = await listReportsByTask(fakeTaskId, orgA);
-    expect(empty).toEqual([]);
-
-    // 创建 2 个 advanced_search 来源（无 task） + 1 个其它 org → 都不应在 fakeTaskId 下命中
-    await createReport({
-      organizationId: orgA,
-      sourceType: "advanced_search",
-      searchSnapshot: advancedSnapshot,
-      title: "无 task A1",
-    });
-    await createReport({
-      organizationId: orgA,
-      sourceType: "advanced_search",
-      searchSnapshot: advancedSnapshot,
-      title: "无 task A2",
-    });
-    await createReport({
-      organizationId: orgB,
-      sourceType: "advanced_search",
-      searchSnapshot: advancedSnapshot,
-      title: "无 task B1",
-    });
-
-    const stillEmpty = await listReportsByTask(fakeTaskId, orgA);
-    expect(stillEmpty).toEqual([]);
-  });
-
   it("listSnapshotsByParent only returns rows with matching parentReportId in same org", async () => {
     const parent = await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "母版",
     });
@@ -128,7 +90,6 @@ describe("research-reports DAL", () => {
     await new Promise((r) => setTimeout(r, 5));
     const snap1 = await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "snap-1",
       parentReportId: parent.id,
@@ -138,7 +99,6 @@ describe("research-reports DAL", () => {
     await new Promise((r) => setTimeout(r, 5));
     const snap2 = await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "snap-2",
       parentReportId: parent.id,
@@ -149,7 +109,6 @@ describe("research-reports DAL", () => {
     // 另一份 org A 报告（不挂 parent）— 不应被列出
     await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "无关报告",
     });
@@ -171,7 +130,6 @@ describe("research-reports DAL", () => {
   it("updateReportStatus updates status + currentStep + timestamps; other fields untouched", async () => {
     const row = await createReport({
       organizationId: orgA,
-      sourceType: "advanced_search",
       searchSnapshot: advancedSnapshot,
       title: "状态机测试",
     });

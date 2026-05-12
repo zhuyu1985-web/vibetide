@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -230,9 +230,12 @@ export function MissionsClient({
   const hasActive = missions.some((m) =>
     ["queued", "planning", "executing", "consolidating"].includes(m.status)
   );
+  const [, startRefreshTransition] = useTransition();
   useEffect(() => {
     if (!hasActive) return;
-    const t = setInterval(() => router.refresh(), 5000);
+    const t = setInterval(() => {
+      startRefreshTransition(() => { router.refresh(); });
+    }, 5000);
     return () => clearInterval(t);
   }, [hasActive, router]);
 

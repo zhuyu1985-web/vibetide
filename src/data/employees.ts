@@ -3,6 +3,7 @@ import type { AIEmployee } from "@/lib/types";
 export const employees: AIEmployee[] = [
   {
     id: "xiaolei",
+    isPreset: true,
     dbId: "mock-xiaolei",
     name: "热点猎手",
     nickname: "小雷",
@@ -19,6 +20,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaoce",
+    isPreset: true,
     dbId: "mock-xiaoce",
     name: "选题策划师",
     nickname: "小策",
@@ -35,6 +37,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaozi",
+    isPreset: true,
     dbId: "mock-xiaozi",
     name: "素材管家",
     nickname: "小资",
@@ -51,6 +54,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaowen",
+    isPreset: true,
     dbId: "mock-xiaowen",
     name: "内容创作师",
     nickname: "小文",
@@ -67,6 +71,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaojian",
+    isPreset: true,
     dbId: "mock-xiaojian",
     name: "视频制片人",
     nickname: "小剪",
@@ -82,6 +87,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaoshen",
+    isPreset: true,
     dbId: "mock-xiaoshen",
     name: "质量审核官",
     nickname: "小审",
@@ -98,6 +104,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaofa",
+    isPreset: true,
     dbId: "mock-xiaofa",
     name: "渠道运营师",
     nickname: "小发",
@@ -113,6 +120,7 @@ export const employees: AIEmployee[] = [
   },
   {
     id: "xiaoshu",
+    isPreset: true,
     dbId: "mock-xiaoshu",
     name: "数据分析师",
     nickname: "小数",

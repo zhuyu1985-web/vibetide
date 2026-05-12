@@ -3,7 +3,6 @@ import {
   type SearchOptions,
   type SearchProvider,
   type SearchResult,
-  DEFAULT_INCLUDE_DOMAINS,
   inferCredibility,
   inferSourceType,
   parseDate,
@@ -47,8 +46,13 @@ export const tavilyProvider: SearchProvider = {
         search_depth: "advanced",
         include_answer: true,
         max_results: Math.min(options.maxResults ?? 8, 20),
-        include_domains: options.includeDomains ?? DEFAULT_INCLUDE_DOMAINS,
       };
+      if (options.includeDomains && options.includeDomains.length > 0) {
+        body.include_domains = options.includeDomains;
+      }
+      if (options.excludeDomains && options.excludeDomains.length > 0) {
+        body.exclude_domains = options.excludeDomains;
+      }
 
       if (options.topic) {
         body.topic = options.topic;

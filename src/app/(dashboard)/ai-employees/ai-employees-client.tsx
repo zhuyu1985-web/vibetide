@@ -68,9 +68,12 @@ export function AiEmployeesClient({
       );
     }
 
+    // 分组判定改为读 DB 的 is_preset 字段（AIEmployee.isPreset），不再靠
+    // slug 前缀 custom_ 猜。这样把任意员工标记为自定义（UPDATE is_preset=0）
+    // 都能立即在 UI 上正确归类，不需要重命名 slug 破坏外键。
     return {
-      presetEmployees: result.filter((e) => !String(e.id).startsWith("custom_")),
-      customEmployees: result.filter((e) => String(e.id).startsWith("custom_")),
+      presetEmployees: result.filter((e) => e.isPreset),
+      customEmployees: result.filter((e) => !e.isPreset),
     };
   }, [employees, statusFilter, searchText]);
 

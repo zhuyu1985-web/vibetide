@@ -14,6 +14,8 @@ export interface AIEmployee {
   status: EmployeeStatus;
   currentTask?: string;
   skills: Skill[];
+  /** DB ai_employees.is_preset 字段：true=系统预设，false=自定义（含运营标记的"伪预设"） */
+  isPreset: boolean;
   stats: {
     tasksCompleted: number;
     accuracy: number;

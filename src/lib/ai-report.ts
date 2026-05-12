@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { searchWeb } from "@/lib/search";
+import { DEFAULT_INCLUDE_DOMAINS, DEFAULT_EXCLUDE_DOMAINS } from "@/lib/search/types";
 import { generateText } from "ai";
 import { resolveModelConfig, getLanguageModel } from "@/lib/agent/model-router";
 import type { BenchmarkAISummary } from "@/lib/types";
@@ -20,6 +21,8 @@ export async function generateTopicAIReport(
   const { items } = await searchWeb(topicTitle, {
     maxResults: options?.maxResults ?? 15,
     topic: "news",
+    includeDomains: DEFAULT_INCLUDE_DOMAINS,
+    excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
   });
 
   if (items.length === 0) {

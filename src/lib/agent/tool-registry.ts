@@ -14,6 +14,7 @@ import {
   type SourceType,
 } from "@/lib/web-fetch";
 import { searchWeb, isSearchProviderConfigured, getActiveSearchProvider } from "@/lib/search";
+import { DEFAULT_INCLUDE_DOMAINS, DEFAULT_EXCLUDE_DOMAINS } from "@/lib/search/types";
 import { ilike, sql } from "drizzle-orm";
 import type { AgentTool } from "./types";
 import { decrypt } from "@/lib/crypto";
@@ -411,6 +412,8 @@ function createToolDefinitions(): ToolSet {
               timeRange,
               maxResults: limitedResults,
               topic,
+              includeDomains: DEFAULT_INCLUDE_DOMAINS,
+              excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
             });
             fetchedItems = searchResult.items;
             tavilyAnswer = searchResult.answer;
@@ -468,7 +471,9 @@ function createToolDefinitions(): ToolSet {
             sourceCount: new Set(results.map((item) => item.source)).size,
             timeRange,
             sourceFilters: sources ?? [],
-            channel: process.env.TAVILY_API_KEY ? "tavily" : "rss",
+            channel: fetchedItems.length > 0 && isSearchProviderConfigured()
+              ? getActiveSearchProvider()
+              : "rss",
           },
           results,
           hotTopics,
@@ -603,7 +608,10 @@ function createToolDefinitions(): ToolSet {
           };
         }
 
-        const crossPlatformTopics = mode === "hot" ? buildCrossPlatformTopics(items) : [];
+        // buildCrossPlatformTopics 内部已 filter platforms.size>=2，单平台
+        // 自然返回空数组，所以 platforms 模式（用户拉多平台时）也跑一遍
+        // 是安全的，能展现"跨平台共振"价值；之前只让 mode=hot 跑是过度保守。
+        const crossPlatformTopics = buildCrossPlatformTopics(items);
         const activePlatforms = Array.from(new Set(items.map((i) => i.platform)));
 
         return {
@@ -654,6 +662,8 @@ function createToolDefinitions(): ToolSet {
           timeRange,
           maxResults: Math.min(maxResults, 20),
           topic,
+          includeDomains: DEFAULT_INCLUDE_DOMAINS,
+          excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
         });
         // 字段命名沿用 web_search 的 `results` —— 下游 mission-executor
         // 统一按 `results` 检测 0 / 稀疏结果并注入强约束警示。
@@ -696,7 +706,13 @@ function createToolDefinitions(): ToolSet {
         const activeProvider = getActiveSearchProvider();
         const [searchRes, trendingRes] = await Promise.allSettled([
           isSearchProviderConfigured()
-            ? searchWeb(q, { timeRange, maxResults: 8, topic: "news" })
+            ? searchWeb(q, {
+                timeRange,
+                maxResults: 8,
+                topic: "news",
+                includeDomains: DEFAULT_INCLUDE_DOMAINS,
+                excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
+              })
             : Promise.reject(new Error(`${activeProvider.toUpperCase()}_API_KEY 未配置`)),
           process.env.TRENDING_API_KEY
             ? fetchTrendingFromApi("search", { query: q, limit: 20 })
@@ -829,7 +845,13 @@ function createToolDefinitions(): ToolSet {
         const activeProvider = getActiveSearchProvider();
         const [newsRes, trendingRes] = await Promise.allSettled([
           isSearchProviderConfigured()
-            ? searchWeb(q, { timeRange, maxResults: 20, topic: "news" })
+            ? searchWeb(q, {
+                timeRange,
+                maxResults: 20,
+                topic: "news",
+                includeDomains: DEFAULT_INCLUDE_DOMAINS,
+                excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
+              })
             : Promise.reject(new Error(`${activeProvider.toUpperCase()}_API_KEY 未配置`)),
           process.env.TRENDING_API_KEY
             ? fetchTrendingFromApi("search", { query: q, limit: 30 })

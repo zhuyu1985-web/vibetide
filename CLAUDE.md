@@ -28,18 +28,32 @@ Vibetide (Vibe Media) is a Chinese-language AI-powered content management platfo
 ## Commands
 
 ```bash
-npm run dev          # Start Next.js dev server (localhost:3000)
+npm run dev          # Start Next.js dev server (binds 0.0.0.0:3000)
 npm run build        # Production build
 npm run lint         # ESLint
 npx tsc --noEmit     # Type check (no emit)
 
+# Tests (Vitest)
+npm run test                           # Run all tests once
+npm run test:watch                     # Watch mode
+npm run test:coverage                  # With coverage
+npx vitest run path/to/file.test.ts    # Run a single test file
+npx vitest run -t "test name pattern"  # Filter by test name
+
 # Database (requires DATABASE_URL in .env.local)
-npm run db:push      # Push Drizzle schema to Supabase (dev)
-npm run db:generate  # Generate SQL migration files
-npm run db:migrate   # Apply migrations
-npm run db:studio    # Open Drizzle Studio (visual DB browser)
-npm run db:seed      # Seed database (npx tsx src/db/seed.ts)
+npm run db:push                  # Push Drizzle schema to Supabase (dev)
+npm run db:generate              # Generate SQL migration files
+npm run db:migrate               # Apply migrations
+npm run db:studio                # Open Drizzle Studio (visual DB browser)
+npm run db:seed                  # Seed database (src/db/seed.ts)
+npm run db:seed:research         # Seed research module data
+npm run db:seed:mock-articles    # Seed mock research articles
+npm run db:cleanup-empty-workflows   # Remove empty workflow templates
+npm run db:cleanup-workflow-dupes    # Dedupe workflow templates
+npm run db:cleanup-skill-dupes       # Dedupe legacy skill rows
 ```
+
+**Pre-commit hooks:** husky + lint-staged run `eslint --fix` on staged `src/**/*.{ts,tsx}` (installed automatically via the `prepare` script on `npm install`).
 
 ## Tech Stack
 

@@ -8,7 +8,7 @@ category: data_collection
 metadata:
   skill_kind: data_collection
   scenario_tags: [hot-topic, research, fact-check, competitor]
-  compatibleEmployees: [xiaolei, xiaoce, xiaowen, xiaoshen, xiaozi]
+  compatibleEmployees: [xiaolei, xiaoce, xiaowen, xiaoshen, xiaozi, xiaoyan]
   modelDependency: none
   requires:
     env: [SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY]

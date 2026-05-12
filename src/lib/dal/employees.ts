@@ -64,6 +64,7 @@ export async function getEmployees(): Promise<AIEmployee[]> {
       motto: emp.motto || "",
       status: emp.status,
       currentTask: emp.currentTask || undefined,
+      isPreset: emp.isPreset === 1,
       skills: empSkills.map((s) => ({
         id: s.id,
         name: s.name,
@@ -120,6 +121,7 @@ export async function getEmployee(
     motto: emp.motto || "",
     status: emp.status,
     currentTask: emp.currentTask || undefined,
+    isPreset: emp.isPreset === 1,
     skills: empSkills.map((s) => ({
       id: s.id,
       name: s.name,

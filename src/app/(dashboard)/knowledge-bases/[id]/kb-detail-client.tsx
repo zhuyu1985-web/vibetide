@@ -96,9 +96,12 @@ export function KBDetailClient({ kb, initialItems, bindings, syncLogs }: Props) 
   const chunkCount = kb.chunkCount;
 
   // Poll status while processing/pending — just refresh the server component, no local setState
+  const [, startRefreshTransition] = useTransition();
   useEffect(() => {
     if (currentStatus !== "processing" && currentStatus !== "pending") return;
-    const interval = setInterval(() => router.refresh(), 5000);
+    const interval = setInterval(() => {
+      startRefreshTransition(() => { router.refresh(); });
+    }, 5000);
     return () => clearInterval(interval);
   }, [currentStatus, router]);
 

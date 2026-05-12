@@ -8,7 +8,7 @@ category: data_collection
 metadata:
   skill_kind: data_collection
   scenario_tags: [news, daily-brief, research, policy]
-  compatibleEmployees: [xiaolei, xiaoce, xiaoshu, xiaozi]
+  compatibleEmployees: [xiaolei, xiaoce, xiaoshu, xiaozi, xiaoyan]
   modelDependency: deepseek:deepseek-chat
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY]

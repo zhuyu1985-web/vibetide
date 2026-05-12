@@ -8,7 +8,7 @@ category: data_collection
 metadata:
   skill_kind: data_collection
   scenario_tags: [hot-topic, deep-read, research, fact-check]
-  compatibleEmployees: [xiaolei, xiaoce, xiaowen, xiaoshen]
+  compatibleEmployees: [xiaolei, xiaoce, xiaowen, xiaoshen, xiaoyan]
   modelDependency: none
   requires:
     env: [JINA_API_KEY]

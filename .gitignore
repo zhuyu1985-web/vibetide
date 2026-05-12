@@ -38,6 +38,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# db backups (本地全量/增量 SQL dump,体积大,不入 git)
+# scripts/db-export-full.sh 自动写到 backups/
+backups/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

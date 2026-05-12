@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutGrid, Table2, FileText } from "lucide-react";
+import { LayoutGrid, Table2, FileText, Loader2 } from "lucide-react";
 import { formatRelativeTime, formatAbsoluteTime } from "@/lib/format";
 import { EmptyState } from "@/components/shared/empty-state";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
@@ -18,9 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, SOURCE_TYPE_COLOR, type OutletTier } from "@/lib/collection/constants";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, SOURCE_TYPE_COLOR, formatChannelLabel, type OutletTier } from "@/lib/collection/constants";
 import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
+import { loadCollectedItemsAction, type LoadCollectedItemsFilters } from "@/app/actions/collection-items";
 import { ItemDetailDrawer } from "./item-detail-drawer";
+
+const PAGE_SIZE = 50;
+
+function timeWindowToSinceMs(tw: TimeWindow | undefined): number | undefined {
+  if (tw === "all") return undefined;
+  const hours = tw === "24h" ? 24 : tw === "30d" ? 30 * 24 : 7 * 24;
+  return Date.now() - hours * 60 * 60 * 1000;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,8 +106,8 @@ const ENRICHMENT_OPTIONS: { value: EnrichmentStatus | "__all__"; label: string }
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ContentClient({
-  items,
-  total,
+  items: initialItems,
+  total: initialTotal,
   adapterMetas,
   outlets,
   initialFilters,
@@ -106,6 +115,85 @@ export function ContentClient({
 }: ContentClientProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // ── 数据 state — 支持无限滚动追加 ────────────────────────────────────────────
+  const [items, setItems] = useState<CollectedItemViewModel[]>(initialItems);
+  const [total, setTotal] = useState(initialTotal);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // 当 props 变化（URL 筛选触发的 server re-render）时,重置分页 state。
+  useEffect(() => {
+    setItems(initialItems);
+    setTotal(initialTotal);
+    setLoadError(null);
+    setLoadingMore(false);
+  }, [initialItems, initialTotal]);
+
+  // 用 ref 缓存最新 items,避免 loadMore 被频繁重建
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  const filtersForAction = useMemo<LoadCollectedItemsFilters>(
+    () => ({
+      sourceType: initialFilters.sourceType,
+      targetModule: initialFilters.module,
+      sinceMs: timeWindowToSinceMs(initialFilters.time),
+      searchText: initialFilters.q,
+      enrichmentStatus: initialFilters.enrichment,
+      platformAlias: initialFilters.platform,
+      outletTier: initialFilters.outletTier,
+      outletRegion: initialFilters.outletRegion,
+    }),
+    [initialFilters],
+  );
+
+  const hasMore = items.length < total;
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    const currentLen = itemsRef.current.length;
+    if (currentLen >= total) return;
+    setLoadingMore(true);
+    setLoadError(null);
+    try {
+      const result = await loadCollectedItemsAction(filtersForAction, currentLen, PAGE_SIZE);
+      setItems((prev) => {
+        // 去重: server 端如有并发写入新数据,offset 可能错位
+        const seen = new Set(prev.map((it) => it.id));
+        const fresh = result.items.filter((it) => !seen.has(it.id));
+        return [...prev, ...fresh];
+      });
+      setTotal(result.total);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "加载失败,请重试");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, total, filtersForAction]);
+
+  // IntersectionObserver — sentinel 进入视口时加载下一页
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadMore]);
+
+  // 序号映射 — 用 Map 避免 render 内 O(n) 查找
+  const seqOfId = useMemo(
+    () => new Map(items.map((it, i) => [it.id, i + 1])),
+    [items],
+  );
 
   // ── Search (debounced) ──────────────────────────────────────────────────────
   const [searchValue, setSearchValue] = useState(initialFilters.q ?? "");
@@ -343,17 +431,24 @@ export function ContentClient({
 
       {/* Total count */}
       {total > 0 && (
-        <p className="text-xs text-muted-foreground">共 {total} 条记录</p>
+        <p className="text-xs text-muted-foreground">
+          已加载 {items.length} / {total} 条
+        </p>
       )}
 
       {/* Card view */}
       {initialView === "card" && items.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {items.map((item) => {
-            const sourcePart = item.firstSeenChannel.includes("/")
-              ? item.firstSeenChannel.split("/", 2)
-              : [item.firstSeenChannel, ""];
-            const channelCount = Array.isArray(item.sourceChannels) ? item.sourceChannels.length : 1;
+            const uniqueChannelLabels = Array.from(
+              new Set(
+                (item.sourceChannels?.length
+                  ? item.sourceChannels.map((c) => c.channel)
+                  : [item.firstSeenChannel]
+                ).map(formatChannelLabel),
+              ),
+            );
+            const channelCount = item.sourceChannels?.length ?? 1;
             return (
               <button
                 key={item.id}
@@ -363,13 +458,18 @@ export function ContentClient({
               >
                 {/* Source + time row */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 text-[10px]">
-                      {sourcePart[0]}
-                    </span>
-                    {sourcePart[1] && (
-                      <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                        {sourcePart[1]}
+                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    {uniqueChannelLabels.slice(0, 3).map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 text-[10px]"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                    {uniqueChannelLabels.length > 3 && (
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                        +{uniqueChannelLabels.length - 3}
                       </span>
                     )}
                     {channelCount > 1 && (
@@ -435,6 +535,17 @@ export function ContentClient({
           rowKey={(item) => item.id}
           onRowClick={(item) => setDetailItemId(item.id)}
           columns={[
+            {
+              key: "_seq",
+              header: "序号",
+              width: "w-14",
+              align: "center",
+              render: (item) => (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {seqOfId.get(item.id)}
+                </span>
+              ),
+            },
             {
               key: "title",
               header: "标题",
@@ -505,16 +616,31 @@ export function ContentClient({
             {
               key: "channels",
               header: "渠道",
-              width: "w-14",
-              align: "center",
+              width: "w-40",
               render: (item) => {
-                const channels = Array.isArray(item.sourceChannels)
-                  ? item.sourceChannels.length
-                  : 1;
+                const rawChannels = item.sourceChannels?.length
+                  ? item.sourceChannels.map((c) => c.channel)
+                  : [item.firstSeenChannel];
+                const labels = Array.from(new Set(rawChannels.map(formatChannelLabel)));
+                const visible = labels.slice(0, 2);
+                const rest = labels.length - visible.length;
                 return (
-                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs">
-                    {channels}
-                  </span>
+                  <div
+                    className="flex flex-wrap items-center gap-1"
+                    title={labels.join("、")}
+                  >
+                    {visible.map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 text-[11px]"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                    {rest > 0 && (
+                      <span className="text-[11px] text-muted-foreground">+{rest}</span>
+                    )}
+                  </div>
                 );
               },
             },
@@ -547,6 +673,34 @@ export function ContentClient({
             description="当前筛选条件下没有找到内容。可以清空筛选,或到源管理页触发一次采集。"
           />
         </GlassCard>
+      )}
+
+      {/* 无限滚动 sentinel + 加载状态 */}
+      {items.length > 0 && (
+        <div ref={sentinelRef} className="flex flex-col items-center gap-2 py-4">
+          {loadingMore && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              加载中…
+            </div>
+          )}
+          {!loadingMore && loadError && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-red-500">{loadError}</span>
+              <Button variant="ghost" size="sm" onClick={loadMore}>
+                重试
+              </Button>
+            </div>
+          )}
+          {!loadingMore && !loadError && hasMore && (
+            <Button variant="ghost" size="sm" onClick={loadMore}>
+              加载更多
+            </Button>
+          )}
+          {!hasMore && !loadingMore && !loadError && (
+            <span className="text-xs text-muted-foreground">已加载全部 {total} 条</span>
+          )}
+        </div>
       )}
 
       {/* Detail drawer */}

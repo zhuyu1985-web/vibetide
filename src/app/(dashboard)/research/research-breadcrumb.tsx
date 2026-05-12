@@ -20,28 +20,8 @@ function resolveCrumbs(pathname: string): Crumb[] | null {
 
   if (pathname === "/research") return null;
 
-  if (pathname === "/research/admin/media-outlets") {
-    return [root, { label: "媒体源管理" }];
-  }
   if (pathname === "/research/admin/topics") {
     return [root, { label: "主题词库" }];
-  }
-  if (pathname === "/research/admin/tasks") {
-    return [root, { label: "数据采集任务" }];
-  }
-  if (pathname === "/research/admin/tasks/new") {
-    return [
-      root,
-      { label: "数据采集任务", href: "/research/admin/tasks" },
-      { label: "新建任务" },
-    ];
-  }
-  if (/^\/research\/admin\/tasks\/[^/]+$/.test(pathname)) {
-    return [
-      root,
-      { label: "数据采集任务", href: "/research/admin/tasks" },
-      { label: "任务详情" },
-    ];
   }
   return [root, { label: "详情" }];
 }

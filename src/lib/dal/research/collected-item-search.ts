@@ -6,6 +6,7 @@ import {
   researchCollectedItemDistricts,
 } from "@/db/schema/research/annotations";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
+import { getChannelMatchers } from "@/lib/collection/constants";
 import type {
   AdvancedSearchCondition,
   SidebarFilter,
@@ -24,6 +25,13 @@ export interface CollectedItemSearchFilter {
   contentKeyword?: string;
   /** 限定 firstSeenSourceId ∈ sourceIds (取代历史的 research_news_articles 双写方案) */
   sourceIds?: string[];
+  /**
+   * 按可读渠道 label 过滤(微博 / 抖音 / 微信公众号 / 视频号 / 小红书 / 知乎 /
+   * 快手 / 网站 / 热榜 / 搜索)。多 label 之间取并集(OR)。
+   * 实际 SQL 由 getChannelMatchers 展开成 firstSeenChannel 的 exact + prefix
+   * ILIKE 组合。
+   */
+  channelLabels?: string[];
 }
 
 export interface CollectedItemWithAnnotations {
@@ -37,6 +45,27 @@ export interface CollectedItemWithAnnotations {
   publishedAt: Date | null;
   contentType: string;
   url: string | null;
+  /** 首次采集到的渠道 slug,例如 tikhub_weibo / tophub/微博 / rss/host.com */
+  firstSeenChannel: string;
+  /** 全部命中此 item 的渠道列表(去重前的原始 jsonb,与 collectedItems.sourceChannels schema 对齐) */
+  sourceChannels: Array<{
+    channel: string;
+    url?: string;
+    sourceId: string;
+    runId: string;
+    capturedAt: string;
+  }>;
+}
+
+function buildChannelLabelExpr(labels: string[] | undefined): SQL | undefined {
+  if (!labels?.length) return undefined;
+  const m = getChannelMatchers(labels);
+  const parts: SQL[] = [];
+  if (m.exact.length) parts.push(inArray(collectedItems.firstSeenChannel, m.exact));
+  for (const p of m.prefix) {
+    parts.push(ilike(collectedItems.firstSeenChannel, `${p}%`));
+  }
+  return parts.length ? or(...parts) : undefined;
 }
 
 export async function searchCollectedItemsForResearch(
@@ -81,6 +110,8 @@ export async function searchCollectedItemsForResearch(
   if (filter.sourceIds?.length) {
     conditions.push(inArray(collectedItems.firstSeenSourceId, filter.sourceIds));
   }
+  const channelExpr = buildChannelLabelExpr(filter.channelLabels);
+  if (channelExpr) conditions.push(channelExpr);
 
   // topic / district 过滤 — 用 EXISTS 子查询避免 leftJoin 引起重复行
   if (filter.topicIds?.length) {
@@ -122,6 +153,8 @@ export async function searchCollectedItemsForResearch(
       publishedAt: collectedItems.publishedAt,
       contentType: collectedItems.contentType,
       url: collectedItems.canonicalUrl,
+      firstSeenChannel: collectedItems.firstSeenChannel,
+      sourceChannels: collectedItems.sourceChannels,
     })
     .from(collectedItems)
     .leftJoin(
@@ -192,6 +225,8 @@ export async function advancedSearchCollectedItems(
       publishedAt: collectedItems.publishedAt,
       contentType: collectedItems.contentType,
       url: collectedItems.canonicalUrl,
+      firstSeenChannel: collectedItems.firstSeenChannel,
+      sourceChannels: collectedItems.sourceChannels,
     })
     .from(collectedItems)
     .leftJoin(

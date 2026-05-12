@@ -43,6 +43,34 @@ function extractDomain(url: string): string {
   }
 }
 
+/**
+ * 从用户消息中识别热榜平台关键词，返回 TopHub PLATFORM_ALIASES 能匹配的中文短名。
+ * resolveNodeIds 内部对大小写不敏感 + 双向 includes，所以传"抖音"/"douyin"/"抖音热搜"
+ * 任一形式都能命中节点；这里统一返回中文短名，便于日志可读。
+ */
+function detectTrendingPlatforms(message: string): string[] {
+  const lower = message.toLowerCase();
+  const triggers: Array<[string[], string]> = [
+    [["微博"], "微博"],
+    [["知乎"], "知乎"],
+    [["百度"], "百度"],
+    [["抖音"], "抖音"],
+    [["今日头条", "头条"], "头条"],
+    [["36氪", "36kr"], "36氪"],
+    [["哔哩哔哩", "b站", "bilibili", "哔哩"], "哔哩哔哩"],
+    [["小红书", "红书", "xiaohongshu"], "小红书"],
+    [["澎湃", "thepaper"], "澎湃"],
+    [["微信", "wechat"], "微信"],
+  ];
+  const found = new Set<string>();
+  for (const [keys, canonical] of triggers) {
+    if (keys.some((k) => lower.includes(k.toLowerCase()))) {
+      found.add(canonical);
+    }
+  }
+  return [...found];
+}
+
 function extractSources(toolResult: unknown): string[] {
   if (!toolResult || typeof toolResult !== "object") return [];
   const obj = toolResult as Record<string, unknown>;
@@ -253,14 +281,20 @@ export async function POST(req: Request) {
               count: number;
             } | null = null;
 
-            // 只自动预执行 web_search —— 参数通用（只要 query）。
-            // trending_topics 的 mode/platforms/query 高度上下文相关（比如
-            // "微博科技热榜" 需要 mode=platforms + platforms=["weibo"]，
-            // "成都抖音本地新闻"需要 query 过滤），server 端硬塞 mode=hot
-            // 会拿到"全网热点"掩盖用户真实意图。交给 LLM 按 SKILL.md 指引
-            // 自己挑参数调用。
+            // 预执行工具按 step.skills 路由：
+            // - step 明确请求 trending_topics → 预执行它（mode=hot 适配
+            //   "今天的热点新闻有哪些"这种全网热榜场景）。覆盖单平台/搜索
+            //   场景需要 LLM 自己定参，下一步可以扩展，但目前默认 hot 比让
+            //   web_search 顶替更接近用户意图。
+            // - 否则回退到 web_search（参数通用，只要 query）。
             const toolsToPrefetch: string[] = [];
-            if (hasRetrievalIntent) toolsToPrefetch.push("web_search");
+            if (hasRetrievalIntent) {
+              if (step.skills.includes("trending_topics")) {
+                toolsToPrefetch.push("trending_topics");
+              } else {
+                toolsToPrefetch.push("web_search");
+              }
+            }
 
             console.log(
               `[chat/intent-execute] step ${i + 1}/${intent.steps.length} ` +
@@ -291,14 +325,32 @@ export async function POST(req: Request) {
               // （tool-registry.ts 的 description 早就说过不要写死默认）。
               // query 走 extractSearchQuery —— 把场景表单格式（含 "场景：XX"
               // + 多行 key:value）解析成纯关键词串，避免 label 稀释检索。
-              const params: Record<string, unknown> = {
-                query: searchQuery,
-                maxResults: 8,
-                topic: "news",
-              };
-              if (resolvedTimeRange) {
-                params.timeRange = resolvedTimeRange;
-              }
+              const params: Record<string, unknown> =
+                toolName === "trending_topics"
+                  ? (() => {
+                      // 默认走 platforms 模式（与"热点发现"页面、tophub.today
+                      // 官网一致 —— 按平台节点 /nodes/{hashid} 并发拉，保留
+                      // 各平台原始热搜榜）。`/hot` 接口是 TopHub 编辑精选 50
+                      // 条聚合，跟用户期望的"实时各平台热榜"对不上。
+                      // 检测到具体平台关键词（如"抖音的实时热点"）→ 只拉那
+                      // 几个平台；没检测到 → 拉全部 10 个节点。
+                      const detected = detectTrendingPlatforms(message);
+                      const p: Record<string, unknown> = {
+                        mode: "platforms",
+                        limit: detected.length > 0 ? 20 : 10,
+                      };
+                      if (detected.length > 0) p.platforms = detected;
+                      return p;
+                    })()
+                  : (() => {
+                      const p: Record<string, unknown> = {
+                        query: searchQuery,
+                        maxResults: 8,
+                        topic: "news",
+                      };
+                      if (resolvedTimeRange) p.timeRange = resolvedTimeRange;
+                      return p;
+                    })();
 
               // 通知客户端"正在调技能"
               if (!usedToolSet.has(toolName)) {
@@ -402,8 +454,11 @@ export async function POST(req: Request) {
                   }
                 );
 
-                // 保存第一个成功的 web_search 结果用于短路直出
-                if (toolName === "web_search" && !preExecRealResult) {
+                // 保存第一个成功的 web_search / trending_topics 结果用于短路直出
+                if (
+                  (toolName === "web_search" || toolName === "trending_topics") &&
+                  !preExecRealResult
+                ) {
                   preExecRealResult = {
                     toolName,
                     params: invocation.params,
@@ -453,6 +508,169 @@ export async function POST(req: Request) {
             if (
               preExecRealResult &&
               hasRetrievalIntent &&
+              !hasGenerationIntent &&
+              preExecRealResult.toolName === "trending_topics"
+            ) {
+              const todayIso = new Date().toISOString().slice(0, 10);
+              const trendingResult = preExecRealResult.result as {
+                fetchedAt?: string;
+                mode?: string;
+                platforms?: string[];
+                totalCount?: number;
+                topics?: Array<{
+                  platform?: string;
+                  rank?: number;
+                  title?: string;
+                  heat?: number | string;
+                  url?: string;
+                  category?: string;
+                }>;
+                crossPlatformTopics?: Array<{
+                  title?: string;
+                  platforms?: string[];
+                  totalHeat?: number;
+                  verified?: boolean;
+                }>;
+                warnings?: string[];
+              };
+
+              const topicsList = Array.isArray(trendingResult.topics)
+                ? trendingResult.topics
+                : [];
+              const crossList = Array.isArray(trendingResult.crossPlatformTopics)
+                ? trendingResult.crossPlatformTopics
+                : [];
+
+              if (topicsList.length === 0) {
+                const warnLines = (trendingResult.warnings ?? [])
+                  .map((w) => `- ${w}`)
+                  .join("\n");
+                const emptyText = `【${step.employeeName} · 实时热榜报告】
+
+**模式**：${trendingResult.mode ?? "hot"}
+**生成时间**：${todayIso}
+**热榜条数**：0 条
+
+## 未获取到任何平台的热榜数据
+
+可能原因：
+- 热榜聚合 API（TopHub）暂时不可用
+- 环境未配置 TRENDING_API_KEY
+${warnLines ? warnLines + "\n" : ""}
+**不伪造结果：** 本系统不会从训练语料里补填"看起来热门"的假话题。
+
+---
+*本步骤由 server 端直接调用 TopHub API，未经 LLM 改写。*`;
+
+                send("text-delta", { text: emptyText });
+                stepText = emptyText;
+                send("step-complete", {
+                  stepIndex: i,
+                  employeeSlug: step.employeeSlug,
+                  employeeName: step.employeeName,
+                  summary: stepText.slice(0, 200),
+                });
+                priorStepOutput = stepText;
+                if (intent.steps.length > 1) {
+                  fullAssistantOutput +=
+                    (fullAssistantOutput ? "\n\n" : "") +
+                    `【${step.employeeName}】\n${stepText}`;
+                } else {
+                  fullAssistantOutput = stepText;
+                }
+                console.log(
+                  `[chat/intent-execute] short-circuited empty trending step ${i + 1} (${step.employeeSlug})`,
+                );
+                continue;
+              }
+
+              // 按平台分组，每个平台展示 Top 5
+              const byPlatform = new Map<
+                string,
+                Array<(typeof topicsList)[number]>
+              >();
+              for (const t of topicsList) {
+                const p = t.platform ?? "未知平台";
+                const arr = byPlatform.get(p) ?? [];
+                arr.push(t);
+                byPlatform.set(p, arr);
+              }
+              const platformBlocks = Array.from(byPlatform.entries())
+                .map(([platform, items]) => {
+                  const lines = items
+                    .slice(0, 5)
+                    .map(
+                      (t, idx) =>
+                        `${idx + 1}. **${t.title ?? "(无标题)"}** · 热度 ${t.heat ?? "—"}\n   · ${t.url ?? ""}`,
+                    )
+                    .join("\n");
+                  return `### ${platform}\n${lines}`;
+                })
+                .join("\n\n");
+
+              const crossBlock = crossList.length
+                ? crossList
+                    .slice(0, 8)
+                    .map(
+                      (t, idx) =>
+                        `${idx + 1}. **${t.title ?? "(无标题)"}** · 平台：${(t.platforms ?? []).join("、")} · 总热度 ${t.totalHeat ?? 0}${t.verified ? " ✓ 多平台共振" : ""}`,
+                    )
+                    .join("\n")
+                : "（暂未发现多平台共振话题）";
+
+              const requestedPlatforms = Array.isArray(
+                preExecRealResult.params.platforms,
+              )
+                ? (preExecRealResult.params.platforms as string[])
+                : [];
+              const filterLine =
+                requestedPlatforms.length > 0
+                  ? `**筛选平台**：${requestedPlatforms.join("、")}\n`
+                  : `**筛选平台**：全部默认节点（未指定平台）\n`;
+
+              const trendingText = `【${step.employeeName} · 实时热榜报告】
+
+**模式**：${trendingResult.mode ?? "platforms"}（按平台节点 /nodes/{hashid} 并发拉取，与"热点发现"页同源）
+${filterLine}**生成时间**：${todayIso}
+**覆盖平台**：${(trendingResult.platforms ?? []).join("、") || "无"}
+**热榜条数**：${topicsList.length} 条
+
+## 各平台热榜（按平台分组 · 每平台 Top 5）
+
+${platformBlocks}
+
+## 跨平台共振话题
+
+${crossBlock}
+
+---
+*本步骤由 server 端直接从 TopHub 实时热榜 API 返回，未经 LLM 改写，保证平台、标题、热度、URL 100% 原样。下游稿件撰写步骤请严格基于以上真实数据，不得引入训练数据里的旧内容。*`;
+
+              send("text-delta", { text: trendingText });
+              stepText = trendingText;
+              send("step-complete", {
+                stepIndex: i,
+                employeeSlug: step.employeeSlug,
+                employeeName: step.employeeName,
+                summary: stepText.slice(0, 200),
+              });
+              priorStepOutput = stepText;
+              if (intent.steps.length > 1) {
+                fullAssistantOutput +=
+                  (fullAssistantOutput ? "\n\n" : "") +
+                  `【${step.employeeName}】\n${stepText}`;
+              } else {
+                fullAssistantOutput = stepText;
+              }
+              console.log(
+                `[chat/intent-execute] short-circuited trending step ${i + 1} (${step.employeeSlug}) topics=${topicsList.length}`,
+              );
+              continue;
+            }
+
+            if (
+              preExecRealResult &&
+              hasRetrievalIntent &&
               !hasGenerationIntent
             ) {
               const todayIso = new Date().toISOString().slice(0, 10);
@@ -460,7 +678,7 @@ export async function POST(req: Request) {
                 query?: string;
                 generatedAt?: string;
                 summary?: string;
-                coverage?: { returnedCount?: number; sourceCount?: number };
+                coverage?: { returnedCount?: number; sourceCount?: number; channel?: string };
                 results?: Array<{
                   title?: string;
                   snippet?: string;
@@ -556,6 +774,19 @@ export async function POST(req: Request) {
                     .join("\n")
                 : "暂未聚类出显著话题";
 
+              const channelLabel = (() => {
+                switch (result.coverage?.channel) {
+                  case "bocha":
+                    return "博查（Bocha）";
+                  case "tavily":
+                    return "Tavily";
+                  case "rss":
+                    return "公共 RSS 信源";
+                  default:
+                    return "实时检索通道";
+                }
+              })();
+
               const shortCircuitText = `【${step.employeeName} · 实时检索报告】
 
 **检索参数**：query="${preExecRealResult.params.query ?? ""}"，timeRange=${preExecRealResult.params.timeRange ?? "unset"}，topic=${preExecRealResult.params.topic ?? "general"}
@@ -573,7 +804,7 @@ ${formattedResults}
 ${formattedTopics}
 
 ---
-*本步骤由 server 端直接从 Tavily 实时返回，未经 LLM 改写，保证来源、标题、日期、URL 100% 原样。下游稿件撰写步骤请严格基于以上真实数据，不得引入训练数据里的旧内容。*`;
+*本步骤由 server 端直接从 ${channelLabel} 实时返回，未经 LLM 改写，保证来源、标题、日期、URL 100% 原样。下游稿件撰写步骤请严格基于以上真实数据，不得引入训练数据里的旧内容。*`;
 
               // 通过 SSE 把文本分片发给前端，维持与 LLM 路径一致的 UI 体验
               send("text-delta", { text: shortCircuitText });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useEffect } from "react";
+import { useState, useTransition, useCallback, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/shared/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { formatChannelLabel } from "@/lib/collection/constants";
 import {
   Select,
   SelectContent,
@@ -29,12 +30,11 @@ import {
 import {
   Search,
   ExternalLink,
-  Settings,
   FileText,
   Database,
-  ChevronLeft,
-  ChevronRight,
+  Loader2,
   SlidersHorizontal,
+  BookMarked,
 } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
 import {
@@ -52,12 +52,14 @@ import type {
 } from "@/app/actions/research/collected-item-search";
 import { AdvancedSearchBuilder, type BuilderOptions } from "./advanced-search-builder";
 import { AdvancedFiltersSidebar } from "./advanced-filters-sidebar";
+import { TopicLibrarySearch } from "./topic-library-search";
 import type {
   AdvancedSearchCondition,
   SidebarFilter,
 } from "./search-mode-types";
 import { highlightKeyword } from "@/lib/research/keyword-highlight";
 import type { CollectedItemWithAnnotations } from "@/lib/dal/research/collected-item-search";
+import type { TopicSummary } from "@/lib/dal/research/research-topics";
 
 const TIER_OPTIONS = [
   { value: "central", label: "中央级" },
@@ -83,20 +85,6 @@ const TIER_LABELS: Record<string, string> = {
   self_media: "自媒体/热榜",
 };
 
-const CHANNEL_OPTIONS = [
-  { value: "tavily", label: "全网搜索" },
-  { value: "whitelist_crawl", label: "白名单" },
-  { value: "manual_url", label: "手工URL" },
-  { value: "hot_topic_crawler", label: "热榜采集" },
-];
-
-const CHANNEL_LABELS: Record<string, string> = {
-  tavily: "全网搜索",
-  whitelist_crawl: "白名单",
-  manual_url: "手工URL",
-  hot_topic_crawler: "热榜采集",
-};
-
 /* ─── Advanced search constants ─── */
 // 旧版 inline advanced builder（FIELD_OPTIONS / getOperatorsForField / ConditionRow / defaultCondition / renderValueInput）
 // 已在 A4 Phase 3 移除，由 AdvancedSearchBuilder + AdvancedFiltersSidebar + searchAdvanced action 替代。
@@ -112,25 +100,36 @@ export function SearchWorkbenchClient({
   districts,
   outlets,
   sources,
+  topics,
   initialResult,
   builderOptions,
+  channelLabels,
 }: {
   districts: CqDistrict[];
   outlets: MediaOutletSummary[];
   sources: ResearchSourceOption[];
+  topics: TopicSummary[];
   initialResult?: ArticleSearchResponse;
   builderOptions: BuilderOptions;
+  channelLabels: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const [mode, setMode] = useState<"simple" | "advanced">("simple");
+  const [mode, setMode] = useState<"simple" | "advanced" | "topic">("simple");
 
-  // A5 Phase 8 — "生成报告"入口 2 dialog state
+  // A5 Phase 8 — "生成报告"入口 dialog state
+  // reportContext 记录本次点击是来自 simple 还是 advanced，dialog 文案/确认逻辑据此分支
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportTitle, setReportTitle] = useState("");
   const [reportDesc, setReportDesc] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportContext, setReportContext] = useState<
+    | { kind: "simple"; total: number }
+    | { kind: "advanced"; total: number }
+    | { kind: "topic"; topicId: string; topicName: string; total: number }
+    | null
+  >(null);
 
   // Simple search filters
   const [keyword, setKeyword] = useState("");
@@ -174,42 +173,157 @@ export function SearchWorkbenchClient({
     pageSize: number;
   } | null>(null);
 
-  // Results (shared) — pre-hydrate with latest articles so 首屏 has data without manual search
-  const [result, setResult] = useState<ArticleSearchResponse | null>(initialResult ?? null);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Results — pre-hydrate with latest articles so 首屏 has data without manual search.
+  // items/total/loadedPage 是 simple mode 无限滚动专用,advanced/topic 模式各有独立 state。
+  const [items, setItems] = useState<ArticleSearchResult[]>(initialResult?.articles ?? []);
+  const [total, setTotal] = useState(initialResult?.total ?? 0);
+  const [loadedPage, setLoadedPage] = useState(initialResult ? 1 : 0);
+  const [pageSize] = useState(initialResult?.pageSize ?? 50);
+  const [hasSearched, setHasSearched] = useState(Boolean(initialResult));
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Selection (shared)
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   /* ─── Simple search ─── */
 
-  const doSimpleSearch = useCallback(
-    (page: number) => {
-      startTransition(async () => {
-        const params: Record<string, unknown> = { page, pageSize: 50 };
-        if (keyword.trim()) params.keyword = keyword.trim();
-        if (tierFilter !== "__all__") params.tiers = [tierFilter];
-        if (districtFilter !== "__all__") params.districtIds = [districtFilter];
-        if (outletFilter !== "__all__") params.outletId = outletFilter;
-        if (channelFilter !== "__all__")
-          params.sourceChannels = [channelFilter];
-        if (timeStart) params.timeStart = timeStart;
-        if (timeEnd) params.timeEnd = timeEnd + "T23:59:59.999Z";
-
-        const res = await searchArticles(params as Parameters<typeof searchArticles>[0]);
-        setResult(res);
-        setCurrentPage(page);
-      });
+  const buildSimpleParams = useCallback(
+    (page: number): Parameters<typeof searchArticles>[0] => {
+      const params: Record<string, unknown> = { page, pageSize };
+      if (keyword.trim()) params.keyword = keyword.trim();
+      if (tierFilter !== "__all__") params.tiers = [tierFilter];
+      if (districtFilter !== "__all__") params.districtIds = [districtFilter];
+      if (outletFilter !== "__all__") params.outletId = outletFilter;
+      if (channelFilter !== "__all__") params.sourceChannels = [channelFilter];
+      if (timeStart) params.timeStart = timeStart;
+      if (timeEnd) params.timeEnd = timeEnd + "T23:59:59.999Z";
+      return params as Parameters<typeof searchArticles>[0];
     },
-    [keyword, tierFilter, districtFilter, outletFilter, channelFilter, timeStart, timeEnd],
+    [keyword, tierFilter, districtFilter, outletFilter, channelFilter, timeStart, timeEnd, pageSize],
   );
 
-  // A4 Phase 3：简单模式仍走 doSimpleSearch；高级模式由 handleAdvancedSearch 单独处理
-  const doSearch = doSimpleSearch;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  // 首次/筛选后的全量重搜:重置 items + loadedPage
+  const runFreshSearch = useCallback(() => {
+    startTransition(async () => {
+      setLoadError(null);
+      try {
+        const res = await searchArticles(buildSimpleParams(1));
+        setItems(res.articles);
+        setTotal(res.total);
+        setLoadedPage(1);
+        setHasSearched(true);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : "检索失败");
+      }
+    });
+  }, [buildSimpleParams]);
+
+  // 滚动触发的追加加载
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasSearched) return;
+    if (itemsRef.current.length >= total) return;
+    setLoadingMore(true);
+    setLoadError(null);
+    try {
+      const nextPage = loadedPage + 1;
+      const res = await searchArticles(buildSimpleParams(nextPage));
+      setItems((prev) => {
+        const seen = new Set(prev.map((it) => it.id));
+        const fresh = res.articles.filter((it) => !seen.has(it.id));
+        return [...prev, ...fresh];
+      });
+      setTotal(res.total);
+      setLoadedPage(nextPage);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "加载失败,请重试");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasSearched, total, loadedPage, buildSimpleParams]);
 
   function handleSearch() {
     setSelected(new Set());
-    doSearch(1);
+    runFreshSearch();
+  }
+
+  // 序号映射 — id → 当前列表中的位置(1-based)
+  const seqOfId = useMemo(
+    () => new Map(items.map((it, i) => [it.id, i + 1])),
+    [items],
+  );
+
+  // IntersectionObserver — sentinel 进视口时自动 loadMore
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadMore]);
+
+  /* ─── 简单 filter → advanced conditions+sidebar 映射 ─── */
+  // 用于"生成报告"，把 simple 模式的 7 个 filter 翻译成 advanced 的 conditions+sidebar 形态，
+  // 复用同一个 createReportFromSearch 入口。snapshot.hitItemIds 锁定数据，
+  // outletId → outletName contains 这种轻微 fuzzy 不影响后续重生。
+  function simpleFiltersToAdvanced(): {
+    conditions: AdvancedSearchCondition[];
+    sidebarFilter: SidebarFilter;
+  } {
+    const conditions: AdvancedSearchCondition[] = [];
+    const sidebarFilter: SidebarFilter = {};
+    if (keyword.trim()) {
+      conditions.push({
+        id: "sim-kw",
+        field: "title",
+        operator: "contains",
+        value: keyword.trim(),
+        logic: "and",
+      });
+    }
+    if (tierFilter !== "__all__") sidebarFilter.outletTiers = [tierFilter];
+    if (districtFilter !== "__all__") sidebarFilter.districtIds = [districtFilter];
+    if (outletFilter !== "__all__") {
+      const outlet = outlets.find((o) => o.id === outletFilter);
+      if (outlet) {
+        conditions.push({
+          id: "sim-outlet",
+          field: "outletName",
+          operator: "contains",
+          value: outlet.name,
+          logic: "and",
+        });
+      }
+    }
+    if (channelFilter !== "__all__") {
+      conditions.push({
+        id: "sim-channel",
+        field: "platform",
+        operator: "equals",
+        value: channelFilter,
+        logic: "and",
+      });
+    }
+    if (timeStart && timeEnd) {
+      conditions.push({
+        id: "sim-time",
+        field: "publishedAt",
+        operator: "between",
+        value: "",
+        valueRange: { from: timeStart, to: timeEnd + "T23:59:59.999Z" },
+        logic: "and",
+      });
+    }
+    return { conditions, sidebarFilter };
   }
 
   /* ─── A4 Phase 3：新版 advanced 检索（用 searchAdvanced server action） ─── */
@@ -330,10 +444,9 @@ export function SearchWorkbenchClient({
   }
 
   function selectAllOnPage() {
-    if (!result) return;
     setSelected((prev) => {
       const next = new Set(prev);
-      for (const a of result.articles) next.add(a.id);
+      for (const a of items) next.add(a.id);
       return next;
     });
   }
@@ -342,7 +455,7 @@ export function SearchWorkbenchClient({
     setSelected(new Set());
   }
 
-  const totalPages = result ? Math.ceil(result.total / result.pageSize) : 0;
+  const hasMore = items.length < total;
 
   return (
     <div className="max-w-[1400px] mx-auto w-full space-y-6">
@@ -357,14 +470,6 @@ export function SearchWorkbenchClient({
           </div>
           <div className="flex items-center gap-3">
             <Link
-              href="/research/admin/media-outlets"
-              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              媒体源管理
-            </Link>
-            <span className="text-gray-300 dark:text-gray-600">·</span>
-            <Link
               href="/research/admin/topics"
               className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
             >
@@ -373,22 +478,30 @@ export function SearchWorkbenchClient({
             </Link>
             <span className="text-gray-300 dark:text-gray-600">·</span>
             <Link
-              href="/research/admin/tasks"
+              href="/research/reports"
               className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
             >
               <Database className="h-3.5 w-3.5" />
-              检索快照
+              研究报告
             </Link>
           </div>
         </div>
 
         {/* Mode toggle */}
-        <Tabs value={mode} onValueChange={(v) => setMode(v as "simple" | "advanced")} className="mb-3">
+        <Tabs
+          value={mode}
+          onValueChange={(v) => setMode(v as "simple" | "advanced" | "topic")}
+          className="mb-3"
+        >
           <TabsList variant="line">
             <TabsTrigger value="simple">快速搜索</TabsTrigger>
             <TabsTrigger value="advanced">
               <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
               高级检索
+            </TabsTrigger>
+            <TabsTrigger value="topic">
+              <BookMarked className="h-3.5 w-3.5 mr-1" />
+              主题词库检索
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -454,14 +567,14 @@ export function SearchWorkbenchClient({
               </Select>
 
               <Select value={channelFilter} onValueChange={setChannelFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="采集来源" />
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="渠道" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">全部来源</SelectItem>
-                  {CHANNEL_OPTIONS.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.label}
+                  <SelectItem value="__all__">全部渠道</SelectItem>
+                  {channelLabels.map((label) => (
+                    <SelectItem key={label} value={label}>
+                      {label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -487,7 +600,8 @@ export function SearchWorkbenchClient({
         {/* Advanced mode (A4 Phase 3：外置 AdvancedSearchBuilder + AdvancedFiltersSidebar) */}
         {mode === "advanced" && (
           <div className="flex gap-4">
-            <div className="flex-1 space-y-3">
+            {/* min-w-0:让 flex-1 子项能收缩到 viewport 宽度,否则结果表格里的长标题会撑爆容器 */}
+            <div className="flex-1 min-w-0 space-y-3">
               <AdvancedSearchBuilder
                 conditions={advConditions}
                 onChange={setAdvConditions}
@@ -527,6 +641,10 @@ export function SearchWorkbenchClient({
                       onClick={() => {
                         setReportTitle("高级检索研究报告");
                         setReportDesc("");
+                        setReportContext({
+                          kind: "advanced",
+                          total: advResults.total,
+                        });
                         setReportDialogOpen(true);
                       }}
                     >
@@ -615,17 +733,35 @@ export function SearchWorkbenchClient({
             />
           </div>
         )}
+
+        {/* Topic library mode */}
+        {mode === "topic" && (
+          <TopicLibrarySearch
+            topics={topics}
+            onRequestReport={(req) => {
+              setReportTitle(`${req.topicName} · 主题研究报告`);
+              setReportDesc("");
+              setReportContext({
+                kind: "topic",
+                topicId: req.topicId,
+                topicName: req.topicName,
+                total: req.total,
+              });
+              setReportDialogOpen(true);
+            }}
+          />
+        )}
       </div>
 
-      {/* Results (shared, simple mode only — advanced has its own DataTable above) */}
-      <div hidden={mode === "advanced"}>
-        {!result ? (
+      {/* Results (shared, simple mode only — advanced/topic 各有独立结果区) */}
+      <div hidden={mode !== "simple"}>
+        {!hasSearched ? (
           <GlassCard variant="default" padding="lg">
             <div className="text-center text-gray-500 dark:text-gray-400 py-10">
               输入关键词或筛选条件后点击搜索，查询数据库中已采集的新闻
             </div>
           </GlassCard>
-        ) : result.articles.length === 0 ? (
+        ) : items.length === 0 ? (
           <GlassCard variant="default" padding="lg">
             <div className="text-center text-gray-500 dark:text-gray-400 py-10 space-y-2">
               <div>数据库中暂未检索到符合条件的文章</div>
@@ -637,58 +773,59 @@ export function SearchWorkbenchClient({
                 >
                   数据采集
                 </Link>{" "}
-                模块补充数据，或新建{" "}
-                <Link
-                  href="/research/admin/tasks/new"
-                  className="text-sky-600 dark:text-sky-400 hover:underline"
-                >
-                  检索快照
-                </Link>{" "}
-                保存当前筛选条件
+                模块补充数据
               </div>
             </div>
           </GlassCard>
         ) : (
           <div className="space-y-3">
-            {/* Count + pagination info */}
-            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+            {/* Count + 已加载进度 + 生成报告 */}
+            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 gap-3 flex-wrap">
               <span>
-                共 <strong className="text-foreground">{result.total}</strong> 条结果
-                {totalPages > 1 &&
-                  ` · 第 ${result.page}/${totalPages} 页`}
+                已加载{" "}
+                <strong className="text-foreground">{items.length}</strong> /{" "}
+                {total} 条
+                {total > 500 && (
+                  <span className="ml-2 text-amber-600 dark:text-amber-400 text-xs">
+                    超 500 条，无法生成报告，请缩小条件
+                  </span>
+                )}
               </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={currentPage <= 1 || pending}
-                    onClick={() => doSearch(currentPage - 1)}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    上一页
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={currentPage >= totalPages || pending}
-                    onClick={() => doSearch(currentPage + 1)}
-                  >
-                    下一页
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={total === 0 || total > 500 || pending || loadingMore}
+                onClick={() => {
+                  setReportTitle("快速检索研究报告");
+                  setReportDesc("");
+                  setReportContext({ kind: "simple", total });
+                  setReportDialogOpen(true);
+                }}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                生成报告
+              </Button>
             </div>
 
             {/* Table */}
             <DataTable
-              rows={result.articles as ArticleSearchResult[]}
+              rows={items}
               rowKey={(a) => a.id}
               selectable
               selectedKeys={selected}
               onSelectionChange={setSelected}
               columns={[
+                {
+                  key: "_seq",
+                  header: "序号",
+                  width: "w-14",
+                  align: "center",
+                  render: (a) => (
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {seqOfId.get(a.id)}
+                    </span>
+                  ),
+                },
                 {
                   key: "title",
                   header: "标题",
@@ -744,13 +881,36 @@ export function SearchWorkbenchClient({
                 },
                 {
                   key: "channel",
-                  header: "来源",
-                  width: "w-20",
-                  render: (a) => (
-                    <span className="text-xs text-muted-foreground truncate block">
-                      {CHANNEL_LABELS[a.sourceChannel] ?? a.sourceChannel}
-                    </span>
-                  ),
+                  header: "渠道",
+                  width: "w-32",
+                  render: (a) => {
+                    const raw = a.sourceChannels?.length
+                      ? a.sourceChannels.map((c) => c.channel)
+                      : [a.firstSeenChannel];
+                    const labels = Array.from(new Set(raw.map(formatChannelLabel)));
+                    const visible = labels.slice(0, 2);
+                    const rest = labels.length - visible.length;
+                    return (
+                      <div
+                        className="flex flex-wrap items-center gap-1"
+                        title={labels.join("、")}
+                      >
+                        {visible.map((l) => (
+                          <span
+                            key={l}
+                            className="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 text-[11px]"
+                          >
+                            {l}
+                          </span>
+                        ))}
+                        {rest > 0 && (
+                          <span className="text-[11px] text-muted-foreground">
+                            +{rest}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  },
                 },
                 {
                   key: "url",
@@ -770,6 +930,37 @@ export function SearchWorkbenchClient({
                 },
               ] satisfies DataTableColumn<ArticleSearchResult>[]}
             />
+
+            {/* 无限滚动 sentinel + 加载状态 */}
+            <div
+              ref={sentinelRef}
+              className="flex flex-col items-center gap-2 py-4"
+            >
+              {loadingMore && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  加载中…
+                </div>
+              )}
+              {!loadingMore && loadError && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-red-500">{loadError}</span>
+                  <Button variant="ghost" size="sm" onClick={loadMore}>
+                    重试
+                  </Button>
+                </div>
+              )}
+              {!loadingMore && !loadError && hasMore && (
+                <Button variant="ghost" size="sm" onClick={loadMore}>
+                  加载更多
+                </Button>
+              )}
+              {!hasMore && !loadingMore && !loadError && items.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  已加载全部 {total} 条
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -801,9 +992,15 @@ export function SearchWorkbenchClient({
               />
             </div>
             <div className="text-xs text-muted-foreground">
-              将基于当前高级检索条件命中的{" "}
+              将基于当前
+              {reportContext?.kind === "simple"
+                ? "快速搜索"
+                : reportContext?.kind === "topic"
+                  ? `主题词库「${reportContext.topicName}」`
+                  : "高级检索"}
+              {reportContext?.kind === "topic" ? "" : "条件"}命中的{" "}
               <strong className="text-foreground">
-                {advResults?.total ?? 0}
+                {reportContext?.total ?? 0}
               </strong>{" "}
               条数据生成报告（最多 500 条）。
             </div>
@@ -827,13 +1024,26 @@ export function SearchWorkbenchClient({
                 }
                 setReportSubmitting(true);
                 try {
-                  // 1) 用 conditions + sidebarFilter 预拿全量 hitItemIds（≤ 500）
-                  const filtered = advConditions.filter(
-                    (c) => Boolean(c.value?.trim()) || Boolean(c.valueRange),
-                  );
+                  // 1) 根据 context 决定 conditions + sidebarFilter 来源
+                  let conditions: AdvancedSearchCondition[];
+                  let sidebarFilter: SidebarFilter;
+                  if (reportContext?.kind === "simple") {
+                    const mapped = simpleFiltersToAdvanced();
+                    conditions = mapped.conditions;
+                    sidebarFilter = mapped.sidebarFilter;
+                  } else if (reportContext?.kind === "topic") {
+                    conditions = [];
+                    sidebarFilter = { topicIds: [reportContext.topicId] };
+                  } else {
+                    conditions = advConditions.filter(
+                      (c) => Boolean(c.value?.trim()) || Boolean(c.valueRange),
+                    );
+                    sidebarFilter = advSidebarFilter;
+                  }
+                  // 2) 预拿全量 hitItemIds（≤ 500）
                   const { hitItemIds } = await fetchHitItemIdsForReport({
-                    conditions: filtered,
-                    sidebarFilter: advSidebarFilter,
+                    conditions,
+                    sidebarFilter,
                   });
                   if (hitItemIds.length === 0) {
                     toast.error("没有命中数据可生成报告");
@@ -843,10 +1053,10 @@ export function SearchWorkbenchClient({
                     toast.error("命中数据超过 500 条，请缩小检索条件");
                     return;
                   }
-                  // 2) 创建报告 + 触发 Inngest
+                  // 3) 创建报告 + 触发 Inngest
                   const r = await createReportFromSearch({
-                    conditions: filtered,
-                    sidebarFilter: advSidebarFilter,
+                    conditions,
+                    sidebarFilter,
                     hitItemIds,
                     title: t,
                     topicDescription: reportDesc.trim() || undefined,

@@ -147,16 +147,8 @@ export type InngestEvents = {
       operation: "created" | "updated" | "deleted";
     };
   };
-  "research/task.submitted": {
-    data: {
-      taskId: string;
-    };
-  };
-  "research/task.cancelled": {
-    data: {
-      taskId: string;
-    };
-  };
+  // research/task.submitted / research/task.cancelled — deleted 2026-05-13
+  // (/research/admin/tasks 整体下线,采集任务统一到 Collection Hub)
   // research/tavily.crawl — deleted A3 Phase 5 (走 Collection Hub tavily Adapter)
   // research/whitelist.crawl — deleted A3 Phase 5 (走 list_scraper Adapter)
   // research/manual-url.ingest — deleted A3 Phase 5 (走 jina_url Adapter)

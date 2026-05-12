@@ -27,7 +27,10 @@ export interface SearchOptions {
   timeRange?: WebSearchTimeRange;
   maxResults?: number;
   topic?: "general" | "news" | "finance";
+  /** 白名单:限定只返回这些域名(business 策略,caller 显式指定;不传则全网) */
   includeDomains?: string[];
+  /** 黑名单:排除这些域名(图片/模板/百科等通用垃圾源;caller 显式指定,通常合并 DEFAULT_EXCLUDE_DOMAINS) */
+  excludeDomains?: string[];
   /** Bypass the global SEARCH_PROVIDER setting; used by collection adapters that bind to a specific engine. */
   forceProvider?: SearchProviderId;
 }
@@ -84,10 +87,45 @@ export function parseDate(value: string) {
   };
 }
 
+/**
+ * AI agent / 报告场景使用的"可信源白名单"。
+ * 仅在 caller 明确想要"只看主流媒体"时显式传入,provider 层不再做兜底。
+ * 采集模块不使用此常量,完全由源配置 includeDomains 决定。
+ */
 export const DEFAULT_INCLUDE_DOMAINS = [
   "xinhuanet.com", "people.com.cn", "cctv.com", "chinanews.com",
   "36kr.com", "huxiu.com", "tmtpost.com", "jiemian.com",
   "caixin.com", "yicai.com", "thepaper.cn", "sina.com.cn",
   "weibo.com", "zhihu.com", "bilibili.com", "sohu.com",
   "163.com", "qq.com", "baidu.com", "toutiao.com",
+];
+
+/**
+ * 系统级垃圾源黑名单 —— 任何新闻/政策类搜索都不应返回这些站点。
+ * Caller 应合并自身追加的 excludeDomains 后传给 provider。
+ * 增删此列表请同步 docs (后续如果暴露运营配置 UI 再迁库表)。
+ */
+export const DEFAULT_EXCLUDE_DOMAINS = [
+  // 图片素材站
+  "588ku.com",       // 千库网
+  "photophoto.cn",   // 摄图网
+  "ibaotu.com",      // 包图网
+  "51yuansu.com",    // 觅元素
+  "58pic.com",       // 千图网
+  "ooopic.com",      // 我图网
+  "tukuppt.com",     // 熊猫办公
+  "sc.chinaz.com",   // 站长素材
+  "mizhi.com",       // 觅知网
+  // 模板/文档下载站
+  "book118.com",     // 原创力文档
+  "doc88.com",       // 道客巴巴
+  "docin.com",       // 豆丁网
+  "jianli.com",      // 简历模板
+  // 百科类(新闻搜索通常不要)
+  "baike.baidu.com",
+  "baike.sogou.com",
+  "baike.so.com",
+  // SEO / 学习内容农场
+  "koolearn.com",    // 新东方在线
+  "fanyishang.com",  // 翻译站
 ];

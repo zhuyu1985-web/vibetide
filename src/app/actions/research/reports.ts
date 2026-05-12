@@ -5,17 +5,17 @@
 // A5 Phase 8 — Report server actions（完整化）
 //
 // 全部走 requirePermission(MENU_RESEARCH) 鉴权 + getReportById 双键 (reportId, orgId)
-// 防跨 org 访问。createReportFromTask / createReportFromSearch 双入口；
-// regenerateReport 拒绝快照；saveAsSnapshot 复制 parent 内容（不再触发 Inngest）；
+// 防跨 org 访问。仅保留 createReportFromSearch (高级检索入口);
+// regenerateReport 拒绝快照;saveAsSnapshot 复制 parent 内容（不再触发 Inngest）;
 // getSignedUrlForReport 跨 org 校验 + 临过期 1h 重签。
+// 2026-05-13: createReportFromTask 已移除(/research/admin/tasks 整体下线)。
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { inngest } from "@/inngest/client";
 import { db } from "@/db";
-import { researchTasks } from "@/db/schema/research/research-tasks";
 import { researchReports } from "@/db/schema/research/reports";
 import {
   createReport as dalCreate,
@@ -76,76 +76,7 @@ export async function pollReport(reportId: string): Promise<ReportPollResult> {
 }
 
 /**
- * 入口 1 — 从 research_task 创建报告。
- * 由 task 详情页"生成报告"按钮调用；hitItemIds 由 Server Component 端
- * 用 Drizzle 查询 collected_items + annotations 计算后传入（≤ 500 条）。
- *
- * 安全性：
- *   - requirePermission(MENU_RESEARCH) 鉴权
- *   - taskId + organizationId 双键校验（跨 org 访问任务直接抛错）
- *   - hitItemIds.length > 500 拒绝（spec §3.2 数据漂移上限）
- */
-export async function createReportFromTask(input: {
-  taskId: string;
-  title: string;
-  topicDescription?: string;
-  hitItemIds: string[];
-}): Promise<{ reportId: string }> {
-  const { organizationId, userId } = await requirePermission(
-    PERMISSIONS.MENU_RESEARCH,
-  );
-  if (!input.title.trim()) throw new Error("报告标题不能为空");
-  if (input.hitItemIds.length === 0) {
-    throw new Error("没有命中数据可生成报告");
-  }
-  if (input.hitItemIds.length > MAX_HIT_ITEMS) {
-    throw new Error(`命中数据超过 ${MAX_HIT_ITEMS} 条，请缩小研究任务范围`);
-  }
-
-  const [task] = await db
-    .select()
-    .from(researchTasks)
-    .where(
-      and(
-        eq(researchTasks.id, input.taskId),
-        eq(researchTasks.organizationId, organizationId),
-      ),
-    );
-  if (!task) throw new Error("研究任务不存在或无访问权限");
-
-  const snapshot: ReportSearchSnapshot = {
-    kind: "research_task",
-    taskId: task.id,
-    timeRange: {
-      start: task.timeRangeStart.toISOString(),
-      end: task.timeRangeEnd.toISOString(),
-    },
-    topicIds: task.topicIds,
-    districtIds: task.districtIds,
-    mediaTiers: task.mediaTiers,
-    hitItemIds: input.hitItemIds,
-  };
-
-  const r = await dalCreate({
-    organizationId,
-    sourceType: "research_task",
-    researchTaskId: task.id,
-    searchSnapshot: snapshot,
-    title: input.title.trim(),
-    topicDescription: input.topicDescription?.trim() || undefined,
-    generatedBy: userId,
-  });
-  await inngest.send({
-    name: "research/report.generate",
-    data: { reportId: r.id, organizationId },
-  });
-
-  revalidatePath(`/research/admin/tasks/${task.id}`);
-  return { reportId: r.id };
-}
-
-/**
- * 入口 2 — 从高级检索快照创建报告。
+ * 入口 — 从高级检索快照创建报告。
  * 由 search-workbench-client "生成报告"按钮调用；hitItemIds 通过
  * fetchAllHitItemIdsForReport DAL helper 一次性预拿（≤ 500 条），
  * 不依赖前端列表分页态。
@@ -178,7 +109,6 @@ export async function createReportFromSearch(input: {
 
   const r = await dalCreate({
     organizationId,
-    sourceType: "advanced_search",
     searchSnapshot: snapshot,
     title: input.title.trim(),
     topicDescription: input.topicDescription?.trim() || undefined,
@@ -248,7 +178,6 @@ export async function saveAsSnapshot(input: {
     .values({
       organizationId,
       sourceType: parent.sourceType,
-      researchTaskId: parent.researchTaskId,
       searchSnapshot: parent.searchSnapshot,
       title: parent.title,
       topicDescription: parent.topicDescription,
@@ -323,4 +252,14 @@ export async function deleteReport(reportId: string): Promise<never> {
   const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
   await dalDelete(reportId, organizationId);
   redirect("/research");
+}
+
+/**
+ * 同 deleteReport，但不 redirect — 给报告列表页内联删除按钮用，
+ * 删完原地 revalidatePath 刷新列表。
+ */
+export async function deleteReportInline(reportId: string): Promise<void> {
+  const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
+  await dalDelete(reportId, organizationId);
+  revalidatePath("/research/reports");
 }

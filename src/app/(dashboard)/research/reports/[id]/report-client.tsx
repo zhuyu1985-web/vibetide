@@ -85,7 +85,9 @@ export function ReportClient(props: Props) {
   const [excelFileUrl, setExcelFileUrl] = useState<string | null>(
     props.initialExcelFileUrl,
   );
-  const [aggregates, setAggregates] = useState<AggregatesJson | null>(
+  // aggregates 由报告 HTML 的 chart-placeholder data-payload 直接驱动（server-render 时序列化进 HTML attr），
+  // 不需要 client 端维护本地状态，pollReport 返回的 aggregatesJson 仅用于 poll 进度跟踪
+  const [, setAggregates] = useState<AggregatesJson | null>(
     props.initialAggregates,
   );
   const [isAiFallback, setIsAiFallback] = useState<boolean>(
@@ -210,11 +212,11 @@ export function ReportClient(props: Props) {
   // ── pending / generating ─────────────────────────────────────────────
   if (status === "pending" || status === "generating") {
     return (
-      <div className="p-6">
+      <div className="max-w-[1400px] mx-auto w-full space-y-6">
         <PageHeader title={props.title} description="生成中..." />
-        <GlassCard className="p-8 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+        <GlassCard variant="panel" padding="lg">
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-sky-500" />
             <p className="text-sm text-gray-700 dark:text-gray-300">
               {currentStep ?? "排队中..."}
             </p>
@@ -230,10 +232,10 @@ export function ReportClient(props: Props) {
   // ── failed ──────────────────────────────────────────────────────────
   if (status === "failed") {
     return (
-      <div className="p-6">
+      <div className="max-w-[1400px] mx-auto w-full space-y-6">
         <PageHeader title={props.title} description="生成失败" />
-        <GlassCard className="p-8">
-          <div className="mb-4 p-3 rounded-md bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 text-sm">
+        <GlassCard variant="panel" padding="lg">
+          <div className="mb-4 p-4 rounded-md bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 text-sm">
             <div className="font-medium mb-1">报告生成失败</div>
             <div className="text-xs opacity-90">
               {errorMessage ?? "未知错误，请重试或联系管理员"}
@@ -258,198 +260,166 @@ export function ReportClient(props: Props) {
   }
 
   // ── ready ───────────────────────────────────────────────────────────
-  return (
-    <div className="p-6 grid grid-cols-[220px_1fr] gap-6">
-      <aside className="sticky top-4 self-start text-sm space-y-1">
-        <a
-          href="#chapter1"
-          className="block py-1 text-gray-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400"
-        >
-          第一章 研究背景
-        </a>
-        <a
-          href="#chapter2"
-          className="block py-1 text-gray-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400"
-        >
-          第二章 数据来源与统计
-        </a>
-        <a
-          href="#chapter3"
-          className="block py-1 text-gray-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400"
-        >
-          第三章 研究发现
-        </a>
-        <a
-          href="#appendix"
-          className="block py-1 text-gray-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400"
-        >
-          附录
-        </a>
-      </aside>
+  const tocItems = [
+    { href: "#chapter1", label: "第一章 研究背景" },
+    { href: "#chapter2", label: "第二章 数据来源与统计" },
+    { href: "#chapter3", label: "第三章 研究发现" },
+    { href: "#appendix", label: "附录" },
+  ];
 
-      <div>
-        <PageHeader
-          title={props.title}
-          description={props.isSnapshot ? "快照" : "母版"}
-          actions={
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => handleExport("word")}
-                disabled={!wordFileUrl || exporting !== null}
-                title={
-                  wordFileUrl
-                    ? "下载 Word 文件"
-                    : "Word 文件未生成或已失效，请重新生成"
-                }
-              >
-                {exporting === "word" ? "导出中..." : "导出 Word"}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => handleExport("excel")}
-                disabled={!excelFileUrl || exporting !== null}
-                title={
-                  excelFileUrl
-                    ? "下载 Excel 文件"
-                    : "Excel 文件未生成或已失效，请重新生成"
-                }
-              >
-                {exporting === "excel" ? "导出中..." : "导出 Excel"}
-              </Button>
-              <Button variant="ghost" onClick={handleCopyShareLink}>
-                分享链接
-              </Button>
-              {!props.isSnapshot && (
-                <>
+  return (
+    <div className="max-w-[1400px] mx-auto w-full space-y-4">
+      <PageHeader
+        title={props.title}
+        description={props.isSnapshot ? "快照报告" : "母版报告"}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Link
+              href="/research/reports"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            >
+              ← 全部报告
+            </Link>
+            <span className="text-gray-300 dark:text-gray-600 mx-1">·</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleExport("word")}
+              disabled={!wordFileUrl || exporting !== null}
+              title={
+                wordFileUrl
+                  ? "下载 Word 文件"
+                  : "Word 文件未生成或已失效，请重新生成"
+              }
+            >
+              {exporting === "word" ? "导出中..." : "导出 Word"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleExport("excel")}
+              disabled={!excelFileUrl || exporting !== null}
+              title={
+                excelFileUrl
+                  ? "下载 Excel 文件"
+                  : "Excel 文件未生成或已失效，请重新生成"
+              }
+            >
+              {exporting === "excel" ? "导出中..." : "导出 Excel"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleCopyShareLink}>
+              分享链接
+            </Button>
+            {!props.isSnapshot && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSnapshotDialogOpen(true)}
+                >
+                  另存为快照
+                </Button>
+                {props.snapshots.length > 0 && (
                   <Button
                     variant="ghost"
-                    onClick={() => setSnapshotDialogOpen(true)}
+                    size="sm"
+                    onClick={() => setSnapshotsExpanded((v) => !v)}
                   >
-                    另存为快照
+                    <History className="mr-1 h-4 w-4" />
+                    快照 ({props.snapshots.length})
                   </Button>
-                  {props.snapshots.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSnapshotsExpanded((v) => !v)}
-                    >
-                      <History className="mr-1 h-4 w-4" />
-                      快照 ({props.snapshots.length})
-                    </Button>
-                  )}
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRegenerate}
+                  disabled={regenerating}
+                >
+                  {regenerating ? "提交中..." : "重新生成"}
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-start">
+        {/* TOC 面板 */}
+        <aside className="lg:sticky lg:top-4">
+          <GlassCard variant="panel" padding="none">
+            <div className="px-4 py-3 border-b border-gray-200/60 dark:border-white/5 text-xs font-semibold text-gray-700 dark:text-gray-300">
+              目录
+            </div>
+            <nav className="p-2 space-y-0.5">
+              {tocItems.map((t) => (
+                <a
+                  key={t.href}
+                  href={t.href}
+                  className="block px-3 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-sky-50/70 dark:hover:bg-sky-900/20 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+                >
+                  {t.label}
+                </a>
+              ))}
+            </nav>
+          </GlassCard>
+        </aside>
+
+        {/* 主内容面板 */}
+        <GlassCard variant="panel" padding="none" className="min-w-0">
+          <div className="px-6 py-6 space-y-4">
+            {isAiFallback && (
+              <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-sm flex items-center justify-between gap-3 flex-wrap">
+                <span>AI 段落降级，已使用模板兜底。可点击「重新生成」重试。</span>
+                {!props.isSnapshot && (
                   <Button
                     variant="ghost"
+                    size="sm"
                     onClick={handleRegenerate}
                     disabled={regenerating}
+                    className="shrink-0"
                   >
                     {regenerating ? "提交中..." : "重新生成"}
                   </Button>
-                </>
-              )}
-            </div>
-          }
-        />
-
-        {isAiFallback && (
-          <div className="mb-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-sm flex items-center justify-between gap-3">
-            <span>
-              AI 段落降级，已使用模板兜底。可点击「重新生成」重试。
-            </span>
-            {!props.isSnapshot && (
-              <Button
-                variant="ghost"
-                onClick={handleRegenerate}
-                disabled={regenerating}
-                className="shrink-0"
-              >
-                {regenerating ? "提交中..." : "重新生成"}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {!props.isSnapshot &&
-          snapshotsExpanded &&
-          props.snapshots.length > 0 && (
-            <GlassCard className="mb-4 p-4">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                历史快照 ({props.snapshots.length})
+                )}
               </div>
-              <ul className="space-y-1 text-sm">
-                {props.snapshots.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <Link
-                      href={`/research/reports/${s.id}`}
-                      className="text-sky-600 dark:text-sky-400 hover:underline truncate"
-                    >
-                      {s.snapshotName}
-                    </Link>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-                      {new Date(s.createdAt).toLocaleString("zh-CN")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </GlassCard>
-          )}
+            )}
 
-        <ReportHtmlBody html={reportHtml ?? ""} />
+            {!props.isSnapshot &&
+              snapshotsExpanded &&
+              props.snapshots.length > 0 && (
+                <div className="rounded-md border border-gray-200/60 dark:border-white/5 bg-white/40 dark:bg-white/5 p-4">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    历史快照 ({props.snapshots.length})
+                  </div>
+                  <ul className="space-y-1 text-sm">
+                    {props.snapshots.map((s) => (
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <Link
+                          href={`/research/reports/${s.id}`}
+                          className="text-sky-600 dark:text-sky-400 hover:underline truncate"
+                        >
+                          {s.snapshotName}
+                        </Link>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                          {new Date(s.createdAt).toLocaleString("zh-CN")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-        {aggregates && (
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <GlassCard className="p-4">
-              <h3 className="text-sm mb-2 text-gray-700 dark:text-gray-300">
-                媒体层级分布
-              </h3>
-              <BarChartCard
-                data={aggregates.mediaTierDistribution.map((m) => ({
-                  name: m.tier,
-                  count: m.count,
-                }))}
-                dataKey="count"
-              />
-            </GlassCard>
-            <GlassCard className="p-4">
-              <h3 className="text-sm mb-2 text-gray-700 dark:text-gray-300">
-                区县分布
-              </h3>
-              <HorizontalBarChartCard
-                data={aggregates.districtDistribution.map((d) => ({
-                  name: d.districtName,
-                  count: d.count,
-                }))}
-                dataKey="count"
-              />
-            </GlassCard>
-            <GlassCard className="p-4">
-              <h3 className="text-sm mb-2 text-gray-700 dark:text-gray-300">
-                主题分布
-              </h3>
-              <DonutChartCard
-                data={aggregates.topicDistribution.map((t, i) => ({
-                  name: t.topicName,
-                  value: t.count,
-                  color: DONUT_COLORS[i % DONUT_COLORS.length]!,
-                }))}
-              />
-            </GlassCard>
-            <GlassCard className="p-4">
-              <h3 className="text-sm mb-2 text-gray-700 dark:text-gray-300">
-                时间趋势
-              </h3>
-              <LineChartCard
-                data={aggregates.dailyTrend.map((d) => ({
-                  date: d.date,
-                  count: d.count,
-                }))}
-                dataKey="count"
-              />
-            </GlassCard>
+            {/* 报告正文 — 样式用 inline <style> 注入，scope 到 .research-report
+                类（report-html-renderer 注入的外层 article 已带该类）。
+                之前放 globals.css 可能被 Tailwind v4 PostCSS 优化掉部分规则，
+                改 inline 保证规则一定生效且 HMR 即时刷新。 */}
+            <ReportStyleSheet />
+            <ReportHtmlBody html={reportHtml ?? ""} />
           </div>
-        )}
+        </GlassCard>
       </div>
 
       {/* Phase 9：另存为快照 dialog（仅母版报告挂载） */}
@@ -621,11 +591,257 @@ function ReportHtmlBody({ html }: { html: string }) {
     };
   }, [html]);
 
+  // 容器不再加 prose（typography 插件未安装），样式由 ReportStyleSheet inline <style> 控制
   return (
-    <article
+    <div
       ref={containerRef}
-      className="prose prose-sm dark:prose-invert max-w-none"
+      className="research-report-container"
       dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+// ── ReportStyleSheet ─────────────────────────────────────────────────
+// 注入 .research-report scope 下的全部样式。放 inline <style> 是为了：
+//   1. 保证 HMR 即时生效（不被 Tailwind v4 PostCSS 全局缓存影响）
+//   2. 仅在报告详情页加载，不污染其它页面
+//   3. 选择器特异性高于全局 reset，无需 !important
+function ReportStyleSheet() {
+  return (
+    <style
+      dangerouslySetInnerHTML={{
+        __html: `
+.research-report {
+  color: rgb(31 41 55);
+  font-size: 14.5px;
+  line-height: 2;
+  word-break: break-word;
+}
+.dark .research-report { color: rgb(229 231 235); }
+
+.research-report h1 {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0 0 0.6em;
+  letter-spacing: 0.02em;
+}
+.research-report h2 {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 2.4em 0 1em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid rgb(229 231 235);
+  letter-spacing: 0.02em;
+}
+.dark .research-report h2 { border-bottom-color: rgba(255,255,255,0.08); }
+
+.research-report h3 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 2em 0 0.8em;
+  color: rgb(55 65 81);
+}
+.dark .research-report h3 { color: rgb(209 213 219); }
+
+.research-report p {
+  margin: 0 0 1.6em;
+  text-align: justify;
+  text-justify: inter-ideograph;
+  letter-spacing: 0.01em;
+}
+.research-report p:last-child { margin-bottom: 0; }
+
+.research-report strong { font-weight: 600; color: rgb(15 23 42); }
+.dark .research-report strong { color: rgb(248 250 252); }
+
+.research-report .report-cover {
+  margin-bottom: 2.4em;
+  padding-bottom: 1.8em;
+  border-bottom: 1px solid rgb(229 231 235);
+}
+.dark .research-report .report-cover { border-bottom-color: rgba(255,255,255,0.08); }
+.research-report .report-cover .subtitle {
+  font-size: 13px;
+  color: rgb(107 114 128);
+  margin: 0 0 1.2em;
+}
+.research-report .cover-meta {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6em;
+}
+.research-report .cover-meta li {
+  font-size: 13.5px;
+  color: rgb(75 85 99);
+  line-height: 1.7;
+}
+.dark .research-report .cover-meta li { color: rgb(156 163 175); }
+
+.research-report .banner {
+  padding: 0.85em 1.1em;
+  border-radius: 8px;
+  margin-bottom: 1.6em;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.research-report .banner-warn {
+  background: rgb(254 252 232);
+  color: rgb(146 64 14);
+  border: 1px solid rgb(253 230 138);
+}
+.research-report .banner-info {
+  background: rgb(239 246 255);
+  color: rgb(30 64 175);
+  border: 1px solid rgb(191 219 254);
+}
+
+/* 通用 data-table — 强制 display:table，覆盖任何全局 reset */
+.research-report table.data-table {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.2em 0 2em;
+  font-size: 13px;
+  background: rgb(255 255 255 / 0.6);
+  border: 1px solid rgb(229 231 235);
+  border-radius: 8px;
+  overflow: hidden;
+  table-layout: auto;
+}
+.dark .research-report table.data-table {
+  background: rgb(255 255 255 / 0.03);
+  border-color: rgba(255,255,255,0.08);
+}
+
+.research-report table.data-table thead {
+  display: table-header-group;
+  background: rgb(243 244 246);
+}
+.dark .research-report table.data-table thead { background: rgba(255,255,255,0.04); }
+
+.research-report table.data-table thead tr,
+.research-report table.data-table tbody tr {
+  display: table-row;
+}
+.research-report table.data-table thead th {
+  display: table-cell;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: rgb(55 65 81);
+  text-align: left;
+  padding: 0.85em 1.1em;
+  border-bottom: 1px solid rgb(229 231 235);
+  white-space: nowrap;
+}
+.dark .research-report table.data-table thead th {
+  color: rgb(209 213 219);
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+.research-report table.data-table tbody td {
+  display: table-cell;
+  padding: 0.75em 1.1em;
+  border-top: 1px solid rgb(243 244 246);
+  vertical-align: middle;
+  line-height: 1.65;
+  white-space: nowrap;
+}
+.dark .research-report table.data-table tbody td { border-top-color: rgba(255,255,255,0.06); }
+
+/* 第 4 列（Top3 媒体 / Top3 主题 / Top3 区县）允许换行 */
+.research-report table.data-table tbody td:nth-child(4) {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.research-report table.data-table tbody tr:hover {
+  background: rgb(249 250 251 / 0.7);
+}
+.dark .research-report table.data-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+/* 附录表 — 6 列固定布局 */
+.research-report table.data-table-appendix {
+  table-layout: fixed;
+  font-size: 12.5px;
+}
+.research-report table.data-table-appendix thead th:nth-child(1),
+.research-report table.data-table-appendix tbody td:nth-child(1) {
+  width: 52px;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: rgb(107 114 128);
+}
+.research-report table.data-table-appendix thead th:nth-child(2),
+.research-report table.data-table-appendix tbody td:nth-child(2) {
+  width: auto;
+  white-space: normal;
+  word-break: break-word;
+}
+.research-report table.data-table-appendix thead th:nth-child(3),
+.research-report table.data-table-appendix tbody td:nth-child(3) {
+  width: 130px;
+  white-space: normal;
+  word-break: break-word;
+}
+.research-report table.data-table-appendix thead th:nth-child(4),
+.research-report table.data-table-appendix tbody td:nth-child(4) {
+  width: 96px;
+  white-space: nowrap;
+}
+.research-report table.data-table-appendix thead th:nth-child(5),
+.research-report table.data-table-appendix tbody td:nth-child(5) {
+  width: 84px;
+  white-space: nowrap;
+}
+.research-report table.data-table-appendix thead th:nth-child(6),
+.research-report table.data-table-appendix tbody td:nth-child(6) {
+  width: 106px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: rgb(75 85 99);
+}
+
+.research-report table.data-table-appendix a {
+  color: rgb(2 132 199);
+  text-decoration: none;
+}
+.research-report table.data-table-appendix a:hover { text-decoration: underline; }
+.dark .research-report table.data-table-appendix a { color: rgb(56 189 248); }
+
+/* 章节 sections 的间距 */
+.research-report > section,
+.research-report section[id^="chapter"],
+.research-report section[id="appendix"] {
+  display: block;
+  margin-bottom: 1em;
+}
+
+/* 图表占位符 — 未 hydrate 时折叠 (0px) 不留白；hydrate 后由 Recharts 内部撑开 */
+.research-report .chart-placeholder {
+  margin: 1em 0 1.8em;
+}
+.research-report .chart-placeholder:empty {
+  display: none;
+}
+/* Recharts ResponsiveContainer 需要父级有明确宽度 + 自身指定 height */
+.research-report .chart-placeholder > * {
+  width: 100%;
+}
+
+.research-report .empty-hint {
+  font-size: 13px;
+  color: rgb(156 163 175);
+  font-style: italic;
+  padding: 1em 0;
+}
+        `,
+      }}
     />
   );
 }

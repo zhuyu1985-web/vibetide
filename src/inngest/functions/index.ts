@@ -15,14 +15,12 @@ import { hotTopicEnrichmentPipeline } from "./hot-topic-enrichment";
 import { employeeStatusGuard } from "./employee-status-guard";
 import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
 import {
-  researchTaskStart,
   annotateCollectedItem,
   backfillAnnotate,
   researchReportGenerate,
 } from "./research";
 import {
   runCollectionSource,
-  collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
   outletBatchRecognize,
@@ -61,7 +59,7 @@ export const functions = [
   // Knowledge base
   knowledgeBaseVectorize,
   // News Research (S2) — A3: 自采分支已迁至 Collection Hub Adapter 架构
-  researchTaskStart,
+  // researchTaskStart 已于 2026-05-13 删除(/research/admin/tasks 整体下线)
   // Research auto-annotation (A3 Phase 3) — 直接读 collected_items,不再走 research_news_articles 桥接
   annotateCollectedItem,
   backfillAnnotate,
@@ -69,7 +67,6 @@ export const functions = [
   researchReportGenerate,
   // Collection Hub (2026-04-18)
   runCollectionSource,
-  collectionSmokeConsumer,
   collectionHotTopicCron,
   collectionHotTopicBridge,
   // Outlet batch recognition (2026-05-05)

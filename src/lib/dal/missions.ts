@@ -31,6 +31,7 @@ function rowToEmployee(row: typeof aiEmployees.$inferSelect): AIEmployee {
     motto: row.motto ?? "",
     status: row.status as AIEmployee["status"],
     currentTask: row.currentTask ?? undefined,
+    isPreset: row.isPreset === 1,
     skills: [],
     stats: {
       tasksCompleted: row.tasksCompleted,

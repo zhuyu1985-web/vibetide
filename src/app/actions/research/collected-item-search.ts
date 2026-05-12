@@ -9,8 +9,10 @@ import {
   type CollectedItemWithAnnotations,
 } from "@/lib/dal/research/collected-item-search";
 
-// Re-export filter type for client components
-export type { CollectedItemSearchFilter };
+// 注意：不要在本 "use server" 文件里 re-export 来自其它模块的 type。
+// Next.js 16 Turbopack 的 next-flight-loader 会把这种 `export type { X };`
+// 当作 server action 注册（registerServerReference），导致运行时 ReferenceError。
+// 客户端需要时直接从 DAL/共享类型模块 import。
 
 // Result shape — compatible with search-workbench-client.tsx (Phase 4 will fully redesign)
 export type ResearchItemResult = CollectedItemWithAnnotations & {
@@ -28,15 +30,6 @@ export type ResearchSearchResponse = {
   pageSize: number;
 };
 
-// Re-export search types from shared module (A4 Phase 1: 11 fields + valueRange)
-export type {
-  AdvancedSearchField,
-  AdvancedSearchOperator,
-  AdvancedSearchCondition,
-  AdvancedSearchCondition as SearchCondition, // 兼容旧名
-  SidebarFilter,
-} from "@/app/(dashboard)/research/search-mode-types";
-
 import type {
   AdvancedSearchCondition as _AdvancedSearchCondition,
   SidebarFilter as _SidebarFilter,
@@ -52,7 +45,7 @@ function mapToResult(item: CollectedItemWithAnnotations): ResearchItemResult {
   return {
     ...item,
     districtName: null, // Phase 4: join annotation table to resolve district name
-    sourceChannel: item.outletTier ?? "unknown",
+    sourceChannel: item.firstSeenChannel,
     platformFallback: item.outletName ?? null,
   };
 }
@@ -63,6 +56,10 @@ export async function searchArticles(
     tiers?: string[];
     districtIds?: string[];
     outletId?: string;
+    /**
+     * 渠道 label 过滤,例如 ["微博","抖音"]。
+     * 字段名保持 sourceChannels 是历史遗留(未来可重命名为 channelLabels)。
+     */
     sourceChannels?: string[];
     timeStart?: string;
     timeEnd?: string;
@@ -80,6 +77,7 @@ export async function searchArticles(
   if (params.tiers?.length === 1) filter.outletTier = params.tiers[0];
   if (params.districtIds?.length) filter.districtIds = params.districtIds;
   if (params.outletId) filter.outletId = params.outletId;
+  if (params.sourceChannels?.length) filter.channelLabels = params.sourceChannels;
   if (params.timeStart) filter.publishedAtFrom = new Date(params.timeStart);
   if (params.timeEnd) filter.publishedAtTo = new Date(params.timeEnd);
 

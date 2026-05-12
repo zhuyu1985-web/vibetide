@@ -594,9 +594,9 @@ export const researchReportGenerate = inngest.createFunction(
 // ── helpers ────────────────────────────────────────────────────────
 
 function pickRangeStart(snap: ReportSearchSnapshot): string {
-  return snap.kind === "research_task" ? snap.timeRange.start : snap.capturedAt;
+  return snap.capturedAt;
 }
 
 function pickRangeEnd(snap: ReportSearchSnapshot): string {
-  return snap.kind === "research_task" ? snap.timeRange.end : snap.capturedAt;
+  return snap.capturedAt;
 }

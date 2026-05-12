@@ -4,7 +4,6 @@ import {
   type SearchProvider,
   type SearchResult,
   type WebSearchTimeRange,
-  DEFAULT_INCLUDE_DOMAINS,
   inferCredibility,
   inferSourceType,
   parseDate,
@@ -90,11 +89,13 @@ export const bochaProvider: SearchProvider = {
     if (!apiKey) throw new Error("BOCHA_API_KEY not configured");
 
     const requestedMax = Math.min(options.maxResults ?? 8, 20);
-    const filterDomains = options.includeDomains ?? DEFAULT_INCLUDE_DOMAINS;
-    const applyDomainFilter = filterDomains.length > 0;
+    const includeFilter = options.includeDomains ?? [];
+    const excludeFilter = options.excludeDomains ?? [];
+    const applyIncludeFilter = includeFilter.length > 0;
+    const applyExcludeFilter = excludeFilter.length > 0;
 
-    // Bocha 不原生支持 include_domains —— 域名白名单走 client-side 过滤；为补偿召回率，over-fetch
-    const fetchCount = applyDomainFilter
+    // Bocha 不原生支持 include/exclude —— 域名过滤走 client-side;为补偿过滤损失,over-fetch
+    const fetchCount = (applyIncludeFilter || applyExcludeFilter)
       ? Math.min(requestedMax * DOMAIN_OVERFETCH_MULTIPLIER, BOCHA_MAX_COUNT)
       : requestedMax;
 
@@ -138,9 +139,13 @@ export const bochaProvider: SearchProvider = {
       }
 
       const pages = json.data?.webPages?.value ?? [];
-      const filtered = applyDomainFilter
-        ? pages.filter((p) => matchesDomain(p.url, filterDomains))
-        : pages;
+      let filtered = pages;
+      if (applyIncludeFilter) {
+        filtered = filtered.filter((p) => matchesDomain(p.url, includeFilter));
+      }
+      if (applyExcludeFilter) {
+        filtered = filtered.filter((p) => !matchesDomain(p.url, excludeFilter));
+      }
 
       const items: NewsFeedItem[] = filtered.slice(0, requestedMax).map((p) => {
         let host = "";
