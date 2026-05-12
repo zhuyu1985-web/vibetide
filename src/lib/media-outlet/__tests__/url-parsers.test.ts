@@ -43,6 +43,19 @@ describe("parseWeiboProfileUrl", () => {
       uid: "2803301701",
     });
   });
+  it("省略 /u/, 直接 weibo.com/{uid} 也支持", () => {
+    expect(parseWeiboProfileUrl("https://weibo.com/2803301701")).toMatchObject({
+      uid: "2803301701",
+    });
+  });
+  it("带 refer_flag query 也能识别", () => {
+    expect(
+      parseWeiboProfileUrl("https://weibo.com/2404269462?refer_flag=1001030103_"),
+    ).toMatchObject({ uid: "2404269462" });
+  });
+  it("username 形式(如 weibo.com/rmrb)返回 null - 离线无法转 uid", () => {
+    expect(parseWeiboProfileUrl("https://weibo.com/cqtv68629315")).toBeNull();
+  });
 });
 
 describe("parseKuaishouProfileUrl", () => {
@@ -55,6 +68,11 @@ describe("parseKuaishouProfileUrl", () => {
   it("live.kuaishou.com 子域", () => {
     expect(parseKuaishouProfileUrl("https://live.kuaishou.com/profile/3xy4nh4nzqzkfxg")).toMatchObject({
       userId: "3xy4nh4nzqzkfxg",
+    });
+  });
+  it("live.kuaishou.com/u/{userId} 直播间格式", () => {
+    expect(parseKuaishouProfileUrl("https://live.kuaishou.com/u/3x5a39id7vkjh2u")).toMatchObject({
+      userId: "3x5a39id7vkjh2u",
     });
   });
 });

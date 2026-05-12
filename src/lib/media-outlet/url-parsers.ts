@@ -35,19 +35,25 @@ export function parseDouyinProfileUrl(url: string): DouyinChannel | null {
 
 // ─── 微博主页 URL ─────────────────────────────────────────────────────
 // 支持格式:
-//   https://weibo.com/u/2803301701
-//   https://m.weibo.cn/u/2803301701
-//   https://www.weibo.com/u/2803301701/profile
-const WEIBO_RE = /^https?:\/\/(?:www\.|m\.)?weibo\.(?:com|cn)\/u\/(\d+)/i;
+//   https://weibo.com/u/2803301701               (标准 /u/{uid})
+//   https://m.weibo.cn/u/2803301701              (移动端)
+//   https://www.weibo.com/u/2803301701/profile   (带尾段)
+//   https://weibo.com/2803301701                 (省略 /u/,直接 uid)
+//   https://weibo.com/2803301701?refer_flag=xxx  (带 query)
+// 不支持: https://weibo.com/{username} 形式(如 weibo.com/rmrb),
+//        因为 username 离线无法转换为 uid。
+const WEIBO_RE_WITH_U = /^https?:\/\/(?:www\.|m\.)?weibo\.(?:com|cn)\/u\/(\d+)/i;
+const WEIBO_RE_BARE_UID = /^https?:\/\/(?:www\.|m\.)?weibo\.(?:com|cn)\/(\d+)(?:[/?#]|$)/i;
 
 export function parseWeiboProfileUrl(url: string): WeiboChannel | null {
-  const m = url.trim().match(WEIBO_RE);
+  const trimmed = url.trim();
+  const m = trimmed.match(WEIBO_RE_WITH_U) ?? trimmed.match(WEIBO_RE_BARE_UID);
   if (!m) return null;
   return {
     type: "weibo",
     nickname: "",
     uid: m[1]!,
-    profileUrl: url.trim(),
+    profileUrl: trimmed,
   };
 }
 
@@ -55,16 +61,19 @@ export function parseWeiboProfileUrl(url: string): WeiboChannel | null {
 // 支持格式:
 //   https://www.kuaishou.com/profile/3xy4nh4nzqzkfxg
 //   https://live.kuaishou.com/profile/3xy4nh4nzqzkfxg
-const KUAISHOU_RE = /^https?:\/\/(?:www\.|live\.|m\.)?kuaishou\.com\/profile\/([A-Za-z0-9_-]+)/i;
+//   https://live.kuaishou.com/u/3xy4nh4nzqzkfxg     (直播间格式)
+const KUAISHOU_RE_PROFILE = /^https?:\/\/(?:www\.|live\.|m\.)?kuaishou\.com\/profile\/([A-Za-z0-9_-]+)/i;
+const KUAISHOU_RE_LIVE_U = /^https?:\/\/live\.kuaishou\.com\/u\/([A-Za-z0-9_-]+)/i;
 
 export function parseKuaishouProfileUrl(url: string): KuaishouChannel | null {
-  const m = url.trim().match(KUAISHOU_RE);
+  const trimmed = url.trim();
+  const m = trimmed.match(KUAISHOU_RE_PROFILE) ?? trimmed.match(KUAISHOU_RE_LIVE_U);
   if (!m) return null;
   return {
     type: "kuaishou",
     nickname: "",
     userId: m[1]!,
-    profileUrl: url.trim(),
+    profileUrl: trimmed,
   };
 }
 
