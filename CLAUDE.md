@@ -405,15 +405,16 @@ After implementing features, always verify before considering work complete:
 - Use OpenSpec workflow for architectural changes (see `openspec/AGENTS.md`)
 - Glass UI design system: follow existing component patterns in `src/components/shared/` for consistent styling (GlassCard, frosted backgrounds, gradient accents)
 
-## Git Workflow（强制：单分支开发）
+## Git Workflow
 
-**本仓库只有 `main` 一个分支，所有功能迭代直接在 `main` 上进行。**
+主分支是 `main`，正式发布的代码最终都要回到 `main`。分支 / worktree 不再被禁止，可用于并行的 subagent 工作流，但需要遵循以下纪律：
 
-- **禁止创建 feature / worktree 分支**（包括 `feature/*`、`claude/*`、`.worktrees/`、`.claude/worktrees/` 等）。历史上多分支 + worktree 并行导致过多次合并冲突；目前是单人开发，没有分支隔离的收益。
-- **所有 commit 直接落在 `main`**。每个完成的逻辑单元立即 commit + push。
-- **Agent / subagent 工作也必须在 `main` 上进行**，不要"为了隔离"而私自开分支。如果担心 breaking change，就把工作拆小成多个独立 commit，每个都能独立 build，而不是用分支隔离。
-- **不要使用 `git worktree add`**。`.worktrees/` 和 `.claude/worktrees/` 已在 `.gitignore` 中；即便创建也不会被追踪。
-- **Phase 级 / 大 refactor 的临时中间态**：用 tsc 零错误 + 每个 commit 都能独立 build 来保证安全，而不是分支隔离。如果中间态必然 break（例如 Phase 3 的常量删除引发 Phase 4 连锁修改），把 Phase 3 + Phase 4 合为一次 commit，不要拆成跨 commit 的 red→green 状态。
+- **常规小改动直接落 `main`**：单人单线程的修改、bug fix、小重构，commit + push 到 `main` 是默认动作，不必拆分支。
+- **subagent / 并行工作可以开分支或 worktree**：当存在 2 个以上独立 subagent 同时改不同子模块、或某个 agent 想在隔离环境里做大改动时，鼓励用 `git worktree add` 或临时分支隔离，避免互相踩 working tree。命名约定：`claude/<topic>` 或 `feature/<topic>`，`.worktrees/<topic>` 放工作区目录。
+- **分支生命周期短**：分支只用于隔离一次 subagent 任务或一次大 refactor，完成后立刻 merge/rebase 回 `main` 并删除分支与 worktree。不要长期维护多条平行分支。
+- **每个 commit 都能独立 build**：无论在 `main` 还是临时分支，每个 commit 都要 `tsc --noEmit` 零错误、`npm run build` 通过。中间态必然 break 的（例如 Phase 3 删除常量引发 Phase 4 连锁修改），合并成一个 commit。
+- **不要 force-push `main`**；临时分支 force-push 没问题（rebase 后常需要）。merge 回 `main` 用 fast-forward 或 squash，避免无意义的 merge commit。
+- **`.worktrees/` 和 `.claude/worktrees/` 在 `.gitignore` 中**——这是为了避免 worktree 工作目录被作为子目录追踪进 `main`，不是禁止使用 worktree 本身。worktree 检出的分支正常追踪。
 
 所有的按钮或lab等任何可以点击触发事件的按钮，不要带边框
 
