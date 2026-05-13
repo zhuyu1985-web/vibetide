@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List } from "lucide-react";
@@ -22,6 +22,8 @@ import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 import { OutletEditDialog } from "./outlet-edit-dialog";
 import { OutletDeleteConfirmDialog } from "./outlet-delete-confirm-dialog";
 import { reseedDictionary, batchRecognizeOutlets } from "@/app/actions/media-outlet-dictionary";
+
+const PAGE_SIZE = 30;
 
 const PLATFORM_ORDER: ChannelType[] = [
   "website",
@@ -126,6 +128,63 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
     [outlets],
   );
 
+  // 当前视图的"总条数"(过滤后,未分页)
+  const totalCount = viewMode === "outlets" ? filtered.length : channelRows.length;
+
+  // 增量分页:首屏 PAGE_SIZE 条,触底加载下一批,序号继续累计
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // 任何会改变结果集顺序/数量的状态变化都重置分页
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, tierFilter, platformFilter, viewMode]);
+
+  // 总数收缩时夹住 visibleCount,避免显示空白尾巴
+  const effectiveVisible = Math.min(visibleCount, totalCount);
+
+  const visibleOutlets = useMemo(
+    () => filtered.slice(0, effectiveVisible),
+    [filtered, effectiveVisible],
+  );
+  const visibleChannels = useMemo(
+    () => channelRows.slice(0, effectiveVisible),
+    [channelRows, effectiveVisible],
+  );
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const hasMore = effectiveVisible < totalCount;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => c + PAGE_SIZE);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, totalCount, viewMode]);
+
+  const tableFooter = totalCount === 0 ? null : (
+    <div className="flex flex-col items-center gap-1 py-3 text-xs text-muted-foreground">
+      <div>
+        已加载 <span className="tabular-nums text-foreground">{effectiveVisible}</span>
+        {" / "}
+        <span className="tabular-nums">{totalCount}</span>
+        {viewMode === "outlets" ? " 条媒体" : " 条账号"}
+      </div>
+      {hasMore && (
+        <div ref={sentinelRef} className="h-4 w-full text-center">
+          加载中…
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       <PageHeader title="媒体字典" description="维护采集源的媒体身份字典，用于自动识别采集项的媒体分级" />
@@ -219,10 +278,22 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
 
       {viewMode === "outlets" ? (
         <DataTable
-          rows={filtered}
+          rows={visibleOutlets}
           rowKey={(r) => r.id}
           className="mt-4"
+          footer={tableFooter}
           columns={[
+            {
+              key: "index",
+              header: "#",
+              width: "w-12",
+              align: "right",
+              render: (r) => (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {filtered.indexOf(r) + 1}
+                </span>
+              ),
+            },
             { key: "outletName", header: "媒体名", width: "w-44", render: (r) => (
               <div className="min-w-0">
                 <div className="text-sm text-foreground truncate">{r.outletName}</div>
@@ -287,10 +358,22 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
         />
       ) : (
         <DataTable
-          rows={channelRows}
+          rows={visibleChannels}
           rowKey={(r) => r.key}
           className="mt-4"
+          footer={tableFooter}
           columns={[
+            {
+              key: "index",
+              header: "#",
+              width: "w-12",
+              align: "right",
+              render: (r) => (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {channelRows.indexOf(r) + 1}
+                </span>
+              ),
+            },
             {
               key: "platform",
               header: "平台",

@@ -69,9 +69,9 @@ const keywordConfigSchema = z.object({
 
 const accountConfigSchema = z.object({
   mode: z.literal("account"),
-  /** 引用 media_outlet_dictionary.id — 该 outlet 必须存在且包含 channels[type=accountPlatform] */
-  outletId: z.string().uuid("outletId 必须是 UUID"),
-  accountPlatform: z.enum(TIKHUB_ACCOUNT_PLATFORMS),
+  /** 引用 media_outlet_dictionary.id 列表 — 每个 outlet 必须存在且至少包含 channels[type ∈ accountPlatforms] 中的一个平台 */
+  outletIds: z.array(z.string().uuid("outletId 必须是 UUID")).min(1, "至少选择一个媒体"),
+  accountPlatforms: z.array(z.enum(TIKHUB_ACCOUNT_PLATFORMS)).min(1, "至少选择一个平台"),
   maxPagesPerRun: z.number().int().min(1).max(10).default(3),
   resultsPerPage: z.number().int().min(10).max(50).default(20),
   monthlyBudgetUsd: z.number().min(0).max(1000).default(5),
@@ -86,16 +86,27 @@ export type TikhubConfig = z.infer<typeof tikhubConfigSchema>;
 export type TikhubKeywordConfig = z.infer<typeof keywordConfigSchema>;
 export type TikhubAccountConfig = z.infer<typeof accountConfigSchema>;
 
-// ─── 兼容旧 config(无 mode 字段)的预处理 ─────────────────────────────
-// 历史 sources 已经存在,DB 里的 config 没有 mode 字段。在 read 路径加个 default:
-//   { mode: undefined, platform: ..., keywords: [...] }  →  { mode: "keyword", ... }
-// adapter execute 入口加一层 normalizeLegacyConfig 调用即可。
+// ─── 兼容旧 config 的预处理 ───────────────────────────────────────────
+// 1) 早期 config 没有 mode 字段  → 默认 keyword 模式
+// 2) account 模式早期是单值 outletId / accountPlatform → 升级为数组 outletIds / accountPlatforms
+// adapter execute 入口走一次 normalize 即可,DB 不需要改写。
 export function normalizeLegacyTikhubConfig(raw: unknown): TikhubConfig {
-  if (typeof raw === "object" && raw !== null) {
-    const r = raw as Record<string, unknown>;
-    if (!r.mode) {
-      return tikhubConfigSchema.parse({ ...r, mode: "keyword" });
-    }
+  if (typeof raw !== "object" || raw === null) {
+    return tikhubConfigSchema.parse(raw);
   }
-  return tikhubConfigSchema.parse(raw);
+  const r = { ...(raw as Record<string, unknown>) };
+  if (!r.mode) r.mode = "keyword";
+  if (r.mode === "account") {
+    // 单值 → 数组(只填补,不覆盖)
+    if (!Array.isArray(r.outletIds) && typeof r.outletId === "string") {
+      r.outletIds = [r.outletId];
+    }
+    if (!Array.isArray(r.accountPlatforms) && typeof r.accountPlatform === "string") {
+      r.accountPlatforms = [r.accountPlatform];
+    }
+    // 删掉旧字段避免 zod strict 报警(虽然当前 schema 默认 strip,但显式删更稳)
+    delete r.outletId;
+    delete r.accountPlatform;
+  }
+  return tikhubConfigSchema.parse(r);
 }

@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { collectionSources } from "@/db/schema/collection";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
@@ -10,6 +10,7 @@ import {
   type TikhubConfig,
   type TikhubKeywordConfig,
   type TikhubAccountConfig,
+  type TikhubAccountPlatform,
   type TikhubPlatform,
 } from "./config";
 import { tikhubConfigFields } from "./config-fields";
@@ -87,12 +88,13 @@ interface AccountFetchPlan {
 
 function buildAccountFetchPlan(
   cfg: TikhubAccountConfig,
+  platform: TikhubAccountPlatform,
   channel: Channel,
   pageIndex: number,
 ): AccountFetchPlan {
-  const endpoint = TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS[cfg.accountPlatform];
+  const endpoint = TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS[platform];
 
-  switch (cfg.accountPlatform) {
+  switch (platform) {
     case "douyin": {
       if (channel.type !== "douyin") throw new Error("channel type mismatch");
       return {
@@ -139,34 +141,77 @@ function buildAccountFetchPlan(
   }
 }
 
-/** 启动校验:从字典里找 outlet 并取对应平台的 channel(取第一个);失败抛错。 */
-async function resolveAccountChannel(
+/** Account 模式一次执行涉及的 (outlet, platform, channel) 三元组,以及无效配对的诊断信息 */
+interface AccountResolveResult {
+  pairs: Array<{
+    outletId: string;
+    outletName: string;
+    platform: TikhubAccountPlatform;
+    channel: Channel;
+  }>;
+  /** 用户配置了但被跳过的 (outlet, platform) 配对,会作为 partialFailures 报出去 */
+  skipped: Array<{
+    outletId: string;
+    outletName: string;
+    platform: TikhubAccountPlatform;
+    reason: string;
+  }>;
+}
+
+/** 启动校验:展开 (outletIds × accountPlatforms) 笛卡尔积,只保留实际有 channel 的配对 */
+async function resolveAccountPairs(
   cfg: TikhubAccountConfig,
   organizationId: string,
-): Promise<Channel> {
-  const [outlet] = await db
+): Promise<AccountResolveResult> {
+  const outlets = await db
     .select()
     .from(mediaOutletDictionary)
     .where(
       and(
-        eq(mediaOutletDictionary.id, cfg.outletId),
+        inArray(mediaOutletDictionary.id, cfg.outletIds),
         eq(mediaOutletDictionary.organizationId, organizationId),
       ),
-    )
-    .limit(1);
-
-  if (!outlet) {
-    throw new Error(`outlet ${cfg.outletId} 不存在或跨 org`);
-  }
-
-  const channels = (outlet.channels ?? []) as Channel[];
-  const ch = channels.find((c) => c.type === cfg.accountPlatform);
-  if (!ch) {
-    throw new Error(
-      `outlet ${outlet.outletName} 在 ${cfg.accountPlatform} 平台没有配置 channel,请到媒体字典补全`,
     );
+
+  const byId = new Map(outlets.map((o) => [o.id, o]));
+  const pairs: AccountResolveResult["pairs"] = [];
+  const skipped: AccountResolveResult["skipped"] = [];
+
+  for (const outletId of cfg.outletIds) {
+    const outlet = byId.get(outletId);
+    if (!outlet) {
+      for (const platform of cfg.accountPlatforms) {
+        skipped.push({
+          outletId,
+          outletName: "(未知)",
+          platform,
+          reason: `outlet ${outletId} 不存在或跨 org`,
+        });
+      }
+      continue;
+    }
+    const channels = (outlet.channels ?? []) as Channel[];
+    for (const platform of cfg.accountPlatforms) {
+      const ch = channels.find((c) => c.type === platform);
+      if (!ch) {
+        skipped.push({
+          outletId,
+          outletName: outlet.outletName,
+          platform,
+          reason: `${outlet.outletName} 在 ${platform} 平台没有配置 channel,请到媒体字典补全`,
+        });
+        continue;
+      }
+      pairs.push({
+        outletId,
+        outletName: outlet.outletName,
+        platform,
+        channel: ch,
+      });
+    }
   }
-  return ch;
+
+  return { pairs, skipped };
 }
 
 // ─── 预算累加 / auto-disable ─────────────────────────────────────────
@@ -343,16 +388,33 @@ async function runAccountMode(
   const partialFailures: { message: string; meta?: Record<string, unknown> }[] = [];
   let totalCost = 0;
 
-  // 1) 启动校验:取 outlet + 对应 channel
-  const channel = await resolveAccountChannel(config, ctx.organizationId);
+  // 1) 启动校验:展开 (outletIds × accountPlatforms),只保留有 channel 的有效配对
+  const { pairs, skipped } = await resolveAccountPairs(config, ctx.organizationId);
+
+  for (const s of skipped) {
+    partialFailures.push({
+      message: s.reason,
+      meta: { outletId: s.outletId, platform: s.platform },
+    });
+    ctx.log("warn", `tikhub account skip ${s.outletName}/${s.platform}: ${s.reason}`);
+  }
+
+  if (pairs.length === 0) {
+    throw new Error(
+      `tikhub account: 没有任何有效的 (媒体, 平台) 配对 — 检查媒体字典是否给所选平台补全了账号`,
+    );
+  }
+
   ctx.log(
     "info",
-    `tikhub account mode: outlet=${config.outletId} platform=${config.accountPlatform}`,
+    `tikhub account mode: ${pairs.length} 个有效配对 (outlets=${config.outletIds.length}, platforms=${config.accountPlatforms.length}, 跳过=${skipped.length})`,
   );
 
-  // 2) 预算预估(account 模式按 1 账号 × maxPagesPerRun 估算)
-  const endpoint = TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS[config.accountPlatform];
-  const estimated = estimateCost(config, endpoint);
+  // 2) 预算预估:对每个有效配对各跑 maxPagesPerRun 页,按各平台 endpoint 估价后累加
+  const estimated = pairs.reduce(
+    (sum, p) => sum + estimateCost(config, TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS[p.platform]),
+    0,
+  );
   ctx.log("info", `tikhub account estimated cost: $${estimated.toFixed(4)}`);
   if (estimated > config.monthlyBudgetUsd) {
     throw new Error(
@@ -360,30 +422,36 @@ async function runAccountMode(
     );
   }
 
-  // 3) 按页拉取
-  const mapper = ACCOUNT_MAPPERS[config.accountPlatform];
-  for (let p = 0; p < config.maxPagesPerRun; p++) {
-    try {
-      const plan = buildAccountFetchPlan(config, channel, p);
-      const result = await tikhubFetch({ endpoint: plan.endpoint, params: plan.params });
-      totalCost += result.costUsd;
-      const mapped = mapper(result.data);
-      items.push(...mapped);
+  // 3) 按 (配对, 页) 拉取
+  for (const pair of pairs) {
+    const mapper = ACCOUNT_MAPPERS[pair.platform];
+    const endpoint = TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS[pair.platform];
 
-      ctx.log(
-        "info",
-        `tikhub ${config.accountPlatform} page=${p + 1} → ${mapped.length} items`,
-      );
-      // 早停:页结果远低于预期就停
-      if (mapped.length < config.resultsPerPage * 0.3) break;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      partialFailures.push({ message, meta: { page: p + 1 } });
-      ctx.log(
-        "error",
-        `tikhub ${config.accountPlatform} page=${p + 1} failed: ${message}`,
-      );
-      break;
+    for (let p = 0; p < config.maxPagesPerRun; p++) {
+      try {
+        const plan = buildAccountFetchPlan(config, pair.platform, pair.channel, p);
+        const result = await tikhubFetch({ endpoint: plan.endpoint, params: plan.params });
+        totalCost += result.costUsd;
+        const mapped = mapper(result.data);
+        items.push(...mapped);
+
+        ctx.log(
+          "info",
+          `tikhub ${pair.outletName}/${pair.platform} page=${p + 1} → ${mapped.length} items`,
+        );
+        if (mapped.length < config.resultsPerPage * 0.3) break;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        partialFailures.push({
+          message,
+          meta: { outletId: pair.outletId, platform: pair.platform, page: p + 1 },
+        });
+        ctx.log(
+          "error",
+          `tikhub ${pair.outletName}/${pair.platform} page=${p + 1} failed: ${message}`,
+        );
+        break;
+      }
     }
   }
 
@@ -405,8 +473,10 @@ async function runAccountMode(
     runMetadata: {
       tikhubCostUsd: totalCost,
       tikhubMode: "account",
-      tikhubAccountPlatform: config.accountPlatform,
-      tikhubOutletId: config.outletId,
+      tikhubAccountPlatforms: config.accountPlatforms,
+      tikhubOutletIds: config.outletIds,
+      tikhubResolvedPairs: pairs.length,
+      tikhubSkippedPairs: skipped.length,
     },
   };
 }

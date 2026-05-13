@@ -75,13 +75,18 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
   const canAdvance = () => {
     if (step === 1) return Boolean(sourceType);
     if (step === 2) {
-      // tikhub 走自定义校验:keyword 模式需 platform+keywords;account 模式需 accountPlatform+outletId
+      // tikhub 走自定义校验:keyword 模式需 platform+keywords;account 模式需 accountPlatforms[]+outletIds[]
       if (selectedMeta?.type === "tikhub") {
         const mode = (config.mode as string) ?? "keyword";
         if (mode === "keyword") {
           return Boolean(config.platform) && Array.isArray(config.keywords) && (config.keywords as string[]).length > 0;
         }
-        return Boolean(config.accountPlatform) && Boolean(config.outletId);
+        const platforms = config.accountPlatforms;
+        const outletIds = config.outletIds;
+        return (
+          Array.isArray(platforms) && (platforms as string[]).length > 0 &&
+          Array.isArray(outletIds) && (outletIds as string[]).length > 0
+        );
       }
       return selectedMeta?.configFields.every((f) => {
         if (!f.required) return true;
@@ -583,6 +588,85 @@ function MultiSelectInput({ field, value, onChange }: MultiSelectInputProps) {
   );
 }
 
+interface OutletMultiPickerProps {
+  eligibleOutlets: WizardOutletOption[];
+  accountPlatforms: string[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  onSelectAll: () => void;
+  onClear: () => void;
+}
+
+function OutletMultiPicker({
+  eligibleOutlets,
+  accountPlatforms,
+  selected,
+  onToggle,
+  onSelectAll,
+  onClear,
+}: OutletMultiPickerProps) {
+  const [search, setSearch] = useState("");
+  const filtered = search.trim()
+    ? eligibleOutlets.filter((o) =>
+        o.outletName.toLowerCase().includes(search.trim().toLowerCase()),
+      )
+    : eligibleOutlets;
+  const allFilteredSelected = filtered.length > 0 && filtered.every((o) => selected.includes(o.id));
+  return (
+    <div className="rounded-md border bg-card overflow-hidden">
+      <div className="flex items-center gap-2 border-b bg-muted/30 px-3 py-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={`搜索媒体名（共 ${eligibleOutlets.length} 个候选）`}
+          className="h-8 text-xs flex-1"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-8 text-xs"
+          onClick={allFilteredSelected ? onClear : onSelectAll}
+        >
+          {allFilteredSelected ? "清空" : "全选"}
+        </Button>
+      </div>
+      <div className="max-h-60 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="px-3 py-4 text-center text-xs text-muted-foreground">没有匹配的媒体</div>
+        ) : (
+          filtered.map((o) => {
+            const matched = o.channels
+              .filter((c) => accountPlatforms.includes(c.type))
+              .map((c) => c.type);
+            const on = selected.includes(o.id);
+            return (
+              <label
+                key={o.id}
+                className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer border-b last:border-b-0 transition-colors ${
+                  on ? "bg-primary/5" : "hover:bg-muted/40"
+                }`}
+              >
+                <Checkbox checked={on} onCheckedChange={() => onToggle(o.id)} />
+                <span className="flex-1 truncate">{o.outletName}</span>
+                <div className="flex gap-1 shrink-0">
+                  {matched.map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {TIKHUB_ACCOUNT_PLATFORMS.find((p) => p.value === t)?.label ?? t}
+                    </span>
+                  ))}
+                </div>
+              </label>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────
 // TikhubConfigPanel — M4: tikhub 专用配置面板,支持 keyword / account 双模式
 // ───────────────────────────────────────────────────────────────────────
@@ -595,16 +679,41 @@ interface TikhubConfigPanelProps {
 
 function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProps) {
   const mode = (config.mode as string) ?? "keyword";
-  const accountPlatform = (config.accountPlatform as string) ?? "";
+  const accountPlatforms = Array.isArray(config.accountPlatforms)
+    ? (config.accountPlatforms as string[])
+    : [];
+  const outletIds = Array.isArray(config.outletIds) ? (config.outletIds as string[]) : [];
 
   function patch(p: Record<string, unknown>) {
     setConfig({ ...config, ...p });
   }
 
-  // 按平台过滤"在该平台有 channel 的 outlets"
-  const eligibleOutlets = accountPlatform
-    ? outlets.filter((o) => o.channels.some((c) => c.type === accountPlatform))
-    : [];
+  function toggleAccountPlatform(value: string) {
+    const next = accountPlatforms.includes(value)
+      ? accountPlatforms.filter((v) => v !== value)
+      : [...accountPlatforms, value];
+    // 平台变更后,清理掉那些"在剩余平台里一个 channel 都没有"的 outlet
+    const stillValidOutletIds = outletIds.filter((id) => {
+      const o = outlets.find((x) => x.id === id);
+      return o?.channels.some((c) => next.includes(c.type));
+    });
+    patch({ accountPlatforms: next, outletIds: stillValidOutletIds });
+  }
+
+  function toggleOutletId(id: string) {
+    const next = outletIds.includes(id)
+      ? outletIds.filter((v) => v !== id)
+      : [...outletIds, id];
+    patch({ outletIds: next });
+  }
+
+  // 把已选平台 + 媒体筛出来:必须该 outlet 至少在已选平台之一上有 channel
+  const eligibleOutlets =
+    accountPlatforms.length === 0
+      ? []
+      : outlets.filter((o) =>
+          o.channels.some((c) => accountPlatforms.includes(c.type)),
+        );
 
   return (
     <div className="flex flex-col gap-6">
@@ -702,63 +811,62 @@ function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProp
         </>
       ) : (
         <>
-          <div className="space-y-1.5">
-            <Label>平台 *</Label>
-            <Select
-              value={accountPlatform}
-              onValueChange={(v) => patch({ accountPlatform: v, outletId: undefined })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="请选择" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIKHUB_ACCOUNT_PLATFORMS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <Label>平台 * <span className="text-xs font-normal text-muted-foreground">(可多选)</span></Label>
+              {accountPlatforms.length > 0 && (
+                <span className="text-xs text-muted-foreground">已选 {accountPlatforms.length} 个</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {TIKHUB_ACCOUNT_PLATFORMS.map((p) => {
+                const on = accountPlatforms.includes(p.value);
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => toggleAccountPlatform(p.value)}
+                    className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                      on
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
                     {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>选择媒体(必须该平台已配账号) *</Label>
-            <Select
-              value={(config.outletId as string) ?? ""}
-              onValueChange={(v) => patch({ outletId: v })}
-              disabled={!accountPlatform}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={!accountPlatform ? "请先选平台" : "选择媒体"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {eligibleOutlets.length === 0 ? (
-                  <div className="px-2 py-4 text-xs text-muted-foreground">
-                    {accountPlatform
-                      ? `没有任何媒体在"${TIKHUB_ACCOUNT_PLATFORMS.find((p) => p.value === accountPlatform)?.label}"平台配置了账号,请先到 媒体字典 补全`
-                      : "请先选平台"}
-                  </div>
-                ) : (
-                  eligibleOutlets.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.outletName}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {accountPlatform && eligibleOutlets.length === 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                ⚠️ 请去{" "}
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <Label>选择媒体 * <span className="text-xs font-normal text-muted-foreground">(可多选,需在已选平台至少配过一个账号)</span></Label>
+              {outletIds.length > 0 && (
+                <span className="text-xs text-muted-foreground">已选 {outletIds.length} 个</span>
+              )}
+            </div>
+            {accountPlatforms.length === 0 ? (
+              <div className="rounded-md border border-dashed bg-muted/20 px-3 py-6 text-center text-xs text-muted-foreground">
+                请先勾选平台
+              </div>
+            ) : eligibleOutlets.length === 0 ? (
+              <div className="rounded-md border border-dashed bg-amber-50 dark:bg-amber-950/30 px-3 py-4 text-xs text-amber-700 dark:text-amber-400">
+                ⚠️ 没有任何媒体在已选平台配置过账号。请去{" "}
                 <Link href="/data-collection/outlets" className="underline">
                   媒体字典
                 </Link>{" "}
-                给目标媒体补全{" "}
-                {TIKHUB_ACCOUNT_PLATFORMS.find((p) => p.value === accountPlatform)?.label}{" "}
-                平台账号后再回来。
-              </p>
+                补全后再回来。
+              </div>
+            ) : (
+              <OutletMultiPicker
+                eligibleOutlets={eligibleOutlets}
+                accountPlatforms={accountPlatforms}
+                selected={outletIds}
+                onToggle={toggleOutletId}
+                onSelectAll={() => patch({ outletIds: eligibleOutlets.map((o) => o.id) })}
+                onClear={() => patch({ outletIds: [] })}
+              />
             )}
           </div>
         </>
