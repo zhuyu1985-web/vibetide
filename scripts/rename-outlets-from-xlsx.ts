@@ -39,7 +39,7 @@ const dryRun = args.includes("--dry-run");
 const filePath =
   args.find((a) => a.endsWith(".xlsx")) ?? "docs/media-outlets-channels-todo.xlsx";
 
-function norm(s: string | undefined): string {
+function norm(s: unknown): string {
   return String(s ?? "").trim();
 }
 
