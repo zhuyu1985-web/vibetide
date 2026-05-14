@@ -21,7 +21,8 @@ import {
 import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 import { OutletEditDialog } from "./outlet-edit-dialog";
 import { OutletDeleteConfirmDialog } from "./outlet-delete-confirm-dialog";
-import { reseedDictionary, batchRecognizeOutlets } from "@/app/actions/media-outlet-dictionary";
+import { OutletHardDeleteDialog } from "./outlet-hard-delete-dialog";
+import { reseedDictionary, batchRecognizeOutlets, reactivateOutlet } from "@/app/actions/media-outlet-dictionary";
 
 const PAGE_SIZE = 30;
 
@@ -67,6 +68,7 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
   const [editing, setEditing] = useState<MediaOutletRow | null>(null);
   const [creatingNew, setCreatingNew] = useState(false);
   const [deletingOutlet, setDeletingOutlet] = useState<{ id: string; name: string } | null>(null);
+  const [hardDeletingOutlet, setHardDeletingOutlet] = useState<{ id: string; name: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -343,13 +345,64 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
                 );
               },
             },
-            { key: "isActive", header: "状态", width: "w-16", render: (r) => r.isActive ? "启用" : "停用" },
             {
-              key: "actions", header: "操作", width: "w-32",
+              key: "isActive",
+              header: "状态",
+              width: "w-20",
+              render: (r) => (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.5 font-normal",
+                    r.isActive
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+                  )}
+                >
+                  {r.isActive ? "已启用" : "已停用"}
+                </Badge>
+              ),
+            },
+            {
+              key: "actions", header: "操作", width: "w-44",
               render: (r) => (
                 <div className="flex gap-1">
                   <Button variant="ghost" onClick={() => setEditing(r)}>编辑</Button>
-                  <Button variant="ghost" onClick={() => setDeletingOutlet({ id: r.id, name: r.outletName })}>停用</Button>
+                  {r.isActive ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setDeletingOutlet({ id: r.id, name: r.outletName })}
+                    >
+                      停用
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={() =>
+                          startTransition(async () => {
+                            try {
+                              await reactivateOutlet(r.id);
+                              toast.success(`已启用 ${r.outletName}`);
+                              router.refresh();
+                            } catch (e) {
+                              toast.error(`启用失败：${(e as Error).message}`);
+                            }
+                          })
+                        }
+                      >
+                        启用
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setHardDeletingOutlet({ id: r.id, name: r.outletName })}
+                      >
+                        删除
+                      </Button>
+                    </>
+                  )}
                 </div>
               ),
             },
@@ -483,6 +536,19 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
           onDeleted={() => {
             setDeletingOutlet(null);
             toast.success("已停用");
+            router.refresh();
+          }}
+        />
+      )}
+
+      {hardDeletingOutlet && (
+        <OutletHardDeleteDialog
+          outletId={hardDeletingOutlet.id}
+          outletName={hardDeletingOutlet.name}
+          onClose={() => setHardDeletingOutlet(null)}
+          onDeleted={() => {
+            setHardDeletingOutlet(null);
+            toast.success("已彻底删除");
             router.refresh();
           }}
         />

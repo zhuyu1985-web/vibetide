@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
@@ -59,6 +59,95 @@ export async function softDeleteOutlet(id: string) {
       eq(mediaOutletDictionary.id, id),
       eq(mediaOutletDictionary.organizationId, user.organizationId),
     ));
+  await bumpDictionaryVersion(user.organizationId);
+  revalidatePath("/data-collection/outlets");
+}
+
+export async function reactivateOutlet(id: string) {
+  const user = await requireAuth();
+  await db.update(mediaOutletDictionary).set({ isActive: true, updatedAt: new Date() })
+    .where(and(
+      eq(mediaOutletDictionary.id, id),
+      eq(mediaOutletDictionary.organizationId, user.organizationId),
+    ));
+  await bumpDictionaryVersion(user.organizationId);
+  revalidatePath("/data-collection/outlets");
+}
+
+/**
+ * 硬删一个 outlet 的影响面预览(给 confirm dialog 用)。
+ * 返回引用了该 outlet_id 但 FK 没约束的下游 dangling 数。
+ */
+export async function getOutletDeletionImpact(id: string): Promise<{
+  outletName: string;
+  isActive: boolean;
+  collectedItems: number;
+  collectionSources: number;
+}> {
+  const user = await requireAuth();
+  const [outlet] = await db
+    .select()
+    .from(mediaOutletDictionary)
+    .where(and(
+      eq(mediaOutletDictionary.id, id),
+      eq(mediaOutletDictionary.organizationId, user.organizationId),
+    ))
+    .limit(1);
+  if (!outlet) throw new Error("outlet 不存在");
+
+  const itemsRows = await db.execute(
+    sql`SELECT count(*)::int AS n FROM collected_items WHERE outlet_id = ${id}::uuid AND organization_id = ${user.organizationId}::uuid`,
+  );
+  const sourcesRows = await db.execute(
+    sql`SELECT count(*)::int AS n FROM collection_sources WHERE outlet_id = ${id}::uuid AND organization_id = ${user.organizationId}::uuid`,
+  );
+  const items = Number((itemsRows as unknown as Array<{ n: number }>)[0]?.n ?? 0);
+  const sources = Number((sourcesRows as unknown as Array<{ n: number }>)[0]?.n ?? 0);
+
+  return {
+    outletName: outlet.outletName,
+    isActive: outlet.isActive,
+    collectedItems: items,
+    collectionSources: sources,
+  };
+}
+
+/**
+ * 彻底删除一个 outlet 行,只允许在 is_active=false 时执行。
+ * 同步把 collected_items / collection_sources 中引用它的 outlet_id 置 NULL,
+ * 清理 dangling 引用。
+ */
+export async function hardDeleteOutlet(id: string): Promise<void> {
+  const user = await requireAuth();
+  const [outlet] = await db
+    .select()
+    .from(mediaOutletDictionary)
+    .where(and(
+      eq(mediaOutletDictionary.id, id),
+      eq(mediaOutletDictionary.organizationId, user.organizationId),
+    ))
+    .limit(1);
+  if (!outlet) throw new Error("outlet 不存在");
+  if (outlet.isActive) {
+    throw new Error("启用中的媒体不能彻底删除,请先停用");
+  }
+
+  // 1) 清理 dangling 引用
+  await db.execute(
+    sql`UPDATE collected_items SET outlet_id = NULL WHERE outlet_id = ${id}::uuid AND organization_id = ${user.organizationId}::uuid`,
+  );
+  await db.execute(
+    sql`UPDATE collection_sources SET outlet_id = NULL WHERE outlet_id = ${id}::uuid AND organization_id = ${user.organizationId}::uuid`,
+  );
+
+  // 2) 真删 outlet
+  await db
+    .delete(mediaOutletDictionary)
+    .where(and(
+      eq(mediaOutletDictionary.id, id),
+      eq(mediaOutletDictionary.organizationId, user.organizationId),
+    ));
+
   await bumpDictionaryVersion(user.organizationId);
   revalidatePath("/data-collection/outlets");
 }
