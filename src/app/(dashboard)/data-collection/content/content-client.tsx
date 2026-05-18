@@ -31,7 +31,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, SOURCE_TYPE_COLOR, formatChannelLabel, getPlatformChipClass, type OutletTier } from "@/lib/collection/constants";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, SOURCE_TYPE_COLOR, getPlatformChipClass, type OutletTier } from "@/lib/collection/constants";
+import {
+  CHANNEL_BUCKET_ORDER,
+  CHANNEL_BUCKET_SLUG,
+} from "@/lib/collection/channel-bucket";
 import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 import {
   bulkDeleteCollectedItemsAction,
@@ -41,6 +45,7 @@ import {
 } from "@/app/actions/collection-items";
 import { ItemDetailDrawer } from "./item-detail-drawer";
 import { ImportExcelDialog } from "./import-excel-dialog";
+import { FilterChips, type ChipOption } from "./filter-chips";
 
 const PAGE_SIZE = 50;
 
@@ -144,6 +149,8 @@ interface ContentClientProps {
   adapterMetas: AdapterMeta[];
   outlets: MediaOutletRow[];
   filterOptions: CollectedItemFilterOptions;
+  /** 信息来源 chip 计数(已按 ChannelBucket 折叠);chip label → 总条数。 */
+  channelCounts: Record<string, number>;
   initialFilters: ClientFilters;
   initialView: "card" | "table";
 }
@@ -178,6 +185,7 @@ export function ContentClient({
   adapterMetas,
   outlets,
   filterOptions,
+  channelCounts,
   initialFilters,
   initialView,
 }: ContentClientProps) {
@@ -479,67 +487,67 @@ export function ContentClient({
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  // ── chip options 构造 ────────────────────────────────────────────────────────
+  // 信息来源 chips:按 ChannelBucket 固定顺序展示,带 channelCounts 计数。
+  // 没出现过的桶(count=0)也保留,跟图 1 一样固定列表
+  const channelChipOptions: ChipOption[] = CHANNEL_BUCKET_ORDER.map((bucket) => ({
+    value: CHANNEL_BUCKET_SLUG[bucket],
+    label: bucket,
+    count: channelCounts[bucket] ?? 0,
+  }));
+
+  // 时间快捷段 chips
+  const timeChipOptions: ChipOption[] = TIME_OPTIONS.filter((o) => o.value !== "all").map((o) => ({
+    value: o.value,
+    label: o.label,
+  }));
+
+  // 媒体分级 chips
+  const outletTierChipOptions: ChipOption[] = [
+    ...OUTLET_TIER_VALUES.map((t) => ({ value: t, label: OUTLET_TIER_LABELS[t] })),
+    { value: "unclassified", label: "未分类" },
+  ];
+
+  // 分类 chips(只取前 8 项,避免过长;剩下的还能用 Select 兜底,但 V1 留个上限就够)
+  const categoryChipOptions: ChipOption[] = filterOptions.categories.slice(0, 8).map((c) => ({
+    value: c,
+    label: c,
+  }));
+
+  // 当前选中状态映射(slug ↔ chip value)
+  const currentPlatformChip = initialFilters.platform;
+  const currentTimeChip: string | undefined = currentTime === "all" ? undefined : currentTime;
+
+  // chip 选择 → URL patch
+  const handleTimeChipChange = (v: string | undefined) => {
+    if (v === undefined) {
+      // 等同"全部"
+      updateUrl({ time: undefined, publishedSince: undefined, publishedUntil: undefined });
+    } else if (v !== "custom") {
+      updateUrl({ time: v, publishedSince: undefined, publishedUntil: undefined });
+    } else {
+      updateUrl({ time: v });
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* Row 1: 检索 — 所有筛选条件 + 清空 */}
+    <div className="flex flex-col gap-3">
+      {/* Row 1: 信息来源 chips(按 channel bucket 计数) */}
+      <FilterChips
+        label="信息来源"
+        options={channelChipOptions}
+        value={currentPlatformChip}
+        onChange={(v) => updateUrl({ platform: v })}
+      />
+
+      {/* Row 2: 监测时间快捷段 + 自定义范围 */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Search */}
-        <SearchInput
-          className="w-64"
-          placeholder="搜索标题或内容…"
-          value={searchValue}
-          onChange={(e) => handleSearchChange(e.target.value)}
+        <FilterChips
+          label="监测时间"
+          options={timeChipOptions}
+          value={currentTimeChip}
+          onChange={handleTimeChipChange}
         />
-
-        {/* Source type */}
-        <Select
-          value={currentSourceType}
-          onValueChange={(v) =>
-            updateUrl({ sourceType: v === "__all__" ? undefined : v })
-          }
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="源类型" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">全部源类型</SelectItem>
-            {adapterMetas.map((m) => (
-              <SelectItem key={m.type} value={m.type}>
-                {m.displayName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* 发布时间 — 快捷窗 + 自定义合二为一 */}
-        <Select
-          value={currentTime}
-          onValueChange={(v) => {
-            // 切换到非 custom 时清掉自定义日期 param
-            if (v !== "custom") {
-              updateUrl({
-                time: v === "all" ? undefined : v,
-                publishedSince: undefined,
-                publishedUntil: undefined,
-              });
-            } else {
-              updateUrl({ time: v });
-            }
-          }}
-        >
-          <SelectTrigger className="w-28">
-            <SelectValue placeholder="发布时间" />
-          </SelectTrigger>
-          <SelectContent>
-            {TIME_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* 自定义发布时间范围 — 仅当时间窗选"自定义"时显示 */}
         {currentTime === "custom" && (
           <DateRangePicker
             value={
@@ -567,48 +575,17 @@ export function ContentClient({
             placeholder="选择日期范围"
           />
         )}
+      </div>
 
-        {/* AI 解析状态 */}
-        <Select
-          value={currentEnrichment}
-          onValueChange={(v) =>
-            updateUrl({ enrichment: v === "__all__" ? undefined : v })
-          }
-        >
-          <SelectTrigger className="w-28">
-            <SelectValue placeholder="AI解析" />
-          </SelectTrigger>
-          <SelectContent>
-            {ENRICHMENT_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Row 3: 媒体维度 — 媒体分级 chips + 区域 / 分类 / 源类型 / 绑定媒体 / 标签 / AI解析 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterChips
+          label="媒体分级"
+          options={outletTierChipOptions}
+          value={currentOutletTier === "__all__" ? undefined : currentOutletTier}
+          onChange={(v) => updateUrl({ outletTier: v })}
+        />
 
-        {/* Outlet tier */}
-        <Select
-          value={currentOutletTier}
-          onValueChange={(v) =>
-            updateUrl({ outletTier: v === "__all__" ? undefined : v })
-          }
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="媒体分级" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">全部分级</SelectItem>
-            {OUTLET_TIER_VALUES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {OUTLET_TIER_LABELS[t]}
-              </SelectItem>
-            ))}
-            <SelectItem value="unclassified">未分类</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Outlet region */}
         <Select
           value={currentOutletRegion}
           onValueChange={(v) =>
@@ -625,7 +602,25 @@ export function ContentClient({
           </SelectContent>
         </Select>
 
-        {/* A2: 绑定媒体(outletId 精确) */}
+        <Select
+          value={currentSourceType}
+          onValueChange={(v) =>
+            updateUrl({ sourceType: v === "__all__" ? undefined : v })
+          }
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="源类型" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">全部源类型</SelectItem>
+            {adapterMetas.map((m) => (
+              <SelectItem key={m.type} value={m.type}>
+                {m.displayName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select
           value={currentOutletId}
           onValueChange={(v) =>
@@ -645,27 +640,6 @@ export function ContentClient({
           </SelectContent>
         </Select>
 
-        {/* A2: 默认分类(source 上配的 defaultCategory 反过来筛) */}
-        <Select
-          value={currentCategory}
-          onValueChange={(v) =>
-            updateUrl({ category: v === "__all__" ? undefined : v })
-          }
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="分类" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">全部分类</SelectItem>
-            {filterOptions.categories.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* A2: 默认标签(source 上配的 defaultTags 反过来筛,GIN 索引命中) */}
         <Select
           value={currentTag}
           onValueChange={(v) =>
@@ -685,41 +659,73 @@ export function ContentClient({
           </SelectContent>
         </Select>
 
-        {/* 媒体账号 — 模糊匹配 author 列(账号名) */}
+        <Select
+          value={currentEnrichment}
+          onValueChange={(v) =>
+            updateUrl({ enrichment: v === "__all__" ? undefined : v })
+          }
+        >
+          <SelectTrigger className="w-28">
+            <SelectValue placeholder="AI解析" />
+          </SelectTrigger>
+          <SelectContent>
+            {ENRICHMENT_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Row 3.5: 分类 chips — 单独一行(可能很多个,折行展示) */}
+      {categoryChipOptions.length > 0 && (
+        <FilterChips
+          label="分类"
+          options={categoryChipOptions}
+          value={currentCategory === "__all__" ? undefined : currentCategory}
+          onChange={(v) => updateUrl({ category: v })}
+        />
+      )}
+
+      {/* Row 4: 关键词 + 媒体账号 + 操作 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <SearchInput
+          className="w-64"
+          placeholder="关键词搜索…"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
         <SearchInput
           className="w-40"
           placeholder="媒体账号"
           value={authorValue}
           onChange={(e) => handleAuthorChange(e.target.value)}
         />
-
-        {/* Reset — only when any filter active */}
         {hasActiveFilter && (
           <Button variant="ghost" size="sm" onClick={handleResetAll}>
-            清空
+            重置
           </Button>
         )}
-      </div>
-
-      {/* Row 2: 功能按钮 — 导入 / 导出(右对齐) */}
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-          <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
-          导入 Excel
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportExcel}
-          disabled={exporting || total === 0}
-        >
-          {exporting ? (
-            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-          ) : (
-            <Download className="h-3.5 w-3.5 mr-1" />
-          )}
-          {exporting ? "导出中…" : "导出 Excel"}
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
+            导入 Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={exporting || total === 0}
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5 mr-1" />
+            )}
+            {exporting ? "导出中…" : "导出 Excel"}
+          </Button>
+        </div>
       </div>
 
       {/* Selection toolbar — 选中后才显示;否则照常显示 total */}
