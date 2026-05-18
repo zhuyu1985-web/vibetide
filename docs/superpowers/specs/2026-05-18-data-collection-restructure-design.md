@@ -68,10 +68,17 @@
 
 `MENU_PERMISSION_MAP`（`src/lib/rbac-constants.ts`）变更：
 
-- `/research` 条目删除。
-- `PERMISSIONS.MENU_RESEARCH` 标 `@deprecated`，废弃 label "查看新闻研究模块"。
-- 新增（或确认存在）`PERMISSIONS.MENU_DATA_COLLECTION`，覆盖 `/data-collection`、`/data-collection/*` 全部子路径。
-- DB migration：把 `role_permissions` 表里所有 `MENU_RESEARCH` 行迁为 `MENU_DATA_COLLECTION`（同 role_id / org_id，避免重复时用 INSERT … ON CONFLICT DO NOTHING），然后删除老权限位行。
+- `/research` 与 `/research/admin/topics` 条目从 `MENU_PERMISSION_MAP` 删除。
+- `PERMISSIONS.MENU_RESEARCH` 常量**保留**（避免破坏 `role_permissions` 表里既有的行），标 `@deprecated`；废弃 label "查看新闻研究模块"。
+- `PERMISSIONS_CONFIG` 里的 `MENU_RESEARCH` label 删除（避免在权限管理 UI 里再出现该权限位）。
+
+**关于 MENU_DATA_COLLECTION**（实地核查后的决定）：当前 `MENU_PERMISSION_MAP` 中**没有** `/data-collection` 条目，即采集模块**对所有登录用户开放**。本次重构**不**新增 `MENU_DATA_COLLECTION` permission、**不**修改 `role_permissions` 表，原因：
+
+1. 引入新 permission gate 会给已经能访问 `/data-collection` 的用户带来意外权限墙。
+2. 现有用户的角色绑定无需调整；MENU_RESEARCH 权限位虽不再被代码引用，但作为 db 行存在不破坏任何逻辑。
+3. 若日后需要更细粒度 RBAC（如限制研究报告只对特定角色可见），可单独立新 spec 引入。
+
+实际效果：迁移后，原绑了 `MENU_RESEARCH` 的角色与未绑该权限的普通用户一样，都能正常访问 `/data-collection/*`。
 
 ---
 
