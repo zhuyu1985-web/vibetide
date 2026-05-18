@@ -12,26 +12,16 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  {
-    href: "/data-collection/content",
-    label: "采集池",
-    matchPrefixes: ["/data-collection/content"],
-  },
-  {
-    href: "/data-collection/sources",
-    label: "源管理",
-    matchPrefixes: ["/data-collection/sources"],
-  },
-  {
-    href: "/data-collection/outlets",
-    label: "媒体字典",
-    matchPrefixes: ["/data-collection/outlets"],
-  },
-  {
-    href: "/data-collection/monitoring",
-    label: "监控面板",
-    matchPrefixes: ["/data-collection/monitoring"],
-  },
+  { href: "/data-collection/content",    label: "采集池",
+    matchPrefixes: ["/data-collection/content"] },
+  { href: "/data-collection/sources",    label: "采集配置",
+    matchPrefixes: ["/data-collection/sources", "/data-collection/outlets"] },
+  { href: "/data-collection/topics",     label: "主题监测",
+    matchPrefixes: ["/data-collection/topics"] },
+  { href: "/data-collection/reports",    label: "研究报告",
+    matchPrefixes: ["/data-collection/reports"] },
+  { href: "/data-collection/monitoring", label: "监控面板",
+    matchPrefixes: ["/data-collection/monitoring"] },
 ];
 
 export function DataCollectionTabs() {

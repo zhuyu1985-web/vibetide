@@ -36,7 +36,6 @@ import {
   ShieldCheck,
   ChevronDown,
   Wrench,
-  Telescope,
   Compass,
   Plus,
   Database,
@@ -92,7 +91,7 @@ function useHoverPopover(delayClose = 120) {
 
 /* ─── Types ─── */
 
-interface SubItem { label: string; href: string; icon: LucideIcon }
+interface SubItem { label: string; href: string; icon: LucideIcon; matchPrefixes?: string[] }
 interface NavItem extends SubItem { children?: SubItem[] }
 
 /* ─── Navigation Data ─── */
@@ -110,7 +109,17 @@ const NAV_ITEMS: NavItem[] = [
   { label: "任务", href: "/missions", icon: ListTodo },
   { label: "审核", href: "/audit-center", icon: ShieldCheck },
   { label: "渠道", href: "/settings/channels", icon: Radio },
-  { label: "采集", href: "/data-collection", icon: Database },
+  {
+    label: "采集", href: "#data-collection", icon: Database,
+    children: [
+      { label: "采集池", href: "/data-collection/content", icon: FolderOpen },
+      { label: "采集配置", href: "/data-collection/sources",
+        matchPrefixes: ["/data-collection/sources", "/data-collection/outlets"], icon: Wrench },
+      { label: "主题监测", href: "/data-collection/topics", icon: BookMarked },
+      { label: "研究报告", href: "/data-collection/reports", icon: FileText },
+      { label: "监控面板", href: "/data-collection/monitoring", icon: BarChart3 },
+    ],
+  },
   {
     label: "创作", href: "#creation", icon: PenLine,
     children: [
@@ -144,13 +153,6 @@ const NAV_ITEMS: NavItem[] = [
       { label: "精品提升率", href: "/content-excellence", icon: Star },
     ],
   },
-  {
-    label: "研究", href: "/research", icon: Compass,
-    children: [
-      { label: "检索工作台", href: "/research", icon: Telescope },
-      { label: "主题词库", href: "/research/admin/topics", icon: BookMarked },
-    ],
-  },
 ];
 
 const MORE_ITEMS: SubItem[] = [
@@ -172,7 +174,11 @@ function isHrefActive(pathname: string, href: string) {
 }
 
 function hasActiveChild(pathname: string, children?: SubItem[]) {
-  return children?.some((c) => isHrefActive(pathname, c.href)) ?? false;
+  return children?.some((c) =>
+    c.matchPrefixes
+      ? c.matchPrefixes.some((p) => isHrefActive(pathname, p))
+      : isHrefActive(pathname, c.href),
+  ) ?? false;
 }
 
 /* ─── Popover sub-menu (collapsed mode only) ─── */
@@ -182,7 +188,9 @@ function SubMenuList({ items, pathname }: { items: SubItem[]; pathname: string }
     <div className="space-y-0.5">
       {items.map((child) => {
         const ChildIcon = child.icon;
-        const active = isHrefActive(pathname, child.href);
+        const active = child.matchPrefixes
+          ? child.matchPrefixes.some((p) => isHrefActive(pathname, p))
+          : isHrefActive(pathname, child.href);
         return (
           <Link key={child.href} href={child.href}
             className={cn(
@@ -403,7 +411,9 @@ function NavGroup({ item, pathname, canSeeItem, expanded }: {
         <div className="ml-[22px] space-y-0.5">
           {children.map((child) => {
             const ChildIcon = child.icon;
-            const childActive = isHrefActive(pathname, child.href);
+            const childActive = child.matchPrefixes
+              ? child.matchPrefixes.some((p) => isHrefActive(pathname, p))
+              : isHrefActive(pathname, child.href);
             return (
               <Link key={child.href} href={child.href}
                 className={cn(
