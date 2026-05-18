@@ -11,6 +11,7 @@ export const researchTopics = pgTable(
     organizationId: uuid("organization_id").references(() => organizations.id).notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    groupName: text("group_name"),
     sortOrder: integer("sort_order").notNull().default(0),
     isPreset: boolean("is_preset").notNull().default(false),
     createdBy: uuid("created_by"),

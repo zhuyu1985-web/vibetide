@@ -382,6 +382,38 @@ export async function requestBackfillAnnotate(): Promise<Result<{ enqueued: true
   }
 }
 
+// ---------- Group ----------
+
+/**
+ * 设置主题的分组名（null 表示移出分组 / 默认分组）。
+ * Phase 3a 新增,配合 /data-collection/topics 侧边栏分组 UI(Phase 3b)。
+ */
+export async function setTopicGroup(
+  topicId: string,
+  groupName: string | null,
+): Promise<Result> {
+  try {
+    const { organizationId } = await requirePermission(
+      PERMISSIONS.RESEARCH_TOPIC_MANAGE,
+    );
+
+    await db
+      .update(researchTopics)
+      .set({ groupName, updatedAt: new Date() })
+      .where(
+        and(
+          eq(researchTopics.id, topicId),
+          eq(researchTopics.organizationId, organizationId),
+        ),
+      );
+
+    revalidatePath("/data-collection/topics");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 // ---------- Detail fetch ----------
 
 export async function getTopicDetail(id: string) {

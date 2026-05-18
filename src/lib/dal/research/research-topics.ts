@@ -11,6 +11,7 @@ export type TopicSummary = {
   id: string;
   name: string;
   description: string | null;
+  groupName: string | null;
   isPreset: boolean;
   primaryKeyword: string | null;
   aliasCount: number;
@@ -56,12 +57,27 @@ export async function listResearchTopics(orgId: string): Promise<TopicSummary[]>
       id: t.id,
       name: t.name,
       description: t.description,
+      groupName: t.groupName,
       isPreset: t.isPreset,
       primaryKeyword: primary?.keyword ?? null,
       aliasCount: kws.filter((k) => !k.isPrimary).length,
       sampleCount: sampleCountByTopic.get(t.id) ?? 0,
     };
   });
+}
+
+/**
+ * 返回该 org 下所有去重的 group_name（null 不返回，由 UI 单独处理为"默认分组"）。
+ */
+export async function listTopicGroups(orgId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ g: researchTopics.groupName })
+    .from(researchTopics)
+    .where(eq(researchTopics.organizationId, orgId));
+  return rows
+    .map((r) => r.g)
+    .filter((g): g is string => Boolean(g))
+    .sort();
 }
 
 export async function getResearchTopicById(id: string, orgId: string) {
