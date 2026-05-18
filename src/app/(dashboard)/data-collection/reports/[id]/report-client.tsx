@@ -1,6 +1,6 @@
 "use client";
 
-// src/app/(dashboard)/research/reports/[id]/report-client.tsx
+// src/app/(dashboard)/data-collection/reports/[id]/report-client.tsx
 //
 // A5 Phase 5 — 报告详情 Client Component
 //
@@ -178,7 +178,7 @@ export function ReportClient(props: Props) {
 
   // Phase 9：复制分享链接
   async function handleCopyShareLink() {
-    const url = `${window.location.origin}/research/reports/${props.reportId}`;
+    const url = `${window.location.origin}/data-collection/reports/${props.reportId}`;
     try {
       await navigator.clipboard.writeText(url);
       toast.success(
@@ -275,7 +275,7 @@ export function ReportClient(props: Props) {
         actions={
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <Link
-              href="/research/reports"
+              href="/data-collection/reports"
               className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             >
               ← 全部报告
@@ -398,7 +398,7 @@ export function ReportClient(props: Props) {
                         className="flex items-center justify-between gap-2"
                       >
                         <Link
-                          href={`/research/reports/${s.id}`}
+                          href={`/data-collection/reports/${s.id}`}
                           className="text-sky-600 dark:text-sky-400 hover:underline truncate"
                         >
                           {s.snapshotName}

@@ -41,7 +41,7 @@ import {
   removeSample,
   getTopicDetail,
 } from "@/app/actions/research/research-topics";
-import { ResearchBreadcrumb } from "../../research-breadcrumb";
+import { ReportsBreadcrumb } from "@/app/(dashboard)/data-collection/reports/reports-breadcrumb";
 
 type KeywordItem = {
   id: string;
@@ -330,7 +330,7 @@ export function TopicsClient({ topics }: { topics: TopicSummary[] }) {
           </Button>
         </div>
         <div className="mt-3">
-          <ResearchBreadcrumb />
+          <ReportsBreadcrumb />
         </div>
       </div>
 

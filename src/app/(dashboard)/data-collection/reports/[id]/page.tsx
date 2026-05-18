@@ -1,4 +1,4 @@
-// src/app/(dashboard)/research/reports/[id]/page.tsx
+// src/app/(dashboard)/data-collection/reports/[id]/page.tsx
 //
 // A5 Phase 5 — Report 详情页 Server Component
 // 拉取初始报告 → 传给 client，client 自己管 polling / 状态机 / chart hydration

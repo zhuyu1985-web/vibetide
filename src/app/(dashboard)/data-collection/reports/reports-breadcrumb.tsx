@@ -26,7 +26,7 @@ function resolveCrumbs(pathname: string): Crumb[] | null {
   return [root, { label: "详情" }];
 }
 
-export function ResearchBreadcrumb() {
+export function ReportsBreadcrumb() {
   const pathname = usePathname();
   const crumbs = resolveCrumbs(pathname);
   if (!crumbs) return null;

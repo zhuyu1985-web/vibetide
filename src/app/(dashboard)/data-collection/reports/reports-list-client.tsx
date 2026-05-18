@@ -166,7 +166,7 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
             <DataTable
               rows={filtered}
               rowKey={(r) => r.id}
-              onRowClick={(r) => router.push(`/research/reports/${r.id}`)}
+              onRowClick={(r) => router.push(`/data-collection/reports/${r.id}`)}
               columns={[
                 {
                   key: "title",
@@ -246,7 +246,7 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          router.push(`/research/reports/${r.id}`)
+                          router.push(`/data-collection/reports/${r.id}`)
                         }
                       >
                         打开

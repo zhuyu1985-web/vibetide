@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/rbac";
 import { listReportsByOrg } from "@/lib/dal/research/reports";
-import { ReportsListClient, type ReportListRow } from "./reports-list-client";
+import {
+  ReportsListClient,
+  type ReportListRow,
+} from "@/app/(dashboard)/data-collection/reports/reports-list-client";
 
 export const dynamic = "force-dynamic";
 
