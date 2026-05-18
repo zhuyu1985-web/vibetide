@@ -1,6 +1,6 @@
 import { and, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { collectedItems } from "@/db/schema/collection";
+import { collectedItems, collectedItemContents } from "@/db/schema/collection";
 import {
   researchCollectedItemTopics,
   researchCollectedItemDistricts,
@@ -93,8 +93,13 @@ export async function searchCollectedItemsForResearch(
     conditions.push(ilike(collectedItems.title, `%${filter.titleKeyword}%`));
   }
   if (filter.contentKeyword) {
+    // 正文已拆到副表 — EXISTS 子查询命中 trigram GIN(副表索引)
     conditions.push(
-      sql`${collectedItems.content} ILIKE ${"%" + filter.contentKeyword + "%"}`,
+      sql`EXISTS (
+        SELECT 1 FROM collected_item_contents cic
+        WHERE cic.item_id = ${collectedItems.id}
+          AND cic.content ILIKE ${"%" + filter.contentKeyword + "%"}
+      )`,
     );
   }
   if (filter.publishedAtFrom) {
@@ -145,7 +150,8 @@ export async function searchCollectedItemsForResearch(
     .select({
       id: collectedItems.id,
       title: collectedItems.title,
-      content: collectedItems.content,
+      // 正文走副表 LEFT JOIN — 列表场景未必都需要 content,但保留原 API 兼容下游(下次重构可再拆出"详情/列表"两种 query)
+      content: collectedItemContents.content,
       outletId: collectedItems.outletId,
       outletTier: collectedItems.outletTier,
       outletRegion: collectedItems.outletRegion,
@@ -160,6 +166,10 @@ export async function searchCollectedItemsForResearch(
     .leftJoin(
       mediaOutletDictionary,
       eq(collectedItems.outletId, mediaOutletDictionary.id),
+    )
+    .leftJoin(
+      collectedItemContents,
+      eq(collectedItemContents.itemId, collectedItems.id),
     )
     .where(where)
     .orderBy(sql`${collectedItems.publishedAt} DESC NULLS LAST`)
@@ -217,7 +227,7 @@ export async function advancedSearchCollectedItems(
     .select({
       id: collectedItems.id,
       title: collectedItems.title,
-      content: collectedItems.content,
+      content: collectedItemContents.content,
       outletId: collectedItems.outletId,
       outletTier: collectedItems.outletTier,
       outletRegion: collectedItems.outletRegion,
@@ -232,6 +242,10 @@ export async function advancedSearchCollectedItems(
     .leftJoin(
       mediaOutletDictionary,
       eq(collectedItems.outletId, mediaOutletDictionary.id),
+    )
+    .leftJoin(
+      collectedItemContents,
+      eq(collectedItemContents.itemId, collectedItems.id),
     )
     .where(finalExpr)
     .orderBy(sql`${collectedItems.publishedAt} DESC NULLS LAST`)
@@ -291,9 +305,16 @@ function buildSingleCondition(c: AdvancedSearchCondition): SQL {
         ? ilike(collectedItems.title, `%${c.value}%`)
         : sql`(${collectedItems.title} NOT ILIKE ${`%${c.value}%`} OR ${collectedItems.title} IS NULL)`;
     case "content":
+      // 正文已拆到副表 collected_item_contents
       return c.operator === "contains"
-        ? sql`${collectedItems.content} ILIKE ${`%${c.value}%`}`
-        : sql`(${collectedItems.content} NOT ILIKE ${`%${c.value}%`} OR ${collectedItems.content} IS NULL)`;
+        ? sql`EXISTS (
+            SELECT 1 FROM collected_item_contents cic
+            WHERE cic.item_id = ${collectedItems.id} AND cic.content ILIKE ${`%${c.value}%`}
+          )`
+        : sql`NOT EXISTS (
+            SELECT 1 FROM collected_item_contents cic
+            WHERE cic.item_id = ${collectedItems.id} AND cic.content ILIKE ${`%${c.value}%`}
+          )`;
     case "author":
       return c.operator === "contains"
         ? sql`${collectedItems.rawMetadata}->>'author' ILIKE ${`%${c.value}%`}`

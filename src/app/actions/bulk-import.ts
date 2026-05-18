@@ -11,6 +11,10 @@ import {
   type ImportMapping,
   type ImportDefaults,
 } from "@/lib/collection/bulk-import/transform";
+import {
+  transformOpinionRow,
+  isOpinionExcelFormat,
+} from "@/lib/collection/bulk-import/opinion-transform";
 import { writeItems } from "@/lib/collection/writer";
 import {
   seedExcelImportVirtualSource,
@@ -223,6 +227,8 @@ export async function executeBulkImport(payload: ExecutePayload): Promise<Execut
           defaultOutletRegion: virtualSource.defaultOutletRegion,
         },
         items: rawItems,
+        // Excel 导入路径统一按 URL 去重(同标题不同来源应视为独立条目)
+        dedupStrategy: "url_only",
       });
       // WriteResult 字段：inserted / merged / failed（不是 itemsInserted 等）
       batchInserted = result.inserted;
@@ -239,6 +245,148 @@ export async function executeBulkImport(payload: ExecutePayload): Promise<Execut
   }
 
   // 5. 最后一批 → 标记 run 完成
+  if (payload.batchIndex === payload.totalBatches - 1) {
+    await db
+      .update(collectionRuns)
+      .set({
+        finishedAt: new Date(),
+        status: errorRows.length > 0 ? "partial" : "success",
+      })
+      .where(eq(collectionRuns.id, runId));
+  }
+
+  return {
+    batchInserted,
+    batchSkipped,
+    batchFailed,
+    errorRows: errorRows.slice(0, 50),
+    runId,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 舆情格式批量导入 — 列名硬编码,不需要 mapping
+// 跟 executeBulkImport 是平行路径(走不同 transformer)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OpinionImportPayload {
+  rows: Record<string, unknown>[]; // 当前批次(最多 500 行)
+  batchIndex: number;
+  totalBatches: number;
+  runId?: string; // 第二批起复用第一批的 runId
+}
+
+export interface OpinionImportResult {
+  batchInserted: number;
+  batchSkipped: number;
+  batchFailed: number;
+  errorRows: Array<{ rowIndex: number; reason: string }>;
+  runId: string;
+}
+
+/** 判断 columns 是否舆情格式 — 给 UI 用,决定走哪条 import 路径 */
+export async function detectOpinionFormat(columns: string[]): Promise<boolean> {
+  return isOpinionExcelFormat(columns);
+}
+
+export async function importOpinionBatch(
+  payload: OpinionImportPayload,
+): Promise<OpinionImportResult> {
+  const user = await requireAuth();
+  const orgId = user.organizationId;
+
+  // virtual source 复用 excel_import 那条
+  await seedExcelImportVirtualSource(orgId);
+  const [virtualSource] = await db
+    .select()
+    .from(collectionSources)
+    .where(
+      and(
+        eq(collectionSources.organizationId, orgId),
+        eq(collectionSources.name, EXCEL_IMPORT_SOURCE_NAME),
+      ),
+    )
+    .limit(1);
+  if (!virtualSource) throw new Error("virtual excel_import source 创建失败");
+
+  // 第一批创建 run,后续批次复用
+  let runId = payload.runId;
+  if (!runId) {
+    const [newRun] = await db
+      .insert(collectionRuns)
+      .values({
+        sourceId: virtualSource.id,
+        organizationId: orgId,
+        trigger: "manual",
+        startedAt: new Date(),
+        status: "running",
+        itemsAttempted: 0,
+        itemsInserted: 0,
+        itemsMerged: 0,
+        itemsFailed: 0,
+        metadata: {
+          source: "opinion_bulk_import",
+          totalBatches: payload.totalBatches,
+        },
+      })
+      .returning();
+    runId = newRun!.id;
+  }
+
+  // transform
+  const rawItems: RawItem[] = [];
+  const errorRows: OpinionImportResult["errorRows"] = [];
+
+  for (let i = 0; i < payload.rows.length; i++) {
+    const row = payload.rows[i]!;
+    const absoluteIndex = payload.batchIndex * 500 + i;
+    try {
+      const r = transformOpinionRow(row);
+      if (!r) {
+        errorRows.push({ rowIndex: absoluteIndex, reason: "标题为空,跳过" });
+      } else {
+        rawItems.push(r.rawItem);
+      }
+    } catch (err) {
+      errorRows.push({ rowIndex: absoluteIndex, reason: (err as Error).message });
+    }
+  }
+
+  let batchInserted = 0;
+  let batchSkipped = 0;
+  let batchFailed = 0;
+
+  if (rawItems.length > 0) {
+    try {
+      const result = await writeItems({
+        runId,
+        sourceId: virtualSource.id,
+        organizationId: orgId,
+        source: {
+          targetModules: virtualSource.targetModules,
+          defaultCategory: virtualSource.defaultCategory,
+          defaultTags: virtualSource.defaultTags,
+          outletId: virtualSource.outletId,
+          defaultOutletTier: virtualSource.defaultOutletTier,
+          defaultOutletRegion: virtualSource.defaultOutletRegion,
+        },
+        items: rawItems,
+        // 舆情数据:严格按 URL 去重;不同媒体转发同标题保留为独立条目
+        dedupStrategy: "url_only",
+      });
+      batchInserted = result.inserted;
+      batchSkipped = result.merged;
+      batchFailed = result.failed;
+    } catch (err) {
+      batchFailed += rawItems.length;
+      errorRows.push({
+        rowIndex: -1,
+        reason: `批量写入失败:${(err as Error).message}`,
+      });
+    }
+  }
+
+  // 最后一批 → 标记 run 完成
   if (payload.batchIndex === payload.totalBatches - 1) {
     await db
       .update(collectionRuns)

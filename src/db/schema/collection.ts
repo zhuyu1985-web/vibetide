@@ -68,7 +68,7 @@ export const collectedItems = pgTable(
     canonicalUrl: text("canonical_url"),
     canonicalUrlHash: text("canonical_url_hash"),
     title: text("title").notNull(),
-    content: text("content"),
+    /** 首屏摘要(舆情系统的"内容摘要"列、RSS 的 summary 等)。详情正文在 collected_item_contents 副表。 */
     summary: text("summary"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     firstSeenSourceId: uuid("first_seen_source_id").references(() => collectionSources.id, {
@@ -86,7 +86,8 @@ export const collectedItems = pgTable(
       }>>()
       .notNull()
       .default(sql`'[]'::jsonb`),
-    category: text("category"),
+    /** 行业/业务分类,多值(对接舆情数据"行业分类":"公安, 政务")。 */
+    category: text("category").array().notNull().default(sql`ARRAY[]::text[]`),
     tags: text("tags").array(),
     language: text("language"),
     derivedModules: text("derived_modules").array().notNull().default(sql`ARRAY[]::text[]`),
@@ -112,6 +113,42 @@ export const collectedItems = pgTable(
     outletId: uuid("outlet_id"),
     outletTier: text("outlet_tier"),
     outletRegion: text("outlet_region"),
+
+    // ── 平台/账号/身份 ──
+    externalId: text("external_id"),
+    platform: text("platform"),
+    author: text("author"),
+    accountId: text("account_id"),
+    accountHandle: text("account_handle"),
+    authorFollowerCount: integer("author_follower_count"),
+
+    // ── 舆情属性 ──
+    sentiment: text("sentiment"),
+    infoType: text("info_type"),
+
+    // ── 互动指标 ──
+    likeCount: integer("like_count").notNull().default(0),
+    commentCount: integer("comment_count").notNull().default(0),
+    shareCount: integer("share_count").notNull().default(0),
+    viewCount: integer("view_count").notNull().default(0),
+    favoriteCount: integer("favorite_count").notNull().default(0),
+    replyCount: integer("reply_count").notNull().default(0),
+
+    // ── 稿件级地域(跟 outlet_region 是不同语义) ──
+    ipRegion: text("ip_region"),
+    postRegion: text("post_region"),
+    mentionedRegions: text("mentioned_regions").array(),
+
+    // ── 命中分析 ──
+    matchedKeywords: text("matched_keywords").array(),
+    matchedRegions: text("matched_regions").array(),
+
+    // ── 行业(多值);跟单值 industry 不同,行业分类如["公安","政务"] ──
+    industries: text("industries").array(),
+
+    // ── 媒体附加 ──
+    coverImageUrl: text("cover_image_url"),
+    durationSeconds: integer("duration_seconds"),
   },
   (t) => ({
     uniqueFingerprint: unique("collected_items_org_fp_unique").on(
@@ -119,24 +156,84 @@ export const collectedItems = pgTable(
       t.contentFingerprint,
     ),
     pubIdx: index("collected_items_org_pub_idx").on(t.organizationId, t.publishedAt),
+    firstSeenIdx: index("collected_items_org_first_seen_idx").on(
+      t.organizationId,
+      sql`${t.firstSeenAt} DESC`,
+    ),
     urlHashIdx: index("collected_items_url_hash_idx").on(t.canonicalUrlHash).where(sql`canonical_url_hash IS NOT NULL`),
-    categoryIdx: index("collected_items_org_category_idx").on(t.organizationId, t.category),
+    // category 变多值后用 GIN(单值的 btree 索引已废)
+    categoryGin: index("collected_items_category_gin").using("gin", t.category),
     tagsIdx: index("collected_items_tags_gin").using("gin", t.tags),
     derivedIdx: index("collected_items_derived_gin").using("gin", t.derivedModules),
+    industriesGin: index("collected_items_industries_gin").using("gin", t.industries),
+    mentionedGin: index("collected_items_mentioned_regions_gin").using("gin", t.mentionedRegions),
+    matchedKwGin: index("collected_items_matched_keywords_gin").using("gin", t.matchedKeywords),
+    matchedRegionGin: index("collected_items_matched_regions_gin").using("gin", t.matchedRegions),
     // trigram 全文索引 — pg_trgm 扩展必须已启用 (见 0022 migration)
+    // content trigram 已迁到 collected_item_contents 副表,主表只保留 title trigram
     titleTrgmIdx: index("collected_items_title_trgm").using(
       "gin",
       sql`${t.title} gin_trgm_ops`,
     ),
-    contentTrgmIdx: index("collected_items_content_trgm").using(
-      "gin",
-      sql`${t.content} gin_trgm_ops`,
-    ),
     contentTypeIdx: index("collected_items_content_type_idx").on(t.organizationId, t.contentType),
     outletTierIdx: index("collected_items_outlet_tier_idx").on(t.organizationId, t.outletTier),
     outletIdIdx: index("collected_items_outlet_id_idx").on(t.outletId),
+
+    // 舆情维度索引
+    authorIdx: index("collected_items_org_author_idx").on(t.organizationId, t.author),
+    accountIdx: index("collected_items_org_account_idx").on(t.organizationId, t.accountId),
+    platformIdx: index("collected_items_org_platform_idx").on(t.organizationId, t.platform),
+    sentimentIdx: index("collected_items_org_sentiment_idx").on(t.organizationId, t.sentiment),
+    ipRegionIdx: index("collected_items_org_ip_region_idx").on(t.organizationId, t.ipRegion),
+    postRegionIdx: index("collected_items_org_post_region_idx").on(t.organizationId, t.postRegion),
+    externalIdIdx: index("collected_items_org_external_id_idx").on(t.organizationId, t.externalId),
+    likeRankIdx: index("collected_items_org_like_idx").on(t.organizationId, sql`${t.likeCount} DESC`),
   }),
 );
+
+// ───────────────────────────────────────────────────────────
+// ②.5 正文表(1:1 拆出): 把可能很长的正文从主表移出,主表保持轻量。
+// ───────────────────────────────────────────────────────────
+// 设计要点:
+// - item_id 是 PK 也是 FK,1:1 关系。ON DELETE CASCADE 跟主表同步。
+// - content 列在 PG14+ 用 LZ4 压缩(migration 里手写 ALTER COLUMN SET COMPRESSION)。
+// - content trigram GIN 索引保留在此副表(Q2=A 兜底任意关键词搜索)。
+//   主表上的旧 contentTrgmIdx 已删,索引膨胀只发生在副表。
+// - 列表/筛选/排序查询绝不读此表,只在详情页 JOIN。
+export const collectedItemContents = pgTable(
+  "collected_item_contents",
+  {
+    itemId: uuid("item_id")
+      .primaryKey()
+      .references(() => collectedItems.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    /** 视频/图片 OCR 文本(舆情系统提取);LZ4 压缩;trigram 索引保留兜底全文搜索。 */
+    ocrText: text("ocr_text"),
+    /** 音视频 ASR 转写文本;LZ4 压缩;trigram 索引保留兜底全文搜索。 */
+    asrText: text("asr_text"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    contentTrgmIdx: index("collected_item_contents_content_trgm").using(
+      "gin",
+      sql`${t.content} gin_trgm_ops`,
+    ),
+    ocrTrgmIdx: index("collected_item_contents_ocr_trgm")
+      .using("gin", sql`${t.ocrText} gin_trgm_ops`)
+      .where(sql`ocr_text IS NOT NULL`),
+    asrTrgmIdx: index("collected_item_contents_asr_trgm")
+      .using("gin", sql`${t.asrText} gin_trgm_ops`)
+      .where(sql`asr_text IS NOT NULL`),
+  }),
+);
+
+export const collectedItemContentsRelations = relations(collectedItemContents, ({ one }) => ({
+  item: one(collectedItems, {
+    fields: [collectedItemContents.itemId],
+    references: [collectedItems.id],
+  }),
+}));
 
 // ───────────────────────────────────────────────────────────
 // ③ 运行日志: 每次 adapter 执行一条

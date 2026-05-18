@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { organizations } from "@/db/schema/users";
-import { collectedItems } from "@/db/schema/collection";
+import { collectedItems, collectedItemContents } from "@/db/schema/collection";
 import { researchTopics } from "@/db/schema/research/research-topics";
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import {
@@ -53,7 +53,6 @@ beforeAll(async () => {
       organizationId: orgId,
       contentFingerprint: "a4-fp1-" + Date.now(),
       title: "美丽中国生态宜居进展",
-      content: "讨论美丽中国建设",
       firstSeenChannel: "tavily",
       firstSeenAt: new Date(),
       publishedAt: new Date("2025-06-15"),
@@ -62,6 +61,8 @@ beforeAll(async () => {
     })
     .returning();
   item1Id = i1!.id;
+  // 正文走副表(1A 拆表后)
+  await db.insert(collectedItemContents).values({ itemId: item1Id, content: "讨论美丽中国建设" });
 
   const [i2] = await db
     .insert(collectedItems)
@@ -69,7 +70,6 @@ beforeAll(async () => {
       organizationId: orgId,
       contentFingerprint: "a4-fp2-" + Date.now(),
       title: "长江保护重要部署",
-      content: "聚焦长江流域",
       firstSeenChannel: "tavily",
       firstSeenAt: new Date(),
       publishedAt: new Date("2025-06-15"),
@@ -78,6 +78,7 @@ beforeAll(async () => {
     })
     .returning();
   item2Id = i2!.id;
+  await db.insert(collectedItemContents).values({ itemId: item2Id, content: "聚焦长江流域" });
 
   const [i3] = await db
     .insert(collectedItems)
@@ -85,7 +86,6 @@ beforeAll(async () => {
       organizationId: orgId,
       contentFingerprint: "a4-fp3-" + Date.now(),
       title: "无主题文章",
-      content: "今天天气真好",
       firstSeenChannel: "tavily",
       firstSeenAt: new Date(),
       publishedAt: new Date("2025-06-15"),
@@ -95,6 +95,7 @@ beforeAll(async () => {
     })
     .returning();
   item3Id = i3!.id;
+  await db.insert(collectedItemContents).values({ itemId: item3Id, content: "今天天气真好" });
 
   // item4：NULL-safe fixture — outletTier=null / outletRegion=null
   // 故意放在 2025-06 区间之外 + 不同 channel + 不带"美丽"/"长江"等关键字，
@@ -105,7 +106,6 @@ beforeAll(async () => {
       organizationId: orgId,
       contentFingerprint: "a4-fp4-" + Date.now(),
       title: "无 tier 测试条目",
-      content: "测试内容",
       firstSeenChannel: "rss",
       firstSeenAt: new Date(),
       publishedAt: new Date("2024-01-15"),
@@ -115,6 +115,7 @@ beforeAll(async () => {
     })
     .returning();
   item4Id = i4!.id;
+  await db.insert(collectedItemContents).values({ itemId: item4Id, content: "测试内容" });
 
   await db.insert(researchCollectedItemTopics).values({
     collectedItemId: item1Id,

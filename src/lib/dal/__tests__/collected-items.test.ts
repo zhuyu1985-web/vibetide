@@ -4,6 +4,7 @@ import {
   organizations,
   collectionSources,
   collectedItems,
+  collectedItemContents,
   collectionRuns,
   collectionLogs,
   hotTopics,
@@ -90,7 +91,6 @@ beforeAll(async () => {
       organizationId: orgA,
       contentFingerprint: `fp-a1-${now}`,
       title: "科技新闻标题一",
-      content: "这是科技相关内容，AI 驱动未来",
       summary: "科技摘要",
       firstSeenSourceId: sourceA1,
       firstSeenChannel: "tophub/weibo",
@@ -100,6 +100,8 @@ beforeAll(async () => {
     })
     .returning();
   itemA1 = i1.id;
+  // 正文已拆到 collected_item_contents 副表(1A 改动)
+  await db.insert(collectedItemContents).values({ itemId: i1.id, content: "这是科技相关内容，AI 驱动未来" });
 
   const [i2] = await db
     .insert(collectedItems)
@@ -107,7 +109,6 @@ beforeAll(async () => {
       organizationId: orgA,
       contentFingerprint: `fp-a2-${now}`,
       title: "财经头条报道",
-      content: "股市波动明显",
       summary: "财经摘要",
       firstSeenSourceId: sourceA2,
       firstSeenChannel: "tavily/web",
@@ -117,6 +118,7 @@ beforeAll(async () => {
     })
     .returning();
   itemA2 = i2.id;
+  await db.insert(collectedItemContents).values({ itemId: i2.id, content: "股市波动明显" });
 
   // 旧 item: 8 天前 (超出 7 天窗口)
   const [i3] = await db
@@ -125,7 +127,6 @@ beforeAll(async () => {
       organizationId: orgA,
       contentFingerprint: `fp-a3-${now}`,
       title: "很久之前的旧内容",
-      content: "过时内容",
       firstSeenSourceId: sourceA1,
       firstSeenChannel: "tophub/weibo",
       firstSeenAt: new Date(now - 8 * 24 * 60 * 60 * 1000),
@@ -134,18 +135,19 @@ beforeAll(async () => {
     })
     .returning();
   itemA3 = i3.id;
+  await db.insert(collectedItemContents).values({ itemId: i3.id, content: "过时内容" });
 
   // orgB 的 item（隔离用）
-  await db.insert(collectedItems).values({
+  const [iB1] = await db.insert(collectedItems).values({
     organizationId: orgB,
     contentFingerprint: `fp-b1-${now}`,
     title: "orgB 内容",
-    content: "B 组织内容",
     firstSeenChannel: "tophub/weibo",
     firstSeenAt: new Date(),
     derivedModules: [],
     enrichmentStatus: "pending",
-  });
+  }).returning();
+  await db.insert(collectedItemContents).values({ itemId: iB1.id, content: "B 组织内容" });
 
   // runs：一个失败一个成功
   const [r1] = await db
