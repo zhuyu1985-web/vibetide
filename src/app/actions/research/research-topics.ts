@@ -12,6 +12,10 @@ import { eq, and } from "drizzle-orm";
 import { requirePermission, PERMISSIONS } from "@/lib/rbac";
 import { inngest } from "@/inngest/client";
 import { getResearchTopicById } from "@/lib/dal/research/research-topics";
+import {
+  searchCollectedItemsForResearch,
+  type CollectedItemWithAnnotations,
+} from "@/lib/dal/research/collected-item-search";
 
 // ---------- Schemas ----------
 
@@ -421,4 +425,39 @@ export async function getTopicDetail(id: string) {
     PERMISSIONS.RESEARCH_TOPIC_MANAGE,
   );
   return getResearchTopicById(id, organizationId);
+}
+
+// ---------- Topic hits search (for /data-collection/topics detail panel) ----------
+
+/**
+ * Phase 3b — 主题监测主从布局右栏专用:按 topicId 搜索命中卡片。
+ * 包装 DAL searchCollectedItemsForResearch,锁死 topicIds=[topicId];
+ * 支持 channelLabels / publishedAtFrom-To / 关键词三类 filter chips。
+ */
+export async function searchCollectedItemsByTopicAction(
+  topicId: string,
+  filters: {
+    channelLabels?: string[];
+    publishedAtFrom?: number; // epoch ms
+    publishedAtTo?: number;
+    titleKeyword?: string;
+  },
+  pagination: { limit: number; offset: number },
+): Promise<{ items: CollectedItemWithAnnotations[]; total: number }> {
+  const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
+  return searchCollectedItemsForResearch(
+    organizationId,
+    {
+      topicIds: [topicId],
+      channelLabels: filters.channelLabels,
+      publishedAtFrom: filters.publishedAtFrom
+        ? new Date(filters.publishedAtFrom)
+        : undefined,
+      publishedAtTo: filters.publishedAtTo
+        ? new Date(filters.publishedAtTo)
+        : undefined,
+      titleKeyword: filters.titleKeyword,
+    },
+    pagination,
+  );
 }
