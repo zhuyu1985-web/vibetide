@@ -142,7 +142,7 @@ export async function regenerateReport(
     name: "research/report.generate",
     data: { reportId, organizationId },
   });
-  revalidatePath(`/research/reports/${reportId}`);
+  revalidatePath(`/data-collection/reports/${reportId}`);
   return { ok: true };
 }
 
@@ -196,7 +196,7 @@ export async function saveAsSnapshot(input: {
     .returning({ id: researchReports.id });
   if (!snapshot) throw new Error("快照创建失败");
 
-  revalidatePath(`/research/reports/${parent.id}`);
+  revalidatePath(`/data-collection/reports/${parent.id}`);
   return { snapshotId: snapshot.id };
 }
 
@@ -246,12 +246,12 @@ export async function getSignedUrlForReport(
 
 /**
  * 删除报告（含级联快照 — schema 自带 onDelete cascade）。
- * 删后跳回 /research 列表（详情页删除按钮调用）。
+ * 删后跳回 /data-collection/reports 列表（详情页删除按钮调用）。
  */
 export async function deleteReport(reportId: string): Promise<never> {
   const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
   await dalDelete(reportId, organizationId);
-  redirect("/research");
+  redirect("/data-collection/reports");
 }
 
 /**
@@ -261,5 +261,5 @@ export async function deleteReport(reportId: string): Promise<never> {
 export async function deleteReportInline(reportId: string): Promise<void> {
   const { organizationId } = await requirePermission(PERMISSIONS.MENU_RESEARCH);
   await dalDelete(reportId, organizationId);
-  revalidatePath("/research/reports");
+  revalidatePath("/data-collection/reports");
 }

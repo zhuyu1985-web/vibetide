@@ -122,7 +122,7 @@ export function createDataPivoterTool(orgId: string) {
       // 仅在 current_report_id 存在时构造 applyUrl（A5 报告页 deeplink hydrate）
       // A5 ship 后需在 report-client.tsx 加 `apply_pivot` URL hydrate（spec §4.4）
       const applyUrl = current_report_id
-        ? `/research/reports/${current_report_id}?apply_pivot=${encodeURIComponent(
+        ? `/data-collection/reports/${current_report_id}?apply_pivot=${encodeURIComponent(
             JSON.stringify(output),
           )}`
         : undefined;

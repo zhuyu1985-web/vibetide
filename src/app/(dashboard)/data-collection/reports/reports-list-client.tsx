@@ -96,7 +96,7 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
         description="查看历史生成的研究报告，支持状态筛选、检索、快照与删除"
         actions={
           <Link
-            href="/research"
+            href="/data-collection/content"
             className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -153,7 +153,7 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
                 <div className="text-xs">
                   到{" "}
                   <Link
-                    href="/research"
+                    href="/data-collection/content"
                     className="text-sky-600 dark:text-sky-400 hover:underline"
                   >
                     检索工作台

@@ -180,9 +180,9 @@ describe("data_pivoter tool", () => {
     expect(result.pivot_config.filter).toEqual({ date: ["2025-06"] });
     expect(result.chart_type).toBe("bar");
 
-    // applyUrl: /research/reports/<uuid>?apply_pivot=<encoded JSON>
+    // applyUrl: /data-collection/reports/<uuid>?apply_pivot=<encoded JSON>
     expect(result.applyUrl).toBeDefined();
-    expect(result.applyUrl).toContain(`/research/reports/${reportId}`);
+    expect(result.applyUrl).toContain(`/data-collection/reports/${reportId}`);
     expect(result.applyUrl).toContain("apply_pivot=");
 
     const encoded = result.applyUrl!.split("apply_pivot=")[1];

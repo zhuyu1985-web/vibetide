@@ -48,6 +48,8 @@ export const PERMISSIONS = {
   MENU_CONTENT_EXCELLENCE: "menu:content_excellence",
   MENU_CASE_LIBRARY: "menu:case_library",
   // Menu visibility — news research
+  /** @deprecated 2026-05-18 — /research 路径已迁到 /data-collection/*,此 permission 不再被代码引用。
+   * 保留常量避免破坏 role_permissions 表里既有的行。下个 release 可彻底删除 + DB cleanup. */
   MENU_RESEARCH: "menu:research",
   // News research module
   // 2026-05-13: RESEARCH_TASK_* + RESEARCH_MEDIA_OUTLET_MANAGE 已下线
@@ -101,9 +103,6 @@ export const MENU_PERMISSION_MAP: Record<string, string | undefined> = {
   "/publishing": PERMISSIONS.MENU_PUBLISHING,
   "/leaderboard": PERMISSIONS.MENU_LEADERBOARD,
   "/content-excellence": PERMISSIONS.MENU_CONTENT_EXCELLENCE,
-  // News research
-  "/research": PERMISSIONS.MENU_RESEARCH,
-  "/research/admin/topics": PERMISSIONS.RESEARCH_TOPIC_MANAGE,
 };
 
 // Tab-level permission map for pages with tabbed sub-sections
@@ -252,7 +251,6 @@ export const PERMISSION_GROUPS = [
   {
     label: "研究",
     permissions: [
-      { key: PERMISSIONS.MENU_RESEARCH, label: "查看新闻研究模块" },
       { key: PERMISSIONS.RESEARCH_TOPIC_MANAGE, label: "管理主题词库" },
     ],
   },

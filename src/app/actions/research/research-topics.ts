@@ -81,7 +81,7 @@ export async function createTopic(
       })
       .returning({ id: researchTopics.id });
 
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true, id: row.id };
   } catch (e) {
     return fail(e);
@@ -119,7 +119,7 @@ export async function updateTopic(
       });
     }
 
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -148,7 +148,7 @@ export async function deleteTopic(id: string): Promise<Result> {
     }
 
     await db.delete(researchTopics).where(eq(researchTopics.id, id));
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -193,7 +193,7 @@ export async function addKeyword(
       data: { topicId: data.topicId, organizationId, reason: "keyword-added" },
     });
 
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true, id: row.id };
   } catch (e) {
     return fail(e);
@@ -230,7 +230,7 @@ export async function removeKeyword(id: string): Promise<Result> {
       data: { topicId: kw.topicId, organizationId, reason: "keyword-removed" },
     });
 
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -274,7 +274,7 @@ export async function addSample(
       data: { sampleId: row.id, topicId: data.topicId, operation: "created" },
     });
 
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true, id: row.id };
   } catch (e) {
     return fail(e);
@@ -325,7 +325,7 @@ export async function updateSample(
       },
     });
 
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -351,7 +351,7 @@ export async function removeSample(id: string): Promise<Result> {
     }
 
     await db.delete(researchTopicSamples).where(eq(researchTopicSamples.id, id));
-    revalidatePath("/research/admin/topics");
+    revalidatePath("/data-collection/topics");
     return { ok: true };
   } catch (e) {
     return fail(e);

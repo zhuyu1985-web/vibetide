@@ -15,12 +15,12 @@ import {
 type Crumb = { label: string; href?: string };
 
 function resolveCrumbs(pathname: string): Crumb[] | null {
-  if (!pathname.startsWith("/research")) return null;
-  const root: Crumb = { label: "检索工作台", href: "/research" };
+  if (!pathname.startsWith("/data-collection")) return null;
+  const root: Crumb = { label: "检索工作台", href: "/data-collection/content" };
 
-  if (pathname === "/research") return null;
+  if (pathname === "/data-collection/content") return null;
 
-  if (pathname === "/research/admin/topics") {
+  if (pathname === "/data-collection/topics") {
     return [root, { label: "主题词库" }];
   }
   return [root, { label: "详情" }];

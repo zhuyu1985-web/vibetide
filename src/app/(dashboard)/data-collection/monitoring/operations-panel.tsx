@@ -304,7 +304,7 @@ export function OperationsPanel({
             {recentErrors.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">暂无错误日志</p>
             ) : (
-              <div className="max-h-72 overflow-y-auto flex flex-col gap-2 pr-1">
+              <div className="h-72 overflow-y-auto flex flex-col gap-2 pr-1">
                 {recentErrors.map((entry) => (
                   <div
                     key={entry.logId}
