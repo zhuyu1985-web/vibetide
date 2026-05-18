@@ -20,14 +20,16 @@ const configSchema = z
       z.string().url("请填写合法的列表页 URL"),
     ),
     extractMode: z.enum(["regex", "css"]),
+    /** regex 模式 — 填了走精确匹配;留空走智能模式(启发式提取候选文章 URL) */
     articleUrlPattern: z.string().optional(),
     selectors: selectorsSchema.optional(),
     maxArticlesPerRun: z.number().int().min(1).max(100).default(10),
     fetchFullContent: z.boolean().default(false),
   })
   .refine(
-    (v) => v.extractMode === "regex" ? Boolean(v.articleUrlPattern) : Boolean(v.selectors),
-    { message: "regex 模式需填 articleUrlPattern;css 模式需填 selectors" },
+    // css 模式仍强制 selectors;regex 模式 articleUrlPattern 可选(留空 = 智能模式)
+    (v) => v.extractMode === "css" ? Boolean(v.selectors) : true,
+    { message: "css 模式需填 selectors" },
   );
 
 type ListScraperConfig = z.infer<typeof configSchema>;
@@ -39,7 +41,7 @@ export const listScraperAdapter: SourceAdapter<ListScraperConfig> = {
   category: "list",
   configSchema,
   configFields: [
-    { key: "listUrl", label: "列表页 URL", type: "url", required: true },
+    { key: "listUrl", label: "列表页 URL", type: "url", required: true, pickFromOutletWebsite: true },
     {
       key: "extractMode",
       label: "提取模式",
@@ -52,9 +54,9 @@ export const listScraperAdapter: SourceAdapter<ListScraperConfig> = {
     },
     {
       key: "articleUrlPattern",
-      label: "文章 URL 正则(仅正则模式)",
+      label: "文章 URL 正则(仅正则模式,留空 = 智能模式)",
       type: "text",
-      help: "如: xinhuanet\\.com/politics/\\d{4}-\\d{2}/\\d{2}/",
+      help: "示例: cbg\\.cn/a/\\d+/\\d{8}/[a-f0-9]+\\.html  · 留空时系统按同 host + 排除资源/栏目页等启发式自动识别",
     },
     {
       key: "selectors",
@@ -85,17 +87,34 @@ export const listScraperAdapter: SourceAdapter<ListScraperConfig> = {
 
     try {
       if (config.extractMode === "regex") {
-        // Regex mode: Jina Reader → Markdown → pattern match
+        // Regex mode: Jina Reader → Markdown → URL scan + filter.
+        //
+        // We scan raw URLs (not `[text](url)` link structures) because some
+        // sites embed nested markdown like `[标题![Image N](图片URL) 摘要](文章URL)`,
+        // which a `[^\]]+` group cannot parse — it stops at the inner `]` and
+        // captures the image URL instead of the article URL. URL-first scanning
+        // is robust against arbitrary nesting; titles come from surrounding
+        // markdown context, or are overridden by Jina's full-fetch title when
+        // `fetchFullContent: true`.
         const { content } = await fetchViaJinaReader(config.listUrl);
-        const pattern = new RegExp(config.articleUrlPattern!);
-        // Match markdown links: [text](url)
-        const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+        const filter = config.articleUrlPattern
+          ? (() => {
+              const re = new RegExp(config.articleUrlPattern!);
+              return (u: string) => re.test(u);
+            })()
+          : buildSmartArticleFilter(config.listUrl);
+        const urlRegex = /https?:\/\/[^\s)<>"'\]]+/g;
         const matches: { title: string; url: string }[] = [];
+        const seen = new Set<string>();
         let m: RegExpExecArray | null;
-        while ((m = linkRegex.exec(content))) {
-          if (pattern.test(m[2])) {
-            matches.push({ title: m[1].trim(), url: m[2] });
-          }
+        while ((m = urlRegex.exec(content))) {
+          const url = m[0];
+          if (!filter(url) || seen.has(url)) continue;
+          seen.add(url);
+          matches.push({
+            title: extractTitleBeforeUrl(content, m.index) || url,
+            url,
+          });
         }
         const capped = matches.slice(0, config.maxArticlesPerRun);
 
@@ -111,6 +130,9 @@ export const listScraperAdapter: SourceAdapter<ListScraperConfig> = {
               const full = await fetchViaJinaReader(entry.url);
               if (full.content && full.content.length >= 50) {
                 item.content = full.content;
+              }
+              if (full.title) {
+                item.title = full.title;
               }
             } catch (err) {
               log("warn", `deep-read failed for ${entry.url}: ${err instanceof Error ? err.message : String(err)}`);
@@ -181,6 +203,80 @@ export const listScraperAdapter: SourceAdapter<ListScraperConfig> = {
     return { items, partialFailures };
   },
 };
+
+/* === 共享 helper(被 site-scraper.ts 也用) === */
+
+// 智能模式启发式:用户没填 articleUrlPattern 时,自动判断 URL 是否像"文章页"。
+// 规则(顺序应用,任何一条不满足都丢弃):
+//   1. 必须同 host(支持 www 子域差异 — 父 host 一致即可)
+//   2. 排除资源后缀(.jpg/.png/.css/.js/.mp4/.pdf ...)
+//   3. 排除明显的栏目/导航路径段(/list/、/category/、/tag/、/channel/ 等单独到栏目层级)
+//   4. 排除"扁平"路径(根、/index、/about、/contact、/login、/register)
+//   5. 路径深度 ≥ 2(过滤栏目入口)
+// 注意:这是召回优先的启发式,可能误收一些非文章页;调用方应配合 `fetchFullContent`
+// 让 Jina 二次抓取时筛掉真正没有正文的 URL。
+const RESOURCE_EXT = /\.(jpg|jpeg|png|gif|webp|svg|ico|css|js|json|xml|zip|rar|pdf|mp3|mp4|m4a|wav|ogg|webm|woff2?|ttf|eot)(\?|#|$)/i;
+const NAV_PATH_SEG = /^(list|category|categories|tag|tags|channel|channels|topic|topics|column|columns|page|pages|index)$/i;
+const FLAT_NAV_PATH = /^(|index(\.\w+)?|about|contact|login|register|signup|signin|signout|logout|search|sitemap|rss|feed|home|main)$/i;
+
+export function buildSmartArticleFilter(listUrl: string): (u: string) => boolean {
+  let baseHost = "";
+  try {
+    baseHost = stripWww(new URL(listUrl).hostname);
+  } catch {
+    return () => false;
+  }
+  return (raw: string) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      return false;
+    }
+    if (stripWww(parsed.hostname) !== baseHost) return false;
+    if (RESOURCE_EXT.test(parsed.pathname)) return false;
+
+    const segs = parsed.pathname.split("/").filter(Boolean);
+    if (segs.length === 0) return false; // 根
+    if (segs.length === 1 && FLAT_NAV_PATH.test(segs[0])) return false; // /about etc.
+    // 单段且看起来是栏目入口(如 /list、/category)— 排除
+    if (segs.length === 1 && NAV_PATH_SEG.test(segs[0])) return false;
+    // 路径全是"栏目层级"型(/list/705/1.html → segs = ["list", "705", "1.html"])
+    // 启发:第一段命中 NAV_PATH_SEG 且总段数 ≤ 3 时认为是栏目页而非文章
+    if (NAV_PATH_SEG.test(segs[0]) && segs.length <= 3) return false;
+    // 路径深度太浅(< 2)排除 — 文章页一般 ≥ 2 段
+    if (segs.length < 2) return false;
+    return true;
+  };
+}
+
+export function stripWww(host: string): string {
+  return host.replace(/^www\./i, "");
+}
+
+// 在 markdown 里给定 URL 的位置,反向追溯它所属的 `[...](url)` 链接文本。
+// 支持嵌套 `[Image N](...)`,失败时返回空串(由 caller 回退到 URL 本身)。
+export function extractTitleBeforeUrl(content: string, urlOffset: number): string {
+  if (urlOffset < 2 || content[urlOffset - 1] !== "(" || content[urlOffset - 2] !== "]") {
+    return "";
+  }
+  let depth = 1;
+  let i = urlOffset - 3;
+  while (i >= 0) {
+    const c = content[i];
+    if (c === "]") depth++;
+    else if (c === "[") {
+      depth--;
+      if (depth === 0) break;
+    }
+    i--;
+  }
+  if (depth !== 0 || i < 0) return "";
+  let title = content.slice(i + 1, urlOffset - 2);
+  title = title.replace(/!\[[^\]]*\]\([^)]*\)/g, " ");
+  title = title.replace(/\s+/g, " ").trim();
+  return title;
+}
 
 function parseFlexibleDate(s?: string): Date | undefined {
   if (!s) return undefined;

@@ -50,21 +50,43 @@ export interface SourceListItem {
   lastRunAt: string | null;
   lastRunStatus: string | null;
   totalItemsCollected: number;
+  // A1 (2026-05-14): 给"按媒体筛"用
+  outletId: string | null;
+}
+
+/** A1 (2026-05-14): 给"按媒体筛"的下拉选项,只透传必要字段(精简 payload) */
+export interface SourceClientOutlet {
+  id: string;
+  outletName: string;
 }
 
 interface SourcesClientProps {
   initialSources: SourceListItem[];
   adapterMetas: AdapterMeta[];
+  outlets: SourceClientOutlet[];
 }
 
-const POLL_INTERVAL_MS = 2000;
-const POLL_MAX_ATTEMPTS = 45;
+/** A1: 与新建 wizard 的 TARGET_MODULES 保持一致 */
+const TARGET_MODULE_OPTIONS = [
+  { value: "hot_topics", label: "热点 (hot_topics)" },
+  { value: "news", label: "研究 (news)" },
+  { value: "benchmarking", label: "对标 (benchmarking)" },
+  { value: "knowledge", label: "知识库 (knowledge)" },
+];
 
-export function SourcesClient({ initialSources, adapterMetas }: SourcesClientProps) {
+// Polling 2s × 150 = 5 分钟。覆盖整站采集等长任务(实测 cbg.cn 2 栏目 ≈ 3-6 分钟)。
+// 真正"长跑超时"的 toast 是 info 提示,不是失败,run 在后台继续。
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_ATTEMPTS = 150;
+
+export function SourcesClient({ initialSources, adapterMetas, outlets }: SourcesClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
+  // A1 (2026-05-14)
+  const [moduleFilter, setModuleFilter] = useState<string>("__all__");
+  const [outletFilter, setOutletFilter] = useState<string>("__all__");
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -76,6 +98,10 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
     if (typeFilter !== "__all__" && s.sourceType !== typeFilter) return false;
     if (statusFilter === "enabled" && !s.enabled) return false;
     if (statusFilter === "disabled" && s.enabled) return false;
+    // A1
+    if (moduleFilter !== "__all__" && !s.targetModules.includes(moduleFilter)) return false;
+    if (outletFilter === "__unbound__" && s.outletId !== null) return false;
+    if (outletFilter !== "__all__" && outletFilter !== "__unbound__" && s.outletId !== outletFilter) return false;
     return true;
   });
 
@@ -119,7 +145,10 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
     });
     baselineRunIds.current.delete(sourceId);
     if (!finalRun) {
-      toast.warning("采集超时,请稍后在详情页查看运行记录");
+      // 不是失败 — 仅仅是前端 polling 等不到完成。整站采集等长任务会超过 90s polling 上限,
+      // run 在后台继续跑。给用户清晰提示,引导他去详情页看实时进度。
+      toast.info("任务仍在后台运行,可关闭此提示继续操作,稍后到详情页「最近运行」查看结果");
+      router.refresh();
       return;
     }
     if (finalRun.status === "success") {
@@ -225,6 +254,31 @@ export function SourcesClient({ initialSources, adapterMetas }: SourcesClientPro
               <SelectItem value="__all__">全部</SelectItem>
               <SelectItem value="enabled">启用</SelectItem>
               <SelectItem value="disabled">暂停</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* A1: 归属模块 */}
+          <Select value={moduleFilter} onValueChange={setModuleFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="归属模块" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">全部模块</SelectItem>
+              {TARGET_MODULE_OPTIONS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* A1: 绑定媒体 */}
+          <Select value={outletFilter} onValueChange={setOutletFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="绑定媒体" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">全部媒体</SelectItem>
+              <SelectItem value="__unbound__">未绑定</SelectItem>
+              {outlets.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.outletName}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <span className="text-xs text-gray-500 dark:text-gray-400">

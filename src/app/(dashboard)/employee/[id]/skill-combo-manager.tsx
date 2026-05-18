@@ -350,7 +350,12 @@ export function SkillComboManager({
               <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
                 可选技能
               </label>
-              <div className="max-h-[200px] overflow-y-auto space-y-1 pr-1">
+              <div className="h-[200px] overflow-y-auto space-y-1 pr-1">
+                {allSkills.filter((s) => !selectedSkillIds.includes(s.id)).length === 0 ? (
+                  <div className="flex h-full items-center justify-center">
+                    <p className="text-xs text-gray-400 dark:text-gray-500">没有更多可选技能</p>
+                  </div>
+                ) : null}
                 {allSkills
                   .filter((s) => !selectedSkillIds.includes(s.id))
                   .map((skill) => (

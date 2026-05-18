@@ -107,12 +107,12 @@ export function KBBrowserDialog({
           ))}
         </div>
 
-        {/* KB List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        {/* KB List — 固定高度避免列表内容变化时容器抖动 */}
+        <div className="h-[400px] overflow-y-auto space-y-2 pr-1">
           {filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
-              没有可绑定的知识库
-            </p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">没有可绑定的知识库</p>
+            </div>
           ) : (
             filtered.map((kb) => (
               <div

@@ -58,3 +58,13 @@ next-env.d.ts
 
 # tikhub 探针脚本输出(含真实账号响应,可能包含个人信息)
 scripts/tikhub-probe-output/
+
+# 工具/IDE 状态目录
+.agents/
+.codex/
+
+# 大体积数据/演示文档(476MB json + 51MB presentations 等,不入仓)
+docs/data.xlsx
+docs/test-site.xlsx
+docs/json/
+docs/presentations/

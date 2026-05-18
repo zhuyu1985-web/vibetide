@@ -4,6 +4,7 @@ import { tavilyAdapter } from "./tavily";
 import { bochaAdapter } from "./bocha";
 import { jinaUrlAdapter } from "./jina-url";
 import { listScraperAdapter } from "./list-scraper";
+import { siteScraperAdapter } from "./site-scraper";
 import { rssAdapter } from "./rss";
 import { tikhubAdapter } from "./tikhub";
 
@@ -18,6 +19,8 @@ registerAdapter(rssAdapter);
 registerAdapter(tikhubAdapter);
 // 博查搜索 Adapter（国内可直连，与 tavilyAdapter 并列）
 registerAdapter(bochaAdapter);
+// 2026-05-14: 整站采集
+registerAdapter(siteScraperAdapter);
 
 export {
   tophubAdapter,
@@ -25,6 +28,7 @@ export {
   bochaAdapter,
   jinaUrlAdapter,
   listScraperAdapter,
+  siteScraperAdapter,
   rssAdapter,
   tikhubAdapter,
 };

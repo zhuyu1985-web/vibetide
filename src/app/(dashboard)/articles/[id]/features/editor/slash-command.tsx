@@ -333,7 +333,7 @@ export function SlashCommand({ editor }: SlashCommandProps) {
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-[240px] max-h-[320px] overflow-y-auto bg-popover border border-border rounded-lg shadow-lg py-1"
+      className="absolute z-50 w-[240px] h-[320px] overflow-y-auto bg-popover border border-border rounded-lg shadow-lg py-1"
       style={{ top: position.top, left: position.left }}
     >
       {blockItems.length > 0 && (

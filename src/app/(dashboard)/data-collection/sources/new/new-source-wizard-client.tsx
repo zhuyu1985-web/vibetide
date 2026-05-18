@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import type { ConfigField } from "@/lib/collection/types";
@@ -37,8 +44,16 @@ export interface WizardOutletOption {
   id: string;
   outletName: string;
   outletTier: string;
-  /** M4: 该 outlet 在各平台的账号矩阵(从 channels jsonb)。tikhub account 模式联动用 */
-  channels: Array<{ type: string; nickname?: string; name?: string }>;
+  /** M4: 该 outlet 在各平台的账号矩阵(从 channels jsonb)。
+   *  - tikhub account 模式联动用 nickname/name
+   *  - "从媒体字典选 URL" picker 用 type=website 时的 url/domain */
+  channels: Array<{
+    type: string;
+    nickname?: string;
+    name?: string;
+    url?: string;
+    domain?: string;
+  }>;
 }
 
 interface NewSourceWizardClientProps {
@@ -234,12 +249,30 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
           ) : (
             <div className="flex flex-col gap-6">
               {selectedMeta.configFields.map((f) => (
-                <ConfigFieldInput
-                  key={f.key}
-                  field={f}
-                  value={config[f.key]}
-                  onChange={(v) => setConfig({ ...config, [f.key]: v })}
-                />
+                <div key={f.key} className="flex flex-col gap-2">
+                  {f.pickFromOutletWebsite && (
+                    <OutletWebsitePickerButton
+                      outlets={outlets}
+                      onPick={(picked) => {
+                        // textarea 类字段(多 URL)→ append 一行;其余 → 直接覆盖
+                        if (f.type === "textarea") {
+                          const current = config[f.key];
+                          const existing = typeof current === "string" ? current.trim() : "";
+                          const next = existing ? `${existing}\n${picked.url}` : picked.url;
+                          setConfig({ ...config, [f.key]: next });
+                        } else {
+                          setConfig({ ...config, [f.key]: picked.url });
+                        }
+                        setOutletId(picked.outletId);
+                      }}
+                    />
+                  )}
+                  <ConfigFieldInput
+                    field={f}
+                    value={config[f.key]}
+                    onChange={(v) => setConfig({ ...config, [f.key]: v })}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -912,5 +945,125 @@ function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProp
         </div>
       </div>
     </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// 从媒体字典选择站点 URL —— 弹窗 picker
+//
+// 用法:在 ConfigField 上设 `pickFromOutletWebsite: true`,wizard 会在该字段
+// 上方渲染一个触发按钮。点开弹窗显示所有 outlet 的 `channels[type=website].url`
+// 候选项;选中一条后回调:把 url 写回当前字段,同时把所属 outlet 绑定到 source。
+// ───────────────────────────────────────────────────────────────────────
+
+interface OutletWebsiteOption {
+  outletId: string;
+  outletName: string;
+  outletTier: string;
+  url: string;
+  domain: string;
+}
+
+interface OutletWebsitePickerButtonProps {
+  outlets: WizardOutletOption[];
+  onPick: (picked: { outletId: string; url: string }) => void;
+}
+
+function OutletWebsitePickerButton({ outlets, onPick }: OutletWebsitePickerButtonProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const options = useMemo<OutletWebsiteOption[]>(() => {
+    const out: OutletWebsiteOption[] = [];
+    for (const o of outlets) {
+      for (const c of o.channels) {
+        if (c.type !== "website" || !c.url) continue;
+        out.push({
+          outletId: o.id,
+          outletName: o.outletName,
+          outletTier: o.outletTier,
+          url: c.url,
+          domain: c.domain ?? "",
+        });
+      }
+    }
+    return out;
+  }, [outlets]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.outletName.toLowerCase().includes(q) ||
+        o.url.toLowerCase().includes(q) ||
+        o.domain.toLowerCase().includes(q),
+    );
+  }, [options, search]);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-7 self-start text-xs"
+        onClick={() => setOpen(true)}
+      >
+        <BookMarked className="mr-1 h-3.5 w-3.5" />
+        从媒体字典选择
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>从媒体字典选择站点 URL</DialogTitle>
+            <DialogDescription>
+              选择一条媒体的站点 URL,选定后自动填入字段,并把该媒体作为采集源所属
+              outlet 一并绑定。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`搜索媒体名 / 域名 / URL(共 ${options.length} 条候选）`}
+            />
+            <div className="h-96 overflow-y-auto rounded-md border">
+              {filtered.length === 0 ? (
+                <div className="flex h-full items-center justify-center px-6 text-center text-xs text-muted-foreground">
+                  {options.length === 0
+                    ? "媒体字典里还没有任何 outlet 绑定 website channel — 请先到 / 数据采集 / 媒体字典 给媒体添加站点信息"
+                    : "没有匹配的媒体"}
+                </div>
+              ) : (
+                <ul className="divide-y">
+                  {filtered.map((opt) => (
+                    <li key={`${opt.outletId}-${opt.url}`}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          onPick({ outletId: opt.outletId, url: opt.url });
+                          setOpen(false);
+                          setSearch("");
+                        }}
+                        className="flex h-auto w-full flex-col items-start gap-0.5 rounded-none px-3 py-2.5 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{opt.outletName}</span>
+                          <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {opt.outletTier}
+                          </span>
+                        </div>
+                        <span className="w-full truncate text-xs text-muted-foreground">{opt.url}</span>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

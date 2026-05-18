@@ -4,7 +4,7 @@
 
 import { inngest } from "@/inngest/client";
 import { db } from "@/db";
-import { collectedItems } from "@/db/schema/collection";
+import { collectedItems, collectedItemContents } from "@/db/schema/collection";
 import { researchTopics, researchTopicKeywords } from "@/db/schema/research/research-topics";
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import {
@@ -73,13 +73,15 @@ export const backfillAnnotate = inngest.createFunction(
       const batch = await step.run(`load-batch-${batchIdx}`, async () => {
         const conditions = [eq(collectedItems.organizationId, organizationId)];
         if (lastId) conditions.push(sql`${collectedItems.id}::text > ${lastId}`);
+        // 正文已拆到副表 — LEFT JOIN 读取
         return await db
           .select({
             id: collectedItems.id,
             title: collectedItems.title,
-            content: collectedItems.content,
+            content: collectedItemContents.content,
           })
           .from(collectedItems)
+          .leftJoin(collectedItemContents, eq(collectedItemContents.itemId, collectedItems.id))
           .where(and(...conditions))
           .orderBy(asc(collectedItems.id))
           .limit(BATCH);

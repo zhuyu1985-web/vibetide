@@ -21,7 +21,14 @@ export default async function NewSourcePage() {
         outletName: o.outletName,
         outletTier: o.outletTier,
         // M4 新增:供 tikhub account 模式过滤"哪些 outlets 在某平台有 channel"
-        channels: (o.channels ?? []) as Array<{ type: string; nickname?: string; name?: string }>,
+        // + Phase site-A:website channel 的 url/domain 给 "从媒体字典选 URL" picker 用
+        channels: (o.channels ?? []) as Array<{
+          type: string;
+          nickname?: string;
+          name?: string;
+          url?: string;
+          domain?: string;
+        }>,
       }))}
     />
   );

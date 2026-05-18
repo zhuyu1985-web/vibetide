@@ -23,7 +23,7 @@ export default async function SourceDetailPage({
 
   const [runs, items, outlets] = await Promise.all([
     listRecentRunsBySource(id, orgId, 20),
-    listRecentItemsBySource(id, orgId, 20),
+    listRecentItemsBySource(id, orgId, 50),
     listOutletsByOrg(orgId),
   ]);
   const meta = getAdapterMeta(source.sourceType);
@@ -76,6 +76,7 @@ export default async function SourceDetailPage({
         outletName: o.outletName,
         outletTier: o.outletTier,
       }))}
+      configFields={meta?.configFields ?? []}
     />
   );
 }

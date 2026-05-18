@@ -27,6 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Copy } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   getCollectionItemDetailAction,
   type ItemDetailPayload,
@@ -46,7 +48,8 @@ export function ItemDetailDrawer({ itemId, onClose, outlets }: ItemDetailDrawerP
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState<ItemDetailPayload | null>(null);
   const [showRaw, setShowRaw] = useState(false);
-  const [showContent, setShowContent] = useState(false);
+  // 2026-05-14: 正文默认展开 — 详情抽屉的"主要内容"就该一眼看到
+  const [showContent, setShowContent] = useState(true);
 
   // Correct outlet dialog state
   const [showCorrectDialog, setShowCorrectDialog] = useState(false);
@@ -101,7 +104,7 @@ export function ItemDetailDrawer({ itemId, onClose, outlets }: ItemDetailDrawerP
   return (
     <>
       <Sheet open={Boolean(itemId)} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-4xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-left">
               {loading ? "加载中..." : detail?.title ?? "(无标题)"}
@@ -137,7 +140,9 @@ export function ItemDetailDrawer({ itemId, onClose, outlets }: ItemDetailDrawerP
 
               {/* Category + tags */}
               <div className="flex flex-wrap gap-2">
-                {detail.category && <Badge variant="secondary">{detail.category}</Badge>}
+                {detail.category.map((c) => (
+                  <Badge key={c} variant="secondary">{c}</Badge>
+                ))}
                 {detail.tags?.map((t) => (
                   <Badge key={t} variant="outline">{t}</Badge>
                 ))}
@@ -244,21 +249,36 @@ export function ItemDetailDrawer({ itemId, onClose, outlets }: ItemDetailDrawerP
                 </section>
               )}
 
-              {/* Full content (collapsible) */}
+              {/* Full content (默认展开,长正文内容是详情页的主体) */}
               {detail.content && (
                 <section>
-                  <button
-                    type="button"
-                    onClick={() => setShowContent((v) => !v)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {showContent ? "收起正文" : "查看正文"} ({detail.content.length} 字)
-                  </button>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium">正文 <span className="text-xs text-muted-foreground ml-1">({detail.content.length} 字)</span></h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-6 text-xs"
+                      onClick={() => setShowContent((v) => !v)}
+                    >
+                      {showContent ? "收起" : "展开"}
+                    </Button>
+                  </div>
                   {showContent && (
-                    <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed rounded border bg-muted/30 p-3 max-h-96 overflow-y-auto">
-                      {detail.content}
-                    </pre>
+                    <div className="rounded border bg-card p-5 max-h-[70vh] overflow-y-auto prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-sky-600 prose-img:rounded">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {detail.content}
+                      </ReactMarkdown>
+                    </div>
                   )}
+                </section>
+              )}
+              {/* 没正文(deep-read 失败时):明确提示 */}
+              {!detail.content && (
+                <section>
+                  <h4 className="text-sm font-medium mb-2">正文</h4>
+                  <div className="rounded border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/30 p-3 text-xs text-amber-700 dark:text-amber-300">
+                    本条目无正文数据(adapter 没抓回 content 或 Jina deep-read 失败)。可点上方"原文链接"查看源站。
+                  </div>
                 </section>
               )}
 

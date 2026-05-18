@@ -117,6 +117,7 @@ export default async function ResearchPage() {
     <SearchWorkbenchClient
       districts={districts}
       outlets={outlets.map((o) => ({ id: o.id, name: o.outletName }))}
+      outletsFull={outlets}
       sources={sourceOptions}
       topics={topicSummaries}
       initialResult={initialResult}

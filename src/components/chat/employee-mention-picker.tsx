@@ -46,7 +46,7 @@ export function EmployeeMentionPicker({
 
   return (
     <div
-      className="absolute bottom-full left-0 z-50 mb-2 max-h-60 w-64 overflow-y-auto rounded-md bg-popover shadow-lg"
+      className="absolute bottom-full left-0 z-50 mb-2 h-60 w-64 overflow-y-auto rounded-md bg-popover shadow-lg"
       role="listbox"
       aria-label="选择 AI 员工"
     >

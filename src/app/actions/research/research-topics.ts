@@ -94,6 +94,10 @@ export async function updateTopic(
     const data = updateTopicSchema.parse(input);
     const { id, ...patch } = data;
 
+    // 若改了 name —— topic.name 默认会作为 primaryKeyword 兜底,
+    // 所以改名必须触发回算,否则旧命中可能不再正确。
+    const nameChanged = typeof patch.name === "string" && patch.name.length > 0;
+
     await db
       .update(researchTopics)
       .set({ ...patch, updatedAt: new Date() })
@@ -103,6 +107,13 @@ export async function updateTopic(
           eq(researchTopics.organizationId, organizationId),
         ),
       );
+
+    if (nameChanged) {
+      await inngest.send({
+        name: "research/topic.changed",
+        data: { topicId: id, organizationId, reason: "topic-renamed" },
+      });
+    }
 
     revalidatePath("/research/admin/topics");
     return { ok: true };
@@ -172,6 +183,12 @@ export async function addKeyword(
       })
       .returning({ id: researchTopicKeywords.id });
 
+    // 新增 keyword 后,该 topic 的命中范围可能扩大 — 异步重算
+    await inngest.send({
+      name: "research/topic.changed",
+      data: { topicId: data.topicId, organizationId, reason: "keyword-added" },
+    });
+
     revalidatePath("/research/admin/topics");
     return { ok: true, id: row.id };
   } catch (e) {
@@ -185,9 +202,12 @@ export async function removeKeyword(id: string): Promise<Result> {
       PERMISSIONS.RESEARCH_TOPIC_MANAGE,
     );
 
-    // Scope check via join to ensure keyword belongs to a topic in this org
+    // Scope check via join + 拿到 topicId(删除后才能派发回算事件)
     const [kw] = await db
-      .select({ topicOrgId: researchTopics.organizationId })
+      .select({
+        topicOrgId: researchTopics.organizationId,
+        topicId: researchTopicKeywords.topicId,
+      })
       .from(researchTopicKeywords)
       .innerJoin(
         researchTopics,
@@ -199,6 +219,13 @@ export async function removeKeyword(id: string): Promise<Result> {
     }
 
     await db.delete(researchTopicKeywords).where(eq(researchTopicKeywords.id, id));
+
+    // 删除 keyword 后,旧命中可能依赖该词 — 必须 reannotate 重置该 topic 命中
+    await inngest.send({
+      name: "research/topic.changed",
+      data: { topicId: kw.topicId, organizationId, reason: "keyword-removed" },
+    });
+
     revalidatePath("/research/admin/topics");
     return { ok: true };
   } catch (e) {
@@ -322,6 +349,34 @@ export async function removeSample(id: string): Promise<Result> {
     await db.delete(researchTopicSamples).where(eq(researchTopicSamples.id, id));
     revalidatePath("/research/admin/topics");
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ---------- Backfill ----------
+
+/**
+ * 一次性触发:对该 org 全量历史 collected_items 跑 topic + district 匹配。
+ *
+ * 用途:
+ *   - 首次建立词库后,把历史已采集的 items 回填命中
+ *   - 异常恢复(annotation 表数据丢失)
+ *   - 跨系统导入词库后批量初始化
+ *
+ * 注意:这是兜底操作,日常词库变更已由 reannotate-topic Inngest fn 自动覆盖,
+ * 不需要每次都手动触发本 action。
+ */
+export async function requestBackfillAnnotate(): Promise<Result<{ enqueued: true }>> {
+  try {
+    const { organizationId } = await requirePermission(
+      PERMISSIONS.RESEARCH_TOPIC_MANAGE,
+    );
+    await inngest.send({
+      name: "research/backfill-annotate.requested",
+      data: { organizationId },
+    });
+    return { ok: true, enqueued: true };
   } catch (e) {
     return fail(e);
   }

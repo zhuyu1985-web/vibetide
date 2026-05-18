@@ -3,7 +3,7 @@
 
 import { inngest } from "@/inngest/client";
 import { db } from "@/db";
-import { collectedItems } from "@/db/schema/collection";
+import { collectedItems, collectedItemContents } from "@/db/schema/collection";
 import { researchTopics, researchTopicKeywords } from "@/db/schema/research/research-topics";
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import {
@@ -21,9 +21,15 @@ export const annotateCollectedItem = inngest.createFunction(
     const { itemId, organizationId } = event.data;
 
     const item = await step.run("load-item", async () => {
+      // 正文已拆到 collected_item_contents 副表 — LEFT JOIN 读取(可能 null)
       const [row] = await db
-        .select()
+        .select({
+          id: collectedItems.id,
+          title: collectedItems.title,
+          content: collectedItemContents.content,
+        })
         .from(collectedItems)
+        .leftJoin(collectedItemContents, eq(collectedItemContents.itemId, collectedItems.id))
         .where(eq(collectedItems.id, itemId))
         .limit(1);
       return row;

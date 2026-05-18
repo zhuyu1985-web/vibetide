@@ -17,6 +17,7 @@ import { knowledgeBaseVectorize } from "./knowledge-base-vectorize";
 import {
   annotateCollectedItem,
   backfillAnnotate,
+  reannotateTopic,
   researchReportGenerate,
 } from "./research";
 import {
@@ -63,6 +64,7 @@ export const functions = [
   // Research auto-annotation (A3 Phase 3) — 直接读 collected_items,不再走 research_news_articles 桥接
   annotateCollectedItem,
   backfillAnnotate,
+  reannotateTopic,
   // A5 报告生成 (Phase 4)
   researchReportGenerate,
   // Collection Hub (2026-04-18)

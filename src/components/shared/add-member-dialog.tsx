@@ -87,11 +87,11 @@ export function AddMemberDialog({
           </TabsList>
 
           <TabsContent value="ai">
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+            <div className="h-[300px] space-y-2 overflow-y-auto pr-1">
               {unassigned.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
-                  所有AI员工已在团队中
-                </p>
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-sm text-gray-400 dark:text-gray-500">所有AI员工已在团队中</p>
+                </div>
               ) : (
                 unassigned.map((emp) => (
                   <div

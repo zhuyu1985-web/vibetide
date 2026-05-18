@@ -183,9 +183,9 @@ export function UploadDialog({ open, onOpenChange, libraryType, categoryId }: Pr
           </label>
         </div>
 
-        {/* File list */}
+        {/* File list — 固定高度避免文件增减时容器抖动 */}
         {items.length > 0 && (
-          <div className="max-h-[240px] overflow-y-auto space-y-1.5">
+          <div className="h-[240px] overflow-y-auto space-y-1.5">
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/[0.03]">
                 <File size={16} className="text-gray-400 shrink-0" />

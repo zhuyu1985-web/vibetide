@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { searchByTopic } from "@/app/actions/research/topic-library-search";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import type { CollectedItemWithAnnotations } from "@/lib/dal/research/collected-item-search";
+import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
+import { ItemDetailDrawer } from "@/app/(dashboard)/data-collection/content/item-detail-drawer";
 
 const TIER_LABELS: Record<string, string> = {
   central: "中央级",
@@ -45,15 +47,20 @@ export interface TopicReportRequest {
 
 export function TopicLibrarySearch({
   topics,
+  outletsFull,
   onRequestReport,
 }: {
   topics: TopicSummary[];
+  /** 完整 MediaOutletRow,给点标题打开的 ItemDetailDrawer 用 */
+  outletsFull: MediaOutletRow[];
   onRequestReport?: (req: TopicReportRequest) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
   const [topicFilter, setTopicFilter] = useState("");
   const [result, setResult] = useState<Result>(null);
+  // 2026-05-14: 点标题打开详情 drawer
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
 
   const filteredTopics = useMemo(() => {
     const q = topicFilter.trim().toLowerCase();
@@ -332,12 +339,14 @@ export function TopicLibrarySearch({
                         key: "title",
                         header: "标题",
                         render: (r) => (
-                          <span
-                            className="truncate block text-gray-800 dark:text-gray-200"
+                          <Button
+                            variant="ghost"
+                            onClick={() => setDetailItemId(r.id)}
+                            className="h-auto p-0 truncate w-full justify-start text-left text-sm font-normal text-gray-800 dark:text-gray-200 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-transparent"
                             title={r.title}
                           >
-                            {r.title}
-                          </span>
+                            <span className="truncate">{r.title}</span>
+                          </Button>
                         ),
                       },
                       {
@@ -396,6 +405,13 @@ export function TopicLibrarySearch({
           </GlassCard>
         )}
       </main>
+
+      {/* 2026-05-14: 点标题打开 — 复用采集池的详情抽屉 */}
+      <ItemDetailDrawer
+        itemId={detailItemId}
+        onClose={() => setDetailItemId(null)}
+        outlets={outletsFull}
+      />
     </div>
   );
 }

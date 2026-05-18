@@ -27,9 +27,11 @@ export function MoveToDialog({ open, onOpenChange, title, description, categorie
 
         <p className="text-[13px] text-gray-500 dark:text-gray-400 mb-3">{description}</p>
 
-        <div className="max-h-[300px] overflow-y-auto border rounded-lg p-2 bg-gray-50 dark:bg-white/[0.02]">
+        <div className="h-[300px] overflow-y-auto border rounded-lg p-2 bg-gray-50 dark:bg-white/[0.02]">
           {categories.length === 0 ? (
-            <p className="text-[13px] text-gray-400 py-4 text-center">暂无栏目，请先创建栏目</p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-[13px] text-gray-400">暂无栏目，请先创建栏目</p>
+            </div>
           ) : (
             <CategoryTree
               nodes={categories}

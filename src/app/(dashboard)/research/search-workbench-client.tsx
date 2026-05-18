@@ -53,6 +53,7 @@ import type {
 import { AdvancedSearchBuilder, type BuilderOptions } from "./advanced-search-builder";
 import { AdvancedFiltersSidebar } from "./advanced-filters-sidebar";
 import { TopicLibrarySearch } from "./topic-library-search";
+import { ItemDetailDrawer } from "@/app/(dashboard)/data-collection/content/item-detail-drawer";
 import type {
   AdvancedSearchCondition,
   SidebarFilter,
@@ -99,6 +100,7 @@ export interface ResearchSourceOption {
 export function SearchWorkbenchClient({
   districts,
   outlets,
+  outletsFull,
   sources,
   topics,
   initialResult,
@@ -107,6 +109,8 @@ export function SearchWorkbenchClient({
 }: {
   districts: CqDistrict[];
   outlets: MediaOutletSummary[];
+  /** 完整 MediaOutletRow,给点标题打开的详情 drawer 用 */
+  outletsFull: import("@/db/schema/media-outlet-dictionary").MediaOutletRow[];
   sources: ResearchSourceOption[];
   topics: TopicSummary[];
   initialResult?: ArticleSearchResponse;
@@ -117,6 +121,8 @@ export function SearchWorkbenchClient({
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"simple" | "advanced" | "topic">("simple");
+  // 2026-05-14: 点标题打开详情 drawer(simple / advanced 两种模式共用)
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
 
   // A5 Phase 8 — "生成报告"入口 dialog state
   // reportContext 记录本次点击是来自 simple 还是 advanced，dialog 文案/确认逻辑据此分支
@@ -664,9 +670,14 @@ export function SearchWorkbenchClient({
                             (c) => c.field === "title" && c.operator === "contains",
                           )?.value;
                           return (
-                            <span className="truncate block" title={r.title}>
-                              {highlightKeyword(r.title, titleKw)}
-                            </span>
+                            <Button
+                              variant="ghost"
+                              onClick={() => setDetailItemId(r.id)}
+                              className="h-auto p-0 truncate w-full justify-start text-left text-sm font-normal hover:text-sky-600 hover:bg-transparent"
+                              title={r.title}
+                            >
+                              <span className="truncate">{highlightKeyword(r.title, titleKw)}</span>
+                            </Button>
                           );
                         },
                       },
@@ -738,6 +749,7 @@ export function SearchWorkbenchClient({
         {mode === "topic" && (
           <TopicLibrarySearch
             topics={topics}
+            outletsFull={outletsFull}
             onRequestReport={(req) => {
               setReportTitle(`${req.topicName} · 主题研究报告`);
               setReportDesc("");
@@ -830,7 +842,14 @@ export function SearchWorkbenchClient({
                   key: "title",
                   header: "标题",
                   render: (a) => (
-                    <span className="truncate block" title={a.title}>{a.title}</span>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setDetailItemId(a.id)}
+                      className="h-auto p-0 truncate w-full justify-start text-left text-sm font-normal hover:text-sky-600 hover:bg-transparent"
+                      title={a.title}
+                    >
+                      <span className="truncate">{a.title}</span>
+                    </Button>
                   ),
                 },
                 {
@@ -1106,6 +1125,13 @@ export function SearchWorkbenchClient({
           </Button>
         </div>
       )}
+
+      {/* 2026-05-14: 详情抽屉 — simple / advanced / topic 三个模式都通过 setDetailItemId 打开 */}
+      <ItemDetailDrawer
+        itemId={detailItemId}
+        onClose={() => setDetailItemId(null)}
+        outlets={outletsFull}
+      />
     </div>
   );
 }

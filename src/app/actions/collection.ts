@@ -105,8 +105,14 @@ export async function updateCollectionSource(payload: z.infer<typeof updatePaylo
   if (rest.defaultOutletTier !== undefined) patch.defaultOutletTier = rest.defaultOutletTier;
   if (rest.defaultOutletRegion !== undefined) patch.defaultOutletRegion = rest.defaultOutletRegion;
 
+  // 源类型不可变更:历史 collection_runs / collected_items 都基于当前 sourceType 跑,
+  // 换 type 数据语义会断。如需换类型,请用户删除当前源后新建。
+  if (rest.sourceType !== undefined && rest.sourceType !== source.sourceType) {
+    throw new Error("源类型不可变更,如需切换请删除当前源后新建");
+  }
+
   if (rest.config !== undefined) {
-    // Validate config against adapter
+    // 校验始终用当前 source.sourceType 的 adapter schema
     const adapter = getAdapter(source.sourceType);
     const configResult = adapter.configSchema.safeParse(rest.config);
     if (!configResult.success) {

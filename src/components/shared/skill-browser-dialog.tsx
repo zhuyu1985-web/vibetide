@@ -130,8 +130,8 @@ export function SkillBrowserDialog({
           ))}
         </div>
 
-        {/* Skills List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        {/* Skills List — 固定高度避免列表内容变化时容器抖动 */}
+        <div className="h-[400px] overflow-y-auto space-y-2 pr-1">
           {showRecommended && recommendations.length > 0 && (
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
@@ -186,9 +186,9 @@ export function SkillBrowserDialog({
             ? filtered.filter((s) => !recommendedIds.has(s.id))
             : filtered
           ).length === 0 && !showRecommended ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
-              没有可绑定的技能
-            </p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">没有可绑定的技能</p>
+            </div>
           ) : (
             (showRecommended
               ? filtered.filter((s) => !recommendedIds.has(s.id))

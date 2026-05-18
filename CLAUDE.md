@@ -222,6 +222,24 @@ Known drift patterns to avoid (these have all appeared and been cleaned up — d
 ```
 The trigger visually matches `<Input>` (bordered, muted) since date pickers are form inputs, not primary-action buttons.
 
+**Dialog / Popover 内的可滚动列表必须用固定高度,不能用 `max-h-X`。** `max-h-X` 让容器跟着内容长度伸缩 — 用户输入搜索过滤、切 tab、增删条目时,弹层高度会不断抖动,体验差。统一规则:
+
+```tsx
+// ❌ 抖动:容器高度跟内容走
+<div className="max-h-[300px] overflow-y-auto">
+  {items.length === 0 ? <p className="text-center py-8">空</p> : items.map(...)}
+</div>
+
+// ✅ 稳定:容器固定高度,空态用 flex h-full 居中占满
+<div className="h-[300px] overflow-y-auto">
+  {items.length === 0
+    ? <div className="flex h-full items-center justify-center"><p>空</p></div>
+    : items.map(...)}
+</div>
+```
+
+适用范围:所有 `<Dialog>` / `<Popover>` / `<Sheet>` 内部 `overflow-y-auto` 的容器,只要上方有搜索框 / 过滤按钮 / tab / 动态条目增删,都必须 `h-X` 不用 `max-h-X`。常见高度区间:popover 用 `h-60` ~ `h-[320px]`;dialog 内列表用 `h-[300px]` ~ `h-[400px]`。曾在 2026-05-14 一次性把 9 处历史抖动改完,不要再引入新的 `max-h-X` + `overflow-y-auto` 组合在弹层内。
+
 **Enforcement:** `eslint.config.mjs` defines `no-restricted-syntax` rules (currently `warn`) that flag raw `<button>/<input>/<select>/<textarea>` in `src/app/**` and `src/components/**` (except under `src/components/ui/**`, `src/app/landing/**`, `src/components/media-assets/**`). Editor ESLint integrations show red squigglies on violations; CI output lists them too.
 
 ### Environment Variables

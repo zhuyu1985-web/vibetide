@@ -236,6 +236,20 @@ export type InngestEvents = {
     };
   };
 
+  /**
+   * 单个 topic 词库变更触发回算 — 2026-05-14:
+   * 词库新增/删除关键词 或 topic 改名时派发。处理函数会先 DELETE 该 topic 的
+   * 所有旧命中(scope 该 org),再用最新的 keywords 跑全量 items 重新匹配。
+   * (deleteTopic 不需要派发 — FK ON DELETE CASCADE 自动清掉命中)
+   */
+  "research/topic.changed": {
+    data: {
+      topicId: string;
+      organizationId: string;
+      reason: "topic-renamed" | "keyword-added" | "keyword-removed";
+    };
+  };
+
   // ─── Research Report Events (A5 Phase 4, 2026-05-07) ───
 
   /** 报告生成入口：A5 7-step Inngest pipeline */

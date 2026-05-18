@@ -5,6 +5,8 @@
 // Search-related types/helpers are re-exported below for compatibility.
 // ---------------------------------------------------------------------------
 
+import { stripJinaBoilerplate } from "@/lib/collection/strip-boilerplate";
+
 export type {
   Credibility,
   NewsFeedItem,
@@ -24,7 +26,27 @@ export {
 // Jina Reader API (deep read)
 // ---------------------------------------------------------------------------
 
+const JINA_TIMEOUT_MS = 30_000;
+const JINA_RETRY_ON_TIMEOUT = 1; // 超时后重试 1 次
+
 export async function fetchViaJinaReader(url: string): Promise<{ title: string; content: string }> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= JINA_RETRY_ON_TIMEOUT; attempt++) {
+    try {
+      return await fetchViaJinaReaderOnce(url);
+    } catch (err) {
+      lastErr = err;
+      // 只对"超时/中断"重试,4xx/5xx 业务错误直接抛
+      const msg = err instanceof Error ? err.message : String(err);
+      const isAbort = /abort|timeout/i.test(msg);
+      if (!isAbort || attempt === JINA_RETRY_ON_TIMEOUT) throw err;
+    }
+  }
+  // unreachable
+  throw lastErr;
+}
+
+async function fetchViaJinaReaderOnce(url: string): Promise<{ title: string; content: string }> {
   const apiKey = process.env.JINA_API_KEY;
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -35,7 +57,7 @@ export async function fetchViaJinaReader(url: string): Promise<{ title: string; 
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), JINA_TIMEOUT_MS);
 
   try {
     const response = await fetch(`https://r.jina.ai/${url}`, {
@@ -45,13 +67,31 @@ export async function fetchViaJinaReader(url: string): Promise<{ title: string; 
     });
 
     if (!response.ok) {
+      // 401/402 = 鉴权/配额问题 — 用户能直接看懂的中文提示
+      if (response.status === 401) {
+        throw new Error(
+          apiKey
+            ? "Jina API key 无效,请到 https://jina.ai 检查 / 重新申请"
+            : "Jina API key 缺失,请在 .env.local 配置 JINA_API_KEY",
+        );
+      }
+      if (response.status === 402) {
+        throw new Error(
+          apiKey
+            ? "Jina API 配额已用尽,请到 https://jina.ai 充值 / 升级套餐"
+            : "Jina 匿名配额已用完,请在 .env.local 配置 JINA_API_KEY(https://jina.ai 注册即送免费额度)",
+        );
+      }
       throw new Error(`Jina Reader returned ${response.status}`);
     }
 
     const data = (await response.json()) as { data?: { title?: string; content?: string } };
+    // 2026-05-14: 后处理裁掉 Jina 没识别出来的 navbar / footer / 相关推荐区
+    const rawContent = data.data?.content || "";
+    const cleanedContent = stripJinaBoilerplate(rawContent);
     return {
       title: data.data?.title || "",
-      content: data.data?.content || "",
+      content: cleanedContent,
     };
   } finally {
     clearTimeout(timeout);
