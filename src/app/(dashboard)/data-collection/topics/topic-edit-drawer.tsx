@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -179,14 +177,8 @@ export function TopicEditDrawer({
                 共词「{topic.primaryKeyword ?? "未设置"}」· 别名 {topic.aliasCount}
                 {" "}条 · 样本 {topic.sampleCount} 条。
               </p>
-              <p className="mt-2">
-                <Link
-                  href="/research/admin/topics"
-                  className="inline-flex items-center gap-1 text-sky-600 hover:underline dark:text-sky-400"
-                >
-                  到主题词库管理页编辑
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
+              <p className="mt-2 text-muted-foreground/80">
+                关键词和样本的完整编辑功能开发中。
               </p>
             </div>
           )}

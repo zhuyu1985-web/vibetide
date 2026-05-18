@@ -1,128 +1,13 @@
 import { redirect } from "next/navigation";
-import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { collectedItems } from "@/db/schema/collection";
-import { getCurrentUserAndOrg } from "@/lib/dal/auth";
-import { hasPermission, PERMISSIONS } from "@/lib/rbac";
-import { listCqDistricts } from "@/lib/dal/research/cq-districts";
-import { searchCollectedItemsForResearch } from "@/lib/dal/research/collected-item-search";
-import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
-import { listResearchTopics } from "@/lib/dal/research/research-topics";
-import { listCollectionSources } from "@/lib/dal/collection";
-import { listAdapterMetas } from "@/lib/collection/adapter-meta";
-import {
-  CHANNEL_FILTER_LABELS,
-  CONTENT_TYPE_LABELS,
-  CONTENT_TYPE_VALUES,
-  OUTLET_TIER_LABELS,
-  OUTLET_TIER_VALUES,
-} from "@/lib/collection/constants";
-import { SearchWorkbenchClient } from "./search-workbench-client";
-import type { BuilderOptions } from "./advanced-search-builder";
 
-// A3 已接通 collected_items 数据源（outlets + districts + collected_items 全部从 Collection Hub 读取）
-// A4 Phase 3：加载 BuilderOptions（高级检索 UI 字段下拉选项）
+interface ResearchPageProps {
+  searchParams: Promise<{ mode?: string; tab?: string }>;
+}
 
-export default async function ResearchPage() {
-  const ctx = await getCurrentUserAndOrg();
-  if (!ctx) redirect("/login");
-  const allowed = await hasPermission(
-    ctx.userId,
-    ctx.organizationId,
-    PERMISSIONS.MENU_RESEARCH,
-  );
-  if (!allowed) redirect("/home");
-
-  const orgId = ctx.organizationId;
-
-  const regionsPromise = db
-    .selectDistinct({ region: collectedItems.outletRegion })
-    .from(collectedItems)
-    .where(
-      and(
-        eq(collectedItems.organizationId, orgId),
-        sql`${collectedItems.outletRegion} IS NOT NULL`,
-      ),
-    )
-    .then((rows) =>
-      rows
-        .map((r) => r.region)
-        .filter((r): r is string => Boolean(r)),
-    );
-
-  const platformsPromise = db
-    .selectDistinct({ ch: collectedItems.firstSeenChannel })
-    .from(collectedItems)
-    .where(eq(collectedItems.organizationId, orgId))
-    .then((rows) =>
-      rows
-        .map((r) => r.ch)
-        .filter((p): p is string => Boolean(p)),
-    );
-
-  const [districts, outlets, topicSummaries, rawResult, regions, platforms, sources] =
-    await Promise.all([
-      listCqDistricts(),
-      listOutletsByOrg(orgId),
-      listResearchTopics(orgId),
-      searchCollectedItemsForResearch(orgId, {}, { limit: 50, offset: 0 }),
-      regionsPromise,
-      platformsPromise,
-      listCollectionSources(orgId, { enabled: undefined }),
-    ]);
-
-  const topics = topicSummaries.map((t) => ({ id: t.id, name: t.name }));
-
-  const adapterTypeLabel = new Map(
-    listAdapterMetas().map((m) => [m.type, m.displayName]),
-  );
-  const sourceOptions = sources.map((s) => ({
-    id: s.id,
-    name: s.name,
-    sourceType: s.sourceType,
-    sourceTypeLabel: adapterTypeLabel.get(s.sourceType) ?? s.sourceType,
-  }));
-
-  // Map DAL result to the shape SearchWorkbenchClient expects.
-  // sourceChannel 用 firstSeenChannel 暴露出去,与 action.mapToResult 对齐,
-  // 让 client 可以用 formatChannelLabel 渲染中文渠道名。
-  const initialResult = {
-    articles: rawResult.items.map((item) => ({
-      ...item,
-      districtName: null as string | null,
-      sourceChannel: item.firstSeenChannel,
-      platformFallback: item.outletName ?? null,
-    })),
-    total: rawResult.total,
-    page: 1,
-    pageSize: 50,
-  };
-
-  const builderOptions: BuilderOptions = {
-    outletTiers: OUTLET_TIER_VALUES.map((t) => ({
-      value: t,
-      label: OUTLET_TIER_LABELS[t],
-    })),
-    outletRegions: regions,
-    districts: districts.map((d) => ({ id: d.id, name: d.name })),
-    topics,
-    contentTypes: CONTENT_TYPE_VALUES.map((t) => ({
-      value: t,
-      label: CONTENT_TYPE_LABELS[t],
-    })),
-    platforms,
-  };
-
-  return (
-    <SearchWorkbenchClient
-      districts={districts}
-      outlets={outlets.map((o) => ({ id: o.id, name: o.outletName }))}
-      outletsFull={outlets}
-      sources={sourceOptions}
-      topics={topicSummaries}
-      initialResult={initialResult}
-      builderOptions={builderOptions}
-      channelLabels={[...CHANNEL_FILTER_LABELS]}
-    />
-  );
+export default async function ResearchRedirect({ searchParams }: ResearchPageProps) {
+  const { mode, tab } = await searchParams;
+  if (mode === "topics" || tab === "topics") {
+    redirect("/data-collection/topics");
+  }
+  redirect("/data-collection/content");
 }
