@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { listResearchTopics, getResearchTopicById } from "../research-topics";
 import { db } from "@/db";
-import { organizations } from "@/db/schema/users";
+import { researchTopics } from "@/db/schema/research/research-topics";
 
 let ORG_ID: string;
 
@@ -11,9 +11,18 @@ beforeAll(async () => {
     ORG_ID = process.env.SEED_ORG_ID;
     return;
   }
-  const orgs = await db.select({ id: organizations.id }).from(organizations).limit(1);
-  if (orgs.length === 0) throw new Error("No organization for tests");
-  ORG_ID = orgs[0].id;
+  // 找一个有 research_topics 的 org,而不是任意 LIMIT 1 — 避免后加的 org 抢到 LIMIT 1
+  // 却没 seed 主题导致 tests 全挂。如果一个都没有,提示跑 db:seed:research。
+  const seeded = await db
+    .selectDistinct({ id: researchTopics.organizationId })
+    .from(researchTopics)
+    .limit(1);
+  if (seeded.length === 0) {
+    throw new Error(
+      "No org has research_topics seeded. Run `npm run db:seed:research` or set SEED_ORG_ID.",
+    );
+  }
+  ORG_ID = seeded[0].id;
 });
 
 describe("listResearchTopics", () => {
