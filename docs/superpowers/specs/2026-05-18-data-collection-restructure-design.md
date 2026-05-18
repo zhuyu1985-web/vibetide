@@ -47,17 +47,22 @@
 
 | 新路径 | 来源 / 旧路径 redirect | 说明 |
 |---|---|---|
-| `/data-collection/content` | `/research`（默认落点） | 采集池布局重排 |
+| `/data-collection/content` | `/research`（默认落点，无 query string 或非 topics tab） | 采集池布局重排 |
 | `/data-collection/sources` | 保留不动 | 顶部 sub-tab 切到"源管理" |
 | `/data-collection/sources/[id]` | 保留不动 | 详情/编辑 |
 | `/data-collection/sources/new` | 保留不动 | 新建源 |
 | `/data-collection/outlets` | 保留不动 | 顶部 sub-tab 切到"媒体字典" |
-| `/data-collection/topics` | `/research/admin/topics`<br>`/research`(主题词库 tab 入口) | 新建主从布局页 |
+| `/data-collection/topics` | `/research/admin/topics`<br>`/research?mode=topics`、`/research?tab=topics`（主题词库 deep link） | 新建主从布局页 |
 | `/data-collection/reports` | `/research/reports` | 物理搬迁 |
 | `/data-collection/reports/[id]` | `/research/reports/[id]` | 物理搬迁 |
 | `/data-collection/monitoring` | 保留不动 | 内部 sub-tab 增"业务看板" |
 
 旧 `/research/*` 路径用 Next.js `redirect()` 在 page.tsx 内做服务端跳转（支持 `[id]` 动态参数）；保留旧目录下的薄 redirect page，其他文件清理。
+
+`/research` redirect 时按 query string 区分目标，避免单个 URL 多目标歧义：
+
+- `/research?mode=topics` 或 `/research?tab=topics` → `/data-collection/topics`
+- 其余 `/research` 及 `/research?*` → `/data-collection/content`（默认落点）
 
 ### 2.3 权限
 
@@ -215,7 +220,7 @@ src/app/(dashboard)/research/reports/
 2. `research/topic-library-search.tsx` — 整体删除（功能已迁主题监测）。
 3. `research/reports/reports-list-client.tsx` — 搬走后改 href 为 `/data-collection/reports/[id]`。
 4. `research/reports/[id]/report-client.tsx` — 搬走后扫改返回链接。
-5. `research/research-breadcrumb.tsx` — 评估归属：若仅服务于 reports，跟着搬到 `data-collection/reports/breadcrumb.tsx` 并改链接；否则就地改链接然后保留。
+5. `research/research-breadcrumb.tsx` — 跟着搬到 `data-collection/reports/reports-breadcrumb.tsx`（实地核查仅 `/research/reports/*` 引用，无跨模块用法），所有 `/research/...` href 改为 `/data-collection/...`。
 6. `components/layout/app-sidebar.tsx` — 整体重写侧边栏。
 
 ---
@@ -245,6 +250,8 @@ src/app/(dashboard)/research/reports/
 | 顶部筛选 | 主题/方案多选、信息来源 chips、监测时间 | ✓ |
 
 > 调研结论：`collected_items` 表已包含 `likeCount / commentCount / shareCount / viewCount / favoriteCount / replyCount / sentiment / infoType / authorFollowerCount`，业务看板**全部指标都可真实计算**，无需 stub 或新增字段。
+
+**主题/方案过滤的数据源**：`research_collected_item_topics` 桥接表（含 `collectedItemId`、`topicId`、`matchType`、`matchScore`、`matchedKeyword`），由 Inngest `annotate-collected-item` 函数自动维护。业务看板的主题筛选 query 走 `collected_items INNER JOIN research_collected_item_topics ON collected_item_id = collected_items.id WHERE topic_id IN (selected_ids)`。**同样的桥接表也是主题监测（§3.3）右栏命中结果的数据源**。
 
 **采集运维**（沿用）：当前 `monitoring-client.tsx` 内容（成功率 / 错误源 / 最近错误 / 分布 / tikhub 成本）原样作为该 sub-tab。
 
