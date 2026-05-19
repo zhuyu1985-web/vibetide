@@ -62,7 +62,7 @@ const updateSampleSchema = z.object({
 });
 
 const MAX_TOPIC_REPORT_ITEMS = 500;
-const MAX_TOPIC_EXPORT_ITEMS = 50000;
+const MAX_TOPIC_EXPORT_ITEMS = 100000;
 
 // ---------- Helpers ----------
 

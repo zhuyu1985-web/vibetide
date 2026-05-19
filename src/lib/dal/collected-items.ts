@@ -448,12 +448,12 @@ export async function getDerivedRecordsForItem(
  * 导出查询:按当前筛选条件拉所有匹配行(不分页),LEFT JOIN contents 副表带回正文/OCR/ASR。
  * 用于"导出 Excel"功能,前端不显示但需要落 Excel。
  *
- * 安全限制:hardMaxRows 防止误导致 OOM。默认 50000 行(单次导出上限);超过抛错让 UI 提示分批。
+ * 安全限制:hardMaxRows 防止误导致 OOM。默认 100000 行(单次导出上限);超过抛错让 UI 提示分批。
  */
 export async function exportCollectedItemsForExcel(
   organizationId: string,
   filters: ContentFilters = {},
-  hardMaxRows = 50000,
+  hardMaxRows = 100000,
 ): Promise<Array<CollectedItemRow & { content: string | null; ocrText: string | null; asrText: string | null }>> {
   const conditions = await buildCollectedItemConditions(organizationId, filters);
 
