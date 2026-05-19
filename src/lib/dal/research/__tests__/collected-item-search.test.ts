@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { organizations } from "@/db/schema/users";
-import { collectedItems } from "@/db/schema/collection";
+import { collectedItems, collectedItemContents } from "@/db/schema/collection";
 import { researchTopics, researchTopicKeywords } from "@/db/schema/research/research-topics";
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import {
@@ -9,13 +9,19 @@ import {
   researchCollectedItemDistricts,
 } from "@/db/schema/research/annotations";
 import { eq, sql } from "drizzle-orm";
-import { searchCollectedItemsForResearch } from "../collected-item-search";
+import {
+  searchCollectedItemsByTopicKeywords,
+  searchCollectedItemsForResearch,
+} from "../collected-item-search";
 
 let orgId: string;
 let topicAId: string;
 let districtAId: string;
 let item1Id: string;
 let item2Id: string;
+let itemContentHitId: string;
+let itemTagHitId: string;
+let itemMatchedKeywordHitId: string;
 
 beforeAll(async () => {
   const [org] = await db
@@ -87,6 +93,51 @@ beforeAll(async () => {
     matchType: "keyword",
     matchedKeyword: "涪陵区",
   });
+
+  const [contentHit] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgId,
+      contentFingerprint: "fp-content-hit-" + Date.now(),
+      title: "正文命中的采集项",
+      firstSeenChannel: "test",
+      firstSeenAt: new Date(),
+      outletTier: "industry",
+    })
+    .returning();
+  itemContentHitId = contentHit!.id;
+  await db.insert(collectedItemContents).values({
+    itemId: itemContentHitId,
+    content: "乡村振兴需要持续改善生态宜居水平。",
+  });
+
+  const [tagHit] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgId,
+      contentFingerprint: "fp-tag-hit-" + Date.now(),
+      title: "标签命中的采集项",
+      firstSeenChannel: "test",
+      firstSeenAt: new Date(),
+      tags: ["生态宜居"],
+      outletTier: "industry",
+    })
+    .returning();
+  itemTagHitId = tagHit!.id;
+
+  const [matchedKeywordHit] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgId,
+      contentFingerprint: "fp-matched-keyword-hit-" + Date.now(),
+      title: "命中关键词列召回的采集项",
+      firstSeenChannel: "test",
+      firstSeenAt: new Date(),
+      matchedKeywords: ["生态宜居"],
+      outletTier: "industry",
+    })
+    .returning();
+  itemMatchedKeywordHitId = matchedKeywordHit!.id;
 });
 
 afterAll(async () => {
@@ -154,5 +205,28 @@ describe("searchCollectedItemsForResearch", () => {
       { limit: 10, offset: 0 },
     );
     expect(r.items.length).toBe(0);
+  });
+
+  it("按主题关键词跨正文、标签、命中关键词列 OR 召回", async () => {
+    const r = await searchCollectedItemsByTopicKeywords(
+      orgId,
+      topicAId,
+      ["生态宜居"],
+      {},
+      { limit: 20, offset: 0 },
+    );
+
+    const ids = r.items.map((item) => item.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        itemContentHitId,
+        itemTagHitId,
+        itemMatchedKeywordHitId,
+      ]),
+    );
+    expect(ids).not.toContain(item2Id);
+    expect(
+      r.items.find((item) => item.id === itemTagHitId)?.topicMatchedKeywords,
+    ).toContain("生态宜居");
   });
 });

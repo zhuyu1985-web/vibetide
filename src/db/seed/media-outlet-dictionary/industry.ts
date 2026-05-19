@@ -88,4 +88,13 @@ export const INDUSTRY_OUTLETS: Omit<
     domains: ["chinajsb.cn"],
     publicAccountNames: ["中国建设报"],
   },
+  {
+    outletName: "美丽重庆",
+    outletTier: "industry",
+    outletRegion: "重庆",
+    industryTag: "环境",
+    domains: [],
+    publicAccountNames: ["美丽重庆"],
+    description: "重庆生态环境行业 + 政务媒体（Excel 主题统计口径归入行业媒体列）",
+  },
 ];

@@ -1,16 +1,14 @@
 import { redirect } from "next/navigation";
-import { sql, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { collectedItems } from "@/db/schema";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
   listCollectedItems,
+  listCollectedItemChannelCounts,
   listCollectedItemFilterOptions,
   type ContentFilters,
 } from "@/lib/dal/collected-items";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
 import { listOutletsByOrg } from "@/lib/dal/media-outlet-dictionary";
-import { simpleChannelBucket } from "@/lib/collection/channel-bucket";
+import { PageHeader } from "@/components/shared/page-header";
 import { ContentClient, type CollectedItemViewModel } from "./content-client";
 
 // 强制动态渲染:URL filter 变化必须重新拉数据(否则可能命中 RSC cache)
@@ -98,37 +96,30 @@ export default async function ContentPage({ searchParams }: PageProps) {
     author: params.author || undefined,
   };
 
-  const [{ items: rawItems, total }, baseAdapterMetas, outlets, filterOptions, channelRows] =
+  const [{ items: rawItems, total }, baseAdapterMetas, outlets, filterOptions, channelCounts] =
     await Promise.all([
       listCollectedItems(orgId, filters, { limit: 50, offset: 0 }),
       Promise.resolve(listAdapterMetas()),
       listOutletsByOrg(orgId),
       listCollectedItemFilterOptions(orgId),
-      // 信息来源 chip 计数:按 firstSeenChannel GROUP BY 一次,前端按 bucket 折叠累加。
-      // 这是 org 全量计数(不跟其他 filter 联动)— 类似图 1 的固定 chip 行,作"概览"使用。
-      db
-        .select({ ch: collectedItems.firstSeenChannel, n: sql<number>`count(*)::int` })
-        .from(collectedItems)
-        .where(eq(collectedItems.organizationId, orgId))
-        .groupBy(collectedItems.firstSeenChannel),
+      listCollectedItemChannelCounts(orgId, filters),
     ]);
 
-  // 把原始 firstSeenChannel 计数按 ChannelBucket 折叠(微博/抖音/微信/...);未归类的丢弃。
-  const channelCounts: Record<string, number> = {};
-  for (const { ch, n } of channelRows) {
-    const bucket = simpleChannelBucket(ch);
-    if (!bucket) continue;
-    channelCounts[bucket] = (channelCounts[bucket] ?? 0) + n;
-  }
-
-  // 采集池筛选下拉追加 virtual "Excel 导入" 选项 — 它不是真 adapter,
-  // 不在 /源管理 的"新建源"里出现,只为筛选 firstSeenSourceType=excel_import 服务。
+  // 内容池筛选下拉追加 virtual import 选项 — 它们不是真 adapter,
+  // 不在 /源管理 的"新建源"里出现,只为筛选历史导入数据服务。
   const adapterMetas = [
     ...baseAdapterMetas,
     {
       type: "excel_import",
       displayName: "Excel 导入",
       description: "通过界面或脚本批量导入的 Excel 数据",
+      category: "url" as const,
+      configFields: [],
+    },
+    {
+      type: "json_import",
+      displayName: "JSON 导入",
+      description: "通过脚本批量导入的 JSON 数据",
       category: "url" as const,
       configFields: [],
     },
@@ -155,32 +146,38 @@ export default async function ContentPage({ searchParams }: PageProps) {
   }));
 
   return (
-    <ContentClient
-      items={items}
-      total={total}
-      adapterMetas={adapterMetas}
-      outlets={outlets}
-      filterOptions={filterOptions}
-      channelCounts={channelCounts}
-      initialFilters={{
-        sourceType: params.sourceType,
-        module: params.module,
-        time: timeWindow,
-        q: params.q,
-        enrichment: rawEnrichment as "pending" | "enriched" | "failed" | undefined,
-        platform: params.platform,
-        outletTier: rawOutletTier,
-        outletRegion: rawOutletRegion,
-        // A2
-        outletId: params.outletId,
-        category: params.category,
-        tag: params.tag,
-        // 舆情筛选(2026-05-18)
-        author: params.author,
-        publishedSince: params.publishedSince,
-        publishedUntil: params.publishedUntil,
-      }}
-      initialView={initialView}
-    />
+    <>
+      <PageHeader
+        title="内容池"
+        description="统一检索和管理已入库的采集内容，按来源、发布时间、媒体维度等条件筛选。"
+      />
+      <ContentClient
+        items={items}
+        total={total}
+        adapterMetas={adapterMetas}
+        outlets={outlets}
+        filterOptions={filterOptions}
+        channelCounts={channelCounts}
+        initialFilters={{
+          sourceType: params.sourceType,
+          module: params.module,
+          time: timeWindow,
+          q: params.q,
+          enrichment: rawEnrichment as "pending" | "enriched" | "failed" | undefined,
+          platform: params.platform,
+          outletTier: rawOutletTier,
+          outletRegion: rawOutletRegion,
+          // A2
+          outletId: params.outletId,
+          category: params.category,
+          tag: params.tag,
+          // 舆情筛选(2026-05-18)
+          author: params.author,
+          publishedSince: params.publishedSince,
+          publishedUntil: params.publishedUntil,
+        }}
+        initialView={initialView}
+      />
+    </>
   );
 }

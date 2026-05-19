@@ -456,7 +456,7 @@ export function SourceDetailClient({ source, runs, items, outlets, configFields 
         </TabsContent>
 
         <TabsContent value="items" className="mt-4 flex flex-col gap-3">
-          {/* A1 (2026-05-14): 提示 detail tab 只显示前 50 条,完整列表在采集池 */}
+          {/* A1 (2026-05-14): 提示 detail tab 只显示前 50 条,完整列表在内容池 */}
           {items.length >= 50 && (
             <p className="text-xs text-muted-foreground">
               本 tab 仅显示最近 50 条(累计已采集 {source.totalItemsCollected} 条)。
@@ -464,7 +464,7 @@ export function SourceDetailClient({ source, runs, items, outlets, configFields 
                 href={`/data-collection/content?sourceType=${source.sourceType}`}
                 className="text-sky-600 hover:underline ml-1"
               >
-                到采集池查看完整列表 →
+                到内容池查看完整列表 →
               </Link>
             </p>
           )}

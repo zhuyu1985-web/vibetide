@@ -14,6 +14,7 @@ export type DataTableColumn<T> = {
   /**
    * Column width:
    *  - `"flex"` (default): takes remaining space via `flex-1`
+   *  - Percentage like `"54%"`: uses that as the preferred width and can shrink on narrower layouts
    *  - CSS length like `"120px"` | `"10rem"`: fixed width
    *  - Tailwind width class like `"w-32"`: fixed Tailwind width
    */
@@ -300,6 +301,7 @@ export function DataTable<T>({
 function colStyle<T>(col: DataTableColumn<T>): React.CSSProperties | undefined {
   const w = col.width ?? "flex";
   if (w === "flex") return { flex: 1, minWidth: 0 };
+  if (w.endsWith("%")) return { flex: `0 1 ${w}`, minWidth: 0 };
   if (w.startsWith("w-")) return { flexShrink: 0 };
   return { width: w, flexShrink: 0 };
 }

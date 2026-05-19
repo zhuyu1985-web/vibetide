@@ -47,19 +47,29 @@ export const CHONGQING_MUNICIPAL_OUTLETS: Omit<
     publicAccountNames: ["重庆发布"],
     description: "政务，无独立官网",
   },
-  {
-    outletName: "美丽重庆",
-    outletTier: "provincial_municipal",
-    outletRegion: "重庆",
-    domains: [],
-    publicAccountNames: ["美丽重庆"],
-    description: "行业 + 政务",
-  },
+  // "美丽重庆" 已迁到 industry.ts（按客户 Excel 口径，划入行业媒体 tier）
   {
     outletName: "第1眼新闻",
     outletTier: "provincial_municipal",
     outletRegion: "重庆",
     domains: ["1tv.com.cn"],
     publicAccountNames: ["第 1 眼新闻"],
+  },
+  // TODO: domains / publicAccountNames 待调研确认后补全（当前为 Excel 主题统计口径占位）
+  {
+    outletName: "ichongqing",
+    outletTier: "provincial_municipal",
+    outletRegion: "重庆",
+    domains: ["ichongqing.info"],
+    publicAccountNames: ["iChongqing", "西部国传"],
+    description: "重庆国际传播中心（西部国传），Excel 主题统计市级媒体列",
+  },
+  {
+    outletName: "七一网",
+    outletTier: "provincial_municipal",
+    outletRegion: "重庆",
+    domains: ["71.cn"],
+    publicAccountNames: ["当代党员", "七一客户端"],
+    description: "中共重庆市委《当代党员》杂志官网，Excel 主题统计市级媒体列",
   },
 ];

@@ -246,7 +246,7 @@ export type InngestEvents = {
     data: {
       topicId: string;
       organizationId: string;
-      reason: "topic-renamed" | "keyword-added" | "keyword-removed";
+      reason: "topic-renamed" | "keyword-added" | "keyword-updated" | "keyword-removed";
     };
   };
 

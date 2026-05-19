@@ -1,7 +1,9 @@
 import type { MediaOutletInsert } from "@/db/schema/media-outlet-dictionary";
 
-// 40 条重庆区县融媒 seed（对应 research_cq_districts 表 + 江北区）
-// domains V1 留空数组，仅靠 publicAccountNames 识别；实施后期调研补全
+// 41 条重庆区县融媒 seed
+// 关于江北区/渝北区:cq_districts 统计字典将这俩合并到"两江新区",但区融媒 outlet 实体保留
+// 原 outletName(江北发布/渝北发布),outletDistrict 调整为"两江新区"使统计归口
+// domains V1 留空数组,仅靠 publicAccountNames 识别;实施后期调研补全
 export const CHONGQING_DISTRICT_OUTLETS: Omit<
   MediaOutletInsert,
   "id" | "organizationId" | "createdAt" | "updatedAt"
@@ -26,7 +28,7 @@ export const CHONGQING_DISTRICT_OUTLETS: Omit<
     outletName: "渝北发布",
     outletTier: "district_media",
     outletRegion: "重庆",
-    outletDistrict: "渝北区",
+    outletDistrict: "两江新区", // 渝北区合并到两江新区(统计口径),保留原 outlet 名
     domains: [],
     publicAccountNames: ["渝北发布", "渝北融媒"],
   },
@@ -202,7 +204,7 @@ export const CHONGQING_DISTRICT_OUTLETS: Omit<
     outletName: "江北发布",
     outletTier: "district_media",
     outletRegion: "重庆",
-    outletDistrict: "江北区",
+    outletDistrict: "两江新区", // 江北区合并到两江新区(统计口径),保留原 outlet 名
     domains: [],
     publicAccountNames: ["江北发布", "时尚江北"],
   },
@@ -250,7 +252,7 @@ export const CHONGQING_DISTRICT_OUTLETS: Omit<
     outletName: "西部科学城",
     outletTier: "district_media",
     outletRegion: "重庆",
-    outletDistrict: "科学城重庆高新区",
+    outletDistrict: "科学城重庆高新区", // 跟 cq_districts DB 实际名对齐
     domains: [],
     publicAccountNames: ["西部科学城重庆高新区", "重庆高新区"],
   },
@@ -325,5 +327,13 @@ export const CHONGQING_DISTRICT_OUTLETS: Omit<
     outletDistrict: "石柱县",
     domains: [],
     publicAccountNames: ["石柱发布"],
+  },
+  {
+    outletName: "巫溪发布",
+    outletTier: "district_media",
+    outletRegion: "重庆",
+    outletDistrict: "巫溪县",
+    domains: [],
+    publicAccountNames: ["巫溪发布", "巫溪报"],
   },
 ];

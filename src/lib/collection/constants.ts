@@ -96,7 +96,7 @@ export function getPlatformChipClass(platform: string | null | undefined): strin
   return PLATFORM_FAMILY_COLORS.default;
 }
 
-/** Source-type chip color palette — consistent across /data-collection/sources 和 /采集池 */
+/** Source-type chip color palette — consistent across /data-collection/sources 和 /内容池 */
 export const SOURCE_TYPE_COLOR: Record<string, string> = {
   tophub: "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400",
   tavily: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400",
@@ -105,6 +105,9 @@ export const SOURCE_TYPE_COLOR: Record<string, string> = {
   list_scraper: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400",
   rss: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400",
   tikhub: "bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400",
+  excel_import: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
+  json_import: "bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400",
+  site_scraper: "bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400",
 };
 
 /**
@@ -125,6 +128,7 @@ export const SOURCE_TYPE_COLOR: Record<string, string> = {
  * - list/<host> → 网站(列表)
  * - bocha / tavily → 搜索
  * - excel_import → Excel 导入
+ * - json_import/<file> → JSON 导入
  */
 const TOPHUB_PLATFORM_LABELS: Record<string, string> = {
   weibo: "微博",
@@ -151,6 +155,7 @@ const CHANNEL_EXACT_LABELS: Record<string, string> = {
   bocha: "博查搜索",
   tavily: "Tavily 搜索",
   excel_import: "Excel 导入",
+  json_import: "JSON 导入",
 };
 
 /**
@@ -204,7 +209,7 @@ const CHANNEL_MATCHERS: Record<ChannelFilterLabel, ChannelMatcher> = {
     prefix: ["tophub/知乎", "tophub/zhihu"],
   },
   快手: { exact: ["tikhub_kuaishou_account"], prefix: [] },
-  网站: { exact: [], prefix: ["rss/", "jina/", "list/"] },
+  网站: { exact: ["excel_import", "json_import"], prefix: ["rss/", "jina/", "list/", "json_import/"] },
   热榜: { exact: [], prefix: ["tophub/"] },
   搜索: { exact: ["bocha", "tavily"], prefix: [] },
 };
@@ -237,6 +242,8 @@ export function formatChannelLabel(channel: string | null | undefined): string {
         return "网站";
       case "list":
         return "网站(列表)";
+      case "json_import":
+        return "JSON 导入";
       default:
         return prefix;
     }

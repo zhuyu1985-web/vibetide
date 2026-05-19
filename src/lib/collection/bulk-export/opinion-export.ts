@@ -2,6 +2,8 @@ import type { InferSelectModel } from "drizzle-orm";
 import type { collectedItems } from "@/db/schema/collection";
 import { OPINION_EXCEL_COLUMNS } from "../bulk-import/opinion-transform";
 
+const EXCEL_CELL_TEXT_LIMIT = 32767;
+
 /**
  * 导出行 = 主表行 + 副表 content/ocr/asr(LEFT JOIN 可能 null)
  */
@@ -12,11 +14,10 @@ export type ExportItemRow = InferSelectModel<typeof collectedItems> & {
 };
 
 /**
- * 把一条 collected_items + contents 转为 Excel 33 列 record。
- * 列名/顺序严格对照 OPINION_EXCEL_COLUMNS,与 data.xlsx 模板一致。
+ * 把一条 collected_items + contents 转为 Excel 导出 record。
+ * 导出列基于 data.xlsx 模板,但不包含"查询时段"。
  *
  * 反向转换要点:
- * - "查询时段" 取 raw_metadata.queryWindow(导入时记的);没有就空
  * - "序号" 用导出顺序(由 caller 给 absoluteIndex)
  * - 多值数组 join("，"):industries/matchedKeywords/matchedRegions
  * - mentioned_regions 用分号 + 逗号下钻还原:["江苏省","上海市"] → "江苏省；上海市"
@@ -27,11 +28,9 @@ export function exportRowToOpinionRecord(
   seq: number,
 ): Record<string, unknown> {
   const meta = (row.rawMetadata as Record<string, unknown> | null) ?? {};
-  const queryWindow = typeof meta.queryWindow === "string" ? meta.queryWindow : "";
   const mcn = typeof meta.mcn === "string" ? meta.mcn : "";
 
   const record: Record<string, unknown> = {
-    "查询时段": queryWindow,
     "序号": seq,
     "帖子ID": row.externalId ?? "",
     "标题": row.title,
@@ -66,7 +65,18 @@ export function exportRowToOpinionRecord(
     "ASR文本": row.asrText ?? "",
   };
 
-  return record;
+  return clampRecordText(record);
+}
+
+function clampRecordText(record: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      typeof value === "string" && value.length > EXCEL_CELL_TEXT_LIMIT
+        ? value.slice(0, EXCEL_CELL_TEXT_LIMIT)
+        : value,
+    ]),
+  );
 }
 
 /** "2025-07-09 22:14:03" 风格(本地时区) — Excel 显示友好,且再导入时能 parse */
@@ -78,5 +88,5 @@ function formatDateTime(d: Date): string {
   );
 }
 
-/** 提供给 caller:Excel 列顺序(供 sheetjs aoa_to_sheet / header 配置) */
-export const EXPORT_COLUMN_ORDER = [...OPINION_EXCEL_COLUMNS];
+/** 提供给 caller:Excel 列顺序(供 sheetjs json_to_sheet / header 配置) */
+export const EXPORT_COLUMN_ORDER = OPINION_EXCEL_COLUMNS.filter((column) => column !== "查询时段");

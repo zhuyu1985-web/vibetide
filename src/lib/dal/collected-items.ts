@@ -9,7 +9,13 @@ import {
 } from "@/db/schema";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
 import type { InferSelectModel } from "drizzle-orm";
-import { and, desc, eq, getTableColumns, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, gte, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  CHANNEL_BUCKET_ORDER,
+  CHANNEL_BUCKET_SLUG,
+  getChannelBucketMatcher,
+  normalizeChannelBucketSlug,
+} from "@/lib/collection/channel-bucket";
 
 export type CollectedItemRow = InferSelectModel<typeof collectedItems>;
 
@@ -89,18 +95,46 @@ export interface ListCollectedItemsResult {
   total: number;
 }
 
-export async function listCollectedItems(
+function buildPlatformAliasCondition(platformAlias: string): SQL | undefined {
+  const normalizedAlias = normalizeChannelBucketSlug(platformAlias);
+  const matcher = getChannelBucketMatcher(normalizedAlias);
+  if (!matcher) {
+    const fallback = `%${platformAlias.trim()}%`;
+    return sql`(${collectedItems.firstSeenChannel} ILIKE ${fallback} OR EXISTS (
+      SELECT 1 FROM jsonb_array_elements(${collectedItems.sourceChannels}) AS sc
+      WHERE sc->>'channel' ILIKE ${fallback}
+    ))`;
+  }
+
+  const parts: SQL[] = [];
+  if (matcher.exact.length > 0) {
+    parts.push(inArray(collectedItems.firstSeenChannel, matcher.exact));
+    for (const ch of matcher.exact) {
+      parts.push(sql`EXISTS (
+        SELECT 1 FROM jsonb_array_elements(${collectedItems.sourceChannels}) AS sc
+        WHERE sc->>'channel' = ${ch}
+      )`);
+    }
+  }
+  for (const prefix of matcher.prefix) {
+    const pattern = `${prefix}%`;
+    parts.push(ilike(collectedItems.firstSeenChannel, pattern));
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM jsonb_array_elements(${collectedItems.sourceChannels}) AS sc
+      WHERE sc->>'channel' ILIKE ${pattern}
+    )`);
+  }
+  return parts.length > 0 ? or(...parts) : undefined;
+}
+
+export async function buildCollectedItemConditions(
   organizationId: string,
   filters: ContentFilters = {},
-  pagination: PaginationOpts = {},
-): Promise<ListCollectedItemsResult> {
-  const limit = pagination.limit ?? 50;
-  const offset = pagination.offset ?? 0;
-
-  const conditions = [eq(collectedItems.organizationId, organizationId)];
+  options: { omitPlatformAlias?: boolean } = {},
+): Promise<SQL[]> {
+  const conditions: SQL[] = [eq(collectedItems.organizationId, organizationId)];
 
   if (filters.sourceType) {
-    // 需要 join collection_sources.sourceType
     const sourceIds = await db
       .select({ id: collectionSources.id })
       .from(collectionSources)
@@ -111,13 +145,13 @@ export async function listCollectedItems(
         ),
       );
     if (sourceIds.length === 0) {
-      return { items: [], total: 0 };
+      conditions.push(sql`false`);
+    } else {
+      conditions.push(inArray(collectedItems.firstSeenSourceId, sourceIds.map((r) => r.id)));
     }
-    conditions.push(inArray(collectedItems.firstSeenSourceId, sourceIds.map((r) => r.id)));
   }
 
   if (filters.targetModule) {
-    // derived_modules 是 text[],用 array contains
     conditions.push(
       sql`${collectedItems.derivedModules} @> ARRAY[${filters.targetModule}]::text[]`,
     );
@@ -144,15 +178,13 @@ export async function listCollectedItems(
     );
   }
 
-  if (filters.platformAlias) {
-    conditions.push(
-      sql`(${collectedItems.firstSeenChannel} ILIKE ${`%/${filters.platformAlias}`} OR ${collectedItems.sourceChannels} @> ${JSON.stringify([{ channel: `tophub/${filters.platformAlias}` }])}::jsonb)`,
-    );
+  if (filters.platformAlias && !options.omitPlatformAlias) {
+    const condition = buildPlatformAliasCondition(filters.platformAlias);
+    if (condition) conditions.push(condition);
   }
 
   if (filters.searchText) {
     const q = `%${filters.searchText}%`;
-    // 正文/OCR/ASR 都在副表 — 用 EXISTS 子查询。三列各自的 trigram 索引在副表上生效。
     conditions.push(
       sql`(${collectedItems.title} ILIKE ${q} OR EXISTS (
         SELECT 1 FROM collected_item_contents cic
@@ -162,7 +194,6 @@ export async function listCollectedItems(
     );
   }
 
-  // Outlet filters (Task 5.1)
   if (filters.outletTier === "unclassified") {
     conditions.push(isNull(collectedItems.outletTier));
   } else if (filters.outletTier) {
@@ -175,23 +206,17 @@ export async function listCollectedItems(
     conditions.push(eq(collectedItems.outletRegion, filters.outletRegion));
   }
   if (filters.category) {
-    // text[] contains — GIN 索引 collected_items_category_gin 生效
     conditions.push(sql`${collectedItems.category} @> ARRAY[${filters.category}]::text[]`);
   }
   if (filters.tag) {
-    // text[] contains — GIN 索引 collected_items_tags_gin 生效
     conditions.push(sql`${collectedItems.tags} @> ARRAY[${filters.tag}]::text[]`);
   }
 
-  // ── 舆情/账号维度 ──
   if (filters.platform) {
     conditions.push(eq(collectedItems.platform, filters.platform));
   }
   if (filters.author) {
     const q = `%${filters.author}%`;
-    // "媒体账号"检索兼容多来源:
-    // - Excel/平台采集通常写 author
-    // - JSON 导入把抓取来源写 platform/raw_metadata.source,author 可能是记者署名
     conditions.push(sql`(
       ${collectedItems.author} ILIKE ${q}
       OR ${collectedItems.platform} ILIKE ${q}
@@ -212,7 +237,6 @@ export async function listCollectedItems(
     conditions.push(eq(collectedItems.ipRegion, filters.ipRegion));
   }
   if (filters.postRegion) {
-    // 前缀匹配(支持"重庆市"命中"重庆市,涪陵区"等下钻)
     conditions.push(sql`${collectedItems.postRegion} LIKE ${filters.postRegion + "%"}`);
   }
   if (filters.mentionedRegion) {
@@ -236,6 +260,19 @@ export async function listCollectedItems(
   if (filters.minViewCount !== undefined) {
     conditions.push(gte(collectedItems.viewCount, filters.minViewCount));
   }
+
+  return conditions;
+}
+
+export async function listCollectedItems(
+  organizationId: string,
+  filters: ContentFilters = {},
+  pagination: PaginationOpts = {},
+): Promise<ListCollectedItemsResult> {
+  const limit = pagination.limit ?? 50;
+  const offset = pagination.offset ?? 0;
+
+  const conditions = await buildCollectedItemConditions(organizationId, filters);
 
   // 用 getTableColumns 拿全字段,避免每次新增列都要回来加一行 select
   const rows = await db
@@ -262,26 +299,52 @@ export async function listCollectedItems(
   return { items: rows, total: count };
 }
 
+export async function listCollectedItemChannelCounts(
+  organizationId: string,
+  filters: ContentFilters = {},
+): Promise<Record<string, number>> {
+  const baseConditions = await buildCollectedItemConditions(organizationId, filters, {
+    omitPlatformAlias: true,
+  });
+
+  const entries = await Promise.all(
+    CHANNEL_BUCKET_ORDER.map(async (bucket) => {
+      const condition = buildPlatformAliasCondition(CHANNEL_BUCKET_SLUG[bucket]);
+      if (!condition) return [bucket, 0] as const;
+
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(collectedItems)
+        .where(and(...baseConditions, condition));
+
+      return [bucket, count] as const;
+    }),
+  );
+
+  return Object.fromEntries(entries);
+}
+
 // ────────────────────────────────────────────────
-// 筛选候选项(给采集池 UI 的 Select 下拉用)
+// 筛选候选项(给内容池 UI 的 Select 下拉用)
 // ────────────────────────────────────────────────
 
 export interface CollectedItemFilterOptions {
   categories: string[];          // collected_items.category 去重排序
   tags: string[];                // collected_items.tags 展开 + 去重 + 排序
   platforms: string[];           // collected_items.platform 去重(按使用次数 DESC)
+  accounts: string[];            // author / raw_metadata.source / publicAccountName 去重
 }
 
 /**
  * 拉本 org 下 collected_items 已经出现过的 category / tag 候选值。
- * 给采集池 UI 的下拉框显示用。
+ * 给内容池 UI 的下拉框显示用。
  *
  * 注意:用 LIMIT 截断避免极端情况下数据量爆炸(候选项 > 500 时 UI 也没意义了)。
  */
 export async function listCollectedItemFilterOptions(
   organizationId: string,
 ): Promise<CollectedItemFilterOptions> {
-  const [categories, tags, platforms] = await Promise.all([
+  const [categories, tags, platforms, accounts] = await Promise.all([
     db.execute<{ category: string }>(sql`
       SELECT DISTINCT unnest(category) AS category
       FROM collected_items
@@ -305,12 +368,38 @@ export async function listCollectedItemFilterOptions(
       ORDER BY COUNT(*) DESC
       LIMIT 100
     `),
+    db.execute<{ account: string }>(sql`
+      SELECT account
+      FROM (
+        SELECT author AS account
+        FROM collected_items
+        WHERE organization_id = ${organizationId}::uuid
+          AND author IS NOT NULL
+          AND btrim(author) <> ''
+        UNION ALL
+        SELECT raw_metadata->>'source' AS account
+        FROM collected_items
+        WHERE organization_id = ${organizationId}::uuid
+          AND raw_metadata->>'source' IS NOT NULL
+          AND btrim(raw_metadata->>'source') <> ''
+        UNION ALL
+        SELECT raw_metadata->>'publicAccountName' AS account
+        FROM collected_items
+        WHERE organization_id = ${organizationId}::uuid
+          AND raw_metadata->>'publicAccountName' IS NOT NULL
+          AND btrim(raw_metadata->>'publicAccountName') <> ''
+      ) s
+      GROUP BY account
+      ORDER BY COUNT(*) DESC, account
+      LIMIT 300
+    `),
   ]);
 
   return {
     categories: categories.map((r) => r.category),
     tags: tags.map((r) => r.tag),
     platforms: platforms.map((r) => r.platform),
+    accounts: accounts.map((r) => r.account),
   };
 }
 
@@ -366,100 +455,7 @@ export async function exportCollectedItemsForExcel(
   filters: ContentFilters = {},
   hardMaxRows = 50000,
 ): Promise<Array<CollectedItemRow & { content: string | null; ocrText: string | null; asrText: string | null }>> {
-  // 复用 listCollectedItems 的 conditions 构建会比较啰嗦。这里直接重建。
-  const conditions = [eq(collectedItems.organizationId, organizationId)];
-
-  if (filters.sourceType) {
-    const sourceIds = await db
-      .select({ id: collectionSources.id })
-      .from(collectionSources)
-      .where(
-        and(
-          eq(collectionSources.organizationId, organizationId),
-          eq(collectionSources.sourceType, filters.sourceType),
-        ),
-      );
-    if (sourceIds.length === 0) return [];
-    conditions.push(inArray(collectedItems.firstSeenSourceId, sourceIds.map((r) => r.id)));
-  }
-  if (filters.targetModule) {
-    conditions.push(sql`${collectedItems.derivedModules} @> ARRAY[${filters.targetModule}]::text[]`);
-  }
-  if (filters.enrichmentStatus) {
-    conditions.push(eq(collectedItems.enrichmentStatus, filters.enrichmentStatus));
-  }
-  if (filters.sinceMs !== undefined) {
-    conditions.push(gte(collectedItems.firstSeenAt, new Date(filters.sinceMs)));
-  }
-  if (filters.untilMs !== undefined) {
-    conditions.push(sql`${collectedItems.firstSeenAt} <= ${new Date(filters.untilMs)}`);
-  }
-  if (filters.publishedSinceMs !== undefined) {
-    conditions.push(gte(collectedItems.publishedAt, new Date(filters.publishedSinceMs)));
-  }
-  if (filters.publishedUntilMs !== undefined) {
-    conditions.push(sql`${collectedItems.publishedAt} <= ${new Date(filters.publishedUntilMs)}`);
-  }
-  if (filters.platformAlias) {
-    conditions.push(
-      sql`(${collectedItems.firstSeenChannel} ILIKE ${`%/${filters.platformAlias}`} OR ${collectedItems.sourceChannels} @> ${JSON.stringify([{ channel: `tophub/${filters.platformAlias}` }])}::jsonb)`,
-    );
-  }
-  if (filters.searchText) {
-    const q = `%${filters.searchText}%`;
-    conditions.push(
-      sql`(${collectedItems.title} ILIKE ${q} OR EXISTS (
-        SELECT 1 FROM collected_item_contents cic
-        WHERE cic.item_id = ${collectedItems.id}
-          AND (cic.content ILIKE ${q} OR cic.ocr_text ILIKE ${q} OR cic.asr_text ILIKE ${q})
-      ))`,
-    );
-  }
-  if (filters.outletTier === "unclassified") {
-    conditions.push(isNull(collectedItems.outletTier));
-  } else if (filters.outletTier) {
-    conditions.push(eq(collectedItems.outletTier, filters.outletTier));
-  }
-  if (filters.outletId) conditions.push(eq(collectedItems.outletId, filters.outletId));
-  if (filters.outletRegion) conditions.push(eq(collectedItems.outletRegion, filters.outletRegion));
-  if (filters.category) {
-    conditions.push(sql`${collectedItems.category} @> ARRAY[${filters.category}]::text[]`);
-  }
-  if (filters.tag) {
-    conditions.push(sql`${collectedItems.tags} @> ARRAY[${filters.tag}]::text[]`);
-  }
-  if (filters.platform) conditions.push(eq(collectedItems.platform, filters.platform));
-  if (filters.author) {
-    const q = `%${filters.author}%`;
-    conditions.push(sql`(
-      ${collectedItems.author} ILIKE ${q}
-      OR ${collectedItems.platform} ILIKE ${q}
-      OR ${collectedItems.rawMetadata}->>'source' ILIKE ${q}
-      OR ${collectedItems.rawMetadata}->>'publicAccountName' ILIKE ${q}
-    )`);
-  }
-  if (filters.accountId) conditions.push(eq(collectedItems.accountId, filters.accountId));
-  if (filters.sentiment) conditions.push(eq(collectedItems.sentiment, filters.sentiment));
-  if (filters.infoType) conditions.push(eq(collectedItems.infoType, filters.infoType));
-  if (filters.ipRegion) conditions.push(eq(collectedItems.ipRegion, filters.ipRegion));
-  if (filters.postRegion) {
-    conditions.push(sql`${collectedItems.postRegion} LIKE ${filters.postRegion + "%"}`);
-  }
-  if (filters.mentionedRegion) {
-    conditions.push(sql`${collectedItems.mentionedRegions} @> ARRAY[${filters.mentionedRegion}]::text[]`);
-  }
-  if (filters.matchedKeyword) {
-    conditions.push(sql`${collectedItems.matchedKeywords} @> ARRAY[${filters.matchedKeyword}]::text[]`);
-  }
-  if (filters.matchedRegion) {
-    conditions.push(sql`${collectedItems.matchedRegions} @> ARRAY[${filters.matchedRegion}]::text[]`);
-  }
-  if (filters.industry) {
-    conditions.push(sql`${collectedItems.industries} @> ARRAY[${filters.industry}]::text[]`);
-  }
-  if (filters.minLikeCount !== undefined) conditions.push(gte(collectedItems.likeCount, filters.minLikeCount));
-  if (filters.minCommentCount !== undefined) conditions.push(gte(collectedItems.commentCount, filters.minCommentCount));
-  if (filters.minViewCount !== undefined) conditions.push(gte(collectedItems.viewCount, filters.minViewCount));
+  const conditions = await buildCollectedItemConditions(organizationId, filters);
 
   // 先 count 检查上限,避免拉完才发现超
   const [{ n }] = await db

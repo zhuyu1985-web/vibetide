@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { SourcesClient } from "./sources-client";
 import { listAdapterMetas } from "@/lib/collection/adapter-meta";
 import { ConfigSubtabs } from "../config-subtabs";
+import { PageHeader } from "@/components/shared/page-header";
 
 export default async function SourcesPage() {
   const orgId = await getCurrentUserOrg();
@@ -18,6 +19,10 @@ export default async function SourcesPage() {
 
   return (
     <>
+      <PageHeader
+        title="采集配置"
+        description="管理采集源、调度规则和媒体字典，统一配置内容入库来源。"
+      />
       <ConfigSubtabs />
       <SourcesClient
         initialSources={sources.map((s) => ({

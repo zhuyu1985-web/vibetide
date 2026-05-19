@@ -20,12 +20,14 @@ function buildHotTopicPlatforms(): string[] {
 }
 
 /**
- * 幂等:为指定组织确保存在一个启用的系统热榜采集源。
- * - 不存在时创建
- * - 存在但被软删除时重新启用并清除 deletedAt
- * - 已存在时仅刷新 config.platforms(保证始终与最新 TOPHUB_DEFAULT_NODES 同步)
+ * 幂等:为指定组织确保存在系统热榜采集源,但尊重用户暂停/删除状态。
+ * - 不存在时创建并启用
+ * - 已存在时仅刷新 config.platforms/targetModules
+ * - 已暂停或软删除时不重新启用,由 cron 调用方跳过派发
  */
-export async function ensureHotTopicSystemSource(organizationId: string): Promise<string> {
+export async function ensureHotTopicSystemSource(
+  organizationId: string,
+): Promise<{ sourceId: string; enabled: boolean }> {
   const platforms = buildHotTopicPlatforms();
 
   const [existing] = await db
@@ -44,13 +46,14 @@ export async function ensureHotTopicSystemSource(organizationId: string): Promis
       .update(collectionSources)
       .set({
         config: { platforms },
-        enabled: true,
-        deletedAt: null,
         updatedAt: new Date(),
         targetModules: ["hot_topics"],
       })
       .where(eq(collectionSources.id, existing.id));
-    return existing.id;
+    return {
+      sourceId: existing.id,
+      enabled: existing.enabled && existing.deletedAt === null,
+    };
   }
 
   const [created] = await db
@@ -66,5 +69,5 @@ export async function ensureHotTopicSystemSource(organizationId: string): Promis
     })
     .returning({ id: collectionSources.id });
 
-  return created.id;
+  return { sourceId: created.id, enabled: true };
 }

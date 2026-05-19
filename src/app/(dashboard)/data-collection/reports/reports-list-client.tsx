@@ -100,7 +100,7 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
             className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            返回检索工作台
+            返回内容池
           </Link>
         }
       />
@@ -156,7 +156,7 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
                     href="/data-collection/content"
                     className="text-sky-600 dark:text-sky-400 hover:underline"
                   >
-                    检索工作台
+                    内容池
                   </Link>{" "}
                   做检索后点「生成报告」即可创建
                 </div>

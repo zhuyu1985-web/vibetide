@@ -9,9 +9,10 @@ import {
   collectionLogs,
   hotTopics,
 } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   listCollectedItems,
+  listCollectedItemChannelCounts,
   getCollectedItemDetail,
   getDerivedRecordsForItem,
   getMonitoringSummary,
@@ -27,9 +28,16 @@ let orgA: string;
 let orgB: string;
 let sourceA1: string; // tophub 源
 let sourceA2: string; // tavily 源
+let sourceA3: string; // json_import 虚拟导入源
 let itemA1: string;   // hot_topics 模块 item
 let itemA2: string;   // news 模块 item
 let itemA3: string;   // 旧 item (超时间窗口)
+let itemA4: string;   // 中文 TopHub channel item
+let itemA5: string;   // Tikhub channel item
+let itemA6: string;   // 发布时间窗口 item
+let itemA7: string;   // legacy bare douyin channel item
+let itemA8: string;   // legacy bare wechat channel item
+let itemA9: string;   // json_import channel item
 let runA1: string;    // 失败的 run
 let runA2: string;    // 成功的 run
 let htId: string;     // hotTopics 派生记录 (linked to itemA1)
@@ -73,6 +81,19 @@ beforeAll(async () => {
     })
     .returning();
   sourceA2 = s2.id;
+
+  const [s3] = await db
+    .insert(collectionSources)
+    .values({
+      organizationId: orgA,
+      name: "ci-source-json-import",
+      sourceType: "json_import",
+      config: {},
+      targetModules: [],
+      enabled: false,
+    })
+    .returning();
+  sourceA3 = s3.id;
 
   // orgB 的源（用于隔离测试）
   await db.insert(collectionSources).values({
@@ -136,6 +157,103 @@ beforeAll(async () => {
     .returning();
   itemA3 = i3.id;
   await db.insert(collectedItemContents).values({ itemId: i3.id, content: "过时内容" });
+
+  const [i4] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgA,
+      contentFingerprint: `fp-a4-${now}`,
+      title: "中文热榜微博内容",
+      firstSeenSourceId: sourceA1,
+      firstSeenChannel: "tophub/微博",
+      firstSeenAt: new Date(now - 4 * 60 * 1000),
+      derivedModules: ["hot_topics"],
+      enrichmentStatus: "pending",
+    })
+    .returning();
+  itemA4 = i4.id;
+  await db.insert(collectedItemContents).values({ itemId: i4.id, content: "中文 TopHub 微博频道内容" });
+
+  const [i5] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgA,
+      contentFingerprint: `fp-a5-${now}`,
+      title: "抖音社媒内容",
+      firstSeenSourceId: sourceA2,
+      firstSeenChannel: "tikhub_douyin",
+      firstSeenAt: new Date(now - 3 * 60 * 1000),
+      derivedModules: ["news"],
+      enrichmentStatus: "pending",
+    })
+    .returning();
+  itemA5 = i5.id;
+  await db.insert(collectedItemContents).values({ itemId: i5.id, content: "抖音社媒频道内容" });
+
+  const [i6] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgA,
+      contentFingerprint: `fp-a6-${now}`,
+      title: "按发布时间命中的内容",
+      firstSeenSourceId: sourceA2,
+      firstSeenChannel: "rss/example.com",
+      firstSeenAt: new Date(now - 20 * 24 * 60 * 60 * 1000),
+      publishedAt: new Date(now - 30 * 60 * 1000),
+      derivedModules: ["news"],
+      enrichmentStatus: "pending",
+    })
+    .returning();
+  itemA6 = i6.id;
+  await db.insert(collectedItemContents).values({ itemId: i6.id, content: "这条采集很早但发布时间很近" });
+
+  const [i7] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgA,
+      contentFingerprint: `fp-a7-${now}`,
+      title: "旧格式抖音频道内容",
+      firstSeenSourceId: sourceA2,
+      firstSeenChannel: "douyin",
+      firstSeenAt: new Date(now - 2 * 60 * 1000),
+      derivedModules: ["news"],
+      enrichmentStatus: "pending",
+    })
+    .returning();
+  itemA7 = i7.id;
+  await db.insert(collectedItemContents).values({ itemId: i7.id, content: "旧格式 douyin 裸 channel 内容" });
+
+  const [i8] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgA,
+      contentFingerprint: `fp-a8-${now}`,
+      title: "旧格式微信频道内容",
+      firstSeenSourceId: sourceA2,
+      firstSeenChannel: "wechat",
+      firstSeenAt: new Date(now - 90 * 1000),
+      derivedModules: ["news"],
+      enrichmentStatus: "pending",
+    })
+    .returning();
+  itemA8 = i8.id;
+  await db.insert(collectedItemContents).values({ itemId: i8.id, content: "旧格式 wechat 裸 channel 内容" });
+
+  const [i9] = await db
+    .insert(collectedItems)
+    .values({
+      organizationId: orgA,
+      contentFingerprint: `fp-a9-${now}`,
+      title: "JSON 导入网站内容",
+      firstSeenSourceId: sourceA3,
+      firstSeenChannel: "json_import/people",
+      firstSeenAt: new Date(now - 70 * 1000),
+      derivedModules: [],
+      enrichmentStatus: "pending",
+    })
+    .returning();
+  itemA9 = i9.id;
+  await db.insert(collectedItemContents).values({ itemId: i9.id, content: "JSON 导入的网站内容" });
 
   // orgB 的 item（隔离用）
   const [iB1] = await db.insert(collectedItems).values({
@@ -284,6 +402,12 @@ describe("listCollectedItems — sourceType 过滤", () => {
     expect(result.items.map((r) => r.id)).toContain(itemA2);
   });
 
+  it("过滤 json_import 虚拟导入源 → 返回 JSON 导入数据", async () => {
+    const result = await listCollectedItems(orgA, { sourceType: "json_import" });
+    expect(result.items.every((r) => r.firstSeenSourceId === sourceA3)).toBe(true);
+    expect(result.items.map((r) => r.id)).toContain(itemA9);
+  });
+
   it("不存在的 sourceType 返回空列表", async () => {
     const result = await listCollectedItems(orgA, { sourceType: "nonexistent_adapter" });
     expect(result.items).toHaveLength(0);
@@ -322,6 +446,53 @@ describe("listCollectedItems — sinceMs 时间窗过滤", () => {
     expect(ids).toContain(itemA2);
     // itemA3 (8 天前) 不应该在
     expect(ids).not.toContain(itemA3);
+  });
+});
+
+describe("listCollectedItems — 发布时间窗口过滤", () => {
+  it("publishedSinceMs 作用在 publishedAt,不受 firstSeenAt 早晚影响", async () => {
+    const since1h = Date.now() - 60 * 60 * 1000;
+    const result = await listCollectedItems(orgA, { publishedSinceMs: since1h });
+    const ids = result.items.map((r) => r.id);
+    expect(ids).toContain(itemA6);
+    expect(result.items.every((r) => r.publishedAt && r.publishedAt.getTime() >= since1h)).toBe(true);
+  });
+});
+
+describe("listCollectedItems — 信息来源 platformAlias 过滤", () => {
+  it("weibo 能命中中文 TopHub channel", async () => {
+    const result = await listCollectedItems(orgA, { platformAlias: "weibo" });
+    expect(result.items.map((r) => r.id)).toContain(itemA4);
+  });
+
+  it("douyin 能命中 Tikhub 抖音 channel", async () => {
+    const result = await listCollectedItems(orgA, { platformAlias: "douyin" });
+    expect(result.items.map((r) => r.id)).toContain(itemA5);
+  });
+
+  it("能兼容中文 platformAlias 和旧格式裸 channel", async () => {
+    const douyin = await listCollectedItems(orgA, { platformAlias: "抖音" });
+    const wechat = await listCollectedItems(orgA, { platformAlias: "微信" });
+    expect(douyin.items.map((r) => r.id)).toContain(itemA7);
+    expect(wechat.items.map((r) => r.id)).toContain(itemA8);
+  });
+
+  it("site 能命中 JSON 导入的网站 channel", async () => {
+    const result = await listCollectedItems(orgA, { platformAlias: "site" });
+    expect(result.items.map((r) => r.id)).toContain(itemA9);
+  });
+
+  it("信息来源 chip 计数与对应列表 total 使用同一套 matcher", async () => {
+    const counts = await listCollectedItemChannelCounts(orgA);
+    const douyin = await listCollectedItems(orgA, { platformAlias: "douyin" });
+    const wechat = await listCollectedItems(orgA, { platformAlias: "wechat" });
+    const weibo = await listCollectedItems(orgA, { platformAlias: "weibo" });
+    const site = await listCollectedItems(orgA, { platformAlias: "site" });
+
+    expect(counts["抖音"]).toBe(douyin.total);
+    expect(counts["微信"]).toBe(wechat.total);
+    expect(counts["微博"]).toBe(weibo.total);
+    expect(counts["网站"]).toBe(site.total);
   });
 });
 

@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2, Star, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -22,13 +25,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  addKeyword,
   createTopic,
+  getTopicDetail,
+  removeKeyword,
   updateTopic,
+  updateKeyword,
   setTopicGroup,
 } from "@/app/actions/research/research-topics";
 import type { TopicSummary } from "@/lib/dal/research/research-topics";
 
 const NULL_GROUP_VALUE = "__default__";
+
+type KeywordRow = {
+  id: string;
+  keyword: string;
+  isPrimary: boolean;
+};
 
 interface TopicEditDrawerProps {
   open: boolean;
@@ -49,11 +62,39 @@ export function TopicEditDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [groupValue, setGroupValue] = useState<string>(NULL_GROUP_VALUE);
+  const [keywords, setKeywords] = useState<KeywordRow[]>([]);
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
+  const [keywordDraft, setKeywordDraft] = useState("");
+  const [keywordAsPrimary, setKeywordAsPrimary] = useState(false);
+
+  const loadKeywords = useCallback(async () => {
+    if (!open || !topic) {
+      setKeywords([]);
+      return;
+    }
+    setKeywordsLoading(true);
+    try {
+      const detail = await getTopicDetail(topic.id);
+      setKeywords(
+        detail?.keywords.map((keyword) => ({
+          id: keyword.id,
+          keyword: keyword.keyword,
+          isPrimary: keyword.isPrimary,
+        })) ?? [],
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载关键词失败");
+    } finally {
+      setKeywordsLoading(false);
+    }
+  }, [open, topic]);
 
   // Reset state on open / topic change.
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setKeywordDraft("");
+    setKeywordAsPrimary(false);
     if (topic) {
       setName(topic.name);
       setDescription(topic.description ?? "");
@@ -64,6 +105,10 @@ export function TopicEditDrawer({
       setGroupValue(NULL_GROUP_VALUE);
     }
   }, [open, topic]);
+
+  useEffect(() => {
+    void loadKeywords();
+  }, [loadKeywords]);
 
   function handleSave() {
     setError(null);
@@ -115,13 +160,65 @@ export function TopicEditDrawer({
     });
   }
 
+  function handleAddKeyword() {
+    if (!topic) return;
+    const keyword = keywordDraft.trim();
+    if (!keyword) {
+      setError("请输入关键词");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const res = await addKeyword({
+        topicId: topic.id,
+        keyword,
+        isPrimary: keywordAsPrimary,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setKeywordDraft("");
+      setKeywordAsPrimary(false);
+      await loadKeywords();
+      router.refresh();
+    });
+  }
+
+  function handleSetPrimary(keyword: KeywordRow) {
+    if (keyword.isPrimary) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await updateKeyword({ id: keyword.id, isPrimary: true });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      await loadKeywords();
+      router.refresh();
+    });
+  }
+
+  function handleRemoveKeyword(keyword: KeywordRow) {
+    setError(null);
+    startTransition(async () => {
+      const res = await removeKeyword(keyword.id);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      await loadKeywords();
+      router.refresh();
+    });
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-md">
         <SheetHeader>
           <SheetTitle>{topic ? "编辑方案" : "创建方案"}</SheetTitle>
           <SheetDescription>
-            维护方案的基础信息与分组。关键词、近似称谓与语义样本请到主题词库管理页编辑。
+            维护方案基础信息、分组与检索关键词。
           </SheetDescription>
         </SheetHeader>
 
@@ -169,17 +266,95 @@ export function TopicEditDrawer({
           </div>
 
           {topic && (
-            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-              <p className="mb-1.5 font-medium text-foreground">
-                关键词 / 样本 完整编辑
-              </p>
-              <p>
-                共词「{topic.primaryKeyword ?? "未设置"}」· 别名 {topic.aliasCount}
-                {" "}条 · 样本 {topic.sampleCount} 条。
-              </p>
-              <p className="mt-2 text-muted-foreground/80">
-                关键词和样本的完整编辑功能开发中。
-              </p>
+            <div className="space-y-3 rounded-md border border-border/70 bg-muted/20 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label>关键词</Label>
+                <span className="text-xs text-muted-foreground">
+                  样本 {topic.sampleCount} 条
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  value={keywordDraft}
+                  onChange={(e) => setKeywordDraft(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddKeyword();
+                    }
+                  }}
+                  placeholder="输入主题关键词"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleAddKeyword}
+                  disabled={pending || keywordsLoading}
+                >
+                  添加
+                </Button>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={keywordAsPrimary}
+                  onCheckedChange={(checked) => setKeywordAsPrimary(checked === true)}
+                />
+                设为共词
+              </label>
+
+              {keywordsLoading ? (
+                <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  加载关键词...
+                </div>
+              ) : keywords.length === 0 ? (
+                <div className="rounded-md bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                  暂无关键词，检索会使用方案名称兜底。
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {keywords.map((keyword) => (
+                    <div
+                      key={keyword.id}
+                      className="flex items-center gap-2 rounded-md bg-background/70 px-2 py-2"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {keyword.keyword}
+                      </span>
+                      {keyword.isPrimary ? (
+                        <Badge variant="secondary" className="shrink-0">
+                          共词
+                        </Badge>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="设为共词"
+                          onClick={() => handleSetPrimary(keyword)}
+                          disabled={pending}
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="删除关键词"
+                        onClick={() => handleRemoveKeyword(keyword)}
+                        disabled={pending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

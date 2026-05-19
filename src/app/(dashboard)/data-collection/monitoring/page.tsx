@@ -15,6 +15,7 @@ import {
 import { listResearchTopics } from "@/lib/dal/research/research-topics";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { PageHeader } from "@/components/shared/page-header";
 import { MonitoringClient } from "./monitoring-client";
 import type {
   BusinessChannelOption,
@@ -145,28 +146,34 @@ export default async function MonitoringPage({ searchParams }: MonitoringPagePro
     .map((r) => ({ slug: r.channel, label: r.channel }));
 
   return (
-    <MonitoringClient
-      initialTab={initialTab}
-      operationsProps={{
-        summary,
-        trend,
-        errorSources: serializedErrorSources,
-        recentErrors: serializedRecentErrors,
-        sourceDistribution,
-        tikhubCost,
-      }}
-      businessProps={{
-        summary: businessSummary,
-        trend: channelTrend,
-        recentItems: serializedRecentBusinessItems,
-        topics: topics.map((t) => ({ id: t.id, name: t.name })),
-        channelOptions,
-        initialFilters: {
-          topicId,
-          channel,
-          timeWindow,
-        },
-      }}
-    />
+    <>
+      <PageHeader
+        title="监控面板"
+        description="查看采集运行、业务覆盖和异常情况，跟踪采集系统健康状态。"
+      />
+      <MonitoringClient
+        initialTab={initialTab}
+        operationsProps={{
+          summary,
+          trend,
+          errorSources: serializedErrorSources,
+          recentErrors: serializedRecentErrors,
+          sourceDistribution,
+          tikhubCost,
+        }}
+        businessProps={{
+          summary: businessSummary,
+          trend: channelTrend,
+          recentItems: serializedRecentBusinessItems,
+          topics: topics.map((t) => ({ id: t.id, name: t.name })),
+          channelOptions,
+          initialFilters: {
+            topicId,
+            channel,
+            timeWindow,
+          },
+        }}
+      />
+    </>
   );
 }

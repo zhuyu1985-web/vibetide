@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { DataTable } from "@/components/shared/data-table";
 import { SearchInput } from "@/components/shared/search-input";
-import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
@@ -133,13 +132,11 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
   // 当前视图的"总条数"(过滤后,未分页)
   const totalCount = viewMode === "outlets" ? filtered.length : channelRows.length;
 
-  // 增量分页:首屏 PAGE_SIZE 条,触底加载下一批,序号继续累计
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-  // 任何会改变结果集顺序/数量的状态变化都重置分页
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [search, tierFilter, platformFilter, viewMode]);
+  // 增量分页:首屏 PAGE_SIZE 条,触底加载下一批,序号继续累计。
+  // 过滤 key 变化时通过派生 visibleCount 回到首屏,避免 effect 内同步 setState。
+  const resultKey = `${search}\0${tierFilter}\0${platformFilter}\0${viewMode}`;
+  const [visibleState, setVisibleState] = useState({ key: resultKey, count: PAGE_SIZE });
+  const visibleCount = visibleState.key === resultKey ? visibleState.count : PAGE_SIZE;
 
   // 总数收缩时夹住 visibleCount,避免显示空白尾巴
   const effectiveVisible = Math.min(visibleCount, totalCount);
@@ -162,14 +159,17 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
-          setVisibleCount((c) => c + PAGE_SIZE);
+          setVisibleState((prev) => {
+            const current = prev.key === resultKey ? prev.count : PAGE_SIZE;
+            return { key: resultKey, count: current + PAGE_SIZE };
+          });
         }
       },
       { rootMargin: "200px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, totalCount, viewMode]);
+  }, [hasMore, resultKey]);
 
   const tableFooter = totalCount === 0 ? null : (
     <div className="flex flex-col items-center gap-1 py-3 text-xs text-muted-foreground">
@@ -189,9 +189,7 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
 
   return (
     <>
-      <PageHeader title="媒体字典" description="维护采集源的媒体身份字典，用于自动识别采集项的媒体分级" />
-
-      <div className="mt-4 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <SearchInput
           className="w-64"
           placeholder="搜索媒体名 / 集团 / 账号"
@@ -221,35 +219,27 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
         </Select>
 
         {/* 视图切换 */}
-        <div className="flex items-center rounded-md border overflow-hidden">
-          <button
+        <div className="flex items-center gap-1 rounded-md border p-0.5">
+          <Button
             type="button"
             aria-label="按媒体视图"
             onClick={() => setViewMode("outlets")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors",
-              viewMode === "outlets"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted",
-            )}
+            variant={viewMode === "outlets" ? "default" : "ghost"}
+            size="sm"
           >
             <LayoutGrid className="h-4 w-4" />
             按媒体
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             aria-label="按账号视图"
             onClick={() => setViewMode("channels")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-sm border-l transition-colors",
-              viewMode === "channels"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted",
-            )}
+            variant={viewMode === "channels" ? "default" : "ghost"}
+            size="sm"
           >
             <List className="h-4 w-4" />
             按账号
-          </button>
+          </Button>
         </div>
 
         <div className="ml-auto flex gap-2">

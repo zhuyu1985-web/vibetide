@@ -1,11 +1,19 @@
 import { and, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { collectedItems, collectedItemContents } from "@/db/schema/collection";
+import {
+  collectedItems,
+  collectedItemContents,
+  collectionSources,
+} from "@/db/schema/collection";
 import {
   researchCollectedItemTopics,
   researchCollectedItemDistricts,
 } from "@/db/schema/research/annotations";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
+import {
+  buildCollectedItemConditions,
+  type ContentFilters,
+} from "@/lib/dal/collected-items";
 import { getChannelMatchers } from "@/lib/collection/constants";
 import type {
   AdvancedSearchCondition,
@@ -37,16 +45,34 @@ export interface CollectedItemSearchFilter {
 export interface CollectedItemWithAnnotations {
   id: string;
   title: string;
+  summary: string | null;
   content: string | null;
   outletId: string | null;
   outletTier: string | null;
   outletRegion: string | null;
   outletName: string | null;
   publishedAt: Date | null;
+  firstSeenAt?: Date;
   contentType: string;
   url: string | null;
   /** 首次采集到的渠道 slug,例如 tikhub_weibo / tophub/微博 / rss/host.com */
   firstSeenChannel: string;
+  category?: string[];
+  tags?: string[] | null;
+  platform?: string | null;
+  author?: string | null;
+  enrichmentStatus?: string;
+  sourceType?: string | null;
+  matchedKeywords?: string[] | null;
+  industries?: string[] | null;
+  ocrText?: string | null;
+  asrText?: string | null;
+  /** 当前主题检索命中的关键词集合,由 topic keywords 跨字段 OR 计算得到。 */
+  topicMatchedKeywords?: string[];
+  /** 当前主题检索命中的字段标签,例如 标题 / 正文 / 标签 / 命中关键词。 */
+  topicHitFields?: string[];
+  /** annotation 表中该 topic 对本条内容记录的 matched_keyword。 */
+  topicAnnotationKeyword?: string | null;
   /** 全部命中此 item 的渠道列表(去重前的原始 jsonb,与 collectedItems.sourceChannels schema 对齐) */
   sourceChannels: Array<{
     channel: string;
@@ -66,6 +92,110 @@ function buildChannelLabelExpr(labels: string[] | undefined): SQL | undefined {
     parts.push(ilike(collectedItems.firstSeenChannel, `${p}%`));
   }
   return parts.length ? or(...parts) : undefined;
+}
+
+export function normalizeTopicSearchKeywords(keywords: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of keywords) {
+    const keyword = raw.trim();
+    if (!keyword) continue;
+    const key = keyword.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(keyword);
+  }
+  return out;
+}
+
+function buildTopicKeywordExpr(topicId: string, keywords: string[]): SQL {
+  const normalized = normalizeTopicSearchKeywords(keywords);
+  if (normalized.length === 0) return sql`false`;
+
+  const parts: SQL[] = [];
+  for (const keyword of normalized) {
+    const pattern = `%${keyword}%`;
+    parts.push(ilike(collectedItems.title, pattern));
+    parts.push(ilike(collectedItems.summary, pattern));
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM collected_item_contents cic
+      WHERE cic.item_id = ${collectedItems.id}
+        AND (
+          cic.content ILIKE ${pattern}
+          OR cic.ocr_text ILIKE ${pattern}
+          OR cic.asr_text ILIKE ${pattern}
+        )
+    )`);
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM unnest(${collectedItems.tags}) AS tag(value)
+      WHERE tag.value ILIKE ${pattern}
+    )`);
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM unnest(${collectedItems.category}) AS category(value)
+      WHERE category.value ILIKE ${pattern}
+    )`);
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM unnest(${collectedItems.matchedKeywords}) AS mk(value)
+      WHERE mk.value ILIKE ${pattern}
+    )`);
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM unnest(${collectedItems.industries}) AS industry(value)
+      WHERE industry.value ILIKE ${pattern}
+    )`);
+    parts.push(sql`EXISTS (
+      SELECT 1 FROM ${researchCollectedItemTopics} cit
+      WHERE cit.collected_item_id = ${collectedItems.id}
+        AND cit.topic_id = ${topicId}::uuid
+        AND cit.matched_keyword ILIKE ${pattern}
+    )`);
+  }
+  return or(...parts)!;
+}
+
+function addTopicKeywordMatch(
+  matches: Set<string>,
+  fields: Set<string>,
+  keyword: string,
+  field: string,
+) {
+  matches.add(keyword);
+  fields.add(field);
+}
+
+function textIncludes(text: string | null | undefined, keyword: string): boolean {
+  return Boolean(text?.toLowerCase().includes(keyword.toLowerCase()));
+}
+
+function arrayIncludes(values: string[] | null | undefined, keyword: string): boolean {
+  return Boolean(values?.some((value) => textIncludes(value, keyword)));
+}
+
+function getTopicMatchMeta(
+  item: CollectedItemWithAnnotations,
+  keywords: string[],
+): { topicMatchedKeywords: string[]; topicHitFields: string[] } {
+  const matched = new Set<string>();
+  const fields = new Set<string>();
+  for (const keyword of keywords) {
+    if (textIncludes(item.title, keyword)) addTopicKeywordMatch(matched, fields, keyword, "标题");
+    if (textIncludes(item.summary, keyword)) addTopicKeywordMatch(matched, fields, keyword, "摘要");
+    if (textIncludes(item.content, keyword)) addTopicKeywordMatch(matched, fields, keyword, "正文");
+    if (textIncludes(item.ocrText, keyword)) addTopicKeywordMatch(matched, fields, keyword, "OCR");
+    if (textIncludes(item.asrText, keyword)) addTopicKeywordMatch(matched, fields, keyword, "ASR");
+    if (arrayIncludes(item.tags, keyword)) addTopicKeywordMatch(matched, fields, keyword, "标签");
+    if (arrayIncludes(item.category, keyword)) addTopicKeywordMatch(matched, fields, keyword, "分类");
+    if (arrayIncludes(item.matchedKeywords, keyword)) {
+      addTopicKeywordMatch(matched, fields, keyword, "命中关键词");
+    }
+    if (arrayIncludes(item.industries, keyword)) addTopicKeywordMatch(matched, fields, keyword, "行业");
+    if (textIncludes(item.topicAnnotationKeyword, keyword)) {
+      addTopicKeywordMatch(matched, fields, keyword, "主题标注");
+    }
+  }
+  return {
+    topicMatchedKeywords: Array.from(matched),
+    topicHitFields: Array.from(fields),
+  };
 }
 
 export async function searchCollectedItemsForResearch(
@@ -150,6 +280,7 @@ export async function searchCollectedItemsForResearch(
     .select({
       id: collectedItems.id,
       title: collectedItems.title,
+      summary: collectedItems.summary,
       // 正文走副表 LEFT JOIN — 列表场景未必都需要 content,但保留原 API 兼容下游(下次重构可再拆出"详情/列表"两种 query)
       content: collectedItemContents.content,
       outletId: collectedItems.outletId,
@@ -157,9 +288,17 @@ export async function searchCollectedItemsForResearch(
       outletRegion: collectedItems.outletRegion,
       outletName: mediaOutletDictionary.outletName,
       publishedAt: collectedItems.publishedAt,
+      firstSeenAt: collectedItems.firstSeenAt,
       contentType: collectedItems.contentType,
       url: collectedItems.canonicalUrl,
       firstSeenChannel: collectedItems.firstSeenChannel,
+      category: collectedItems.category,
+      tags: collectedItems.tags,
+      platform: collectedItems.platform,
+      author: collectedItems.author,
+      enrichmentStatus: collectedItems.enrichmentStatus,
+      matchedKeywords: collectedItems.matchedKeywords,
+      industries: collectedItems.industries,
       sourceChannels: collectedItems.sourceChannels,
     })
     .from(collectedItems)
@@ -182,6 +321,85 @@ export async function searchCollectedItemsForResearch(
     .where(where);
 
   return { items, total: countRow?.count ?? 0 };
+}
+
+export async function searchCollectedItemsByTopicKeywords(
+  orgId: string,
+  topicId: string,
+  keywords: string[],
+  filters: ContentFilters,
+  pagination: { limit: number; offset: number },
+): Promise<{ items: CollectedItemWithAnnotations[]; total: number }> {
+  const normalizedKeywords = normalizeTopicSearchKeywords(keywords);
+  const conditions = await buildCollectedItemConditions(orgId, filters);
+  conditions.push(buildTopicKeywordExpr(topicId, normalizedKeywords));
+  const where = and(...conditions);
+
+  const items = await db
+    .select({
+      id: collectedItems.id,
+      title: collectedItems.title,
+      summary: collectedItems.summary,
+      content: collectedItemContents.content,
+      ocrText: collectedItemContents.ocrText,
+      asrText: collectedItemContents.asrText,
+      outletId: collectedItems.outletId,
+      outletTier: collectedItems.outletTier,
+      outletRegion: collectedItems.outletRegion,
+      outletName: mediaOutletDictionary.outletName,
+      publishedAt: collectedItems.publishedAt,
+      firstSeenAt: collectedItems.firstSeenAt,
+      contentType: collectedItems.contentType,
+      url: collectedItems.canonicalUrl,
+      firstSeenChannel: collectedItems.firstSeenChannel,
+      category: collectedItems.category,
+      tags: collectedItems.tags,
+      platform: collectedItems.platform,
+      author: collectedItems.author,
+      enrichmentStatus: collectedItems.enrichmentStatus,
+      sourceType: collectionSources.sourceType,
+      matchedKeywords: collectedItems.matchedKeywords,
+      industries: collectedItems.industries,
+      topicAnnotationKeyword: sql<string | null>`(
+        SELECT cit.matched_keyword
+        FROM research_collected_item_topics cit
+        WHERE cit.collected_item_id = ${collectedItems.id}
+          AND cit.topic_id = ${topicId}::uuid
+        ORDER BY cit.annotated_at DESC
+        LIMIT 1
+      )`,
+      sourceChannels: collectedItems.sourceChannels,
+    })
+    .from(collectedItems)
+    .leftJoin(
+      mediaOutletDictionary,
+      eq(collectedItems.outletId, mediaOutletDictionary.id),
+    )
+    .leftJoin(
+      collectionSources,
+      eq(collectedItems.firstSeenSourceId, collectionSources.id),
+    )
+    .leftJoin(
+      collectedItemContents,
+      eq(collectedItemContents.itemId, collectedItems.id),
+    )
+    .where(where)
+    .orderBy(sql`${collectedItems.publishedAt} DESC NULLS LAST, ${collectedItems.firstSeenAt} DESC`)
+    .limit(pagination.limit)
+    .offset(pagination.offset);
+
+  const [countRow] = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(collectedItems)
+    .where(where);
+
+  return {
+    items: items.map((item) => ({
+      ...item,
+      ...getTopicMatchMeta(item, normalizedKeywords),
+    })),
+    total: countRow?.count ?? 0,
+  };
 }
 
 // ───────────────────────────────────────────────────────────
@@ -227,15 +445,24 @@ export async function advancedSearchCollectedItems(
     .select({
       id: collectedItems.id,
       title: collectedItems.title,
+      summary: collectedItems.summary,
       content: collectedItemContents.content,
       outletId: collectedItems.outletId,
       outletTier: collectedItems.outletTier,
       outletRegion: collectedItems.outletRegion,
       outletName: mediaOutletDictionary.outletName,
       publishedAt: collectedItems.publishedAt,
+      firstSeenAt: collectedItems.firstSeenAt,
       contentType: collectedItems.contentType,
       url: collectedItems.canonicalUrl,
       firstSeenChannel: collectedItems.firstSeenChannel,
+      category: collectedItems.category,
+      tags: collectedItems.tags,
+      platform: collectedItems.platform,
+      author: collectedItems.author,
+      enrichmentStatus: collectedItems.enrichmentStatus,
+      matchedKeywords: collectedItems.matchedKeywords,
+      industries: collectedItems.industries,
       sourceChannels: collectedItems.sourceChannels,
     })
     .from(collectedItems)

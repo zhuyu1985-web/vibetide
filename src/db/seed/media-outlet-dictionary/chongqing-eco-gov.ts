@@ -1,7 +1,7 @@
 import type { MediaOutletInsert } from "@/db/schema/media-outlet-dictionary";
 
-// 重庆 40 个区县名称（与 src/db/seed/research/cq-districts.ts DISTRICTS 保持一致）
-// 注意：cq-districts.ts 仅 export 异步函数，故此处静态内联；如区县字典变更需同步更新
+// 重庆 39 个区县名称(与 src/db/seed/research/cq-districts.ts DISTRICTS 保持一致)
+// 注意:cq-districts.ts 仅 export 异步函数,故此处静态内联;如区县字典变更需同步更新
 const CQ_DISTRICT_NAMES = [
   "北碚区",
   "两江新区",
@@ -42,8 +42,6 @@ const CQ_DISTRICT_NAMES = [
   "大足区",
   "石柱县",
   "巫溪县",
-  // 江北区（research_cq_districts 表未收录，但 sub-spec §4.4 明确包含；补入使总计 40 个区县）
-  "江北区",
 ] as const;
 
 const MUNICIPAL: Omit<
@@ -57,6 +55,31 @@ const MUNICIPAL: Omit<
   publicAccountNames: ["重庆生态环境"],
   description: "重庆市生态环境局政务新媒体",
 };
+
+// 江北区/渝北区生态环境局:实体保留,outletDistrict 归到"两江新区"使统计归口
+const MERGED_INTO_LIANGJIANG: Omit<
+  MediaOutletInsert,
+  "id" | "organizationId" | "createdAt" | "updatedAt"
+>[] = [
+  {
+    outletName: "江北区生态环境局",
+    outletTier: "government_self_media",
+    outletRegion: "重庆",
+    outletDistrict: "两江新区",
+    industryTag: "环境",
+    publicAccountNames: [],
+    description: "江北区生态环境局政务新媒体(并入两江新区统计)",
+  },
+  {
+    outletName: "渝北区生态环境局",
+    outletTier: "government_self_media",
+    outletRegion: "重庆",
+    outletDistrict: "两江新区",
+    industryTag: "环境",
+    publicAccountNames: [],
+    description: "渝北区生态环境局政务新媒体(并入两江新区统计)",
+  },
+];
 
 export const CHONGQING_ECO_GOV_OUTLETS: Omit<
   MediaOutletInsert,
@@ -72,4 +95,5 @@ export const CHONGQING_ECO_GOV_OUTLETS: Omit<
     publicAccountNames: [] as string[],
     description: `${districtName}生态环境局政务新媒体`,
   })),
+  ...MERGED_INTO_LIANGJIANG,
 ];

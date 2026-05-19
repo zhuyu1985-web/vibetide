@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutGrid, Table2, FileText, Loader2, Trash2, FileSpreadsheet, Download } from "lucide-react";
+import { Check, FileText, Filter, Loader2, Trash2, FileSpreadsheet, Download } from "lucide-react";
 import { toast } from "sonner";
 import { formatRelativeTime, formatAbsoluteTime } from "@/lib/format";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -11,7 +11,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { DataTable } from "@/components/shared/data-table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SearchInput } from "@/components/shared/search-input";
 import { DateRangePicker } from "@/components/shared/date-picker";
 import {
@@ -21,6 +21,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +89,7 @@ function simpleChannelLabel(channel: string | undefined | null): string | null {
     c.startsWith("jina") ||
     c.startsWith("list") ||
     c.startsWith("site") ||
+    c.startsWith("json_import") ||
     c.startsWith("opinion_excel")
   ) return "网站";
   return "网站";
@@ -141,6 +154,7 @@ export interface CollectedItemFilterOptions {
   categories: string[];
   tags: string[];
   platforms: string[];
+  accounts: string[];
 }
 
 interface ContentClientProps {
@@ -161,13 +175,6 @@ const TIME_OPTIONS: { value: TimeWindow; label: string }[] = [
   { value: "30d", label: "30天" },
   { value: "all", label: "全部" },
   { value: "custom", label: "自定义" },
-];
-
-const MODULE_OPTIONS = [
-  { value: "hot_topics", label: "热点话题" },
-  { value: "news", label: "新闻稿件" },
-  { value: "benchmarking", label: "同题对比" },
-  { value: "knowledge", label: "知识库" },
 ];
 
 const ENRICHMENT_OPTIONS: { value: EnrichmentStatus | "__all__"; label: string }[] = [
@@ -296,10 +303,7 @@ export function ContentClient({
   // ── Search (debounced) ──────────────────────────────────────────────────────
   const [searchValue, setSearchValue] = useState(initialFilters.q ?? "");
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Author 输入(debounced) ─────────────────────────────────────────────────
-  const [authorValue, setAuthorValue] = useState(initialFilters.author ?? "");
-  const authorDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const updateUrl = useCallback(
     (patch: Record<string, string | undefined>) => {
@@ -334,7 +338,7 @@ export function ContentClient({
       const qs = sp.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
     },
-    [router, pathname, initialFilters, initialView],
+    [router, pathname, initialFilters],
   );
 
   const handleSearchChange = (value: string) => {
@@ -345,18 +349,9 @@ export function ContentClient({
     }, 300);
   };
 
-  const handleAuthorChange = (value: string) => {
-    setAuthorValue(value);
-    if (authorDebounceRef.current) clearTimeout(authorDebounceRef.current);
-    authorDebounceRef.current = setTimeout(() => {
-      updateUrl({ author: value || undefined });
-    }, 300);
-  };
-
   useEffect(() => {
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-      if (authorDebounceRef.current) clearTimeout(authorDebounceRef.current);
     };
   }, []);
 
@@ -407,15 +402,6 @@ export function ContentClient({
     setSelectedKeys(new Set());
   }, [initialFilters, initialView]);
 
-  const toggleOne = useCallback((id: string, checked: boolean) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
-
   const clearSelection = useCallback(() => setSelectedKeys(new Set()), []);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -464,9 +450,7 @@ export function ContentClient({
 
   const handleResetAll = () => {
     setSearchValue("");
-    setAuthorValue("");
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    if (authorDebounceRef.current) clearTimeout(authorDebounceRef.current);
     updateUrl({
       sourceType: undefined,
       time: undefined,
@@ -483,6 +467,12 @@ export function ContentClient({
       publishedSince: undefined,
       publishedUntil: undefined,
     });
+  };
+
+  const handleQuery = () => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    updateUrl({ q: searchValue || undefined });
+    setMoreOpen(false);
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -532,7 +522,6 @@ export function ContentClient({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Row 1: 信息来源 chips(按 channel bucket 计数) */}
       <FilterChips
         label="信息来源"
         options={channelChipOptions}
@@ -540,10 +529,9 @@ export function ContentClient({
         onChange={(v) => updateUrl({ platform: v })}
       />
 
-      {/* Row 2: 监测时间快捷段 + 自定义范围 */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterChips
-          label="监测时间"
+          label="发布时间"
           options={timeChipOptions}
           value={currentTimeChip}
           onChange={handleTimeChipChange}
@@ -572,12 +560,20 @@ export function ContentClient({
                 publishedUntil: fmt(range?.to),
               });
             }}
-            placeholder="选择日期范围"
+            placeholder="选择发布时间范围"
           />
         )}
       </div>
 
-      {/* Row 3: 媒体维度 — 媒体分级 chips + 区域 / 分类 / 源类型 / 绑定媒体 / 标签 / AI解析 */}
+      {categoryChipOptions.length > 0 && (
+        <FilterChips
+          label="分类"
+          options={categoryChipOptions}
+          value={currentCategory === "__all__" ? undefined : currentCategory}
+          onChange={(v) => updateUrl({ category: v })}
+        />
+      )}
+
       <div className="flex items-center gap-2 flex-wrap">
         <FilterChips
           label="媒体分级"
@@ -585,14 +581,23 @@ export function ContentClient({
           value={currentOutletTier === "__all__" ? undefined : currentOutletTier}
           onChange={(v) => updateUrl({ outletTier: v })}
         />
+      </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted-foreground shrink-0 mr-1">其他</span>
+        <SearchInput
+          className="w-72"
+          placeholder="关键词搜索..."
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
         <Select
           value={currentOutletRegion}
           onValueChange={(v) =>
             updateUrl({ outletRegion: v === "__all__" ? undefined : v })
           }
         >
-          <SelectTrigger className="w-24">
+          <SelectTrigger className="w-28">
             <SelectValue placeholder="区域" />
           </SelectTrigger>
           <SelectContent>
@@ -621,24 +626,15 @@ export function ContentClient({
           </SelectContent>
         </Select>
 
-        <Select
-          value={currentOutletId}
-          onValueChange={(v) =>
-            updateUrl({ outletId: v === "__all__" ? undefined : v })
-          }
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="绑定媒体" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">全部媒体</SelectItem>
-            {outlets.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
-                {o.outletName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MediaAccountCombobox
+          outlets={outlets}
+          accounts={filterOptions.accounts}
+          selectedOutletId={currentOutletId === "__all__" ? undefined : currentOutletId}
+          selectedAccount={initialFilters.author}
+          onSelectAll={() => updateUrl({ outletId: undefined, author: undefined })}
+          onSelectOutlet={(outletId) => updateUrl({ outletId, author: undefined })}
+          onSelectAccount={(account) => updateUrl({ author: account, outletId: undefined })}
+        />
 
         <Select
           value={currentTag}
@@ -666,7 +662,7 @@ export function ContentClient({
           }
         >
           <SelectTrigger className="w-28">
-            <SelectValue placeholder="AI解析" />
+            <SelectValue placeholder="解析" />
           </SelectTrigger>
           <SelectContent>
             {ENRICHMENT_OPTIONS.map((opt) => (
@@ -678,55 +674,205 @@ export function ContentClient({
         </Select>
       </div>
 
-      {/* Row 3.5: 分类 chips — 单独一行(可能很多个,折行展示) */}
-      {categoryChipOptions.length > 0 && (
-        <FilterChips
-          label="分类"
-          options={categoryChipOptions}
-          value={currentCategory === "__all__" ? undefined : currentCategory}
-          onChange={(v) => updateUrl({ category: v })}
-        />
-      )}
-
-      {/* Row 4: 关键词 + 媒体账号 + 操作 */}
       <div className="flex items-center gap-2 flex-wrap">
-        <SearchInput
-          className="w-64"
-          placeholder="关键词搜索…"
-          value={searchValue}
-          onChange={(e) => handleSearchChange(e.target.value)}
-        />
-        <SearchInput
-          className="w-40"
-          placeholder="媒体账号"
-          value={authorValue}
-          onChange={(e) => handleAuthorChange(e.target.value)}
-        />
-        {hasActiveFilter && (
-          <Button variant="ghost" size="sm" onClick={handleResetAll}>
-            重置
-          </Button>
-        )}
+        <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+          <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
+          导入 Excel
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportExcel}
+          disabled={exporting || total === 0}
+        >
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5 mr-1" />
+          )}
+          {exporting ? "导出中..." : "导出 Excel"}
+        </Button>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-            <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
-            导入 Excel
+          <Button variant="outline" size="sm" onClick={() => setMoreOpen(true)}>
+            <Filter className="h-3.5 w-3.5 mr-1" />
+            更多筛选
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={handleExportExcel}
-            disabled={exporting || total === 0}
+            onClick={handleResetAll}
+            disabled={!hasActiveFilter}
           >
-            {exporting ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5 mr-1" />
-            )}
-            {exporting ? "导出中…" : "导出 Excel"}
+            重置
+          </Button>
+          <Button size="sm" onClick={handleQuery}>
+            查询
           </Button>
         </div>
       </div>
+
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent side="right" className="w-[520px] sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>筛选条件</SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+            <FilterChips
+              label="信息来源"
+              options={channelChipOptions}
+              value={currentPlatformChip}
+              onChange={(v) => updateUrl({ platform: v })}
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <FilterChips
+                label="发布时间"
+                options={timeChipOptions}
+                value={currentTimeChip}
+                onChange={handleTimeChipChange}
+              />
+              {currentTime === "custom" && (
+                <DateRangePicker
+                  value={
+                    initialFilters.publishedSince || initialFilters.publishedUntil
+                      ? {
+                          from: initialFilters.publishedSince
+                            ? new Date(initialFilters.publishedSince)
+                            : undefined,
+                          to: initialFilters.publishedUntil
+                            ? new Date(initialFilters.publishedUntil)
+                            : undefined,
+                        }
+                      : undefined
+                  }
+                  onChange={(range) => {
+                    const fmt = (d: Date | undefined) =>
+                      d
+                        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+                        : undefined;
+                    updateUrl({
+                      publishedSince: fmt(range?.from),
+                      publishedUntil: fmt(range?.to),
+                    });
+                  }}
+                  placeholder="选择发布时间范围"
+                />
+              )}
+            </div>
+            {categoryChipOptions.length > 0 && (
+              <FilterChips
+                label="分类"
+                options={categoryChipOptions}
+                value={currentCategory === "__all__" ? undefined : currentCategory}
+                onChange={(v) => updateUrl({ category: v })}
+              />
+            )}
+            <FilterChips
+              label="媒体分级"
+              options={outletTierChipOptions}
+              value={currentOutletTier === "__all__" ? undefined : currentOutletTier}
+              onChange={(v) => updateUrl({ outletTier: v })}
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground shrink-0 mr-1">其他</span>
+              <SearchInput
+                className="w-72"
+                placeholder="关键词搜索..."
+                value={searchValue}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+              <Select
+                value={currentOutletRegion}
+                onValueChange={(v) =>
+                  updateUrl({ outletRegion: v === "__all__" ? undefined : v })
+                }
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="区域" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部区域</SelectItem>
+                  <SelectItem value="重庆">重庆</SelectItem>
+                  <SelectItem value="全国">全国</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={currentSourceType}
+                onValueChange={(v) =>
+                  updateUrl({ sourceType: v === "__all__" ? undefined : v })
+                }
+              >
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="源类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部源类型</SelectItem>
+                  {adapterMetas.map((m) => (
+                    <SelectItem key={m.type} value={m.type}>
+                      {m.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <MediaAccountCombobox
+                outlets={outlets}
+                accounts={filterOptions.accounts}
+                selectedOutletId={currentOutletId === "__all__" ? undefined : currentOutletId}
+                selectedAccount={initialFilters.author}
+                onSelectAll={() => updateUrl({ outletId: undefined, author: undefined })}
+                onSelectOutlet={(outletId) => updateUrl({ outletId, author: undefined })}
+                onSelectAccount={(account) => updateUrl({ author: account, outletId: undefined })}
+              />
+              <Select
+                value={currentTag}
+                onValueChange={(v) =>
+                  updateUrl({ tag: v === "__all__" ? undefined : v })
+                }
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="标签" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部标签</SelectItem>
+                  {filterOptions.tags.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={currentEnrichment}
+                onValueChange={(v) =>
+                  updateUrl({ enrichment: v === "__all__" ? undefined : v })
+                }
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="解析" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENRICHMENT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <SheetFooter>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={handleResetAll} disabled={!hasActiveFilter}>
+                重置
+              </Button>
+              <Button size="sm" onClick={handleQuery}>
+                查询
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <div className="border-t border-border/70 pt-3" />
 
       {/* Selection toolbar — 选中后才显示;否则照常显示 total */}
       {selectedKeys.size > 0 ? (
@@ -793,7 +939,7 @@ export function ContentClient({
             {
               key: "_seq",
               header: "序号",
-              width: "w-14",
+              width: "w-12",
               align: "center",
               render: (item) => (
                 <span className="text-xs text-muted-foreground tabular-nums">
@@ -804,6 +950,7 @@ export function ContentClient({
             {
               key: "title",
               header: "标题",
+              width: "56%",
               render: (item) => (
                 <div className="min-w-0">
                   <div className="text-sm text-gray-900 dark:text-gray-100 truncate">
@@ -820,7 +967,7 @@ export function ContentClient({
             {
               key: "outlet",
               header: "媒体",
-              width: "w-40",
+              width: "w-20 2xl:w-24",
               render: (item) => (
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
@@ -837,7 +984,7 @@ export function ContentClient({
             {
               key: "category",
               header: "分类",
-              width: "w-28",
+              width: "w-16",
               render: (item) => (
                 <div
                   className="text-xs text-gray-600 dark:text-gray-300 truncate"
@@ -850,7 +997,7 @@ export function ContentClient({
             {
               key: "account",
               header: "账号",
-              width: "w-32",
+              width: "w-16 2xl:w-20",
               render: (item) => (
                 <span
                   className="text-sm text-gray-700 dark:text-gray-300 truncate block"
@@ -863,7 +1010,7 @@ export function ContentClient({
             {
               key: "platform",
               header: "平台",
-              width: "w-24",
+              width: "w-16 2xl:w-20",
               render: (item) => {
                 const label = item.platform ?? simpleChannelLabel(item.firstSeenChannel);
                 if (!label) return <span className="text-xs text-muted-foreground">—</span>;
@@ -883,7 +1030,7 @@ export function ContentClient({
             {
               key: "sourceType",
               header: "源类型",
-              width: "w-32",
+              width: "w-20 2xl:w-24",
               render: (item) => {
                 if (!item.sourceType) {
                   return <span className="text-xs text-gray-400 dark:text-gray-500">—</span>;
@@ -903,21 +1050,24 @@ export function ContentClient({
             },
             {
               key: "firstSeenAt",
-              header: "时间",
+              header: "发布时间",
               width: "w-20",
-              render: (item) => (
-                <span
-                  className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
-                  title={formatAbsoluteTime(item.firstSeenAt)}
-                >
-                  {formatRelativeTime(item.firstSeenAt)}
-                </span>
-              ),
+              render: (item) => {
+                const time = item.publishedAt ?? item.firstSeenAt;
+                return (
+                  <span
+                    className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                    title={formatAbsoluteTime(time)}
+                  >
+                    {formatRelativeTime(time)}
+                  </span>
+                );
+              },
             },
             {
               key: "enrichment",
               header: "AI解析",
-              width: "w-20",
+              width: "w-16",
               render: (item) => <EnrichmentChip status={item.enrichmentStatus} />,
             },
           ]}
@@ -969,6 +1119,173 @@ export function ContentClient({
       {/* Import Excel dialog */}
       <ImportExcelDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
+  );
+}
+
+// ────────────────────────────────────────────────
+// Media / account combobox
+// ────────────────────────────────────────────────
+interface MediaAccountComboboxProps {
+  outlets: MediaOutletRow[];
+  accounts: string[];
+  selectedOutletId: string | undefined;
+  selectedAccount: string | undefined;
+  onSelectAll: () => void;
+  onSelectOutlet: (outletId: string) => void;
+  onSelectAccount: (account: string) => void;
+}
+
+function MediaAccountCombobox({
+  outlets,
+  accounts,
+  selectedOutletId,
+  selectedAccount,
+  onSelectAll,
+  onSelectOutlet,
+  onSelectAccount,
+}: MediaAccountComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const selectedOutlet = selectedOutletId
+    ? outlets.find((outlet) => outlet.id === selectedOutletId)
+    : undefined;
+  const selectedLabel = selectedOutlet?.outletName ?? selectedAccount ?? "全部媒体/账号";
+
+  const filteredOutlets = useMemo(() => {
+    if (!normalizedQuery) return outlets.slice(0, 80);
+    return outlets
+      .filter((outlet) => {
+        const haystack = [
+          outlet.outletName,
+          outlet.groupName ?? "",
+          ...(outlet.publicAccountNames ?? []),
+          ...(outlet.domains ?? []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+      .slice(0, 80);
+  }, [outlets, normalizedQuery]);
+
+  const filteredAccounts = useMemo(() => {
+    if (!normalizedQuery) return accounts.slice(0, 80);
+    return accounts
+      .filter((account) => account.toLowerCase().includes(normalizedQuery))
+      .slice(0, 80);
+  }, [accounts, normalizedQuery]);
+
+  const hasExactMatch = useMemo(() => {
+    if (!normalizedQuery) return true;
+    return (
+      outlets.some((outlet) => outlet.outletName.toLowerCase() === normalizedQuery) ||
+      accounts.some((account) => account.toLowerCase() === normalizedQuery)
+    );
+  }, [accounts, outlets, normalizedQuery]);
+
+  const closeWith = (fn: () => void) => {
+    fn();
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <ComboboxTrigger className="w-44">
+          <span className="truncate">{selectedLabel}</span>
+        </ComboboxTrigger>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-2">
+        <div className="space-y-2">
+          <SearchInput
+            placeholder="搜索媒体或账号"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            inputClassName="h-8 text-xs"
+          />
+          <div className="max-h-80 overflow-y-auto">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto w-full justify-start px-2 py-2"
+              onClick={() => closeWith(onSelectAll)}
+            >
+              <Check className={cn("h-3.5 w-3.5", (selectedOutletId || selectedAccount) && "opacity-0")} />
+              <span className="truncate">全部媒体/账号</span>
+            </Button>
+
+            {filteredOutlets.length > 0 && (
+              <div className="px-2 pt-2 pb-1 text-[11px] text-muted-foreground">媒体</div>
+            )}
+            {filteredOutlets.map((outlet) => (
+              <Button
+                key={outlet.id}
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start px-2 py-2"
+                onClick={() => closeWith(() => onSelectOutlet(outlet.id))}
+              >
+                <Check
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    selectedOutletId !== outlet.id && "opacity-0",
+                  )}
+                />
+                <span className="min-w-0 flex-1 truncate text-left">{outlet.outletName}</span>
+              </Button>
+            ))}
+
+            {filteredAccounts.length > 0 && (
+              <div className="px-2 pt-2 pb-1 text-[11px] text-muted-foreground">账号</div>
+            )}
+            {filteredAccounts.map((account) => (
+              <Button
+                key={account}
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start px-2 py-2"
+                onClick={() => closeWith(() => onSelectAccount(account))}
+              >
+                <Check
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    selectedAccount !== account && "opacity-0",
+                  )}
+                />
+                <span className="min-w-0 flex-1 truncate text-left">{account}</span>
+              </Button>
+            ))}
+
+            {normalizedQuery && !hasExactMatch && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start px-2 py-2"
+                onClick={() => closeWith(() => onSelectAccount(query.trim()))}
+              >
+                <Check className="h-3.5 w-3.5 opacity-0" />
+                <span className="min-w-0 flex-1 truncate text-left">
+                  按账号搜索「{query.trim()}」
+                </span>
+              </Button>
+            )}
+
+            {filteredOutlets.length === 0 && filteredAccounts.length === 0 && !normalizedQuery && (
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">
+                暂无媒体或账号选项
+              </div>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

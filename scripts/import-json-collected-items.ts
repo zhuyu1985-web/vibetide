@@ -29,6 +29,8 @@ let collectionSources: typeof import("@/db/schema").collectionSources;
 let organizations: typeof import("@/db/schema").organizations;
 let computeUrlHash: typeof import("@/lib/collection/normalize").computeUrlHash;
 let normalizeUrl: typeof import("@/lib/collection/normalize").normalizeUrl;
+let JSON_IMPORT_PLATFORM: typeof import("@/lib/collection/json-import").JSON_IMPORT_PLATFORM;
+let getJsonImportAccountName: typeof import("@/lib/collection/json-import").getJsonImportAccountName;
 
 async function initModules() {
   ({ db } = await import("@/db"));
@@ -40,6 +42,7 @@ async function initModules() {
     organizations,
   } = await import("@/db/schema"));
   ({ computeUrlHash, normalizeUrl } = await import("@/lib/collection/normalize"));
+  ({ JSON_IMPORT_PLATFORM, getJsonImportAccountName } = await import("@/lib/collection/json-import"));
 }
 
 interface JsonArticleRow {
@@ -261,65 +264,72 @@ async function main() {
       const insertedRows = await db
         .insert(collectedItems)
         .values(
-          part.map((item) => ({
-            organizationId: orgId,
-            contentFingerprint: item.hash,
-            canonicalUrl: item.canonicalUrl,
-            canonicalUrlHash: item.hash,
-            title: item.title,
-            summary: item.summary,
-            publishedAt: item.publishedAt,
-            firstSeenSourceId: sourceId,
-            firstSeenChannel: item.channel,
-            firstSeenAt: capturedAt,
-            sourceChannels: [
-              {
-                channel: item.channel,
-                url: item.rawUrl,
-                sourceId,
-                runId,
-                capturedAt: capturedAt.toISOString(),
+          part.map((item) => {
+            const accountName = getJsonImportAccountName(
+              item.channel,
+              item.sourceName,
+              item.author,
+            );
+            return {
+              organizationId: orgId,
+              contentFingerprint: item.hash,
+              canonicalUrl: item.canonicalUrl,
+              canonicalUrlHash: item.hash,
+              title: item.title,
+              summary: item.summary,
+              publishedAt: item.publishedAt,
+              firstSeenSourceId: sourceId,
+              firstSeenChannel: item.channel,
+              firstSeenAt: capturedAt,
+              sourceChannels: [
+                {
+                  channel: item.channel,
+                  url: item.rawUrl,
+                  sourceId,
+                  runId,
+                  capturedAt: capturedAt.toISOString(),
+                },
+              ],
+              category: [],
+              tags: item.keyword ? [item.keyword] : null,
+              rawMetadata: {
+                importedFromJson: true,
+                jsonImportDedupe: "url_hash_only",
+                keyword: item.keyword ?? null,
+                source: item.sourceName ?? null,
+                publicAccountName: accountName,
+                author: accountName,
+                reporterAuthor: item.author ?? null,
+                originalRow: item.rawRowMetadata,
               },
-            ],
-            category: [],
-            tags: item.keyword ? [item.keyword] : null,
-            rawMetadata: {
-              importedFromJson: true,
-              jsonImportDedupe: "url_hash_only",
-              keyword: item.keyword ?? null,
-              source: item.sourceName ?? null,
-              publicAccountName: item.sourceName ?? item.author ?? null,
-              author: item.sourceName ?? item.author ?? null,
-              reporterAuthor: item.author ?? null,
-              originalRow: item.rawRowMetadata,
-            },
-            contentType: "image_text",
-            attachments: [],
-            externalId: null,
-            platform: item.sourceName ?? null,
-            author: item.sourceName ?? item.author ?? null,
-            accountId: null,
-            accountHandle: null,
-            authorFollowerCount: null,
-            sentiment: null,
-            infoType: null,
-            likeCount: 0,
-            commentCount: 0,
-            shareCount: 0,
-            viewCount: 0,
-            favoriteCount: 0,
-            replyCount: 0,
-            ipRegion: null,
-            postRegion: null,
-            mentionedRegions: null,
-            matchedKeywords: item.keyword ? [item.keyword] : null,
-            matchedRegions: null,
-            industries: null,
-            coverImageUrl: null,
-            durationSeconds: null,
-            createdAt: now,
-            updatedAt: now,
-          })),
+              contentType: "image_text",
+              attachments: [],
+              externalId: null,
+              platform: JSON_IMPORT_PLATFORM,
+              author: accountName,
+              accountId: null,
+              accountHandle: null,
+              authorFollowerCount: null,
+              sentiment: null,
+              infoType: null,
+              likeCount: 0,
+              commentCount: 0,
+              shareCount: 0,
+              viewCount: 0,
+              favoriteCount: 0,
+              replyCount: 0,
+              ipRegion: null,
+              postRegion: null,
+              mentionedRegions: null,
+              matchedKeywords: item.keyword ? [item.keyword] : null,
+              matchedRegions: null,
+              industries: null,
+              coverImageUrl: null,
+              durationSeconds: null,
+              createdAt: now,
+              updatedAt: now,
+            };
+          }),
         )
         .onConflictDoNothing({
           target: [collectedItems.organizationId, collectedItems.contentFingerprint],

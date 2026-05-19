@@ -37,7 +37,6 @@ import {
   ChevronDown,
   Wrench,
   Compass,
-  Plus,
   Database,
   type LucideIcon,
 } from "lucide-react";
@@ -112,10 +111,10 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: "采集", href: "#data-collection", icon: Database,
     children: [
-      { label: "采集池", href: "/data-collection/content", icon: FolderOpen },
+      { label: "内容池", href: "/data-collection/content", icon: FolderOpen },
+      { label: "主题监测", href: "/data-collection/topics", icon: BookMarked },
       { label: "采集配置", href: "/data-collection/sources",
         matchPrefixes: ["/data-collection/sources", "/data-collection/outlets"], icon: Wrench },
-      { label: "主题监测", href: "/data-collection/topics", icon: BookMarked },
       { label: "研究报告", href: "/data-collection/reports", icon: FileText },
       { label: "监控面板", href: "/data-collection/monitoring", icon: BarChart3 },
     ],
@@ -290,10 +289,10 @@ function MoreButton({ items, pathname, expanded }: {
 
 /* ─── Hover-triggered collapsed nav group (icon + flyout submenu) ─── */
 
-function HoverNavGroup({ item, active, children, pathname, Icon }: {
+function HoverNavGroup({ item, active, subItems, pathname, Icon }: {
   item: NavItem;
   active: boolean;
-  children: SubItem[];
+  subItems: SubItem[];
   pathname: string;
   Icon: LucideIcon;
 }) {
@@ -328,7 +327,7 @@ function HoverNavGroup({ item, active, children, pathname, Icon }: {
         <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55">
           {item.label}
         </p>
-        <SubMenuList items={children} pathname={pathname} />
+        <SubMenuList items={subItems} pathname={pathname} />
       </PopoverContent>
     </Popover>
   );
@@ -376,15 +375,16 @@ function NavGroup({ item, pathname, canSeeItem, expanded }: {
   item: NavItem; pathname: string; canSeeItem: (h: string) => boolean; expanded: boolean;
 }) {
   const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
-  if (!children.length) return null;
   const Icon = item.icon;
   const active = hasActiveChild(pathname, children);
   const [open, setOpen] = useState(active);
 
+  if (!children.length) return null;
+
   if (!expanded) {
     // Collapsed: hover-triggered popover (opens on hover, closes with small delay)
     return (
-      <HoverNavGroup item={item} active={active} children={children} pathname={pathname} Icon={Icon} />
+      <HoverNavGroup item={item} active={active} subItems={children} pathname={pathname} Icon={Icon} />
     );
   }
 

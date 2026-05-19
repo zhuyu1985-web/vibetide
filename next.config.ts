@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // 生产 Docker 镜像使用多阶段构建 + node .next/standalone/server.js
   output: "standalone",
+  experimental: {
+    serverActions: {
+      // Excel 导入会把前端解析后的批量行数据提交给 Server Action；默认 1MB 不够。
+      bodySizeLimit: "100mb",
+    },
+  },
   // 允许局域网工作站访问 dev server（HMR WebSocket 跨 origin 告警消除）。
   // 注意：Next.js allowedDevOrigins 的 glob 是按 hostname label 匹配的，
   // "*" 只匹配一段，所以 "192.168.*" 匹配不到 "192.168.0.100"。IP 必须写成

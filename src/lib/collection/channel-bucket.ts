@@ -43,6 +43,79 @@ export const CHANNEL_BUCKET_SLUG: Record<ChannelBucket, string> = {
   搜索: "search",
 };
 
+const CHANNEL_BUCKET_LABEL_TO_SLUG: Record<string, string> = {
+  微博: "weibo",
+  抖音: "douyin",
+  微信: "wechat",
+  微信公众号: "wechat",
+  视频号: "wechat_channels",
+  小红书: "xiaohongshu",
+  知乎: "zhihu",
+  快手: "kuaishou",
+  网站: "site",
+  热榜: "tophub",
+  搜索: "search",
+};
+
+export interface ChannelBucketMatcher {
+  exact: string[];
+  prefix: string[];
+}
+
+export const CHANNEL_BUCKET_MATCHERS: Record<string, ChannelBucketMatcher> = {
+  weibo: {
+    exact: ["weibo", "tikhub_weibo", "tikhub_weibo_account"],
+    prefix: ["tophub/微博", "tophub/weibo"],
+  },
+  douyin: {
+    exact: ["douyin", "tikhub_douyin", "tikhub_douyin_account"],
+    prefix: ["tophub/抖音", "tophub/douyin"],
+  },
+  wechat: {
+    exact: ["wechat", "weixin", "wechat_mp", "wechat_oa", "tikhub_wechat_mp", "tikhub_wechat_mp_account"],
+    prefix: ["tophub/微信", "tophub/weixin"],
+  },
+  wechat_channels: {
+    exact: ["wechat_channels", "tikhub_wechat_channels"],
+    prefix: [],
+  },
+  xiaohongshu: {
+    exact: ["xiaohongshu", "xhs", "tikhub_xiaohongshu"],
+    prefix: ["tophub/小红书", "tophub/xiaohongshu"],
+  },
+  zhihu: {
+    exact: ["zhihu", "tikhub_zhihu"],
+    prefix: ["tophub/知乎", "tophub/zhihu"],
+  },
+  kuaishou: {
+    exact: ["kuaishou", "tikhub_kuaishou_account"],
+    prefix: [],
+  },
+  site: {
+    exact: ["excel_import", "json_import", "site", "website", "rss", "jina", "list", "opinion_excel"],
+    prefix: ["rss/", "jina/", "list/", "site/", "website/", "opinion_excel", "json_import/"],
+  },
+  tophub: {
+    exact: ["tophub"],
+    prefix: ["tophub/"],
+  },
+  search: {
+    exact: ["bocha", "tavily"],
+    prefix: ["search/", "bocha/", "tavily/"],
+  },
+};
+
+export function normalizeChannelBucketSlug(value: string): string {
+  const trimmed = value.trim();
+  return CHANNEL_BUCKET_MATCHERS[trimmed]
+    ? trimmed
+    : CHANNEL_BUCKET_LABEL_TO_SLUG[trimmed] ?? trimmed;
+}
+
+export function getChannelBucketMatcher(slug: string): ChannelBucketMatcher | null {
+  return CHANNEL_BUCKET_MATCHERS[normalizeChannelBucketSlug(slug)] ?? null;
+}
+
 export function simpleChannelBucket(channel: string | undefined | null): ChannelBucket | null {
   if (!channel) return null;
   const c = channel.toLowerCase();
@@ -60,6 +133,7 @@ export function simpleChannelBucket(channel: string | undefined | null): Channel
     c.startsWith("jina") ||
     c.startsWith("list") ||
     c.startsWith("site") ||
+    c.startsWith("json_import") ||
     c.startsWith("opinion_excel")
   )
     return "网站";

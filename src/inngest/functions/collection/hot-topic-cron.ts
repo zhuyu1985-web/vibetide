@@ -17,23 +17,28 @@ export const collectionHotTopicCron = inngest.createFunction(
 
     if (orgs.length === 0) return { message: "No organizations found" };
 
-    const dispatched = await step.run("seed-and-dispatch", async () => {
-      let count = 0;
+    const result = await step.run("seed-and-dispatch", async () => {
+      let dispatched = 0;
+      let skipped = 0;
       for (const org of orgs) {
-        const sourceId = await ensureHotTopicSystemSource(org.id);
+        const source = await ensureHotTopicSystemSource(org.id);
+        if (!source.enabled) {
+          skipped++;
+          continue;
+        }
         await inngest.send({
           name: "collection/source.run-requested",
           data: {
-            sourceId,
+            sourceId: source.sourceId,
             organizationId: org.id,
             trigger: "cron",
           },
         });
-        count++;
+        dispatched++;
       }
-      return count;
+      return { dispatched, skipped };
     });
 
-    return { dispatched };
+    return result;
   },
 );

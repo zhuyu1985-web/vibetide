@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, Plus, FolderPlus } from "lucide-react";
+import { ChevronDown, Plus, FolderPlus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ interface TopicSidebarProps {
   groups: string[];
   selectedTopicId: string | null;
   onSelectTopic: (id: string) => void;
+  onEditTopic: (id: string) => void;
   onOpenNewTopic: () => void;
   onOpenNewGroup: () => void;
 }
@@ -26,6 +27,7 @@ export function TopicSidebar({
   groups,
   selectedTopicId,
   onSelectTopic,
+  onEditTopic,
   onOpenNewTopic,
   onOpenNewGroup,
 }: TopicSidebarProps) {
@@ -87,7 +89,11 @@ export function TopicSidebar({
   }
 
   return (
-    <GlassCard variant="panel" padding="none" className="flex w-[280px] shrink-0 flex-col">
+    <GlassCard
+      variant="panel"
+      padding="none"
+      className="flex h-[calc(100vh-220px)] min-h-[520px] w-[280px] shrink-0 flex-col"
+    >
       {/* Top: search */}
       <div className="border-b border-white/10 p-3">
         <SearchInput
@@ -99,7 +105,7 @@ export function TopicSidebar({
       </div>
 
       {/* Middle: scrollable group list */}
-      <div className="h-[calc(100vh-280px)] min-h-[300px] flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {grouped.length === 0 ? (
           <div className="flex h-full items-center justify-center px-4 text-center text-xs text-muted-foreground">
             {query ? "没有匹配的主题" : "暂无主题，点击下方按钮创建"}
@@ -132,13 +138,18 @@ export function TopicSidebar({
                       {bucket.items.map((t) => {
                         const isActive = t.id === selectedTopicId;
                         return (
-                          <Button
+                          <div
                             key={t.id}
-                            variant="ghost"
-                            size="sm"
+                            role="button"
+                            tabIndex={0}
                             onClick={() => onSelectTopic(t.id)}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter" && event.key !== " ") return;
+                              event.preventDefault();
+                              onSelectTopic(t.id);
+                            }}
                             className={cn(
-                              "relative h-auto w-full justify-start py-2 pl-5 pr-2 text-left",
+                              "group relative flex h-auto w-full cursor-pointer items-center justify-start rounded-md py-2 pl-5 pr-2 text-left transition-colors hover:bg-white/50 focus:outline-none focus:ring-2 focus:ring-primary/20 dark:hover:bg-white/10",
                               isActive && "bg-sky-100/60 dark:bg-sky-900/30",
                             )}
                           >
@@ -151,7 +162,7 @@ export function TopicSidebar({
                                   {t.name}
                                 </span>
                                 {t.isPreset && (
-                                  <Badge className="ml-auto shrink-0 bg-blue-100 px-1 py-0 text-[9px] text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
+                                  <Badge variant="secondary" className="ml-auto shrink-0 px-1 py-0 text-[9px]">
                                     预置
                                   </Badge>
                                 )}
@@ -160,7 +171,21 @@ export function TopicSidebar({
                                 共词 {t.primaryKeyword ?? "—"} · 样本 {t.sampleCount}
                               </span>
                             </div>
-                          </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`编辑 ${t.name}`}
+                              title="编辑主题词"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onEditTopic(t.id);
+                              }}
+                              className="ml-1 h-7 w-7 shrink-0 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         );
                       })}
                     </div>

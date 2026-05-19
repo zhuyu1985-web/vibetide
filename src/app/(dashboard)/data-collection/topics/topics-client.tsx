@@ -1,23 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
+import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
+import type { AdapterMeta } from "@/lib/collection/adapter-meta";
+import type { CollectedItemFilterOptions } from "@/lib/dal/collected-items";
+import type { TopicSummary } from "@/lib/dal/research/research-topics";
 import { Plus } from "lucide-react";
-import { TopicSidebar } from "./topic-sidebar";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { TopicDetailPanel } from "./topic-detail-panel";
 import { TopicEditDrawer } from "./topic-edit-drawer";
 import { TopicGroupDialog } from "./topic-group-dialog";
-import type { TopicSummary } from "@/lib/dal/research/research-topics";
+import { TopicSidebar } from "./topic-sidebar";
 
 interface TopicsClientProps {
   topics: TopicSummary[];
   groups: string[];
+  adapterMetas: AdapterMeta[];
+  outlets: MediaOutletRow[];
+  filterOptions: CollectedItemFilterOptions;
 }
 
-export function TopicsClient({ topics, groups }: TopicsClientProps) {
+export function TopicsClient({
+  topics,
+  groups,
+  adapterMetas,
+  outlets,
+  filterOptions,
+}: TopicsClientProps) {
   const router = useRouter();
 
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -31,21 +43,20 @@ export function TopicsClient({ topics, groups }: TopicsClientProps) {
   // immediately, even before user assigns a topic to them via edit drawer).
   const [extraGroups, setExtraGroups] = useState<string[]>([]);
 
-  // Keep selectedId valid when topics list changes after refresh.
-  useEffect(() => {
-    if (selectedId && topics.some((t) => t.id === selectedId)) return;
-    setSelectedId(topics[0]?.id ?? null);
-  }, [topics, selectedId]);
-
   const allGroups = useMemo(() => {
     const set = new Set<string>(groups);
     for (const g of extraGroups) set.add(g);
     return Array.from(set).sort();
   }, [groups, extraGroups]);
 
+  const effectiveSelectedId =
+    selectedId && topics.some((t) => t.id === selectedId)
+      ? selectedId
+      : (topics[0]?.id ?? null);
+
   const selectedTopic = useMemo(
-    () => topics.find((t) => t.id === selectedId) ?? null,
-    [topics, selectedId],
+    () => topics.find((t) => t.id === effectiveSelectedId) ?? null,
+    [topics, effectiveSelectedId],
   );
 
   function handleOpenNewTopic() {
@@ -56,6 +67,14 @@ export function TopicsClient({ topics, groups }: TopicsClientProps) {
   function handleEditTopic() {
     if (!selectedTopic) return;
     setEditingTopic(selectedTopic);
+    setEditDrawerOpen(true);
+  }
+
+  function handleEditTopicById(topicId: string) {
+    const target = topics.find((t) => t.id === topicId);
+    if (!target) return;
+    setSelectedId(topicId);
+    setEditingTopic(target);
     setEditDrawerOpen(true);
   }
 
@@ -72,33 +91,36 @@ export function TopicsClient({ topics, groups }: TopicsClientProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">主题监测</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            管理监测方案与命中结果。左侧为方案列表(按分组组织)，右侧展示命中卡片。
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={handleOpenNewTopic}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          创建方案
-        </Button>
-      </div>
-
+    <div className="min-h-0">
       <div className="flex items-start gap-4">
-        <TopicSidebar
-          topics={topics}
-          groups={allGroups}
-          selectedTopicId={selectedId}
-          onSelectTopic={setSelectedId}
-          onOpenNewTopic={handleOpenNewTopic}
-          onOpenNewGroup={() => setGroupDialogOpen(true)}
-        />
+        <div className="sticky top-4 flex w-[280px] shrink-0 flex-col gap-4 self-start">
+          <div className="min-h-[45px]">
+            <h2 className="text-xl font-semibold text-foreground">主题词</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              按分组管理监测主题词，快速切换预置方案
+            </p>
+          </div>
+
+          <TopicSidebar
+            topics={topics}
+            groups={allGroups}
+            selectedTopicId={effectiveSelectedId}
+            onSelectTopic={setSelectedId}
+            onEditTopic={handleEditTopicById}
+            onOpenNewTopic={handleOpenNewTopic}
+            onOpenNewGroup={() => setGroupDialogOpen(true)}
+          />
+        </div>
 
         <div className="min-w-0 flex-1">
           {selectedTopic ? (
-            <TopicDetailPanel topic={selectedTopic} onEdit={handleEditTopic} />
+            <TopicDetailPanel
+              topic={selectedTopic}
+              onEdit={handleEditTopic}
+              adapterMetas={adapterMetas}
+              outlets={outlets}
+              filterOptions={filterOptions}
+            />
           ) : (
             <GlassCard variant="panel" padding="lg">
               <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">

@@ -16,7 +16,7 @@ type Crumb = { label: string; href?: string };
 
 function resolveCrumbs(pathname: string): Crumb[] | null {
   if (!pathname.startsWith("/data-collection")) return null;
-  const root: Crumb = { label: "检索工作台", href: "/data-collection/content" };
+  const root: Crumb = { label: "内容池", href: "/data-collection/content" };
 
   if (pathname === "/data-collection/content") return null;
 

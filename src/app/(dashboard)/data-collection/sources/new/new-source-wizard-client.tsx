@@ -22,7 +22,6 @@ import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import type { ConfigField } from "@/lib/collection/types";
 import { createCollectionSource } from "@/app/actions/collection";
 import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
-import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 
 const CRON_PRESETS = [
   { value: "__manual__", label: "手工触发" },
@@ -297,14 +296,14 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">选择"手工触发"后源只能手动运行。</p>
+            <p className="text-xs text-muted-foreground">选择「手工触发」后源只能手动运行。</p>
           </div>
           <div className="space-y-1.5">
             <Label>归属模块（标签,不复制数据）</Label>
             <p className="text-xs text-muted-foreground">
-              给这个采集源贴上"服务于哪些下游模块"的标签 — 仅用于在采集池/研究工作台里按此过滤,
+              给这个采集源贴上「服务于哪些下游模块」的标签 — 仅用于在内容池/研究工作台里按此过滤,
               <strong className="text-foreground">不会把数据再复制一份到任何业务表</strong>。
-              所有研究/检索/报告都直接读采集池(collected_items),单一真相源。
+              所有研究/检索/报告都直接读内容池(collected_items),单一真相源。
               <br />
               热点(hot_topics)是特例:勾选后会额外触发 LLM 富化流水线写 hot_topics 表。
             </p>
