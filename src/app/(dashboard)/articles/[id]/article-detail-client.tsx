@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
 import { EditorTopBar } from "./features/header/editor-top-bar";
 import { LeftOuterNav } from "./features/header/left-outer-nav";
+import { RightOuterNav } from "./features/header/right-outer-nav";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
@@ -54,6 +55,8 @@ export default function ArticleDetailClient({
     leftTab,
     rightTab,
     leftCategory,
+    rightCategory,
+    activeChannel,
     toggleLeftPanel,
     toggleRightPanel,
     setLeftTab,
@@ -327,7 +330,8 @@ export default function ArticleDetailClient({
           ) : null}
         </div>
 
-        {/* Right panel */}
+        {/* Right panel —— edit 模式用「基本信息 + 渠道」外层 nav 切换；
+            read 模式保留原 5 tab 横排 */}
         <div
           className={cn(
             "border-l border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl transition-all duration-300 ease-out overflow-hidden shrink-0",
@@ -335,74 +339,111 @@ export default function ArticleDetailClient({
           )}
         >
           {rightPanelOpen ? (
-            <div className="flex flex-col h-full">
-              <div className="flex border-b border-[var(--glass-border)] text-xs">
-                {rightTabs.map((tab) => (
-                  <button
-                    key={tab}
-                    className={cn(
-                      "flex-1 text-center py-2 transition-colors",
-                      rightTab === tab
-                        ? "text-blue-500 border-b-2 border-blue-500"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => setRightTab(tab)}
-                  >
-                    {RIGHT_TAB_LABEL[tab]}
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1 overflow-hidden flex flex-col">
-                {rightTab === "info" && (
-                  <ArticleInfoPanel
-                    articleId={article.id}
-                    initial={{
-                      authorName: article.authorName,
-                      sourceName: article.sourceName,
-                      summary: article.summary,
-                      keywords: article.keywords,
-                      coverImageUrl: article.coverImageUrl,
-                      shareImageUrl: article.shareImageUrl,
-                      listStyle: article.listStyle,
-                    }}
-                  />
-                )}
-                {rightTab === "analysis" && (
-                  <AIAnalysisPanel
-                    articleId={article.id}
-                    articleContent={article.body ?? ""}
-                    initialCache={initialAIAnalysis}
-                  />
-                )}
-                {rightTab === "annotations" && (
-                  <AnnotationsPanel
-                    annotations={annotations}
-                    editAnnotation={editAnnotation}
-                    removeAnnotation={removeAnnotation}
-                  />
-                )}
-                {rightTab === "transcript" && isVideo && (
-                  <TranscriptPanel
-                    segments={MOCK_TRANSCRIPT}
-                    currentTime={videoCurrentTime}
-                    onSeek={(time) => videoSeekRef.current?.(time)}
-                  />
-                )}
-                {rightTab === "channels" && (
-                  <ChannelRewritePanel articleId={article.id} />
-                )}
-              </div>
-              {/* 海外英文稿件专属：发布到 X / Instagram / Facebook / LinkedIn 面板 */}
-              {articleLanguage === "en" && (
-                <div className="border-t border-[var(--glass-border)] p-3 shrink-0">
-                  <ExternalPublishPanel
-                    articleId={article.id}
-                    articleLanguage={articleLanguage}
-                    existingPublications={externalPublications}
-                  />
+            viewMode === "edit" ? (
+              <div className="flex flex-col h-full">
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  {rightCategory === "info" && (
+                    <ArticleInfoPanel
+                      articleId={article.id}
+                      initial={{
+                        authorName: article.authorName,
+                        sourceName: article.sourceName,
+                        summary: article.summary,
+                        keywords: article.keywords,
+                        coverImageUrl: article.coverImageUrl,
+                        shareImageUrl: article.shareImageUrl,
+                        listStyle: article.listStyle,
+                      }}
+                    />
+                  )}
+                  {rightCategory === "channel" && (
+                    <ChannelRewritePanel
+                      articleId={article.id}
+                      initialPlatform={activeChannel}
+                      hidePlatformPicker
+                    />
+                  )}
                 </div>
-              )}
-            </div>
+                {/* 海外英文稿件专属面板 */}
+                {articleLanguage === "en" && (
+                  <div className="border-t border-[var(--glass-border)] p-3 shrink-0">
+                    <ExternalPublishPanel
+                      articleId={article.id}
+                      articleLanguage={articleLanguage}
+                      existingPublications={externalPublications}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col h-full">
+                <div className="flex border-b border-[var(--glass-border)] text-xs">
+                  {rightTabs.map((tab) => (
+                    <button
+                      key={tab}
+                      className={cn(
+                        "flex-1 text-center py-2 transition-colors",
+                        rightTab === tab
+                          ? "text-blue-500 border-b-2 border-blue-500"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      onClick={() => setRightTab(tab)}
+                    >
+                      {RIGHT_TAB_LABEL[tab]}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  {rightTab === "info" && (
+                    <ArticleInfoPanel
+                      articleId={article.id}
+                      initial={{
+                        authorName: article.authorName,
+                        sourceName: article.sourceName,
+                        summary: article.summary,
+                        keywords: article.keywords,
+                        coverImageUrl: article.coverImageUrl,
+                        shareImageUrl: article.shareImageUrl,
+                        listStyle: article.listStyle,
+                      }}
+                    />
+                  )}
+                  {rightTab === "analysis" && (
+                    <AIAnalysisPanel
+                      articleId={article.id}
+                      articleContent={article.body ?? ""}
+                      initialCache={initialAIAnalysis}
+                    />
+                  )}
+                  {rightTab === "annotations" && (
+                    <AnnotationsPanel
+                      annotations={annotations}
+                      editAnnotation={editAnnotation}
+                      removeAnnotation={removeAnnotation}
+                    />
+                  )}
+                  {rightTab === "transcript" && isVideo && (
+                    <TranscriptPanel
+                      segments={MOCK_TRANSCRIPT}
+                      currentTime={videoCurrentTime}
+                      onSeek={(time) => videoSeekRef.current?.(time)}
+                    />
+                  )}
+                  {rightTab === "channels" && (
+                    <ChannelRewritePanel articleId={article.id} />
+                  )}
+                </div>
+                {articleLanguage === "en" && (
+                  <div className="border-t border-[var(--glass-border)] p-3 shrink-0">
+                    <ExternalPublishPanel
+                      articleId={article.id}
+                      articleLanguage={articleLanguage}
+                      existingPublications={externalPublications}
+                    />
+                  </div>
+                )}
+              </div>
+            )
           ) : (
             <button
               className="w-full h-full flex items-start justify-center pt-3 text-muted-foreground hover:text-foreground"
@@ -412,6 +453,9 @@ export default function ArticleDetailClient({
             </button>
           )}
         </div>
+
+        {/* 最右侧 80px 渠道 nav，仅 edit 模式显示 */}
+        {viewMode === "edit" && <RightOuterNav />}
       </div>
 
       {/* Floating sticky notes — rendered above everything via fixed positioning */}

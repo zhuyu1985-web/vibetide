@@ -47,10 +47,24 @@ const STATUS_COLOR: Record<string, string> = {
 
 interface ChannelRewritePanelProps {
   articleId: string;
+  initialPlatform?: string;
+  /** 隐藏内部平台 chip 行（外层 nav 已经提供平台选择时） */
+  hidePlatformPicker?: boolean;
 }
 
-export function ChannelRewritePanel({ articleId }: ChannelRewritePanelProps) {
-  const [activePlatform, setActivePlatform] = useState<string>(PLATFORMS[0].value);
+export function ChannelRewritePanel({
+  articleId,
+  initialPlatform,
+  hidePlatformPicker = false,
+}: ChannelRewritePanelProps) {
+  const [activePlatform, setActivePlatform] = useState<string>(
+    initialPlatform ?? PLATFORMS[0].value,
+  );
+
+  // 外层 nav 切平台时同步
+  useEffect(() => {
+    if (initialPlatform) setActivePlatform(initialPlatform);
+  }, [initialPlatform]);
   const [variants, setVariants] = useState<ArticleChannelVariantItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
@@ -142,7 +156,8 @@ export function ChannelRewritePanel({ articleId }: ChannelRewritePanelProps) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Platform chips */}
+      {/* Platform chips（外层 nav 已选时可隐藏） */}
+      {!hidePlatformPicker && (
       <div className="flex flex-wrap gap-1.5 px-4 pt-4 pb-3 border-b border-[var(--glass-border)]">
         {PLATFORMS.map((p) => {
           const v = variants.find((x) => x.platform === p.value);
@@ -173,6 +188,7 @@ export function ChannelRewritePanel({ articleId }: ChannelRewritePanelProps) {
           );
         })}
       </div>
+      )}
 
       {/* Form */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">

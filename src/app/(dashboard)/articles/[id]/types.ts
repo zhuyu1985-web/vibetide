@@ -78,6 +78,9 @@ export type LeftCategory =
   | "review"      // 智能审校（即将上线）
   | "storage";    // 稿库（跳 /articles 列表）
 
+// 右侧 80px outer nav：'info' 显示基本信息表单，'channel' 显示某 platform 的渠道改写
+export type RightCategory = "info" | "channel";
+
 export interface AppearanceSettings {
   fontSize: number;
   lineHeight: "compact" | "comfortable" | "loose";

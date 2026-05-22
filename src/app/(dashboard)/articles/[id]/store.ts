@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Editor } from "@tiptap/react";
-import type { ViewMode, ContentType, ActiveView, LeftTab, RightTab, LeftCategory } from "./types";
+import type { ViewMode, ContentType, ActiveView, LeftTab, RightTab, LeftCategory, RightCategory } from "./types";
 
 interface EditorHandlers {
   save: () => void;
@@ -17,6 +17,8 @@ interface ArticlePageStore {
   leftTab: LeftTab;
   rightTab: RightTab;
   leftCategory: LeftCategory;
+  rightCategory: RightCategory;
+  activeChannel: string;       // 当 rightCategory='channel' 时的当前平台
   zenMode: boolean;
   selectedText: string | null;
   selectedRange: { from: number; to: number } | null;
@@ -34,6 +36,8 @@ interface ArticlePageStore {
   setLeftTab: (tab: LeftTab) => void;
   setRightTab: (tab: RightTab) => void;
   setLeftCategory: (cat: LeftCategory) => void;
+  setRightCategory: (cat: RightCategory) => void;
+  setActiveChannel: (platform: string) => void;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleZenMode: () => void;
@@ -54,6 +58,8 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   leftTab: "chat",
   rightTab: "info",
   leftCategory: "ai",
+  rightCategory: "info",
+  activeChannel: "wechat_oa",
   zenMode: false,
   selectedText: null,
   selectedRange: null,
@@ -70,6 +76,8 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   setLeftTab: (tab) => set({ leftTab: tab }),
   setRightTab: (tab) => set({ rightTab: tab }),
   setLeftCategory: (cat) => set({ leftCategory: cat }),
+  setRightCategory: (cat) => set({ rightCategory: cat }),
+  setActiveChannel: (platform) => set({ activeChannel: platform, rightCategory: "channel" }),
   toggleLeftPanel: () => set((s) => ({ leftPanelOpen: !s.leftPanelOpen, zenMode: false })),
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen, zenMode: false })),
   toggleZenMode: () =>
