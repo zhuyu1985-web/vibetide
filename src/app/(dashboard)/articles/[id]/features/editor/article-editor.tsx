@@ -16,11 +16,14 @@ import Typography from "@tiptap/extension-typography";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
+import { Color } from "@tiptap/extension-color";
 import { EditorToolbar } from "./editor-toolbar";
 import { EditorStatusBar } from "./editor-status-bar";
 import { SlashCommand } from "./slash-command";
 import { BubbleMenuBar } from "./bubble-menu-bar";
 import { AIHighlight } from "./extensions/ai-highlight";
+import { TextStyleAttrs } from "./extensions/text-style-attrs";
+import { ParagraphAttrs } from "./extensions/paragraph-attrs";
 import { updateArticle } from "@/app/actions/articles";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useArticlePageStore } from "../../store";
@@ -94,6 +97,10 @@ export function ArticleEditor({
       TableCell,
       TableHeader,
       AIHighlight,
+      // Phase 2.2 新增扩展
+      TextStyleAttrs,                    // 字体 / 字号（覆盖默认 TextStyle，加 fontFamily/fontSize 属性）
+      Color.configure({ types: ["textStyle"] }),  // 字体颜色
+      ParagraphAttrs,                    // 行间距 / 段前距 / 段后距 / 首行缩进
     ],
     content: article.body ?? "",
     editorProps: {
