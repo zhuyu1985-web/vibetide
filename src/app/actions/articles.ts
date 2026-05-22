@@ -5,6 +5,35 @@ import { articles } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserOrg } from "@/lib/dal/auth";
+
+/**
+ * 新建空稿件，返回 articleId。
+ * 由 /articles 列表「+」按钮 + /articles/create 直接 URL 访问统一使用，
+ * 创建后跳到 /articles/[id]?mode=edit 进入三栏编辑器。
+ */
+export async function createEmptyArticleAction(): Promise<{ articleId: string }> {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) throw new Error("用户未关联组织");
+
+  const [article] = await db
+    .insert(articles)
+    .values({
+      organizationId: orgId,
+      title: "未命名稿件",
+      body: "",
+      mediaType: "article",
+      status: "draft",
+      createdBy: user.id,
+      content: { headline: "未命名稿件", body: "", imageNotes: [] },
+      wordCount: 0,
+    })
+    .returning();
+  revalidatePath("/articles");
+  return { articleId: article.id };
+}
+
 export async function createArticle(data: {
   organizationId: string;
   title: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { useArticlePageStore } from "./store";
 import { useAppearance } from "./hooks/use-article-context";
@@ -79,6 +80,14 @@ export default function ArticleDetailClient({
   useEffect(() => {
     useArticlePageStore.getState().setContentType(isVideo ? "video" : "article");
   }, [isVideo]);
+
+  // 识别 ?mode=edit URL 参数（由 /articles/create 跳转过来的请求）
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams?.get("mode") === "edit") {
+      useArticlePageStore.getState().setViewMode("edit");
+    }
+  }, [searchParams]);
 
   // Track scroll progress in center pane
   useEffect(() => {
