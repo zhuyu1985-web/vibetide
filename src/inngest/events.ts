@@ -260,4 +260,26 @@ export type InngestEvents = {
     };
   };
 
+  // ─── External Publish Events (海外英文发布, 2026-05-22) ───
+
+  /**
+   * Ayrshare webhook 收到平台终态回执后派发。
+   * 由 `ayrshareWebhookHandler` 消费，更新 `articles.externalPublishStatus` 汇总。
+   */
+  "external/publication.completed": {
+    data: {
+      articleId: string;
+      ayrsharePostId: string;
+      /** webhook 整体状态（按平台已经写回 external_publications 表），这里只是触发汇总刷新 */
+      status: "success" | "failed" | "partial";
+    };
+  };
+
+  /** Ayrshare 发布可重试失败后派发；由 `externalPublishRetry` 消费，3 次指数退避 */
+  "external/publication.retry": {
+    data: {
+      publicationId: string;
+    };
+  };
+
 };
