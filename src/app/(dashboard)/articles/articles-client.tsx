@@ -26,6 +26,8 @@ import {
   Headphones,
   Code2,
   Image as ImageIcon,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import type { ArticleListItem, ArticleStats, CategoryNode } from "@/lib/types";
 
@@ -419,9 +421,21 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
   const tc = thumbConfig[article.mediaType] || thumbConfig.article;
   const TIcon = ThumbIcon[article.mediaType] || FileText;
 
+  const isOriginal = article.sourceType === "original";
+  const sourceLabel = isOriginal
+    ? "原创"
+    : article.sourceName || "其他来源";
+
+  // 处理中徽章（转码优先，因为更阻塞编辑）
+  const processingLabel = article.transcodingStatus === "processing"
+    ? "正在转码"
+    : article.aiAnalysisStatus === "processing"
+      ? "AI 分析中"
+      : null;
+
   return (
     <Link href={`/articles/${article.id}`} className="group block h-full">
-      <div className="glass-card-interactive p-4 h-full flex flex-col">
+      <div className="glass-card-interactive p-4 pb-0 h-full flex flex-col overflow-hidden">
         {/* Top: Title + Thumbnail side by side */}
         <div className="flex gap-3 mb-2">
           {/* Left: Title + Description */}
@@ -451,8 +465,8 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Bottom: source dot + name · date + optional count badge */}
-        <div className="relative z-10 flex items-center justify-between mt-3 pt-2.5 border-t border-[var(--glass-border)]">
+        {/* 中间 meta：状态点 + 分配/栏目 + 日期 + 标签数 */}
+        <div className="relative z-10 flex items-center justify-between mt-3 pt-2.5 border-t border-[var(--glass-border)] pb-2.5">
           <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-gray-400 dark:text-gray-500">
             <span className={cn("w-3.5 h-3.5 rounded-full shrink-0", dotColor)} />
             <span className="truncate">
@@ -462,13 +476,43 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
             <span className="shrink-0">{formatDate(article.updatedAt)}</span>
           </div>
 
-          {/* Count badge */}
           {article.tags.length > 0 && (
             <span className={cn(
               "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium text-white shrink-0 ml-2",
               article.tags.length >= 3 ? "bg-blue-500" : article.tags.length >= 2 ? "bg-green-500" : "bg-amber-400"
             )}>
               {article.tags.length}
+            </span>
+          )}
+        </div>
+
+        {/* 来源区（浅蓝 tint，边到边）+ 处理中徽章 */}
+        <div className="relative z-10 -mx-4 px-4 py-2 bg-blue-50/55 dark:bg-blue-500/[0.06] border-t border-blue-100/60 dark:border-blue-500/10 rounded-b-[18px] flex items-center justify-between gap-2">
+          <div className={cn(
+            "flex items-center gap-1.5 min-w-0 text-[11px] font-medium",
+            isOriginal
+              ? "text-sky-700 dark:text-sky-300"
+              : "text-blue-700 dark:text-blue-300"
+          )}>
+            {isOriginal ? (
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            ) : article.sourceIconUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={article.sourceIconUrl}
+                alt={article.sourceName ?? "来源"}
+                className="w-3.5 h-3.5 shrink-0 rounded-sm object-contain"
+              />
+            ) : (
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span className="truncate">{sourceLabel}</span>
+          </div>
+
+          {processingLabel && (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-500/15 px-1.5 py-0.5 rounded-md shrink-0">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {processingLabel}
             </span>
           )}
         </div>

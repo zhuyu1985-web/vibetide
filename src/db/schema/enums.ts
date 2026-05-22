@@ -127,6 +127,25 @@ export const articleStatusEnum = pgEnum("article_status", [
   "archived",
 ]);
 
+// 稿件来源类型（2026-05-22 新增）
+// original — AI 团队原创产出
+// repost   — 转载/搬运自其他网站，配合 source_name / source_url 显示
+export const articleSourceTypeEnum = pgEnum("article_source_type", [
+  "original",
+  "repost",
+]);
+
+// 稿件处理状态（卡片角标用）
+// null    — 无处理 / 已完成
+// processing — 正在跑
+// done    — 已完成（一般直接清回 null）
+// failed  — 失败
+export const articleProcessStatusEnum = pgEnum("article_process_status", [
+  "processing",
+  "done",
+  "failed",
+]);
+
 export const advisorStatusEnum = pgEnum("advisor_status", [
   "active",
   "training",

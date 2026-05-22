@@ -963,6 +963,14 @@ export interface ArticleListItem {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  // 卡片来源区
+  sourceType: "original" | "repost";
+  sourceName?: string;
+  sourceUrl?: string;
+  sourceIconUrl?: string;
+  // 处理状态徽章
+  aiAnalysisStatus?: "processing" | "done" | "failed";
+  transcodingStatus?: "processing" | "done" | "failed";
 }
 
 export interface ArticleDetail extends ArticleListItem {

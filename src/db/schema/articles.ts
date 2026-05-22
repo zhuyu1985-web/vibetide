@@ -14,7 +14,11 @@ import { tasks } from "./tasks";
 import { missions } from "./missions";
 import { mediaAssets } from "./media-assets";
 import { hotTopics } from "./hot-topics";
-import { articleStatusEnum } from "./enums";
+import {
+  articleStatusEnum,
+  articleSourceTypeEnum,
+  articleProcessStatusEnum,
+} from "./enums";
 
 export const articles = pgTable("articles", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -61,6 +65,14 @@ export const articles = pgTable("articles", {
     () => hotTopics.id,
   ),
   externalPublishStatus: text("external_publish_status"),
+
+  // 卡片来源区 + 处理状态徽章（2026-05-22 新增）
+  sourceType: articleSourceTypeEnum("source_type").notNull().default("original"),
+  sourceName: text("source_name"),
+  sourceUrl: text("source_url"),
+  sourceIconUrl: text("source_icon_url"),
+  aiAnalysisStatus: articleProcessStatusEnum("ai_analysis_status"),
+  transcodingStatus: articleProcessStatusEnum("transcoding_status"),
 
   spreadData: jsonb("spread_data").$type<{
     views?: number;

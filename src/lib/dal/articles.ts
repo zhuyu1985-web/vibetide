@@ -95,6 +95,12 @@ export async function getArticles(): Promise<ArticleListItem[]> {
     tags: (r.tags as string[]) || [],
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
+    sourceType: r.sourceType,
+    sourceName: r.sourceName ?? undefined,
+    sourceUrl: r.sourceUrl ?? undefined,
+    sourceIconUrl: r.sourceIconUrl ?? undefined,
+    aiAnalysisStatus: r.aiAnalysisStatus ?? undefined,
+    transcodingStatus: r.transcodingStatus ?? undefined,
   }));
 }
 
@@ -144,6 +150,12 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
     tags: (row.tags as string[]) || [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    sourceType: row.sourceType,
+    sourceName: row.sourceName ?? undefined,
+    sourceUrl: row.sourceUrl ?? undefined,
+    sourceIconUrl: row.sourceIconUrl ?? undefined,
+    aiAnalysisStatus: row.aiAnalysisStatus ?? undefined,
+    transcodingStatus: row.transcodingStatus ?? undefined,
     body: row.body || undefined,
     summary: row.summary || undefined,
     imageNotes: row.content?.imageNotes,
@@ -177,5 +189,11 @@ export async function getArticlesByCategory(categoryId: string): Promise<Article
     tags: (r.tags as string[]) || [],
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
+    sourceType: r.sourceType,
+    sourceName: r.sourceName ?? undefined,
+    sourceUrl: r.sourceUrl ?? undefined,
+    sourceIconUrl: r.sourceIconUrl ?? undefined,
+    aiAnalysisStatus: r.aiAnalysisStatus ?? undefined,
+    transcodingStatus: r.transcodingStatus ?? undefined,
   }));
 }
