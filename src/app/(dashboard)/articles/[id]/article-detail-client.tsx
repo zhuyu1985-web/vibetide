@@ -21,6 +21,11 @@ import { useAnnotations } from "./features/annotations/use-annotations";
 import { VideoPlayer } from "./features/video-player/video-player";
 import { TranscriptPanel } from "./features/transcript/transcript-panel";
 import { ExternalPublishPanel } from "@/components/articles/external-publish-panel";
+// Phase 2.3 — 4 个新 panel
+import { ArticleInfoPanel } from "./features/info/article-info-panel";
+import { ChannelRewritePanel } from "./features/channels/channel-rewrite-panel";
+import { MediaLibraryPanel } from "./features/library/media-library-panel";
+import { AigcAppsPanel } from "./features/aigc/aigc-apps-panel";
 import {
   MOCK_VIDEO_URL,
   MOCK_CHAPTERS,
@@ -91,10 +96,26 @@ export default function ArticleDetailClient({
     return () => el.removeEventListener("scroll", handler);
   }, []);
 
-  // Build right panel tabs dynamically
+  // Build right panel tabs dynamically — Phase 2.3 加 info / channels
   const rightTabs = isVideo
-    ? (["analysis", "annotations", "transcript"] as const)
-    : (["analysis", "annotations"] as const);
+    ? (["info", "analysis", "annotations", "transcript", "channels"] as const)
+    : (["info", "analysis", "annotations", "channels"] as const);
+
+  const RIGHT_TAB_LABEL: Record<string, string> = {
+    info: "信息",
+    analysis: "解读",
+    annotations: "批注",
+    transcript: "听记",
+    channels: "渠道",
+  };
+
+  const LEFT_TAB_LABEL: Record<string, string> = {
+    outline: isVideo ? "章节" : "大纲",
+    chat: "助手",
+    history: "历史",
+    library: "素材",
+    aigc: "生成",
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
@@ -148,7 +169,7 @@ export default function ArticleDetailClient({
                 </button>
               </div>
               <div className="flex border-b border-[var(--glass-border)] text-xs">
-                {(["outline", "chat", "history"] as const).map((tab) => (
+                {(["outline", "chat", "history", "library", "aigc"] as const).map((tab) => (
                   <button
                     key={tab}
                     className={cn(
@@ -159,13 +180,7 @@ export default function ArticleDetailClient({
                     )}
                     onClick={() => setLeftTab(tab)}
                   >
-                    {tab === "outline"
-                      ? isVideo
-                        ? "章节"
-                        : "大纲"
-                      : tab === "chat"
-                        ? "对话"
-                        : "历史"}
+                    {LEFT_TAB_LABEL[tab]}
                   </button>
                 ))}
               </div>
@@ -191,6 +206,8 @@ export default function ArticleDetailClient({
                 {leftTab === "history" && (
                   <ChatHistoryPanel articleId={article.id} />
                 )}
+                {leftTab === "library" && <MediaLibraryPanel />}
+                {leftTab === "aigc" && <AigcAppsPanel />}
               </div>
             </div>
           ) : (
@@ -284,15 +301,25 @@ export default function ArticleDetailClient({
                     )}
                     onClick={() => setRightTab(tab)}
                   >
-                    {tab === "analysis"
-                      ? "AI 解读"
-                      : tab === "annotations"
-                        ? "批注"
-                        : "听记"}
+                    {RIGHT_TAB_LABEL[tab]}
                   </button>
                 ))}
               </div>
               <div className="flex-1 overflow-hidden flex flex-col">
+                {rightTab === "info" && (
+                  <ArticleInfoPanel
+                    articleId={article.id}
+                    initial={{
+                      authorName: article.authorName,
+                      sourceName: article.sourceName,
+                      summary: article.summary,
+                      keywords: article.keywords,
+                      coverImageUrl: article.coverImageUrl,
+                      shareImageUrl: article.shareImageUrl,
+                      listStyle: article.listStyle,
+                    }}
+                  />
+                )}
                 {rightTab === "analysis" && (
                   <AIAnalysisPanel
                     articleId={article.id}
@@ -313,6 +340,9 @@ export default function ArticleDetailClient({
                     currentTime={videoCurrentTime}
                     onSeek={(time) => videoSeekRef.current?.(time)}
                   />
+                )}
+                {rightTab === "channels" && (
+                  <ChannelRewritePanel articleId={article.id} />
                 )}
               </div>
               {/* 海外英文稿件专属：发布到 X / Instagram / Facebook / LinkedIn 面板 */}

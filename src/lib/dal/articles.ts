@@ -102,6 +102,10 @@ export async function getArticles(): Promise<ArticleListItem[]> {
     sourceIconUrl: r.sourceIconUrl ?? undefined,
     aiAnalysisStatus: r.aiAnalysisStatus ?? undefined,
     transcodingStatus: r.transcodingStatus ?? undefined,
+    keywords: (r.keywords as string[] | null) ?? undefined,
+    coverImageUrl: r.coverImageUrl ?? undefined,
+    shareImageUrl: r.shareImageUrl ?? undefined,
+    listStyle: r.listStyle ?? undefined,
   }));
 }
 
@@ -158,6 +162,10 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
     sourceIconUrl: row.sourceIconUrl ?? undefined,
     aiAnalysisStatus: row.aiAnalysisStatus ?? undefined,
     transcodingStatus: row.transcodingStatus ?? undefined,
+    keywords: (row.keywords as string[] | null) ?? undefined,
+    coverImageUrl: row.coverImageUrl ?? undefined,
+    shareImageUrl: row.shareImageUrl ?? undefined,
+    listStyle: row.listStyle ?? undefined,
     body: row.body || undefined,
     summary: row.summary || undefined,
     imageNotes: row.content?.imageNotes,
@@ -198,5 +206,9 @@ export async function getArticlesByCategory(categoryId: string): Promise<Article
     sourceIconUrl: r.sourceIconUrl ?? undefined,
     aiAnalysisStatus: r.aiAnalysisStatus ?? undefined,
     transcodingStatus: r.transcodingStatus ?? undefined,
+    keywords: (r.keywords as string[] | null) ?? undefined,
+    coverImageUrl: r.coverImageUrl ?? undefined,
+    shareImageUrl: r.shareImageUrl ?? undefined,
+    listStyle: r.listStyle ?? undefined,
   }));
 }

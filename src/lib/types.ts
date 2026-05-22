@@ -972,6 +972,11 @@ export interface ArticleListItem {
   // 处理状态徽章
   aiAnalysisStatus?: "processing" | "done" | "failed";
   transcodingStatus?: "processing" | "done" | "failed";
+  // 编辑器「基本信息」面板字段（Phase 2.1）
+  keywords?: string[];
+  coverImageUrl?: string;
+  shareImageUrl?: string;
+  listStyle?: string;
 }
 
 export interface ArticleDetail extends ArticleListItem {

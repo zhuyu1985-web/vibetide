@@ -102,6 +102,7 @@ interface EditorToolbarProps {
   isSaving: boolean;
   isDirty: boolean;
   onSave: () => void;
+  onSaveAndSubmit: () => void;
   onCancel: () => void;
 }
 
@@ -239,6 +240,7 @@ export function EditorToolbar({
   isSaving,
   isDirty,
   onSave,
+  onSaveAndSubmit,
   onCancel,
 }: EditorToolbarProps) {
   const showStub = useCallback((feature: string) => {
@@ -710,6 +712,13 @@ export function EditorToolbar({
       >
         <Save className="h-3.5 w-3.5" />
         {isSaving ? "保存中…" : "保存"}
+      </button>
+      <button
+        onClick={onSaveAndSubmit}
+        disabled={isSaving}
+        className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors shrink-0 disabled:opacity-50"
+      >
+        保存并提交
       </button>
     </div>
   );

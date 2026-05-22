@@ -66,8 +66,8 @@ export interface ArticleDetailClientProps {
 export type ViewMode = "read" | "edit";
 export type ContentType = "article" | "video";
 export type ActiveView = "immersive" | "web" | "brief" | "archive";
-export type LeftTab = "outline" | "chat" | "history";
-export type RightTab = "analysis" | "annotations" | "transcript";
+export type LeftTab = "outline" | "chat" | "history" | "library" | "aigc";
+export type RightTab = "analysis" | "annotations" | "transcript" | "info" | "channels";
 
 export interface AppearanceSettings {
   fontSize: number;

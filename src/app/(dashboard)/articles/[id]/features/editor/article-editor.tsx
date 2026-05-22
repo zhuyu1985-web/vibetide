@@ -24,7 +24,8 @@ import { BubbleMenuBar } from "./bubble-menu-bar";
 import { AIHighlight } from "./extensions/ai-highlight";
 import { TextStyleAttrs } from "./extensions/text-style-attrs";
 import { ParagraphAttrs } from "./extensions/paragraph-attrs";
-import { updateArticle } from "@/app/actions/articles";
+import { updateArticle, saveAndSubmitArticle } from "@/app/actions/articles";
+import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
@@ -158,6 +159,29 @@ export function ArticleEditor({
     doSave(editor.getHTML(), title);
   }, [editor, doSave, title]);
 
+  const router = useRouter();
+  const handleSaveAndSubmit = useCallback(async () => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    if (!editor) return;
+    setIsSaving(true);
+    setSaveStatus("saving");
+    try {
+      await saveAndSubmitArticle(article.id, {
+        title,
+        body: editor.getHTML(),
+      });
+      setSaveStatus("saved");
+      setIsDirty(false);
+      originalContent.current = editor.getHTML();
+      originalTitle.current = title;
+      router.refresh();
+    } catch {
+      setSaveStatus("error");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editor, title, article.id, router]);
+
   const doCancel = useCallback(() => {
     if (editor) {
       editor.commands.setContent(originalContent.current);
@@ -255,6 +279,7 @@ export function ArticleEditor({
         isSaving={isSaving}
         isDirty={isDirty}
         onSave={handleManualSave}
+        onSaveAndSubmit={handleSaveAndSubmit}
         onCancel={handleCancel}
       />
 
