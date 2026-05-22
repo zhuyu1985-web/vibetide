@@ -957,6 +957,7 @@ export interface ArticleListItem {
   status: "draft" | "reviewing" | "approved" | "published" | "archived";
   assigneeId?: string;
   assigneeName?: string;
+  authorName?: string;
   categoryId?: string;
   categoryName?: string;
   wordCount: number;

@@ -78,7 +78,7 @@ export async function getArticles(): Promise<ArticleListItem[]> {
   const rows = await db.query.articles.findMany({
     where: eq(articles.organizationId, orgId),
     orderBy: [desc(articles.updatedAt)],
-    with: { category: true, assignee: true },
+    with: { category: true, assignee: true, creator: true },
   });
 
   return rows.map((r) => ({
@@ -89,6 +89,7 @@ export async function getArticles(): Promise<ArticleListItem[]> {
     status: r.status,
     assigneeId: r.assigneeId || undefined,
     assigneeName: r.assignee?.nickname,
+    authorName: r.creator?.displayName,
     categoryId: r.categoryId || undefined,
     categoryName: r.category?.name,
     wordCount: r.wordCount || 0,
@@ -131,7 +132,7 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
 
   const row = await db.query.articles.findFirst({
     where: and(eq(articles.id, id), eq(articles.organizationId, orgId)),
-    with: { category: true, assignee: true },
+    with: { category: true, assignee: true, creator: true },
   });
 
   if (!row) return undefined;
@@ -144,6 +145,7 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
     status: row.status,
     assigneeId: row.assigneeId || undefined,
     assigneeName: row.assignee?.nickname,
+    authorName: row.creator?.displayName,
     categoryId: row.categoryId || undefined,
     categoryName: row.category?.name,
     wordCount: row.wordCount || 0,
@@ -172,7 +174,7 @@ export async function getArticlesByCategory(categoryId: string): Promise<Article
   const rows = await db.query.articles.findMany({
     where: and(eq(articles.categoryId, categoryId), eq(articles.organizationId, orgId)),
     orderBy: [desc(articles.updatedAt)],
-    with: { category: true, assignee: true },
+    with: { category: true, assignee: true, creator: true },
   });
 
   return rows.map((r) => ({
@@ -183,6 +185,7 @@ export async function getArticlesByCategory(categoryId: string): Promise<Article
     status: r.status,
     assigneeId: r.assigneeId || undefined,
     assigneeName: r.assignee?.nickname,
+    authorName: r.creator?.displayName,
     categoryId: r.categoryId || undefined,
     categoryName: r.category?.name,
     wordCount: r.wordCount || 0,
