@@ -63,6 +63,28 @@ const statusDotColor: Record<string, string> = {
   archived: "bg-gray-300",
 };
 
+/* ── 作者徽章配色 —— 10 色 palette，按名字哈希稳定取色 ── */
+const AUTHOR_BADGE_PALETTE: string[] = [
+  "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
+  "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300",
+  "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300",
+  "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300",
+  "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
+  "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+];
+
+function authorBadgeColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return AUTHOR_BADGE_PALETTE[h % AUTHOR_BADGE_PALETTE.length];
+}
+
 /* ── Thumbnail bg & icon per media type ── */
 const thumbConfig: Record<string, { bg: string; darkBg: string; iconColor: string }> = {
   article: { bg: "bg-blue-50", darkBg: "dark:bg-blue-950/30", iconColor: "text-blue-400" },
@@ -517,9 +539,15 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
             </span>
           </div>
 
-          {/* 右：作者（shrink-0，永不挤压） */}
+          {/* 右：作者徽章（颜色按名字哈希稳定取色） */}
           {article.authorName && (
-            <span className="text-[10.5px] text-gray-500 dark:text-gray-400 shrink-0 max-w-[80px] truncate">
+            <span
+              className={cn(
+                "text-[10.5px] font-medium leading-none shrink-0 max-w-[80px] truncate",
+                "px-2 py-1 rounded-full",
+                authorBadgeColor(article.authorName),
+              )}
+            >
               {article.authorName}
             </span>
           )}
