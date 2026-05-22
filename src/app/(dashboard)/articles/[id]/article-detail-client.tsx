@@ -10,6 +10,7 @@ import type { ArticleDetailClientProps } from "./types";
 import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
 import { EditorTopBar } from "./features/header/editor-top-bar";
+import { LeftOuterNav } from "./features/header/left-outer-nav";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
@@ -51,6 +52,7 @@ export default function ArticleDetailClient({
     zenMode,
     leftTab,
     rightTab,
+    leftCategory,
     toggleLeftPanel,
     toggleRightPanel,
     setLeftTab,
@@ -127,6 +129,15 @@ export default function ArticleDetailClient({
     aigc: "生成",
   };
 
+  const LEFT_CATEGORY_LABEL: Record<string, string> = {
+    ai: "✦ AI 助手",
+    library: "素材资源",
+    apps: "应用",
+    typography: "排版样式",
+    review: "智能审校",
+    storage: "稿库",
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
       {/* Reading progress bar */}
@@ -164,7 +175,9 @@ export default function ArticleDetailClient({
 
       {/* Three-column body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel */}
+        {/* 左侧 80px 外层 icon nav（仅 edit 模式显示）+ 内层 panel */}
+        {viewMode === "edit" && <LeftOuterNav />}
+
         <div
           className={cn(
             "border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl transition-all duration-300 ease-out overflow-hidden shrink-0",
@@ -174,7 +187,7 @@ export default function ArticleDetailClient({
           {leftPanelOpen ? (
             <div className="flex flex-col h-full">
               <div className="px-3 py-2 text-sm font-medium border-b border-[var(--glass-border)] flex items-center justify-between">
-                <span>✦ AI 助手</span>
+                <span>{LEFT_CATEGORY_LABEL[leftCategory]}</span>
                 <button
                   className="text-muted-foreground hover:text-foreground text-xs"
                   onClick={toggleLeftPanel}
@@ -182,47 +195,60 @@ export default function ArticleDetailClient({
                   ◀
                 </button>
               </div>
-              <div className="flex border-b border-[var(--glass-border)] text-xs">
-                {(["outline", "chat", "history", "library", "aigc"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    className={cn(
-                      "flex-1 text-center py-2 transition-colors",
-                      leftTab === tab
-                        ? "text-blue-500 border-b-2 border-blue-500"
-                        : "text-muted-foreground hover:text-foreground"
+              {/* AI 助手分类下保留原 3 个子 tab（outline/chat/history） */}
+              {leftCategory === "ai" && (
+                <>
+                  <div className="flex border-b border-[var(--glass-border)] text-xs">
+                    {(["outline", "chat", "history"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        className={cn(
+                          "flex-1 text-center py-2 transition-colors",
+                          leftTab === tab
+                            ? "text-blue-500 border-b-2 border-blue-500"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => setLeftTab(tab)}
+                      >
+                        {LEFT_TAB_LABEL[tab]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    {leftTab === "outline" &&
+                      (isVideo ? (
+                        <VideoChapters
+                          chapters={MOCK_CHAPTERS}
+                          currentTime={videoCurrentTime}
+                          onChapterClick={(time) => videoSeekRef.current?.(time)}
+                        />
+                      ) : (
+                        <OutlinePanel htmlContent={article.body ?? ""} />
+                      ))}
+                    {leftTab === "chat" && (
+                      <AIChatPanel
+                        articleId={article.id}
+                        articleContent={article.body ?? ""}
+                        viewMode={viewMode}
+                        contentType={isVideo ? "video" : "article"}
+                      />
                     )}
-                    onClick={() => setLeftTab(tab)}
-                  >
-                    {LEFT_TAB_LABEL[tab]}
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1 overflow-hidden flex flex-col">
-                {leftTab === "outline" &&
-                  (isVideo ? (
-                    <VideoChapters
-                      chapters={MOCK_CHAPTERS}
-                      currentTime={videoCurrentTime}
-                      onChapterClick={(time) => videoSeekRef.current?.(time)}
-                    />
-                  ) : (
-                    <OutlinePanel htmlContent={article.body ?? ""} />
-                  ))}
-                {leftTab === "chat" && (
-                  <AIChatPanel
-                    articleId={article.id}
-                    articleContent={article.body ?? ""}
-                    viewMode={viewMode}
-                    contentType={isVideo ? "video" : "article"}
-                  />
-                )}
-                {leftTab === "history" && (
-                  <ChatHistoryPanel articleId={article.id} />
-                )}
-                {leftTab === "library" && <MediaLibraryPanel />}
-                {leftTab === "aigc" && <AigcAppsPanel />}
-              </div>
+                    {leftTab === "history" && (
+                      <ChatHistoryPanel articleId={article.id} />
+                    )}
+                  </div>
+                </>
+              )}
+              {leftCategory === "library" && (
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <MediaLibraryPanel />
+                </div>
+              )}
+              {leftCategory === "apps" && (
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <AigcAppsPanel />
+                </div>
+              )}
             </div>
           ) : (
             <button

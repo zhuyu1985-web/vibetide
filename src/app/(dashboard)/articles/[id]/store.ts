@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Editor } from "@tiptap/react";
-import type { ViewMode, ContentType, ActiveView, LeftTab, RightTab } from "./types";
+import type { ViewMode, ContentType, ActiveView, LeftTab, RightTab, LeftCategory } from "./types";
 
 interface EditorHandlers {
   save: () => void;
@@ -16,6 +16,7 @@ interface ArticlePageStore {
   rightPanelOpen: boolean;
   leftTab: LeftTab;
   rightTab: RightTab;
+  leftCategory: LeftCategory;
   zenMode: boolean;
   selectedText: string | null;
   selectedRange: { from: number; to: number } | null;
@@ -32,6 +33,7 @@ interface ArticlePageStore {
   setActiveView: (view: ActiveView) => void;
   setLeftTab: (tab: LeftTab) => void;
   setRightTab: (tab: RightTab) => void;
+  setLeftCategory: (cat: LeftCategory) => void;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleZenMode: () => void;
@@ -49,8 +51,9 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   activeView: "immersive",
   leftPanelOpen: true,
   rightPanelOpen: true,
-  leftTab: "outline",
-  rightTab: "analysis",
+  leftTab: "chat",
+  rightTab: "info",
+  leftCategory: "ai",
   zenMode: false,
   selectedText: null,
   selectedRange: null,
@@ -66,6 +69,7 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   setActiveView: (view) => set({ activeView: view }),
   setLeftTab: (tab) => set({ leftTab: tab }),
   setRightTab: (tab) => set({ rightTab: tab }),
+  setLeftCategory: (cat) => set({ leftCategory: cat }),
   toggleLeftPanel: () => set((s) => ({ leftPanelOpen: !s.leftPanelOpen, zenMode: false })),
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen, zenMode: false })),
   toggleZenMode: () =>
