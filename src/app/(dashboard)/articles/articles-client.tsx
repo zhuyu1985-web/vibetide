@@ -489,43 +489,32 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* 来源区（浅蓝 tint，边到边）—— 高 56px，两行布局 */}
+        {/* 来源区（浅蓝 tint，边到边）—— 两行布局 */}
         <div className="relative z-10 -mx-4 px-4 py-3 bg-blue-50/55 dark:bg-blue-500/[0.06] border-t border-gray-200/80 dark:border-white/10 rounded-b-[18px]">
-          {/* 顶行：来源 icon + 名称 · 创建时间 ／ 右上角标签数 */}
-          <div className="flex items-center justify-between gap-2">
-            <div className={cn(
-              "flex items-center gap-1.5 min-w-0 text-[11px] font-medium",
-              isOriginal
-                ? "text-sky-700 dark:text-sky-300"
-                : "text-blue-700 dark:text-blue-300"
-            )}>
-              {isOriginal ? (
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              ) : article.sourceIconUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={article.sourceIconUrl}
-                  alt={article.sourceName ?? "来源"}
-                  className="w-3.5 h-3.5 shrink-0 rounded-sm object-contain"
-                />
-              ) : (
-                <Globe className="w-3.5 h-3.5 shrink-0" />
-              )}
-              <span className="truncate">{sourceLabel}</span>
-              <span className="text-gray-400 dark:text-gray-500">·</span>
-              <span className="text-gray-500 dark:text-gray-400 shrink-0 font-normal">
-                {formatDate(article.createdAt)}
-              </span>
-            </div>
-
-            {article.tags.length > 0 && (
-              <span className={cn(
-                "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium text-white shrink-0",
-                article.tags.length >= 3 ? "bg-blue-500" : article.tags.length >= 2 ? "bg-green-500" : "bg-amber-400"
-              )}>
-                {article.tags.length}
-              </span>
+          {/* 顶行：来源 icon + 名称 · 创建时间 */}
+          <div className={cn(
+            "flex items-center gap-1.5 min-w-0 text-[11px] font-medium",
+            isOriginal
+              ? "text-sky-700 dark:text-sky-300"
+              : "text-blue-700 dark:text-blue-300"
+          )}>
+            {isOriginal ? (
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            ) : article.sourceIconUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={article.sourceIconUrl}
+                alt={article.sourceName ?? "来源"}
+                className="w-3.5 h-3.5 shrink-0 rounded-sm object-contain"
+              />
+            ) : (
+              <Globe className="w-3.5 h-3.5 shrink-0" />
             )}
+            <span className="truncate">{sourceLabel}</span>
+            <span className="text-gray-400 dark:text-gray-500">·</span>
+            <span className="text-gray-500 dark:text-gray-400 shrink-0 font-normal">
+              {formatDate(article.createdAt)}
+            </span>
           </div>
 
           {/* 底行右下：作者 */}
