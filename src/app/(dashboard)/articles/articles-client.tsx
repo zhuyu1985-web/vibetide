@@ -489,11 +489,11 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* 来源区（浅蓝 tint，边到边）—— 两行布局 */}
-        <div className="relative z-10 -mx-4 px-4 py-3 bg-blue-50/55 dark:bg-blue-500/[0.06] border-t border-gray-200/80 dark:border-white/10 rounded-b-[18px]">
-          {/* 顶行：来源 icon + 名称 · 创建时间 */}
+        {/* 来源区（浅蓝 tint，边到边）—— 单行布局，左来源右作者 */}
+        <div className="relative z-10 -mx-4 px-4 py-3 bg-blue-50/55 dark:bg-blue-500/[0.06] border-t border-gray-200/80 dark:border-white/10 rounded-b-[18px] flex items-center gap-2">
+          {/* 左：来源 icon + 名称 · 创建时间（flex-1 + truncate，过长省略） */}
           <div className={cn(
-            "flex items-center gap-1.5 min-w-0 text-[11px] font-medium",
+            "flex items-center gap-1.5 min-w-0 flex-1 text-[11px] font-medium",
             isOriginal
               ? "text-sky-700 dark:text-sky-300"
               : "text-blue-700 dark:text-blue-300"
@@ -510,18 +510,18 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
             ) : (
               <Globe className="w-3.5 h-3.5 shrink-0" />
             )}
-            <span className="truncate">{sourceLabel}</span>
-            <span className="text-gray-400 dark:text-gray-500">·</span>
+            <span className="truncate min-w-0">{sourceLabel}</span>
+            <span className="text-gray-400 dark:text-gray-500 shrink-0">·</span>
             <span className="text-gray-500 dark:text-gray-400 shrink-0 font-normal">
               {formatDate(article.createdAt)}
             </span>
           </div>
 
-          {/* 底行右下：作者 */}
+          {/* 右：作者（shrink-0，永不挤压） */}
           {article.authorName && (
-            <div className="mt-1.5 flex items-center justify-end text-[10.5px] text-gray-500 dark:text-gray-400">
-              <span className="truncate">作者：{article.authorName}</span>
-            </div>
+            <span className="text-[10.5px] text-gray-500 dark:text-gray-400 shrink-0 max-w-[80px] truncate">
+              {article.authorName}
+            </span>
           )}
         </div>
       </div>
