@@ -365,7 +365,9 @@ export function EditorToolbar({
   };
 
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl overflow-x-auto shrink-0">
+    <div className="border-b border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl shrink-0">
+    {/* Row 1：格式化指令 */}
+    <div className="flex items-center gap-0.5 px-2 py-1.5 overflow-x-auto">
       {/* 撤销 / 重做 */}
       <ToolbarIconButton
         icon={<Undo2 className="h-4 w-4" />}
@@ -659,9 +661,10 @@ export function EditorToolbar({
         label="分割线"
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
       />
-      <Divider />
+    </div>
 
-      {/* 插入 */}
+    {/* Row 2：插入指令（链接 / 图片 / 视频 / 音频 / 文件 / 导入） */}
+    <div className="flex items-center gap-0.5 px-2 pb-1.5 overflow-x-auto border-t border-[var(--glass-border)]/40">
       <ToolbarIconButton
         icon={<Link2 className="h-4 w-4" />}
         label="超链接"
@@ -688,38 +691,11 @@ export function EditorToolbar({
         label="导入文章（即将上线）"
         onClick={() => showStub("导入文章")}
       />
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* 保存 / 取消 */}
-      <button
-        onClick={onCancel}
-        className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors shrink-0"
-      >
-        <X className="h-3.5 w-3.5" />
-        取消
-      </button>
-      <button
-        onClick={onSave}
-        disabled={isSaving || !isDirty}
-        className={cn(
-          "flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors shrink-0",
-          isDirty
-            ? "bg-green-500/15 text-green-600 hover:bg-green-500/25"
-            : "text-muted-foreground opacity-50",
-        )}
-      >
-        <Save className="h-3.5 w-3.5" />
-        {isSaving ? "保存中…" : "保存"}
-      </button>
-      <button
-        onClick={onSaveAndSubmit}
-        disabled={isSaving}
-        className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors shrink-0 disabled:opacity-50"
-      >
-        保存并提交
-      </button>
+      {/* 顶栏已有「保存」「保存并提交」「关闭」按钮，工具栏不再重复 */}
+      <span aria-hidden className="hidden">
+        {String(isSaving)}{String(isDirty)}{typeof onSave}{typeof onSaveAndSubmit}{typeof onCancel}
+      </span>
+    </div>
     </div>
   );
 }
