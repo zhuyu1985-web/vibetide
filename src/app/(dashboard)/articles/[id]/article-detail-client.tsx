@@ -17,6 +17,7 @@ import { OutlinePanel } from "./features/outline/outline-panel";
 import { VideoChapters } from "./features/outline/video-chapters";
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
 import { ChatHistoryPanel } from "./features/ai-chat/chat-history-panel";
+import { CreationAssistantPanel } from "./features/ai-chat/creation-assistant-panel";
 import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
 import { AnnotationsPanel } from "./features/annotations/annotations-panel";
 import { FloatingNote } from "./features/annotations/floating-note";
@@ -195,49 +196,55 @@ export default function ArticleDetailClient({
                   ◀
                 </button>
               </div>
-              {/* AI 助手分类下保留原 3 个子 tab（outline/chat/history） */}
+              {/* AI 助手分类：
+                  - edit 模式 → 创作助手 panel（参考图 #5：装饰头 + 热点列表 + prompt）
+                  - read 模式 → 原 outline/chat/history 三子 tab */}
               {leftCategory === "ai" && (
-                <>
-                  <div className="flex border-b border-[var(--glass-border)] text-xs">
-                    {(["outline", "chat", "history"] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        className={cn(
-                          "flex-1 text-center py-2 transition-colors",
-                          leftTab === tab
-                            ? "text-blue-500 border-b-2 border-blue-500"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        onClick={() => setLeftTab(tab)}
-                      >
-                        {LEFT_TAB_LABEL[tab]}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    {leftTab === "outline" &&
-                      (isVideo ? (
-                        <VideoChapters
-                          chapters={MOCK_CHAPTERS}
-                          currentTime={videoCurrentTime}
-                          onChapterClick={(time) => videoSeekRef.current?.(time)}
-                        />
-                      ) : (
-                        <OutlinePanel htmlContent={article.body ?? ""} />
+                viewMode === "edit" ? (
+                  <CreationAssistantPanel articleId={article.id} />
+                ) : (
+                  <>
+                    <div className="flex border-b border-[var(--glass-border)] text-xs">
+                      {(["outline", "chat", "history"] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          className={cn(
+                            "flex-1 text-center py-2 transition-colors",
+                            leftTab === tab
+                              ? "text-blue-500 border-b-2 border-blue-500"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                          onClick={() => setLeftTab(tab)}
+                        >
+                          {LEFT_TAB_LABEL[tab]}
+                        </button>
                       ))}
-                    {leftTab === "chat" && (
-                      <AIChatPanel
-                        articleId={article.id}
-                        articleContent={article.body ?? ""}
-                        viewMode={viewMode}
-                        contentType={isVideo ? "video" : "article"}
-                      />
-                    )}
-                    {leftTab === "history" && (
-                      <ChatHistoryPanel articleId={article.id} />
-                    )}
-                  </div>
-                </>
+                    </div>
+                    <div className="flex-1 overflow-hidden flex flex-col">
+                      {leftTab === "outline" &&
+                        (isVideo ? (
+                          <VideoChapters
+                            chapters={MOCK_CHAPTERS}
+                            currentTime={videoCurrentTime}
+                            onChapterClick={(time) => videoSeekRef.current?.(time)}
+                          />
+                        ) : (
+                          <OutlinePanel htmlContent={article.body ?? ""} />
+                        ))}
+                      {leftTab === "chat" && (
+                        <AIChatPanel
+                          articleId={article.id}
+                          articleContent={article.body ?? ""}
+                          viewMode={viewMode}
+                          contentType={isVideo ? "video" : "article"}
+                        />
+                      )}
+                      {leftTab === "history" && (
+                        <ChatHistoryPanel articleId={article.id} />
+                      )}
+                    </div>
+                  </>
+                )
               )}
               {leftCategory === "library" && (
                 <div className="flex-1 overflow-hidden flex flex-col">
