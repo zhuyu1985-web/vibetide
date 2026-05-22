@@ -74,6 +74,12 @@ export const articles = pgTable("articles", {
   aiAnalysisStatus: articleProcessStatusEnum("ai_analysis_status"),
   transcodingStatus: articleProcessStatusEnum("transcoding_status"),
 
+  // 编辑器三栏「基本信息」面板字段（Phase 2.1）
+  keywords: jsonb("keywords").$type<string[]>().default([]),
+  coverImageUrl: text("cover_image_url"),
+  shareImageUrl: text("share_image_url"),
+  listStyle: text("list_style"),  // 'default' | 'single_image' | 'multi_image' | 'title' | 'narrow' | 'seamless'
+
   spreadData: jsonb("spread_data").$type<{
     views?: number;
     likes?: number;

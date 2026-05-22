@@ -88,6 +88,9 @@ export * from "./cms-publications";
 
 // 海外英文发布（2026-05-22）— article → Ayrshare 外站发布流水
 export * from "./external-publications";
+
+// 稿件编辑器 Phase 2.1（2026-05-22）— per-channel 改写版本
+export * from "./article-channel-variants";
 // app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
