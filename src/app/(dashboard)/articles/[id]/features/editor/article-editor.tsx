@@ -237,6 +237,9 @@ export function ArticleEditor({
 
   // Register editor instance in store for cross-panel access
   const setEditorInstance = useArticlePageStore((s) => s.setEditorInstance);
+  const setEditorState = useArticlePageStore((s) => s.setEditorState);
+  const setEditorHandlers = useArticlePageStore((s) => s.setEditorHandlers);
+
   useEffect(() => {
     if (editor) {
       setEditorInstance(editor);
@@ -245,6 +248,23 @@ export function ArticleEditor({
       setEditorInstance(null);
     };
   }, [editor, setEditorInstance]);
+
+  // 把 isSaving / isDirty 推到 store，让顶部 EditorTopBar 同步显示
+  useEffect(() => {
+    setEditorState({ isSaving, isDirty });
+  }, [isSaving, isDirty, setEditorState]);
+
+  // 把 save / saveAndSubmit / cancel handler 注册到 store
+  useEffect(() => {
+    setEditorHandlers({
+      save: handleManualSave,
+      saveAndSubmit: handleSaveAndSubmit,
+      cancel: handleCancel,
+    });
+    return () => {
+      setEditorHandlers(null);
+    };
+  }, [handleManualSave, handleSaveAndSubmit, handleCancel, setEditorHandlers]);
 
   // Title change triggers dirty state + auto-save
   const handleTitleChange = (newTitle: string) => {

@@ -9,6 +9,7 @@ import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
 import type { ArticleDetailClientProps } from "./types";
 import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
+import { EditorTopBar } from "./features/header/editor-top-bar";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
 import { OutlinePanel } from "./features/outline/outline-panel";
@@ -149,13 +150,17 @@ export default function ArticleDetailClient({
         </div>
       )}
 
-      {/* Header */}
-      <ArticleHeader
-        article={article}
-        annotationCount={annotations.length}
-        appearance={appearance}
-        onUpdateAppearance={setAppearance}
-      />
+      {/* Header — edit 模式用品牌顶栏，read 模式保留原 breadcrumb header */}
+      {viewMode === "edit" ? (
+        <EditorTopBar articleId={article.id} />
+      ) : (
+        <ArticleHeader
+          article={article}
+          annotationCount={annotations.length}
+          appearance={appearance}
+          onUpdateAppearance={setAppearance}
+        />
+      )}
 
       {/* Three-column body */}
       <div className="flex flex-1 overflow-hidden">

@@ -2,6 +2,12 @@ import { create } from "zustand";
 import type { Editor } from "@tiptap/react";
 import type { ViewMode, ContentType, ActiveView, LeftTab, RightTab } from "./types";
 
+interface EditorHandlers {
+  save: () => void;
+  saveAndSubmit: () => void;
+  cancel: () => void;
+}
+
 interface ArticlePageStore {
   viewMode: ViewMode;
   contentType: ContentType;
@@ -16,6 +22,10 @@ interface ArticlePageStore {
   scrollToPosition: number | null;
   highlightAnnotationId: string | null;
   editorInstance: Editor | null;
+  // 顶部品牌栏与编辑器之间共享的状态/handler
+  editorIsSaving: boolean;
+  editorIsDirty: boolean;
+  editorHandlers: EditorHandlers | null;
 
   setViewMode: (mode: ViewMode) => void;
   setContentType: (type: ContentType) => void;
@@ -29,6 +39,8 @@ interface ArticlePageStore {
   scrollToAnnotation: (annotationId: string) => void;
   clearScrollTarget: () => void;
   setEditorInstance: (editor: Editor | null) => void;
+  setEditorState: (state: { isSaving?: boolean; isDirty?: boolean }) => void;
+  setEditorHandlers: (handlers: EditorHandlers | null) => void;
 }
 
 export const useArticlePageStore = create<ArticlePageStore>((set) => ({
@@ -45,6 +57,9 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   scrollToPosition: null,
   highlightAnnotationId: null,
   editorInstance: null,
+  editorIsSaving: false,
+  editorIsDirty: false,
+  editorHandlers: null,
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setContentType: (type) => set({ contentType: type }),
@@ -63,4 +78,10 @@ export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   scrollToAnnotation: (id) => set({ highlightAnnotationId: id, scrollToPosition: Date.now() }),
   clearScrollTarget: () => set({ highlightAnnotationId: null, scrollToPosition: null }),
   setEditorInstance: (editor) => set({ editorInstance: editor }),
+  setEditorState: (state) =>
+    set((s) => ({
+      editorIsSaving: state.isSaving ?? s.editorIsSaving,
+      editorIsDirty: state.isDirty ?? s.editorIsDirty,
+    })),
+  setEditorHandlers: (handlers) => set({ editorHandlers: handlers }),
 }));
