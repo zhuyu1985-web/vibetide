@@ -13,6 +13,7 @@ import { aiEmployees } from "./ai-employees";
 import { tasks } from "./tasks";
 import { missions } from "./missions";
 import { mediaAssets } from "./media-assets";
+import { hotTopics } from "./hot-topics";
 import { articleStatusEnum } from "./enums";
 
 export const articles = pgTable("articles", {
@@ -53,6 +54,14 @@ export const articles = pgTable("articles", {
   taskId: uuid("task_id").references(() => tasks.id),
   missionId: uuid("mission_id").references(() => missions.id),
   publishChannels: jsonb("publish_channels").$type<string[]>().default([]),
+
+  // Cross-language + external publish (2026-05-22)
+  language: text("language").notNull().default("zh"),
+  translatedFromTopicId: uuid("translated_from_topic_id").references(
+    () => hotTopics.id,
+  ),
+  externalPublishStatus: text("external_publish_status"),
+
   spreadData: jsonb("spread_data").$type<{
     views?: number;
     likes?: number;

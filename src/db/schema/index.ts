@@ -85,6 +85,9 @@ export * from "./media-outlet-dictionary";
 export * from "./cms-mapping";
 // CMS Adapter Phase 1 — Task 11：article → CMS 入稿流水
 export * from "./cms-publications";
+
+// 海外英文发布（2026-05-22）— article → Ayrshare 外站发布流水
+export * from "./external-publications";
 // app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
