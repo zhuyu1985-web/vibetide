@@ -35,6 +35,11 @@ export async function updateArticle(articleId: string, data: {
   tags?: string[];
   priority?: string;
   mediaType?: string;
+  // Phase 2.1 新增字段
+  keywords?: string[];
+  coverImageUrl?: string | null;
+  shareImageUrl?: string | null;
+  listStyle?: string | null;
 }) {
   await requireAuth();
   const updates: Record<string, unknown> = { ...data, updatedAt: new Date() };
@@ -50,6 +55,38 @@ export async function updateArticle(articleId: string, data: {
         imageNotes: (existing.content as { imageNotes?: string[] })?.imageNotes || [],
       };
     }
+  }
+  await db.update(articles).set(updates).where(eq(articles.id, articleId));
+  revalidatePath("/articles");
+  revalidatePath(`/articles/${articleId}`);
+}
+
+/**
+ * 保存正文 + 切换状态到 reviewing（提交审核）。
+ * 编辑器顶部「保存并提交」按钮使用。
+ */
+export async function saveAndSubmitArticle(
+  articleId: string,
+  data: { title?: string; body?: string; summary?: string },
+) {
+  await requireAuth();
+  const existing = await db.query.articles.findFirst({
+    where: eq(articles.id, articleId),
+  });
+  if (!existing) throw new Error("Article not found");
+
+  const updates: Record<string, unknown> = {
+    ...data,
+    status: "reviewing",
+    updatedAt: new Date(),
+  };
+  if (data.body !== undefined) {
+    updates.wordCount = data.body.length;
+    updates.content = {
+      headline: data.title || existing.title,
+      body: data.body,
+      imageNotes: (existing.content as { imageNotes?: string[] })?.imageNotes || [],
+    };
   }
   await db.update(articles).set(updates).where(eq(articles.id, articleId));
   revalidatePath("/articles");
