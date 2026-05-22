@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { PermissionGate } from "@/components/shared/permission-gate";
@@ -28,8 +28,27 @@ import {
   Image as ImageIcon,
   Sparkles,
   Loader2,
+  Check,
+  Trash2,
+  FolderInput,
+  X,
 } from "lucide-react";
 import type { ArticleListItem, ArticleStats, CategoryNode } from "@/lib/types";
+import {
+  batchDeleteArticles,
+  batchUpdateArticleStatus,
+  batchMoveArticlesToCategory,
+} from "@/app/actions/articles";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Props {
   articles: ArticleListItem[];
@@ -110,6 +129,26 @@ export default function ArticlesClient({ articles, stats, categories }: Props) {
   const [mediaTypeDropdownOpen, setMediaTypeDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"updated" | "created" | "title">("updated");
+
+  // ── 批量选择状态 ──
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [moveDropdownOpen, setMoveDropdownOpen] = useState(false);
+  const [batchPending, startBatchTransition] = useTransition();
+
+  // 切换筛选条件时清空选择，避免误操作 / 隐藏项被批量处理
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeStatus, activeCategory, activeMediaType, search]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const archivedCount = useMemo(
     () => articles.filter((a) => a.status === "archived").length,
@@ -379,14 +418,50 @@ export default function ArticlesClient({ articles, stats, categories }: Props) {
 
         {/* ── Content ── */}
         <div className="flex-1 overflow-y-auto bg-[#f9fafb] dark:bg-transparent">
-          {/* Section Header */}
-          <div className="flex items-baseline justify-between px-6 pt-5 pb-3">
-            <h3 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
-              {activeSectionLabel}
-            </h3>
-            <span className="text-[13px] text-gray-400 dark:text-gray-500 tabular-nums">
-              {filteredArticles.length} / {stats.totalCount}
-            </span>
+          {/* Section Header / Batch Action Bar */}
+          <div className="px-6 pt-5 pb-3">
+            {selectedIds.size > 0 ? (
+              <BatchActionBar
+                selectedCount={selectedIds.size}
+                allOnPageSelected={
+                  filteredArticles.length > 0 &&
+                  filteredArticles.every((a) => selectedIds.has(a.id))
+                }
+                filteredCount={filteredArticles.length}
+                categories={categories}
+                pending={batchPending}
+                moveDropdownOpen={moveDropdownOpen}
+                onMoveDropdownToggle={setMoveDropdownOpen}
+                onSelectAllToggle={() => {
+                  const allSelected = filteredArticles.every((a) => selectedIds.has(a.id));
+                  setSelectedIds(allSelected ? new Set() : new Set(filteredArticles.map((a) => a.id)));
+                }}
+                onClear={() => setSelectedIds(new Set())}
+                onMoveTo={(categoryId) => {
+                  startBatchTransition(async () => {
+                    await batchMoveArticlesToCategory(Array.from(selectedIds), categoryId);
+                    setSelectedIds(new Set());
+                    setMoveDropdownOpen(false);
+                  });
+                }}
+                onArchive={() => {
+                  startBatchTransition(async () => {
+                    await batchUpdateArticleStatus(Array.from(selectedIds), "archived");
+                    setSelectedIds(new Set());
+                  });
+                }}
+                onDeleteRequest={() => setDeleteDialogOpen(true)}
+              />
+            ) : (
+              <div className="flex items-baseline justify-between">
+                <h3 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+                  {activeSectionLabel}
+                </h3>
+                <span className="text-[13px] text-gray-400 dark:text-gray-500 tabular-nums">
+                  {filteredArticles.length} / {stats.totalCount}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Grid / List */}
@@ -394,13 +469,25 @@ export default function ArticlesClient({ articles, stats, categories }: Props) {
             viewMode === "grid" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-6 pb-6">
                 {filteredArticles.map((article) => (
-                  <ArticleCard key={article.id} article={article} />
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    selected={selectedIds.has(article.id)}
+                    selectionMode={selectedIds.size > 0}
+                    onToggleSelect={toggleSelect}
+                  />
                 ))}
               </div>
             ) : (
               <div className="space-y-2 px-6 pb-6">
                 {filteredArticles.map((article) => (
-                  <ArticleListRow key={article.id} article={article} />
+                  <ArticleListRow
+                    key={article.id}
+                    article={article}
+                    selected={selectedIds.has(article.id)}
+                    selectionMode={selectedIds.size > 0}
+                    onToggleSelect={toggleSelect}
+                  />
                 ))}
               </div>
             )
@@ -411,6 +498,35 @@ export default function ArticlesClient({ articles, stats, categories }: Props) {
             </div>
           )}
         </div>
+
+        {/* 批量删除确认对话框 */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除 {selectedIds.size} 篇稿件？</AlertDialogTitle>
+              <AlertDialogDescription>
+                此操作不可撤销。被选中的稿件以及关联的注释、AI 分析、聊天记录将一并清除。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={batchPending}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  startBatchTransition(async () => {
+                    await batchDeleteArticles(Array.from(selectedIds));
+                    setSelectedIds(new Set());
+                    setDeleteDialogOpen(false);
+                  });
+                }}
+                disabled={batchPending}
+                className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+              >
+                {batchPending ? "删除中..." : "确认删除"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -445,7 +561,17 @@ function ToolbarButton({
 }
 
 /* ── Article Card (Grid View) ── */
-function ArticleCard({ article }: { article: ArticleListItem }) {
+function ArticleCard({
+  article,
+  selected,
+  selectionMode,
+  onToggleSelect,
+}: {
+  article: ArticleListItem;
+  selected: boolean;
+  selectionMode: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
   const dotColor = statusDotColor[article.status] || "bg-gray-400";
   const tc = thumbConfig[article.mediaType] || thumbConfig.article;
   const TIcon = ThumbIcon[article.mediaType] || FileText;
@@ -463,8 +589,34 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
       : null;
 
   return (
-    <Link href={`/articles/${article.id}`} className="group block h-full">
-      <div className="glass-card-interactive p-4 pb-0 h-full flex flex-col overflow-hidden !border-gray-200/85 dark:!border-white/10">
+    <div className="relative group h-full">
+      {/* 选择 checkbox — 进入批量模式或 hover 时显示 */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleSelect(article.id);
+        }}
+        aria-label={selected ? "取消选择" : "选择稿件"}
+        className={cn(
+          "absolute top-3 left-3 z-20 w-5 h-5 rounded-md flex items-center justify-center transition-all",
+          selected
+            ? "bg-blue-500 text-white shadow-sm opacity-100"
+            : cn(
+                "bg-white/90 dark:bg-gray-800/85 ring-1 ring-gray-300 dark:ring-gray-600",
+                selectionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              ),
+        )}
+      >
+        {selected && <Check size={12} strokeWidth={3} />}
+      </button>
+
+    <Link href={`/articles/${article.id}`} className="block h-full">
+      <div className={cn(
+        "glass-card-interactive p-4 pb-0 h-full flex flex-col overflow-hidden !border-gray-200/85 dark:!border-white/10",
+        selected && "!border-blue-400 dark:!border-blue-400 ring-2 ring-blue-400/40"
+      )}>
         {/* Top: Title + Thumbnail side by side */}
         <div className="flex gap-3 mb-2">
           {/* Left: Title + Description */}
@@ -554,16 +706,52 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
         </div>
       </div>
     </Link>
+    </div>
   );
 }
 
 /* ── Article List Row ── */
-function ArticleListRow({ article }: { article: ArticleListItem }) {
+function ArticleListRow({
+  article,
+  selected,
+  selectionMode,
+  onToggleSelect,
+}: {
+  article: ArticleListItem;
+  selected: boolean;
+  selectionMode: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
   const dotColor = statusDotColor[article.status] || "bg-gray-400";
 
   return (
-    <Link href={`/articles/${article.id}`} className="group block">
-      <div className="glass-card-interactive flex items-center gap-4 px-5 py-3.5">
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleSelect(article.id);
+        }}
+        aria-label={selected ? "取消选择" : "选择稿件"}
+        className={cn(
+          "absolute top-1/2 -translate-y-1/2 left-3 z-20 w-5 h-5 rounded-md flex items-center justify-center transition-all",
+          selected
+            ? "bg-blue-500 text-white shadow-sm opacity-100"
+            : cn(
+                "bg-white/90 dark:bg-gray-800/85 ring-1 ring-gray-300 dark:ring-gray-600",
+                selectionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              ),
+        )}
+      >
+        {selected && <Check size={12} strokeWidth={3} />}
+      </button>
+    <Link href={`/articles/${article.id}`} className="block">
+      <div className={cn(
+        "glass-card-interactive flex items-center gap-4 px-5 py-3.5",
+        selectionMode && "pl-10",
+        selected && "!border-blue-400 dark:!border-blue-400 ring-2 ring-blue-400/40",
+      )}>
         <div className="relative z-10 flex-1 min-w-0">
           <h4 className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {article.title}
@@ -580,16 +768,138 @@ function ArticleListRow({ article }: { article: ArticleListItem }) {
           <span>{formatDate(article.updatedAt)}</span>
         </div>
 
-        {article.tags.length > 0 && (
-          <span className={cn(
-            "relative z-10 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium text-white shrink-0",
-            article.tags.length >= 3 ? "bg-blue-500" : article.tags.length >= 2 ? "bg-green-500" : "bg-amber-400"
-          )}>
-            {article.tags.length}
-          </span>
-        )}
       </div>
     </Link>
+    </div>
+  );
+}
+
+/* ── 批量操作栏 ── */
+function BatchActionBar({
+  selectedCount,
+  allOnPageSelected,
+  filteredCount,
+  categories,
+  pending,
+  moveDropdownOpen,
+  onMoveDropdownToggle,
+  onSelectAllToggle,
+  onClear,
+  onMoveTo,
+  onArchive,
+  onDeleteRequest,
+}: {
+  selectedCount: number;
+  allOnPageSelected: boolean;
+  filteredCount: number;
+  categories: CategoryNode[];
+  pending: boolean;
+  moveDropdownOpen: boolean;
+  onMoveDropdownToggle: (open: boolean) => void;
+  onSelectAllToggle: () => void;
+  onClear: () => void;
+  onMoveTo: (categoryId: string | null) => void;
+  onArchive: () => void;
+  onDeleteRequest: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 -my-1">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onSelectAllToggle}
+          className="flex items-center gap-2 text-[13px] text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+        >
+          <span className={cn(
+            "w-5 h-5 rounded-md flex items-center justify-center transition-colors",
+            allOnPageSelected
+              ? "bg-blue-500 text-white"
+              : "bg-white dark:bg-gray-800 ring-1 ring-gray-300 dark:ring-gray-600"
+          )}>
+            {allOnPageSelected && <Check size={12} strokeWidth={3} />}
+          </span>
+          {allOnPageSelected ? "取消全选" : "全选当前页"}
+        </button>
+        <span className="text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">
+          已选 <span className="font-semibold text-blue-600 dark:text-blue-400">{selectedCount}</span> / {filteredCount}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        {/* 移到栏目 */}
+        <div className="relative">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onMoveDropdownToggle(!moveDropdownOpen)}
+            className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+          >
+            <FolderInput size={14} />
+            <span>移到栏目</span>
+            <ChevronDown size={12} />
+          </button>
+          {moveDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-[999]" onClick={() => onMoveDropdownToggle(false)} />
+              <div className="absolute right-0 top-full mt-1 z-[1000] w-44 py-1.5 rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10 max-h-[280px] overflow-y-auto">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => onMoveTo(cat.id)}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <FolderOpen size={14} className="text-gray-400" />
+                    <span className="truncate">{cat.name}</span>
+                  </button>
+                ))}
+                {categories.length > 0 && <div className="h-px bg-gray-100 dark:bg-white/10 my-1" />}
+                <button
+                  type="button"
+                  onClick={() => onMoveTo(null)}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                >
+                  <Inbox size={14} className="text-gray-400" />
+                  <span>移出栏目</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 归档 */}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onArchive}
+          className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+        >
+          <Archive size={14} />
+          <span>归档</span>
+        </button>
+
+        {/* 删除 */}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onDeleteRequest}
+          className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
+        >
+          <Trash2 size={14} />
+          <span>删除</span>
+        </button>
+
+        {/* 取消选择 */}
+        <button
+          type="button"
+          onClick={onClear}
+          className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+          aria-label="取消选择"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 

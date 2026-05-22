@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { articles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 export async function createArticle(data: {
@@ -74,8 +74,33 @@ export async function deleteArticle(articleId: string) {
 
 export async function batchUpdateArticleStatus(articleIds: string[], status: "draft" | "reviewing" | "approved" | "published" | "archived") {
   await requireAuth();
-  for (const id of articleIds) {
-    await db.update(articles).set({ status, updatedAt: new Date() }).where(eq(articles.id, id));
-  }
+  if (articleIds.length === 0) return { count: 0 };
+  const updates: Record<string, unknown> = { status, updatedAt: new Date() };
+  if (status === "published") updates.publishedAt = new Date();
+  if (status === "archived") updates.archivedAt = new Date();
+  await db.update(articles).set(updates).where(inArray(articles.id, articleIds));
   revalidatePath("/articles");
+  return { count: articleIds.length };
+}
+
+export async function batchDeleteArticles(articleIds: string[]) {
+  await requireAuth();
+  if (articleIds.length === 0) return { count: 0 };
+  await db.delete(articles).where(inArray(articles.id, articleIds));
+  revalidatePath("/articles");
+  return { count: articleIds.length };
+}
+
+export async function batchMoveArticlesToCategory(
+  articleIds: string[],
+  categoryId: string | null,
+) {
+  await requireAuth();
+  if (articleIds.length === 0) return { count: 0 };
+  await db
+    .update(articles)
+    .set({ categoryId: categoryId ?? null, updatedAt: new Date() })
+    .where(inArray(articles.id, articleIds));
+  revalidatePath("/articles");
+  return { count: articleIds.length };
 }
