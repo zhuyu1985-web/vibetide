@@ -2205,6 +2205,71 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(4, "热点图文成稿", "content_generate", "内容生成", "content_gen", "write"),
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 公共场景 · 海外热榜搬运（B3 / 2026-05-22）
+  // 设计文档：/Users/zhuyu/.claude/plans/tophub-x-instagram-twitter-sunny-papert.md
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    slug: "hot_topics_overseas_en",
+    name: "海外热榜搬运",
+    description:
+      "拉 24h 国内热榜 → AI 过滤美食/萌宠/国内科技 → 中翻英改写 → 入海外英文栏目 → 编辑审核 → 一键发到 X / Instagram / Facebook。",
+    icon: "globe",
+    category: "social",
+    ownerEmployeeId: null, // 公共场景
+    defaultTeam: ["xiaolei", "xiaowen", "xiaoshen", "xiaofa"],
+    inputFields: [
+      {
+        name: "topic_limit",
+        label: "拉取热点条数",
+        type: "number",
+        required: false,
+        defaultValue: 30,
+        validation: { min: 5, max: 100 },
+      },
+      {
+        name: "min_heat_score",
+        label: "最低热度分",
+        type: "number",
+        required: false,
+        defaultValue: 70,
+        validation: { min: 0, max: 100 },
+      },
+      {
+        name: "categories",
+        label: "海外目标分类",
+        type: "multiselect",
+        required: false,
+        defaultValue: ["food", "pets", "domestic_tech"],
+        options: [
+          { value: "food", label: "美食" },
+          { value: "pets", label: "萌宠" },
+          { value: "domestic_tech", label: "国内科技" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "把过去 24h 国内热榜里 {{categories}} 三类内容筛出来（最少 {{min_heat_score}} 热度分，最多 {{topic_limit}} 条），翻译改写成适合 X / Instagram 海外读者的英文稿件，入英文稿件库等审核。",
+    promptTemplate:
+      "拉取最近 24h 热榜 Top {{topic_limit}}（最低热度 {{min_heat_score}}），筛选 {{categories}}，翻译为英文。",
+    isFeatured: true,
+    steps: [
+      step(1, "拉取 24h 热榜", "trending_topics", "热榜聚合", "data_collection", "pull"),
+      step(2, "海外分类过滤", "topic_classifier", "海外热榜分类", "content_analysis", "classify"),
+      step(3, "深读+翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate"),
+      step(
+        4,
+        "入英文稿件库",
+        "cms_publish",
+        "稿件入库",
+        "distribution",
+        "store",
+        { language: "en", category: "app_overseas_en" },
+      ),
+      step(5, "通知编辑审核", "compliance_check", "审核通知", "quality_review", "notify"),
+    ],
+  },
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────

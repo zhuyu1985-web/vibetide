@@ -20,6 +20,7 @@ import { FloatingNote } from "./features/annotations/floating-note";
 import { useAnnotations } from "./features/annotations/use-annotations";
 import { VideoPlayer } from "./features/video-player/video-player";
 import { TranscriptPanel } from "./features/transcript/transcript-panel";
+import { ExternalPublishPanel } from "@/components/articles/external-publish-panel";
 import {
   MOCK_VIDEO_URL,
   MOCK_CHAPTERS,
@@ -31,6 +32,8 @@ export default function ArticleDetailClient({
   organizationId,
   initialAnnotations,
   initialAIAnalysis,
+  articleLanguage,
+  externalPublications,
 }: ArticleDetailClientProps) {
   const {
     viewMode,
@@ -312,6 +315,16 @@ export default function ArticleDetailClient({
                   />
                 )}
               </div>
+              {/* 海外英文稿件专属：发布到 X / Instagram / Facebook / LinkedIn 面板 */}
+              {articleLanguage === "en" && (
+                <div className="border-t border-[var(--glass-border)] p-3 shrink-0">
+                  <ExternalPublishPanel
+                    articleId={article.id}
+                    articleLanguage={articleLanguage}
+                    existingPublications={externalPublications}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <button

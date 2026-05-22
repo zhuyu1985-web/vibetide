@@ -46,11 +46,21 @@ export interface VideoChapter {
   endTime: number;
 }
 
+export interface ExternalPublicationView {
+  platform: string;
+  status: string;
+  platformPostUrl?: string | null;
+}
+
 export interface ArticleDetailClientProps {
   article: ArticleDetail;
   organizationId: string;
   initialAnnotations: Annotation[];
   initialAIAnalysis: AIAnalysisCacheItem[];
+  /** 文章语种（zh / en），决定是否展示「发布到外站」面板。 */
+  articleLanguage: string;
+  /** 该文章已有的外站发布记录（按 submittedAt desc）。 */
+  externalPublications: ExternalPublicationView[];
 }
 
 export type ViewMode = "read" | "edit";
