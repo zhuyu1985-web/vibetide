@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * 编辑器左侧外层垂直 icon nav。
+ * 编辑器左侧外层垂直 icon nav（最终版，对齐用户参考图 #9）。
  *
- * 设计要点（迭代到第 3 版，2026-05-23）：
- *   - 68px 宽，比全局左侧栏（54px）略宽 —— 便于与全局栏视觉区分
- *   - 图标 + 中文小标签（10px）成组：用户能一眼分清这是「编辑器三栏入口」
- *     而不是全局菜单图标
- *   - 激活态：浅蓝填充 + 蓝色 stroke icon
- *   - hover：muted 背景
+ * 规格：
+ *   - 80px 宽
+ *   - 每项独立按钮，大图标盒 11x11 + 5x5 icon + 中文标签 11px
+ *   - 激活态：蓝紫渐变背景 + 白色 icon + 蓝色标签
+ *   - hover：muted 浅背景
+ *   - 上下 padding 充裕，三项垂直分布有呼吸感
  */
 
 import { Sparkles, Box, AppWindow } from "lucide-react";
@@ -24,7 +24,7 @@ interface CategoryDef {
 
 const CATEGORIES: CategoryDef[] = [
   { key: "ai", label: "AI 助手", icon: Sparkles },
-  { key: "library", label: "资源库", icon: Box },
+  { key: "library", label: "素材资源", icon: Box },
   { key: "apps", label: "AIGC", icon: AppWindow },
 ];
 
@@ -33,7 +33,7 @@ export function LeftOuterNav() {
   const setLeftCategory = useArticlePageStore((s) => s.setLeftCategory);
 
   return (
-    <div className="w-[68px] shrink-0 flex flex-col items-stretch py-2 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl">
+    <div className="w-[80px] shrink-0 flex flex-col items-stretch py-3 gap-1 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl">
       {CATEGORIES.map((cat) => {
         const Icon = cat.icon;
         const active = leftCategory === cat.key;
@@ -43,17 +43,23 @@ export function LeftOuterNav() {
             onClick={() => setLeftCategory(cat.key)}
             title={cat.label}
             className={cn(
-              "mx-1.5 my-0.5 px-1 py-2 rounded-lg flex flex-col items-center gap-1 transition-all",
+              "mx-2 py-2 rounded-xl flex flex-col items-center gap-1.5 transition-all",
               active
-                ? "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400"
+                ? "text-blue-600 dark:text-blue-400"
                 : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
             )}
           >
-            <Icon
-              className="h-5 w-5"
-              strokeWidth={active ? 2.2 : 1.8}
-            />
-            <span className="text-[10px] leading-none">{cat.label}</span>
+            <span
+              className={cn(
+                "w-11 h-11 rounded-xl flex items-center justify-center transition-all",
+                active
+                  ? "bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-md shadow-blue-500/25"
+                  : "bg-muted/30 dark:bg-white/5",
+              )}
+            >
+              <Icon className="h-5 w-5" strokeWidth={1.9} />
+            </span>
+            <span className="text-[11px] leading-none font-medium">{cat.label}</span>
           </button>
         );
       })}
