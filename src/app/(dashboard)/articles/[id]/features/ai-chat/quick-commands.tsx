@@ -23,13 +23,13 @@ export function QuickCommands({ viewMode, contentType, onCommand }: QuickCommand
   const commands = getCommands(viewMode, contentType);
 
   return (
-    <div className="flex gap-1.5 overflow-x-auto px-3 py-2 scrollbar-hide shrink-0">
+    <div className="flex flex-wrap gap-1.5 px-3 py-2 shrink-0">
       {commands.map((cmd) => (
         <button
           key={cmd}
           onClick={() => onCommand(cmd)}
           className={cn(
-            "text-[9px] px-2 py-1 bg-muted/50 rounded-full whitespace-nowrap",
+            "text-xs px-2.5 py-1 bg-muted/50 rounded-full whitespace-nowrap",
             "text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
           )}
         >
