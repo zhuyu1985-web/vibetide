@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * 编辑器左侧 80px 外层垂直 icon nav。
+ * 编辑器左侧外层垂直 icon nav —— 简约风格（对齐用户参考图 #8 的全局侧栏）。
  *
- * 对齐参考图 #5：6 个分类（图标 + 标签），点击切换内层 panel 内容。
- * 前 3 项已实现；后 3 项（排版样式 / 智能审校 / 稿库）点击弹「即将上线」。
+ * 设计：
+ *   - 窄条 56px（原 80px），纯图标无文字标签
+ *   - 激活态：浅蓝填充背景 + 蓝色图标，无渐变色块
+ *   - hover：浅 muted 背景 + 轻微 scale
+ *   - title 属性提供 tooltip 提示当前是哪个分类
  */
 
-import {
-  Sparkles,
-  Box,
-  AppWindow,
-} from "lucide-react";
+import { Sparkles, Box, AppWindow } from "lucide-react";
 import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
 import type { LeftCategory } from "../../types";
@@ -22,51 +21,34 @@ interface CategoryDef {
   icon: React.ElementType;
 }
 
-// 按用户原始需求：左侧只要 AI助手 / 资源库（素材资源）/ AIGC（应用）三项。
 const CATEGORIES: CategoryDef[] = [
-  { key: "ai", label: "AI助手", icon: Sparkles },
-  { key: "library", label: "素材资源", icon: Box },
-  { key: "apps", label: "AIGC", icon: AppWindow },
+  { key: "ai", label: "AI 助手", icon: Sparkles },
+  { key: "library", label: "资源库", icon: Box },
+  { key: "apps", label: "AIGC 应用", icon: AppWindow },
 ];
 
 export function LeftOuterNav() {
   const leftCategory = useArticlePageStore((s) => s.leftCategory);
   const setLeftCategory = useArticlePageStore((s) => s.setLeftCategory);
 
-  const handleClick = (cat: CategoryDef) => {
-    setLeftCategory(cat.key);
-  };
-
   return (
-    <div className="w-[80px] shrink-0 flex flex-col items-stretch border-r border-[var(--glass-border)] bg-gradient-to-b from-blue-50/40 via-violet-50/30 to-blue-50/40 dark:from-blue-950/20 dark:via-violet-950/15 dark:to-blue-950/20">
+    <div className="w-[56px] shrink-0 flex flex-col items-center py-3 gap-1 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl">
       {CATEGORIES.map((cat) => {
         const Icon = cat.icon;
         const active = leftCategory === cat.key;
         return (
           <button
             key={cat.key}
-            onClick={() => handleClick(cat)}
+            onClick={() => setLeftCategory(cat.key)}
+            title={cat.label}
             className={cn(
-              "relative flex flex-col items-center justify-center gap-1 py-3 transition-all",
+              "w-9 h-9 rounded-lg flex items-center justify-center transition-all",
               active
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-muted-foreground hover:text-foreground hover:bg-white/40 dark:hover:bg-white/5",
+                ? "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400"
+                : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
             )}
           >
-            {active && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-blue-500 rounded-r" />
-            )}
-            <div
-              className={cn(
-                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                active
-                  ? "bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-sm"
-                  : "bg-white/60 dark:bg-white/5",
-              )}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
-            <span className="text-xs leading-tight">{cat.label}</span>
+            <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.2 : 1.8} />
           </button>
         );
       })}
