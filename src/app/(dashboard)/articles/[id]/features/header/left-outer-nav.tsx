@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * 编辑器左侧外层垂直 icon nav —— 简约风格（对齐用户参考图 #8 的全局侧栏）。
+ * 编辑器左侧外层垂直 icon nav。
  *
- * 设计：
- *   - 窄条 56px（原 80px），纯图标无文字标签
- *   - 激活态：浅蓝填充背景 + 蓝色图标，无渐变色块
- *   - hover：浅 muted 背景 + 轻微 scale
- *   - title 属性提供 tooltip 提示当前是哪个分类
+ * 设计要点（迭代到第 3 版，2026-05-23）：
+ *   - 68px 宽，比全局左侧栏（54px）略宽 —— 便于与全局栏视觉区分
+ *   - 图标 + 中文小标签（10px）成组：用户能一眼分清这是「编辑器三栏入口」
+ *     而不是全局菜单图标
+ *   - 激活态：浅蓝填充 + 蓝色 stroke icon
+ *   - hover：muted 背景
  */
 
 import { Sparkles, Box, AppWindow } from "lucide-react";
@@ -24,7 +25,7 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   { key: "ai", label: "AI 助手", icon: Sparkles },
   { key: "library", label: "资源库", icon: Box },
-  { key: "apps", label: "AIGC 应用", icon: AppWindow },
+  { key: "apps", label: "AIGC", icon: AppWindow },
 ];
 
 export function LeftOuterNav() {
@@ -32,7 +33,7 @@ export function LeftOuterNav() {
   const setLeftCategory = useArticlePageStore((s) => s.setLeftCategory);
 
   return (
-    <div className="w-[56px] shrink-0 flex flex-col items-center py-3 gap-1 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl">
+    <div className="w-[68px] shrink-0 flex flex-col items-stretch py-2 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl">
       {CATEGORIES.map((cat) => {
         const Icon = cat.icon;
         const active = leftCategory === cat.key;
@@ -42,13 +43,17 @@ export function LeftOuterNav() {
             onClick={() => setLeftCategory(cat.key)}
             title={cat.label}
             className={cn(
-              "w-9 h-9 rounded-lg flex items-center justify-center transition-all",
+              "mx-1.5 my-0.5 px-1 py-2 rounded-lg flex flex-col items-center gap-1 transition-all",
               active
                 ? "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400"
                 : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
             )}
           >
-            <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.2 : 1.8} />
+            <Icon
+              className="h-5 w-5"
+              strokeWidth={active ? 2.2 : 1.8}
+            />
+            <span className="text-[10px] leading-none">{cat.label}</span>
           </button>
         );
       })}
