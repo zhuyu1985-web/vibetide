@@ -7,6 +7,7 @@
  * 点击 → 提示「即将上线」。
  */
 
+import { toast } from "sonner";
 import {
   Image as ImageIcon,
   Sparkles,
@@ -88,7 +89,7 @@ const APPS: AIGCApp[] = [
 
 export function AigcAppsPanel() {
   const handleClick = (app: AIGCApp) => {
-    alert(`「${app.title}」即将上线，敬请期待。`);
+    toast.info(`「${app.title}」即将上线，敬请期待`);
   };
 
   return (
@@ -106,16 +107,18 @@ export function AigcAppsPanel() {
               key={app.id}
               onClick={() => handleClick(app)}
               className={cn(
-                "flex flex-col items-start gap-1 p-2.5 rounded-lg bg-gradient-to-br hover:scale-[1.02] active:scale-[0.98] transition-transform",
+                "aspect-[4/3] flex flex-col items-start justify-between gap-1 p-2.5 rounded-lg bg-gradient-to-br hover:scale-[1.02] active:scale-[0.98] transition-transform overflow-hidden",
                 app.accent,
               )}
             >
-              <Icon className="h-4 w-4" />
-              <span className="text-[11px] font-medium leading-tight">{app.title}</span>
-              <span className="text-[10px] text-muted-foreground leading-snug line-clamp-2 text-left">
-                {app.desc}
-              </span>
-              <span className="mt-0.5 text-[9px] uppercase tracking-wider opacity-60">
+              <Icon className="h-4 w-4 shrink-0" />
+              <div className="flex-1 min-h-0 flex flex-col items-start gap-0.5 w-full">
+                <span className="text-xs font-medium leading-tight">{app.title}</span>
+                <span className="text-[10px] text-muted-foreground leading-snug line-clamp-2 text-left">
+                  {app.desc}
+                </span>
+              </div>
+              <span className="text-[9px] uppercase tracking-wider opacity-60 shrink-0">
                 即将上线
               </span>
             </button>

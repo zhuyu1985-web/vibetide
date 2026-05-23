@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Search, Image as ImageIcon, Video, Music, FileText, Loader2 } from "lucide-react";
 import { fetchMoreAssets } from "@/app/actions/assets";
 import { useArticlePageStore } from "../../store";
@@ -54,12 +55,12 @@ export function MediaLibraryPanel() {
 
   const handleInsert = (asset: MediaAssetFull) => {
     if (!editor) {
-      alert("编辑器未就绪，请先点「编辑」进入编辑模式");
+      toast.warning("编辑器未就绪，请先点「编辑」进入编辑模式");
       return;
     }
     const url = asset.thumbnailUrl;
     if (!url) {
-      alert(`「${asset.title}」无可用 URL，跳过插入`);
+      toast.error(`「${asset.title}」无可用 URL`);
       return;
     }
 

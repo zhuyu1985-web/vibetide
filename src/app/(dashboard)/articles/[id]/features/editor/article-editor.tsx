@@ -73,6 +73,8 @@ export function ArticleEditor({
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useEditor({
+    // Tiptap 3.x + Next.js App Router 必须显式关，否则 SSR/hydration mismatch
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },

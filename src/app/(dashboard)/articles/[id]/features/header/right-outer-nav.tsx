@@ -11,6 +11,7 @@
  */
 
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +61,7 @@ export function RightOuterNav() {
 
       {/* + 按钮 */}
       <button
-        onClick={() => alert("「添加渠道」即将上线。")}
+        onClick={() => toast.info("「添加渠道」即将上线")}
         className="mx-auto w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/15 to-blue-500/15 hover:from-violet-500/25 hover:to-blue-500/25 flex items-center justify-center text-violet-600 dark:text-violet-400 transition-colors"
         title="添加渠道"
       >

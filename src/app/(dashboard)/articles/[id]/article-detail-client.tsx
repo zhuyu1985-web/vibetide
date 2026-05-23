@@ -314,7 +314,7 @@ export default function ArticleDetailClient({
               </div>
             ) : (
               <div className="flex flex-col h-full">
-                <div className="flex border-b border-[var(--glass-border)] text-xs">
+                <div className="flex border-b border-[var(--glass-border)] text-[12px]">
                   {rightTabs.map((tab) => (
                     <button
                       key={tab}

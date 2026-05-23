@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -244,8 +245,7 @@ export function EditorToolbar({
   onCancel,
 }: EditorToolbarProps) {
   const showStub = useCallback((feature: string) => {
-    // 暂未实现的功能用 alert 占位；后续按需补实现
-    alert(`「${feature}」即将上线。`);
+    toast.info(`「${feature}」即将上线`);
   }, []);
 
   if (!editor) return null;
