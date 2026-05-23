@@ -46,7 +46,7 @@ import {
   batchUpdateArticleStatus,
   batchMoveArticlesToCategory,
 } from "@/app/actions/articles";
-import { getCategories } from "@/lib/dal/categories";
+import { listCategoriesAction } from "@/app/actions/categories";
 import type { CategoryNode } from "@/lib/types";
 
 interface ActionsMenuProps {
@@ -122,9 +122,9 @@ export function ActionsMenu({ articleId, articleUrl, children }: ActionsMenuProp
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
-  // 懒加载 categories（移到栏目子菜单用）
+  // 懒加载 categories（移到栏目子菜单用）—— 通过 server action 避免 client 端 import DAL
   useEffect(() => {
-    getCategories()
+    listCategoriesAction()
       .then(setCategories)
       .catch(() => setCategories([]));
   }, []);

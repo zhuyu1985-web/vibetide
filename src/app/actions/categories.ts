@@ -15,6 +15,13 @@ async function requireAuthWithOrg() {
   return orgId;
 }
 
+/** 客户端组件可调用的 categories 列表 server action（避免 client 端直接 import DAL）。 */
+export async function listCategoriesAction() {
+  await requireAuth();
+  const { getCategories } = await import("@/lib/dal/categories");
+  return getCategories();
+}
+
 export async function createCategory(data: {
   organizationId: string;
   name: string;
