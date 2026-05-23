@@ -120,11 +120,8 @@ export default function ArticleDetailClient({
 
   const LEFT_CATEGORY_LABEL: Record<string, string> = {
     ai: "✦ AI 助手",
-    library: "素材资源",
-    apps: "应用",
-    typography: "排版样式",
-    review: "智能审校",
-    storage: "稿库",
+    library: "资源库",
+    apps: "AIGC 应用",
   };
 
   return (

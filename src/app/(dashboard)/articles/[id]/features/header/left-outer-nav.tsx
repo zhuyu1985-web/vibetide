@@ -7,14 +7,10 @@
  * 前 3 项已实现；后 3 项（排版样式 / 智能审校 / 稿库）点击弹「即将上线」。
  */
 
-import { useRouter } from "next/navigation";
 import {
   Sparkles,
   Box,
   AppWindow,
-  LayoutTemplate,
-  ShieldCheck,
-  FolderArchive,
 } from "lucide-react";
 import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
@@ -24,33 +20,20 @@ interface CategoryDef {
   key: LeftCategory;
   label: string;
   icon: React.ElementType;
-  /** 是否为占位（点击给 toast 而不是切换） */
-  placeholder?: boolean;
 }
 
+// 按用户原始需求：左侧只要 AI助手 / 资源库（素材资源）/ AIGC（应用）三项。
 const CATEGORIES: CategoryDef[] = [
   { key: "ai", label: "AI助手", icon: Sparkles },
   { key: "library", label: "素材资源", icon: Box },
-  { key: "apps", label: "应用", icon: AppWindow },
-  { key: "typography", label: "排版样式", icon: LayoutTemplate, placeholder: true },
-  { key: "review", label: "智能审校", icon: ShieldCheck, placeholder: true },
-  { key: "storage", label: "稿库", icon: FolderArchive },
+  { key: "apps", label: "AIGC", icon: AppWindow },
 ];
 
 export function LeftOuterNav() {
-  const router = useRouter();
   const leftCategory = useArticlePageStore((s) => s.leftCategory);
   const setLeftCategory = useArticlePageStore((s) => s.setLeftCategory);
 
   const handleClick = (cat: CategoryDef) => {
-    if (cat.key === "storage") {
-      router.push("/articles");
-      return;
-    }
-    if (cat.placeholder) {
-      alert(`「${cat.label}」即将上线。`);
-      return;
-    }
     setLeftCategory(cat.key);
   };
 
@@ -58,7 +41,7 @@ export function LeftOuterNav() {
     <div className="w-[80px] shrink-0 flex flex-col items-stretch border-r border-[var(--glass-border)] bg-gradient-to-b from-blue-50/40 via-violet-50/30 to-blue-50/40 dark:from-blue-950/20 dark:via-violet-950/15 dark:to-blue-950/20">
       {CATEGORIES.map((cat) => {
         const Icon = cat.icon;
-        const active = leftCategory === cat.key && !cat.placeholder;
+        const active = leftCategory === cat.key;
         return (
           <button
             key={cat.key}

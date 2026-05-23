@@ -69,14 +69,11 @@ export type ActiveView = "immersive" | "web" | "brief" | "archive";
 export type LeftTab = "outline" | "chat" | "history" | "library" | "aigc";
 export type RightTab = "analysis" | "annotations" | "transcript" | "info" | "channels";
 
-// Phase 2 image-aligned redesign: 80px outer icon nav 的 6 个分类
+// 80px outer icon nav 的 3 个分类（按用户原始需求严格 3 项）
 export type LeftCategory =
-  | "ai"          // AI 助手（含 chat / outline / history 子 tab）
-  | "library"     // 素材资源
-  | "apps"        // 应用（AIGC 占位卡片）
-  | "typography"  // 排版样式（即将上线）
-  | "review"      // 智能审校（即将上线）
-  | "storage";    // 稿库（跳 /articles 列表）
+  | "ai"          // AI 助手（与 AI 对话）
+  | "library"     // 资源库（素材选择）
+  | "apps";       // AIGC 应用（文生图等工具）
 
 // 右侧 80px outer nav：'info' 显示基本信息表单，'channel' 显示某 platform 的渠道改写
 export type RightCategory = "info" | "channel";

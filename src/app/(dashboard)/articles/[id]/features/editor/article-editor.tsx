@@ -16,13 +16,12 @@ import Typography from "@tiptap/extension-typography";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
-import { Color } from "@tiptap/extension-color";
+import { TextStyle, FontFamily, FontSize, Color } from "@tiptap/extension-text-style";
 import { EditorToolbar } from "./editor-toolbar";
 import { EditorStatusBar } from "./editor-status-bar";
 import { SlashCommand } from "./slash-command";
 import { BubbleMenuBar } from "./bubble-menu-bar";
 import { AIHighlight } from "./extensions/ai-highlight";
-import { TextStyleAttrs } from "./extensions/text-style-attrs";
 import { ParagraphAttrs } from "./extensions/paragraph-attrs";
 import { updateArticle, saveAndSubmitArticle } from "@/app/actions/articles";
 import { useRouter } from "next/navigation";
@@ -98,10 +97,12 @@ export function ArticleEditor({
       TableCell,
       TableHeader,
       AIHighlight,
-      // Phase 2.2 新增扩展
-      TextStyleAttrs,                    // 字体 / 字号（覆盖默认 TextStyle，加 fontFamily/fontSize 属性）
-      Color.configure({ types: ["textStyle"] }),  // 字体颜色
-      ParagraphAttrs,                    // 行间距 / 段前距 / 段后距 / 首行缩进
+      // Phase 2.2 工具栏所需的格式属性扩展（全部来自 @tiptap/extension-text-style 官方）
+      TextStyle,                         // textStyle mark（FontFamily/FontSize/Color 依赖它）
+      FontFamily,                        // 字体下拉
+      FontSize,                          // 字号下拉
+      Color,                             // 字体颜色
+      ParagraphAttrs,                    // 行间距 / 段前距 / 段后距 / 首行缩进（自建）
     ],
     content: article.body ?? "",
     editorProps: {

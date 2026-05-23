@@ -276,9 +276,9 @@ export function EditorToolbar({
 
   const setFontFamily = (value: string) => {
     if (value === "") {
-      editor.chain().focus().setMark("textStyle", { fontFamily: null }).run();
+      editor.chain().focus().unsetFontFamily().run();
     } else {
-      editor.chain().focus().setMark("textStyle", { fontFamily: value }).run();
+      editor.chain().focus().setFontFamily(value).run();
     }
   };
 
@@ -290,7 +290,7 @@ export function EditorToolbar({
     ) ?? "16";
 
   const setFontSize = (size: string) => {
-    editor.chain().focus().setMark("textStyle", { fontSize: `${size}px` }).run();
+    editor.chain().focus().setFontSize(`${size}px`).run();
   };
 
   // ── 字体颜色 ──
@@ -298,7 +298,7 @@ export function EditorToolbar({
     (editor.getAttributes("textStyle").color as string | null) ?? "#000000";
 
   const setColor = (color: string) => {
-    editor.chain().focus().setMark("textStyle", { color }).run();
+    editor.chain().focus().setColor(color).run();
   };
 
   // ── 高亮 ──
