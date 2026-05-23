@@ -15,7 +15,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { Sparkles, Eye, HelpCircle, Plus, RefreshCw, Loader2 } from "lucide-react";
+import { Eye, HelpCircle, Plus, RefreshCw, Loader2 } from "lucide-react";
 import { updateArticle } from "@/app/actions/articles";
 import { cn } from "@/lib/utils";
 
@@ -88,9 +88,8 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--glass-border)] shrink-0">
         <button
           onClick={() => alert("「AI 帮填」即将上线，将根据稿件正文自动填充摘要 / 关键词 / 列表样式")}
-          className="h-7 px-3 rounded-md bg-gradient-to-r from-violet-500 to-blue-500 text-white text-xs font-medium hover:opacity-90 transition-opacity flex items-center gap-1"
+          className="h-7 px-4 rounded-md bg-gradient-to-r from-violet-500 to-blue-500 text-white text-xs font-medium hover:opacity-90 transition-opacity"
         >
-          <Sparkles className="h-3 w-3" />
           AI 帮填
         </button>
         <button
