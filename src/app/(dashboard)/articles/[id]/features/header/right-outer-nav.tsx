@@ -45,7 +45,7 @@ export function RightOuterNav() {
       <button
         onClick={() => setRightCategory("info")}
         className={cn(
-          "relative mx-2 px-2 py-3 rounded-lg text-[11px] font-medium transition-colors",
+          "relative mx-2 px-2 py-3 rounded-lg text-xs font-medium transition-colors",
           infoActive
             ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
             : "text-muted-foreground hover:text-foreground hover:bg-white/40 dark:hover:bg-white/5",
@@ -87,8 +87,8 @@ export function RightOuterNav() {
               {active && (
                 <span className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-blue-500 rounded-l" />
               )}
-              <span className="text-base">{c.emoji}</span>
-              <span className="text-[9px] leading-none">{c.label}</span>
+              <span className="text-lg">{c.emoji}</span>
+              <span className="text-[10px] leading-tight">{c.label}</span>
             </button>
           );
         })}

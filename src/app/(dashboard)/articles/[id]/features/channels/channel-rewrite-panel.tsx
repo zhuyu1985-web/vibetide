@@ -167,7 +167,7 @@ export function ChannelRewritePanel({
               key={p.value}
               onClick={() => setActivePlatform(p.value)}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
                 activePlatform === p.value
                   ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 font-medium"
                   : "bg-muted/30 dark:bg-white/5 text-muted-foreground hover:text-foreground",
@@ -237,7 +237,7 @@ export function ChannelRewritePanel({
               }}
               placeholder="正文"
               rows={8}
-              className="resize-y rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400/30"
+              className="resize-y rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400/30 leading-relaxed"
             />
 
             <textarea

@@ -75,15 +75,15 @@ export function LeftOuterNav() {
             )}
             <div
               className={cn(
-                "w-9 h-9 rounded-lg flex items-center justify-center transition-colors",
+                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
                 active
                   ? "bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-sm"
                   : "bg-white/60 dark:bg-white/5",
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-5 w-5" />
             </div>
-            <span className="text-[11px] leading-none">{cat.label}</span>
+            <span className="text-xs leading-tight">{cat.label}</span>
           </button>
         );
       })}

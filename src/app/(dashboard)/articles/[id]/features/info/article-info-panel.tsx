@@ -88,14 +88,14 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--glass-border)] shrink-0">
         <button
           onClick={() => alert("「AI 帮填」即将上线，将根据稿件正文自动填充摘要 / 关键词 / 列表样式")}
-          className="h-7 px-4 rounded-md bg-gradient-to-r from-violet-500 to-blue-500 text-white text-xs font-medium hover:opacity-90 transition-opacity"
+          className="h-8 px-4 rounded-md bg-gradient-to-r from-violet-500 to-blue-500 text-white text-sm font-medium hover:opacity-90 transition-opacity"
         >
           AI 帮填
         </button>
         <button
           onClick={handleSave}
           disabled={pending}
-          className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors flex items-center gap-1"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors flex items-center gap-1"
         >
           {pending ? (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -112,7 +112,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
           <select
             value={submitLibrary}
             onChange={(e) => setSubmitLibrary(e.target.value)}
-            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-400/30"
+            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400/30"
           >
             {SUBMIT_LIBRARY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -126,7 +126,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
             placeholder="作者署名"
-            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-400/30"
+            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400/30"
           />
         </FieldGroup>
 
@@ -136,7 +136,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
             value={source}
             onChange={(e) => setSource(e.target.value)}
             placeholder="稿件来源"
-            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-400/30"
+            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400/30"
           />
         </FieldGroup>
 
@@ -165,7 +165,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
             value={keywordsRaw}
             onChange={(e) => setKeywordsRaw(e.target.value)}
             placeholder="请输入关键词"
-            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-400/30"
+            className="w-full rounded-lg bg-muted/30 dark:bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400/30"
           />
         </FieldGroup>
 
@@ -185,7 +185,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
                 key={o.value}
                 onClick={() => setListStyle(o.value)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md text-[11px] transition-colors",
+                  "px-3 py-1 rounded-md text-xs transition-colors",
                   listStyle === o.value
                     ? "bg-blue-500 text-white"
                     : "bg-muted/30 dark:bg-white/5 text-muted-foreground hover:text-foreground",
@@ -248,7 +248,7 @@ function FieldGroup({
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1">
-          <label className="text-[11px] font-medium text-foreground">{label}</label>
+          <label className="text-xs font-medium text-foreground">{label}</label>
           {iconLeft}
         </div>
         {(iconRight || hint) && (

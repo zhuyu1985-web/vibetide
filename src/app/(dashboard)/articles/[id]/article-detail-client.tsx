@@ -170,7 +170,7 @@ export default function ArticleDetailClient({
         <div
           className={cn(
             "border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl transition-all duration-300 ease-out overflow-hidden shrink-0",
-            leftPanelOpen ? "w-[22%] min-w-[280px]" : "w-7"
+            leftPanelOpen ? "w-[clamp(300px,24%,400px)]" : "w-7"
           )}
         >
           {leftPanelOpen ? (
@@ -210,8 +210,8 @@ export default function ArticleDetailClient({
           )}
         </div>
 
-        {/* Center stage */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Center stage —— 淡蓝透明背景（edit 模式下尤其需要弱化与三栏的色差） */}
+        <div className="flex-1 overflow-hidden flex flex-col bg-blue-50/30 dark:bg-blue-500/[0.03]">
           {isVideo ? (
             <div ref={centerRef} className="h-full overflow-y-auto">
               <VideoPlayer
@@ -275,7 +275,7 @@ export default function ArticleDetailClient({
         <div
           className={cn(
             "border-l border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl transition-all duration-300 ease-out overflow-hidden shrink-0",
-            rightPanelOpen ? "w-[27%] min-w-[300px]" : "w-7"
+            rightPanelOpen ? "w-[clamp(300px,24%,400px)]" : "w-7"
           )}
         >
           {rightPanelOpen ? (
