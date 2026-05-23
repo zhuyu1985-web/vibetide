@@ -162,7 +162,7 @@ export default function ArticleDetailClient({
       {/* Three-column body */}
       <div className="flex flex-1 overflow-hidden">
         {/* 左侧 80px 外层 icon nav（仅 edit 模式显示）+ 内层 panel */}
-        {viewMode === "edit" && <LeftOuterNav />}
+        <LeftOuterNav />
 
         <div
           className={cn(
