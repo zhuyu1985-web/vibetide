@@ -33,7 +33,7 @@ export function LeftOuterNav() {
   const setLeftCategory = useArticlePageStore((s) => s.setLeftCategory);
 
   return (
-    <div className="w-[80px] shrink-0 flex flex-col items-stretch py-2 border-r border-[var(--glass-border)] bg-[var(--glass-panel-bg)] backdrop-blur-xl">
+    <div className="w-[80px] shrink-0 flex flex-col items-stretch py-2 border-r border-[var(--glass-border)] bg-gradient-to-b from-sky-50/60 via-blue-50/30 to-sky-50/60 dark:from-sky-500/[0.06] dark:via-blue-500/[0.04] dark:to-sky-500/[0.06] backdrop-blur-xl">
       {CATEGORIES.map((cat) => {
         const Icon = cat.icon;
         const active = leftCategory === cat.key;
