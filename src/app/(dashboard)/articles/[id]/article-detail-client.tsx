@@ -14,11 +14,7 @@ import { LeftOuterNav } from "./features/header/left-outer-nav";
 import { RightOuterNav } from "./features/header/right-outer-nav";
 import { ArticleReader } from "./features/reader/article-reader";
 import { ArticleEditor } from "./features/editor/article-editor";
-import { OutlinePanel } from "./features/outline/outline-panel";
-import { VideoChapters } from "./features/outline/video-chapters";
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
-import { ChatHistoryPanel } from "./features/ai-chat/chat-history-panel";
-import { CreationAssistantPanel } from "./features/ai-chat/creation-assistant-panel";
 import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
 import { AnnotationsPanel } from "./features/annotations/annotations-panel";
 import { FloatingNote } from "./features/annotations/floating-note";
@@ -33,7 +29,6 @@ import { MediaLibraryPanel } from "./features/library/media-library-panel";
 import { AigcAppsPanel } from "./features/aigc/aigc-apps-panel";
 import {
   MOCK_VIDEO_URL,
-  MOCK_CHAPTERS,
   MOCK_TRANSCRIPT,
 } from "./data/mock-video";
 
@@ -52,14 +47,12 @@ export default function ArticleDetailClient({
     leftPanelOpen,
     rightPanelOpen,
     zenMode,
-    leftTab,
     rightTab,
     leftCategory,
     rightCategory,
     activeChannel,
     toggleLeftPanel,
     toggleRightPanel,
-    setLeftTab,
     setRightTab,
   } = useArticlePageStore();
   const { appearance, setAppearance } = useAppearance();
@@ -123,14 +116,6 @@ export default function ArticleDetailClient({
     annotations: "批注",
     transcript: "听记",
     channels: "渠道",
-  };
-
-  const LEFT_TAB_LABEL: Record<string, string> = {
-    outline: isVideo ? "章节" : "大纲",
-    chat: "助手",
-    history: "历史",
-    library: "素材",
-    aigc: "生成",
   };
 
   const LEFT_CATEGORY_LABEL: Record<string, string> = {
@@ -199,66 +184,21 @@ export default function ArticleDetailClient({
                   ◀
                 </button>
               </div>
-              {/* AI 助手分类：
-                  - edit 模式 → 创作助手 panel（参考图 #5：装饰头 + 热点列表 + prompt）
-                  - read 模式 → 原 outline/chat/history 三子 tab */}
-              {leftCategory === "ai" && (
-                viewMode === "edit" ? (
-                  <CreationAssistantPanel articleId={article.id} />
-                ) : (
-                  <>
-                    <div className="flex border-b border-[var(--glass-border)] text-xs">
-                      {(["outline", "chat", "history"] as const).map((tab) => (
-                        <button
-                          key={tab}
-                          className={cn(
-                            "flex-1 text-center py-2 transition-colors",
-                            leftTab === tab
-                              ? "text-blue-500 border-b-2 border-blue-500"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                          onClick={() => setLeftTab(tab)}
-                        >
-                          {LEFT_TAB_LABEL[tab]}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex-1 overflow-hidden flex flex-col">
-                      {leftTab === "outline" &&
-                        (isVideo ? (
-                          <VideoChapters
-                            chapters={MOCK_CHAPTERS}
-                            currentTime={videoCurrentTime}
-                            onChapterClick={(time) => videoSeekRef.current?.(time)}
-                          />
-                        ) : (
-                          <OutlinePanel htmlContent={article.body ?? ""} />
-                        ))}
-                      {leftTab === "chat" && (
-                        <AIChatPanel
-                          articleId={article.id}
-                          articleContent={article.body ?? ""}
-                          viewMode={viewMode}
-                          contentType={isVideo ? "video" : "article"}
-                        />
-                      )}
-                      {leftTab === "history" && (
-                        <ChatHistoryPanel articleId={article.id} />
-                      )}
-                    </div>
-                  </>
-                )
-              )}
-              {leftCategory === "library" && (
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  <MediaLibraryPanel />
-                </div>
-              )}
-              {leftCategory === "apps" && (
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  <AigcAppsPanel />
-                </div>
-              )}
+              {/* 左侧三个真实分类（用户原始需求：只要 AI助手 / 资源库 / AIGC）：
+                  AI 助手 直接渲染 AIChatPanel（包含对话区 + 输入框），
+                  不再有 outline / history 子 tab。 */}
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {leftCategory === "ai" && (
+                  <AIChatPanel
+                    articleId={article.id}
+                    articleContent={article.body ?? ""}
+                    viewMode={viewMode}
+                    contentType={isVideo ? "video" : "article"}
+                  />
+                )}
+                {leftCategory === "library" && <MediaLibraryPanel />}
+                {leftCategory === "apps" && <AigcAppsPanel />}
+              </div>
             </div>
           ) : (
             <button
