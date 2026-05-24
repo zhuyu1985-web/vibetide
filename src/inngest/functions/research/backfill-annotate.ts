@@ -74,11 +74,18 @@ export const backfillAnnotate = inngest.createFunction(
         const conditions = [eq(collectedItems.organizationId, organizationId)];
         if (lastId) conditions.push(sql`${collectedItems.id}::text > ${lastId}`);
         // 正文已拆到副表 — LEFT JOIN 读取
+        // tags / matched_keywords / raw_metadata.keyword 也参与主题词匹配
+        // (json_import / opinion_excel 已经把准确的主题词写到这些字段,不读会大量漏判)
         return await db
           .select({
             id: collectedItems.id,
             title: collectedItems.title,
             content: collectedItemContents.content,
+            ocrText: collectedItemContents.ocrText,
+            asrText: collectedItemContents.asrText,
+            tags: collectedItems.tags,
+            matchedKeywords: collectedItems.matchedKeywords,
+            rawMetadata: collectedItems.rawMetadata,
           })
           .from(collectedItems)
           .leftJoin(collectedItemContents, eq(collectedItemContents.itemId, collectedItems.id))
@@ -91,7 +98,20 @@ export const backfillAnnotate = inngest.createFunction(
 
       await step.run(`annotate-batch-${batchIdx}`, async () => {
         for (const item of batch) {
-          const text = `${item.title}\n${item.content ?? ""}`;
+          // 拼全字段 text:标题 + 正文 + OCR + ASR + tags + matched_keywords + raw_metadata.keyword
+          // 同时供 topic-matcher 和 district-matcher 用
+          const metaKw = (item.rawMetadata as { keyword?: unknown } | null)?.keyword;
+          const text = [
+            item.title,
+            item.content ?? "",
+            item.ocrText ?? "",
+            item.asrText ?? "",
+            ...(item.tags ?? []),
+            ...(item.matchedKeywords ?? []),
+            typeof metaKw === "string" ? metaKw : "",
+          ]
+            .filter((s) => s && s.length > 0)
+            .join("\n");
           const topicMatches = matchTopicsForItem(text, topics);
           const districtMatches = matchDistrictsForItem(text, districts);
 

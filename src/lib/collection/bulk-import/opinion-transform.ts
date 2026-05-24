@@ -1,4 +1,9 @@
 import type { RawItem } from "../types";
+import {
+  normalizeCollectionPlatform,
+  shouldPreserveOriginalPlatform,
+  WEBSITE_PLATFORM,
+} from "../platform-normalization";
 
 /**
  * 舆情数据 Excel 33 列固定列名(对照 docs/data.xlsx 模板)
@@ -120,8 +125,9 @@ export function transformOpinionRow(
   const externalId = str(row, "帖子ID");
   const summary = str(row, "内容摘要");
   const content = str(row, "完整内容");
-  const platform = str(row, "平台");
-  const author = str(row, "作者昵称");
+  const originalPlatform = str(row, "平台");
+  const platform = normalizeCollectionPlatform(originalPlatform, url);
+  const author = str(row, "作者昵称") ?? (platform === WEBSITE_PLATFORM ? originalPlatform : undefined);
   const accountId = str(row, "用户ID");
   const accountHandle = str(row, "短ID");
   const sentiment = str(row, "情感倾向");
@@ -164,6 +170,7 @@ export function transformOpinionRow(
   // rawMetadata 兜底存稀疏字段(MCN 等)+ 原始行(用户可在详情看到 raw)
   const rawMetadata: Record<string, unknown> = {
     importedFromOpinionExcel: true,
+    ...(shouldPreserveOriginalPlatform(originalPlatform, platform) ? { originalPlatform } : {}),
     ...(mcn ? { mcn } : {}),
     queryWindow: str(row, "查询时段"),
     excelSeq: num(row, "序号"),
