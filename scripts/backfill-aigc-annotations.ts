@@ -13,6 +13,11 @@
  * 若某 org 超过 2000 条未标注，回填后重新跑 1 次即可。
  */
 
+// 必须在 import 任何用 process.env 的模块之前加载 .env.local（对齐 scripts/seed-research.ts 风格）
+import { config } from "dotenv";
+config({ path: ".env.local" });
+config();
+
 import { inngest } from "../src/inngest/client";
 import { db } from "../src/db";
 import { organizations } from "../src/db/schema";
