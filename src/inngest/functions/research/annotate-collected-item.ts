@@ -22,11 +22,17 @@ export const annotateCollectedItem = inngest.createFunction(
 
     const item = await step.run("load-item", async () => {
       // 正文已拆到 collected_item_contents 副表 — LEFT JOIN 读取(可能 null)
+      // title + content + ocr + asr + tags + matched_keywords + raw_metadata.keyword 全字段参与匹配
       const [row] = await db
         .select({
           id: collectedItems.id,
           title: collectedItems.title,
           content: collectedItemContents.content,
+          ocrText: collectedItemContents.ocrText,
+          asrText: collectedItemContents.asrText,
+          tags: collectedItems.tags,
+          matchedKeywords: collectedItems.matchedKeywords,
+          rawMetadata: collectedItems.rawMetadata,
         })
         .from(collectedItems)
         .leftJoin(collectedItemContents, eq(collectedItemContents.itemId, collectedItems.id))
@@ -36,7 +42,18 @@ export const annotateCollectedItem = inngest.createFunction(
     });
     if (!item) return { skipped: true, reason: "item not found" };
 
-    const text = `${item.title}\n${item.content ?? ""}`;
+    const metaKw = (item.rawMetadata as { keyword?: unknown } | null)?.keyword;
+    const text = [
+      item.title,
+      item.content ?? "",
+      item.ocrText ?? "",
+      item.asrText ?? "",
+      ...(item.tags ?? []),
+      ...(item.matchedKeywords ?? []),
+      typeof metaKw === "string" ? metaKw : "",
+    ]
+      .filter((s) => s && s.length > 0)
+      .join("\n");
 
     // 加载 topic + 关键词（org-scoped；按 isPrimary 分组）
     const topics = await step.run("load-topics", async () => {

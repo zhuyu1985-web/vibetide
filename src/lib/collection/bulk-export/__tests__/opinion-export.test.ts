@@ -51,6 +51,7 @@ function makeRow(overrides: Partial<ExportItemRow> = {}): ExportItemRow {
     industries: [],
     coverImageUrl: null,
     durationSeconds: null,
+    compositeScore: 0,
     content: "完整内容",
     ocrText: null,
     asrText: null,

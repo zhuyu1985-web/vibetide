@@ -67,6 +67,18 @@ export function mapDouyinAccountResponse(resp: unknown): RawItem[] {
       channel: "tikhub_douyin_account",
       contentType: "short_video",
       attachments,
+      // 顶层身份/统计字段 — Account Analytics 模块 (Phase 2) 需要按账号聚合，
+      // 必须把字段落到 collected_items 顶层列，不能只埋在 rawMetadata 里。
+      platform: "douyin",
+      externalId: awemeId,
+      author: author?.nickname,
+      accountId: author?.sec_uid,
+      accountHandle: author?.sec_uid, // secUid 作为账号 canonical handle；analytics 侧通过 outlet channel.secUid 反查匹配
+      likeCount: (stats?.digg_count as number | undefined) ?? 0,
+      commentCount: (stats?.comment_count as number | undefined) ?? 0,
+      shareCount: (stats?.share_count as number | undefined) ?? 0,
+      viewCount: (stats?.play_count as number | undefined) ?? 0,
+      favoriteCount: (stats?.collect_count as number | undefined) ?? 0,
       rawMetadata: {
         platform: "douyin",
         mode: "account",
@@ -75,7 +87,9 @@ export function mapDouyinAccountResponse(resp: unknown): RawItem[] {
         sec_uid: author?.sec_uid,
         likes: stats?.digg_count,
         comments: stats?.comment_count,
+        shares: stats?.share_count,
         plays: stats?.play_count,
+        collects: stats?.collect_count,
       },
     });
   }
