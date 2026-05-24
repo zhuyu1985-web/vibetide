@@ -2452,16 +2452,66 @@ git commit -m "docs(account-analytics): Phase 2 验收截图归档"
 
 ---
 
-## 附录 A: Phase 0 Audit 结果
+## 附录 A: Phase 0 Audit 结果（2026-05-24 跑出）
 
-**待 implementer 填入** Task 0.1 跑出的实际结果。模板：
+### ⚠️ 重要发现：目标表 `account_daily_snapshots` 当前为空
 
-| platform | snapshot_count | likes | comments | shares | favorites | views |
-|----------|---------------|-------|----------|--------|-----------|-------|
-| douyin   | xxxx          | 1.00  | 1.00     | 1.00   | 1.00      | 1.00  |
-| ...      |               |       |          |        |           |       |
+**本地 / 远程 supabase 上该表 0 行**——design-期表，daily-snapshot cron 还没 seed 数据。Task 0.1 假设的"30 天 snapshots"数据不存在，audit **不能直接来自 snapshots 表本身**。
 
-若 < 0.5 视为该平台该指标无数据 → 调整 Task 1.1 中 `PLATFORM_METRIC_MATRIX[platform].<metric> = false`。
+下面用三份 fallback 数据源做等效推断，但样本量都偏小或命名空间不一致，**不能直接用作 `PLATFORM_METRIC_MATRIX` 的权威依据**。Task 1.1 的 matrix 保留为基于"采集器理论能力"的经验默认值；待 snapshots 表生产积累 ≥ 30 天数据后再回头跑本脚本回填。
+
+### Fallback 1: `collected_items` 全表（含历史，66851 条）
+
+| platform | count | likes | comments | shares | favorites | views |
+|----------|-------|-------|----------|--------|-----------|-------|
+| 网站 | 53088 | 0.0001 | 0.0003 | 0.0001 | 0.0000 | 0.0008 |
+| 微信 | 7816 | 0.0542 | 0.0193 | 0.0542 | 0.0253 | 0.0548 |
+| 今日头条 | 2654 | 0.1797 | 0.0252 | 0.0068 | 0.0000 | 0.3900 |
+| 网易号 | 1301 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 百家号 | 1114 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 澎湃号 | 390 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 微博 | 231 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.9913 |
+| 抖音 | 191 | 0.3665 | 0.2094 | 0.1885 | 0.2042 | 0.0366 |
+| 好看视频 | 23 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| douyin | 20 | 1.0000 | 0.9000 | 0.9500 | 0.9500 | 0.0000 |
+| 人民号 | 13 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 搜狐号 | 5 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 大风号 | 5 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+
+⚠️ **Caveat**：platform 列大量值是**中文 label**（"网站"/"微信"/"抖音"），与 `PLATFORM_METRIC_MATRIX` 期望的英文 slug（`douyin`/`wechat`）命名空间**不一致**。这是历史数据 normalization 不全的产物——绝大多数中文 platform 的 0% 覆盖率实际是采集器没拉互动指标而非平台不支持。**不能直接套用这些覆盖率到 matrix**。
+
+### Fallback 2: `collected_items` 最近 30 天（仅 20 条 douyin）
+
+| platform | count | likes | comments | shares | favorites | views |
+|----------|-------|-------|----------|--------|-----------|-------|
+| douyin | 20 | 1.0000 | 0.9000 | 0.9500 | 0.9500 | 0.0000 |
+
+最近 30 天只有 douyin 有数据，`views=0` 符合 plan 假设（抖音的播放数采集器没拉）。
+
+### Fallback 3: `benchmark_posts + my_post_distributions`（按账号采的真实 posts，25 条，英文 slug）
+
+| platform | count | likes | comments | shares | favorites | views |
+|----------|-------|-------|----------|--------|-----------|-------|
+| douyin | 14 | 1.0000 | 1.0000 | 1.0000 | 0.0000 ⚠️ | 1.0000 |
+| website | 5 | 1.0000 | 1.0000 | 1.0000 | 0.0000 ⚠️ | 1.0000 |
+| app | 3 | 1.0000 | 1.0000 | 1.0000 | 0.0000 ⚠️ | 1.0000 |
+| weibo | 2 | 1.0000 | 1.0000 | 1.0000 | 0.0000 ⚠️ | 1.0000 |
+| wechat | 1 | 1.0000 | 1.0000 | 1.0000 | 0.0000 ⚠️ | 1.0000 |
+
+⚠️ **Caveat（favorites 假阴性）**：`benchmark_posts` 和 `my_post_distributions` schema 根本没有 `favorite_count` 字段（只 4 个指标），所以 favorites 全为 0 不能表示平台不支持。
+
+### 对 Task 1.1 PLATFORM_METRIC_MATRIX 的建议（信号薄弱）
+
+由于上述 caveat，**保留 plan §L141 中基于"采集器理论能力"的经验默认值**，且暂时不依据本次 audit 调整。仅记录两条"可能为 false"的弱信号（待生产 snapshots 数据再确认）：
+
+- ⚠️ **抖音 (`douyin`) `views`**：collected_items 数据显示 views ≈ 0~3%，但 benchmark_posts 显示 1.0。矛盾来源是采集器分两路——通过 benchmark_account 抓数据有 views，通过 hot_topic 抓没有。**保留 `views: true`**（新 DAL 走 snapshots，snapshot job 从 my_post_distributions/benchmark_posts 聚合）。
+- ⚠️ **公众号 (`wechat` / `wechat_oa`) `views`**：本质上等于"阅读数"，公众号语境下是核心指标。保留 `views: true`，并在 UI 中可能要把 `METRIC_LABELS` 中文案改为"阅读数"。
+
+### 后续 audit 计划
+
+- Phase 1 上线后 1 周内跑 daily-snapshot cron 让 snapshots 表积累数据
+- ≥ 30 天后跑 `scripts/audit-snapshots-coverage.ts` 第二次，用真实 snapshots 数据回填本附录
+- 那时再决定是否调整 PLATFORM_METRIC_MATRIX 与 `views` label 文案
 
 ---
 
