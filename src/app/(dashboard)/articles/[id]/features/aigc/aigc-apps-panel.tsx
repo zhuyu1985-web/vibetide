@@ -99,7 +99,7 @@ export function AigcAppsPanel() {
           AI 内容创作工具集，结合稿件正文一键生成图片 / 视频 / 音频 等素材。
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2">
+      <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2 auto-rows-min content-start">
         {APPS.map((app) => {
           const Icon = app.icon;
           return (
