@@ -7,6 +7,8 @@ import { useAccountAnalyticsURLState } from "./use-url-state";
 import { MetricTrendChart } from "./metric-trend-chart";
 import { PublishActivityCard } from "./publish-activity-card";
 import { RecentTopPosts } from "./recent-top-posts";
+import { CategoryDistribution } from "./category-distribution";
+import { KeywordCloud } from "./keyword-cloud";
 import {
   getMetricAvailability,
   getSummaryCards,
@@ -15,11 +17,13 @@ import {
   type MetricKey,
 } from "@/lib/account-analytics/platform-meta";
 import {
+  loadCategoryDistributionAction,
+  loadKeywordCloudAction,
   loadMetricSeriesAction,
   loadPublishActivityAction,
   loadRecentTopPostsAction,
 } from "@/app/actions/account-analytics-tab1";
-import type { TopSort } from "./use-url-state";
+import type { CloudRange, TopSort } from "./use-url-state";
 
 interface Props {
   accountId: string;
@@ -29,8 +33,16 @@ interface Props {
 const GRANULARITIES: Granularity[] = ["day", "week", "month"];
 
 export function DataAnalysisTab({ accountId, platform }: Props) {
-  const { granularity, metric, topSort, setGranularity, setMetric, setTopSort } =
-    useAccountAnalyticsURLState();
+  const {
+    granularity,
+    metric,
+    topSort,
+    cloudRange,
+    setGranularity,
+    setMetric,
+    setTopSort,
+    setCloudRange,
+  } = useAccountAnalyticsURLState();
   const availability = getMetricAvailability(platform);
   const summaryKeys = getSummaryCards(platform);
 
@@ -48,6 +60,14 @@ export function DataAnalysisTab({ accountId, platform }: Props) {
   );
   const topLoader = useCallback(
     (m: TopSort) => loadRecentTopPostsAction({ accountId, mode: m }),
+    [accountId],
+  );
+  const categoryLoader = useCallback(
+    () => loadCategoryDistributionAction({ accountId }),
+    [accountId],
+  );
+  const cloudLoader = useCallback(
+    (r: CloudRange) => loadKeywordCloudAction({ accountId, range: r }),
     [accountId],
   );
 
@@ -96,10 +116,15 @@ export function DataAnalysisTab({ accountId, platform }: Props) {
         />
       </GlassCard>
 
-      {/* 区块 C · Phase 2 占位 */}
+      {/* 区块 C · 类型占比 + 词云 */}
       <GlassCard padding="lg">
-        <div className="text-center py-12 text-sm text-gray-400">
-          内容分类与热门词云正在分析中,预计 24 小时内可见
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CategoryDistribution loader={categoryLoader} />
+          <KeywordCloud
+            range={cloudRange}
+            onRangeChange={setCloudRange}
+            loader={cloudLoader}
+          />
         </div>
       </GlassCard>
 

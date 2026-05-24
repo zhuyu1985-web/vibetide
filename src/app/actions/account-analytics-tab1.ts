@@ -6,6 +6,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
+  getCategoryDistribution,
+  getKeywordCloud,
   getMetricSeries,
   getPublishActivity,
   getRecentTopPosts,
@@ -46,4 +48,19 @@ export async function loadRecentTopPostsAction(input: {
 }) {
   const orgId = await requireOrgId();
   return getRecentTopPosts({ orgId, ...input });
+}
+
+export async function loadCategoryDistributionAction(input: {
+  accountId: string;
+}) {
+  const orgId = await requireOrgId();
+  return getCategoryDistribution({ orgId, ...input });
+}
+
+export async function loadKeywordCloudAction(input: {
+  accountId: string;
+  range: "7d" | "30d";
+}) {
+  const orgId = await requireOrgId();
+  return getKeywordCloud({ orgId, ...input });
 }
