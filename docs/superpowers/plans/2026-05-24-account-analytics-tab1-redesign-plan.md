@@ -1746,7 +1746,7 @@ export const annotateCollectedContent = inngest.createFunction(
 
     if (items.length === 0) return { done: true, processed: 0 }
 
-    // 2) 并行 LLM 调用（concurrency=5 由 createFunction 控制）
+    // 2) 并行 LLM 调用（concurrency=2 由 createFunction 控制，对齐 db pool max:2）
     //    AI SDK v6：generateText + Output.object（generateObject 已移除）
     //    model 通过 model-router 选用项目统一配置的 LLM，不直接绑定 provider
     const modelConfig = resolveModelConfig(['content_analysis'], { temperature: 0, maxTokens: 256 })
@@ -1783,7 +1783,7 @@ export const annotateCollectedContent = inngest.createFunction(
     //    项目里已有 12 处 db.transaction（如 missions.ts:391）都是串行模式，照搬。
     //
     //    50 条串行 UPDATE 在已建立连接上约 50-200ms，远低于 Inngest step timeout。
-    //    Inngest 函数 concurrency:5 + db pool max:2 仍可能阻塞——见下方 concurrency 调整。
+    //    Inngest 函数 concurrency:2 与 db pool max:2 对齐，避免抢连接。
     await step.run('persist', async () => {
       const now = new Date()
       await db.transaction(async (tx) => {
