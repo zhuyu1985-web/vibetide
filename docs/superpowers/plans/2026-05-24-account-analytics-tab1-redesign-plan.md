@@ -81,8 +81,18 @@ git add scripts/audit-snapshots-coverage.ts 2>/dev/null  # 如果保存了脚本
 
 ### Task 1.1: 扩展 `platform-meta.ts` 增加指标矩阵与数字带映射
 
+**前置依赖：必须先跑完 Task 0.1 audit，把附录 A 表格填完，再来填本任务的 `PLATFORM_METRIC_MATRIX` 各项 boolean。**
+
 **Files:**
 - Modify: `src/lib/account-analytics/platform-meta.ts`（在文件末尾追加，不动现有导出）
+
+- [ ] **Step 0: 用 Task 0.1 audit 结果回填 PLATFORM_METRIC_MATRIX 默认值**
+
+打开附录 A 表格，对每个平台每个指标的 coverage：
+- `≥ 0.5` → 标 `true`
+- `< 0.5` → 标 `false`
+
+下面的 boolean 是开发占位，必须替换为 audit 结果。
 
 - [ ] **Step 1: 在文件末尾追加常量**
 
@@ -196,9 +206,12 @@ Create or extend `src/lib/dal/__tests__/account-analytics.test.ts`:
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { randomUUID } from 'node:crypto'
 import { db } from '@/db'
 import { organizations } from '@/db/schema'
-import { myAccounts, accountDailySnapshots } from '@/db/schema/account-analytics'
+// ⚠️ myAccounts 在 topic-compare-v2.ts，不在 account-analytics.ts
+import { myAccounts } from '@/db/schema/topic-compare-v2'
+import { accountDailySnapshots } from '@/db/schema/account-analytics'
 import { eq, inArray } from 'drizzle-orm'
 import { getMetricSeries } from '../account-analytics'
 
@@ -270,7 +283,7 @@ describe('getMetricSeries', () => {
   })
 
   it('跨 org 无数据返回空数组', async () => {
-    const otherOrgId = crypto.randomUUID()  // 随机生成，保证查不到任何数据
+    const otherOrgId = randomUUID()  // 随机生成（node:crypto），保证查不到任何数据
     const series = await getMetricSeries({
       orgId: otherOrgId, accountId, granularity: 'day', metric: 'likes',
     })
@@ -286,11 +299,15 @@ Expected: FAIL — "getMetricSeries is not a function"
 
 - [ ] **Step 3: 实现 DAL 函数**
 
+⚠️ **Drizzle SQL 写法约定**：项目用 `sql\`...\`` tagged template（自动参数化）。**不要**用 `db.execute(sql.raw(...), [bindings])`——Drizzle `db.execute()` 只接受单个 `SQL` 对象，没有 bindings 第二参数。identifier（列名、time unit）用 `sql.raw()` 内嵌**前先做白名单校验**避免注入。参考 `src/lib/dal/account-analytics.ts:296,650` 已有写法。
+
 Append to `src/lib/dal/account-analytics.ts`:
 
 ```ts
+import { sql } from 'drizzle-orm'
 import { GRANULARITY_WINDOW_DAYS, type Granularity, type MetricKey } from '@/lib/account-analytics/platform-meta'
 
+// 列名白名单（杜绝注入）；改 sql.raw 前先 lookup
 const METRIC_COLUMN_MAP: Record<MetricKey, string> = {
   likes:          'total_likes',
   comments:       'total_comments',
@@ -299,6 +316,7 @@ const METRIC_COLUMN_MAP: Record<MetricKey, string> = {
   views:          'total_views',
   compositeScore: 'composite_score_total',
 }
+const TRUNC_UNIT_MAP: Record<Granularity, string> = { day: 'day', week: 'week', month: 'month' }
 
 export async function getMetricSeries(opts: {
   orgId: string
@@ -309,23 +327,22 @@ export async function getMetricSeries(opts: {
   const { orgId, accountId, granularity, metric } = opts
   const column = METRIC_COLUMN_MAP[metric]
   if (!column) throw new Error(`Unknown metric: ${metric}`)
-
+  const truncUnit = TRUNC_UNIT_MAP[granularity]
   const windowDays = GRANULARITY_WINDOW_DAYS[granularity]
-  const truncUnit = granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month'
 
-  const rows = await db.execute(sql.raw(`
+  const rows = await db.execute(sql`
     SELECT
-      TO_CHAR(DATE_TRUNC('${truncUnit}', snapshot_date), 'YYYY-MM-DD') AS bucket,
-      SUM(${column})::float AS value
+      TO_CHAR(DATE_TRUNC(${truncUnit}, snapshot_date), 'YYYY-MM-DD') AS bucket,
+      COALESCE(SUM(${sql.raw(column)}), 0)::float AS value
     FROM account_daily_snapshots
-    WHERE organization_id = $1
-      AND account_id = $2
-      AND snapshot_date >= CURRENT_DATE - INTERVAL '${windowDays} days'
-    GROUP BY DATE_TRUNC('${truncUnit}', snapshot_date)
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND snapshot_date >= CURRENT_DATE - (${windowDays}::int * INTERVAL '1 day')
+    GROUP BY DATE_TRUNC(${truncUnit}, snapshot_date)
     ORDER BY bucket ASC
-  `), [orgId, accountId])
+  `)
 
-  return rows.map((r: Record<string, unknown>) => ({
+  return (rows as unknown as Array<Record<string, unknown>>).map((r) => ({
     bucket: String(r.bucket),
     value: Number(r.value ?? 0),
   }))
@@ -396,46 +413,37 @@ Append to `src/lib/dal/account-analytics.ts`:
 
 ```ts
 import { getSummaryCards, type SummaryKey } from '@/lib/account-analytics/platform-meta'
-import { myAccounts, benchmarkAccounts } from '@/db/schema/account-analytics'
+
+// 关键决策：不在 DAL 里查 platform。page.tsx 已经加载了 account 对象（含 platform），
+// 上层传入更简单，也避免 my_accounts/benchmark_accounts 跨表 JOIN（两表在 topic-compare-v2.ts）。
 
 export async function getPublishActivity(opts: {
   orgId: string
   accountId: string
+  platform: string  // 由上层传入
   granularity: Granularity
 }): Promise<{
   buckets: Array<{ bucket: string; publishCount: number }>
   summary: Partial<Record<SummaryKey, number>>
 }> {
-  const { orgId, accountId, granularity } = opts
+  const { orgId, accountId, platform, granularity } = opts
   const windowDays = GRANULARITY_WINDOW_DAYS[granularity]
-  const truncUnit = granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month'
-
-  // 查平台
-  const [acc] = await db
-    .select({ platform: sql<string>`COALESCE(my.platform, bm.platform)` })
-    .from(sql`(SELECT ${accountId}::uuid AS id) k`)
-    .leftJoin(sql`my_accounts my`, sql`my.id = k.id AND my.organization_id = ${orgId}`)
-    .leftJoin(sql`benchmark_accounts bm`, sql`bm.id = k.id`)
-    .limit(1)
-
-  const platform = acc?.platform ?? 'other'
+  const truncUnit = TRUNC_UNIT_MAP[granularity]
   const cards = getSummaryCards(platform)
 
-  // 1) buckets
-  const bucketRows = await db.execute(sql.raw(`
+  const bucketRows = await db.execute(sql`
     SELECT
-      TO_CHAR(DATE_TRUNC('${truncUnit}', snapshot_date), 'YYYY-MM-DD') AS bucket,
-      SUM(post_count)::int AS publish_count
+      TO_CHAR(DATE_TRUNC(${truncUnit}, snapshot_date), 'YYYY-MM-DD') AS bucket,
+      COALESCE(SUM(post_count), 0)::int AS publish_count
     FROM account_daily_snapshots
-    WHERE organization_id = $1
-      AND account_id = $2
-      AND snapshot_date >= CURRENT_DATE - INTERVAL '${windowDays} days'
-    GROUP BY DATE_TRUNC('${truncUnit}', snapshot_date)
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND snapshot_date >= CURRENT_DATE - (${windowDays}::int * INTERVAL '1 day')
+    GROUP BY DATE_TRUNC(${truncUnit}, snapshot_date)
     ORDER BY bucket ASC
-  `), [orgId, accountId])
+  `) as unknown as Array<Record<string, unknown>>
 
-  // 2) summary
-  const [sumRow] = await db.execute(sql.raw(`
+  const sumRows = await db.execute(sql`
     SELECT
       COALESCE(SUM(post_count), 0)::int AS publish_count,
       COALESCE(SUM(total_likes), 0)::bigint AS total_likes,
@@ -445,22 +453,23 @@ export async function getPublishActivity(opts: {
       COALESCE(SUM(total_views), 0)::bigint AS total_views,
       COALESCE(MAX(total_likes), 0)::int AS max_likes,
       COALESCE(MAX(total_views), 0)::int AS max_views,
-      COALESCE(AVG(NULLIF(total_likes,0)), 0)::int AS avg_likes,
-      COALESCE(AVG(NULLIF(total_views,0)), 0)::int AS avg_views
+      COALESCE(AVG(NULLIF(total_likes, 0)), 0)::int AS avg_likes,
+      COALESCE(AVG(NULLIF(total_views, 0)), 0)::int AS avg_views
     FROM account_daily_snapshots
-    WHERE organization_id = $1
-      AND account_id = $2
-      AND snapshot_date >= CURRENT_DATE - INTERVAL '${windowDays} days'
-  `), [orgId, accountId]) as Array<Record<string, unknown>>
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND snapshot_date >= CURRENT_DATE - (${windowDays}::int * INTERVAL '1 day')
+  `) as unknown as Array<Record<string, unknown>>
+  const sumRow = sumRows[0] ?? {}
 
   const summary: Partial<Record<SummaryKey, number>> = {}
   for (const key of cards) {
     const sqlKey = key.replace(/[A-Z]/g, (m) => '_' + m.toLowerCase())
-    summary[key] = Number(sumRow?.[sqlKey] ?? 0)
+    summary[key] = Number(sumRow[sqlKey] ?? 0)
   }
 
   return {
-    buckets: bucketRows.map((r: Record<string, unknown>) => ({
+    buckets: bucketRows.map((r) => ({
       bucket: String(r.bucket),
       publishCount: Number(r.publish_count ?? 0),
     })),
@@ -468,6 +477,8 @@ export async function getPublishActivity(opts: {
   }
 }
 ```
+
+**注**：调用方需要同步更新——Task 1.10 中 `loadPublishActivityAction` 加 `platform` 参数；Task 1.11 上层 page.tsx 已有 `account.platform`，传下来即可。
 
 - [ ] **Step 4: 跑测试看 PASS**
 
@@ -492,35 +503,94 @@ git commit -m "feat(account-analytics): DAL getPublishActivity 返回发布活�
 
 - [ ] **Step 1: 先写测试（含 collected_items fixture）**
 
+⚠️ **collected_items 类型与 NOT NULL 字段速查表**（来自 `src/db/schema/collection.ts:61-160`）：
+
+| 字段 | 类型 | NOT NULL | 默认 |
+|---|---|---|---|
+| `id` | uuid | ✓ | gen_random_uuid() |
+| `organizationId` | uuid | ✓ | — |
+| **`accountId`** | **text**（注意不是 uuid！） | optional | NULL |
+| `contentFingerprint` | text | ✓ | — （unique 约束 `(org, fp)`）|
+| `title` | text | ✓ | — |
+| `firstSeenChannel` | text | ✓ | — |
+| `firstSeenAt` | timestamptz | ✓ | — |
+| `sourceChannels` | jsonb | ✓ | `'[]'` |
+| `category` | text[] | ✓ | `ARRAY[]::text[]` |
+| `derivedModules` | text[] | ✓ | `ARRAY[]::text[]` |
+| `enrichmentStatus` | text | ✓ | `'pending'` |
+| `contentType` | text | ✓ | `'image_text'` |
+| `likeCount/commentCount/shareCount/viewCount/favoriteCount/replyCount` | int | ✓ | 0 |
+| `compositeScore` | real | ✓ | 0 |
+| `createdAt/updatedAt` | timestamptz | ✓ | now() |
+| `summary/thumbnail/sourceUrl/publishedAt` | nullable | — | NULL |
+
 ```ts
 import { collectedItems } from '@/db/schema'
 import { getRecentTopPosts } from '../account-analytics'
+import { randomUUID } from 'node:crypto'
 
 let itemId1: string, itemId2: string
+// myAccount.id 是 uuid，但 collected_items.accountId 是 text。
+// 把 uuid 转 string 直接存进去（drizzle 会自动 cast），实际生产数据 accountId 就是 platform-specific 字符串
+const accountIdForItems = accountId  // 复用 Task 1.2 fixture 中的 accountId（已是 string）
 
 beforeAll(async () => {
-  // 在前面 fixture 后再插 2 条 collected_items
-  // ⚠️ 注意：可能需要先建 collectionSources，参照 src/lib/dal/__tests__/collected-items.test.ts:55
   const now = new Date()
-  // ...省略 source 创建...
-  const [r1, r2] = await db.insert(collectedItems).values([
-    { organizationId: orgId, accountId, title: 'Top1', publishedAt: now,
-      likeCount: 1000, commentCount: 100, viewCount: 10000, compositeScore: '90.5', ... },
-    { organizationId: orgId, accountId, title: 'Top2', publishedAt: new Date(now.getTime() - 86400000),
-      likeCount: 500, commentCount: 50, viewCount: 5000, compositeScore: '60.0', ... },
-  ]).returning()
-  itemId1 = r1.id
-  itemId2 = r2.id
+  const fp1 = randomUUID()
+  const fp2 = randomUUID()
+  const inserted = await db.insert(collectedItems).values([
+    {
+      organizationId: orgId,
+      accountId: accountIdForItems,
+      contentFingerprint: fp1,
+      title: 'Top1 Highest Score',
+      firstSeenChannel: 'test',
+      firstSeenAt: now,
+      publishedAt: now,
+      likeCount: 1000,
+      commentCount: 100,
+      viewCount: 10000,
+      compositeScore: 90.5,
+      summary: 'top1 summary',
+      sourceUrl: 'https://example.com/top1',
+      // sourceChannels/category/derivedModules/enrichmentStatus/contentType
+      // 全部依赖默认值，无需显式传
+    },
+    {
+      organizationId: orgId,
+      accountId: accountIdForItems,
+      contentFingerprint: fp2,
+      title: 'Top2 Latest',
+      firstSeenChannel: 'test',
+      firstSeenAt: new Date(now.getTime() - 86_400_000),
+      publishedAt: new Date(now.getTime() - 86_400_000),
+      likeCount: 500,
+      commentCount: 50,
+      viewCount: 5000,
+      compositeScore: 60.0,
+      summary: 'top2 summary',
+      sourceUrl: 'https://example.com/top2',
+    },
+  ]).returning({ id: collectedItems.id })
+  itemId1 = inserted[0].id
+  itemId2 = inserted[1].id
+})
+
+afterAll(async () => {
+  await db.delete(collectedItems).where(inArray(collectedItems.id, [itemId1, itemId2]))
+  // ...其他清理...
 })
 
 describe('getRecentTopPosts', () => {
   it('mode=hot 按 compositeScore 降序', async () => {
-    const rows = await getRecentTopPosts({ orgId, accountId, mode: 'hot', limit: 5 })
+    const rows = await getRecentTopPosts({ orgId, accountId: accountIdForItems, mode: 'hot', limit: 5 })
+    expect(rows.length).toBeGreaterThan(0)
     expect(rows[0].score >= (rows[1]?.score ?? 0)).toBe(true)
   })
 
   it('mode=latest 按 publishedAt 降序', async () => {
-    const rows = await getRecentTopPosts({ orgId, accountId, mode: 'latest', limit: 5 })
+    const rows = await getRecentTopPosts({ orgId, accountId: accountIdForItems, mode: 'latest', limit: 5 })
+    expect(rows.length).toBeGreaterThan(0)
     expect(new Date(rows[0].publishedAt).getTime()).toBeGreaterThan(
       new Date(rows[1]?.publishedAt ?? 0).getTime() - 1,
     )
@@ -528,7 +598,13 @@ describe('getRecentTopPosts', () => {
 })
 ```
 
-注意：`collectedItems` 实际 schema 字段在 `src/db/schema/collection.ts:61` 起，必须按真实字段填，特别是 `externalId` / `sourceUrl` / `canonicalUrlHash` 可能是 NOT NULL。implementer 先 `Read` 一遍 collection.ts:61-200 再写 fixture。
+⚠️ **跨表 accountId 类型不一致**（重要！）：
+- `account_daily_snapshots.account_id` 是 **uuid** notNull（schema/account-analytics.ts:39）
+- `collected_items.account_id` 是 **text** nullable（schema/collection.ts:122）
+
+实际生产数据中，collected_items.account_id 存的是 `my_accounts.id` 或 `benchmark_accounts.id` 的 uuid 字符串形式。所以 fixture 里**两张表用同一个 uuid string**就能跑通：snapshot 表认它是 uuid，items 表认它是 text，PG 自动 cast。
+
+Task 1.2 / 1.3 fixture 已经从 `myAccounts.id`（uuid）拿到 string，直接复用到 collected_items 也对。但写测试时记得 **类型上 collected_items.accountId 是 string** — 如果在 plain object spreads 里写 `accountId: someUuid` 会被 drizzle 当 text，没问题。
 
 - [ ] **Step 2: 跑测试看 FAIL** 
 
@@ -619,6 +695,8 @@ git commit -m "feat(account-analytics): DAL getRecentTopPosts 返回近 30 天 T
 **Files:**
 - Create: `src/app/(dashboard)/account-analytics/[accountId]/components/use-url-state.ts`
 
+⚠️ **Next.js 16 强制要求**：`useSearchParams()` 必须被 `<Suspense>` 包裹，否则 prod build 会 fail（"useSearchParams() should be wrapped in a suspense boundary"）。Task 1.11 改 `account-overview-client.tsx` 时要保证调用 hook 的组件外层在 page.tsx server component 里有 `<Suspense fallback={...}>` 包裹。
+
 - [ ] **Step 1: 实现 hook**
 
 ```ts
@@ -706,7 +784,9 @@ git commit -m "feat(account-analytics): URL state hook 同步 tab/粒度/指标/
 ### Task 1.6: MetricPillButton 组件（左侧胶囊按钮）
 
 **Files:**
-- Create: `src/components/account-analytics/metric-pill-button.tsx`
+- Create: `src/app/(dashboard)/account-analytics/[accountId]/components/metric-pill-button.tsx`
+
+（路径统一：本页私有的展示组件全部放 `[accountId]/components/`，不污染 `src/components/account-analytics/` 的共享层）
 
 - [ ] **Step 1: 实现**
 
@@ -744,7 +824,7 @@ export function MetricPillButton({ label, active, onClick }: Props) {
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/components/account-analytics/metric-pill-button.tsx
+git add src/app/\(dashboard\)/account-analytics/\[accountId\]/components/metric-pill-button.tsx
 git commit -m "feat(account-analytics): 新增 MetricPillButton 胶囊按钮组件"
 ```
 
@@ -761,7 +841,7 @@ git commit -m "feat(account-analytics): 新增 MetricPillButton 胶囊按钮组�
 'use client'
 import { useEffect, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { MetricPillButton } from '@/components/account-analytics/metric-pill-button'
+import { MetricPillButton } from './metric-pill-button'
 import {
   METRIC_KEYS, METRIC_LABELS, GRANULARITY_LABELS,
   type MetricKey, type Granularity,
@@ -1053,6 +1133,8 @@ git commit -m "feat(account-analytics): 区块 D 近期 TOP5（最热/最新切�
 - Create: `src/app/(dashboard)/account-analytics/[accountId]/components/data-analysis-tab.tsx`
 - Create: `src/app/actions/account-analytics-tab1.ts`（Server Actions 给客户端组件调）
 
+⚠️ **Race condition 警示**：区块 A/B/D 组件内 `useEffect` 触发 Server Action 时，快速切换粒度（day → week → day）会有"旧请求晚到、覆盖新请求"的问题。React 19 的 transition 不会自救。**实施时必须**：在每个 loader 调用前生成一个 race id（如 `useRef(0)`），fetch 回来时对比当前 id 是否一致，不一致就 return；或使用 `AbortController` 取消旧请求。下方代码骨架未实现这块——implementer 需在 Task 1.7/1.8/1.9 组件内补上。
+
 - [ ] **Step 1: 实现 Server Actions wrapper**
 
 ```ts
@@ -1075,6 +1157,7 @@ export async function loadMetricSeriesAction(input: {
 
 export async function loadPublishActivityAction(input: {
   accountId: string
+  platform: string  // 上层 page.tsx 已有 account.platform
   granularity: Granularity
 }) {
   const user = await requireAuth()
@@ -1125,8 +1208,8 @@ export function DataAnalysisTab({ accountId, platform }: Props) {
     [accountId],
   )
   const publishLoader = useCallback(
-    (g: typeof granularity) => loadPublishActivityAction({ accountId, granularity: g }),
-    [accountId],
+    (g: typeof granularity) => loadPublishActivityAction({ accountId, platform, granularity: g }),
+    [accountId, platform],
   )
   const topLoader = useCallback(
     (m: typeof topSort) => loadRecentTopPostsAction({ accountId, mode: m }),
@@ -1213,28 +1296,38 @@ git commit -m "feat(account-analytics): DataAnalysisTab 容器组装 4 区块 + 
 - Modify: `src/app/(dashboard)/account-analytics/[accountId]/account-overview-client.tsx`
 - Create: `src/app/(dashboard)/account-analytics/[accountId]/components/reports-tab.tsx`（把现有报告列表抽出来，UI 不动）
 
-- [ ] **Step 1: 抽出现有报告列表为独立组件**
+- [ ] **Step 1: 定位真实剪切范围**
 
-把 `account-overview-client.tsx` 第 132-235 行（`{/* 历史报告列表 */}` 那个 `<GlassCard>` 块）整块剪切到新文件 `components/reports-tab.tsx`，包成 `<ReportsTab>` 组件，把 props（reports, account）传进去。
+先 `wc -l` + `grep -n "历史报告列表\|{\* 历史报告"` 重新确认行号（原 plan 写的范围基于过时认知）。实际 `account-overview-client.tsx` 中：
+- 顶部账号 header / 30 天 KPI 卡片 / 30 天趋势图 GlassCard **必须保留在常驻区**
+- 只剪「历史报告列表」`<GlassCard>` 那一块（含上方标题 + chip 切换 + 列表条目）到 `ReportsTab`
 
-UI **必须像素级一致**（spec §10.2 Tab2 视觉回归项）。typeFilter / filteredReports / typeCounts 等内部状态也搬过去。
+```bash
+grep -n "历史报告\|REPORT_TYPE_FILTER_ORDER\|filteredReports" src/app/\(dashboard\)/account-analytics/\[accountId\]/account-overview-client.tsx
+```
+
+确认起止行号后再剪。剪过去到新文件时，把以下状态/常量一并搬：`typeFilter` useState、`filteredReports` derived、`typeCounts` Map、`REPORT_TYPE_LABELS` / `REPORT_TYPE_FILTER_ORDER` / `STATUS_LABELS`（如这些常量没在别处复用）。
+
+UI **必须像素级一致**（spec §10.2 Tab2 视觉回归项）。
 
 - [ ] **Step 2: 改 account-overview-client.tsx 接入 Tabs**
 
-把第 132-235 行替换为：
+`account-overview-client.tsx` 顶部 `"use client"` 保留不动。在 import 区追加：
 
 ```tsx
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DataAnalysisTab } from './components/data-analysis-tab'
 import { ReportsTab } from './components/reports-tab'
 import { useAccountAnalyticsURLState } from './components/use-url-state'
+```
 
-// ... 在 return 内，原 GlassCard 报告列表的位置：
-
+在组件函数体顶部加：
+```tsx
 const { tab, setTab } = useAccountAnalyticsURLState()
-// ⚠️ AccountOverviewClient 必须包成 'use client' 整体，
-//    因为 useAccountAnalyticsURLState 是 client hook
+```
 
+把原 `<GlassCard>` 历史报告整块替换为：
+```tsx
 <Tabs value={tab} onValueChange={(v) => setTab(v as 'analytics' | 'reports')}>
   <TabsList variant="line" className="mb-4">
     <TabsTrigger value="analytics">数据分析</TabsTrigger>
@@ -1247,6 +1340,22 @@ const { tab, setTab } = useAccountAnalyticsURLState()
     <ReportsTab account={account} reports={reports} />
   </TabsContent>
 </Tabs>
+```
+
+- [ ] **Step 2.5: page.tsx 加 Suspense 包裹 client component**
+
+Next.js 16 要求使用 `useSearchParams()` 的 client component 必须被 `<Suspense>` 包裹，否则 prod build fail。Modify `src/app/(dashboard)/account-analytics/[accountId]/page.tsx`：
+
+```tsx
+import { Suspense } from 'react'
+
+// ...原 server logic 不变...
+
+return (
+  <Suspense fallback={<div className="p-8 text-sm text-gray-400">加载中...</div>}>
+    <AccountOverviewClient account={account} overview={overview} reports={reports} />
+  </Suspense>
+)
 ```
 
 - [ ] **Step 3: 验证 Tabs variant="line" 是否存在**
@@ -1550,14 +1659,23 @@ const MODEL_TAG = 'deepseek.chat.v3'
 
 const annotationSchema = z.object({
   category: z.enum(AIGC_CONTENT_CATEGORIES),
+  // spec §7.3 要 5-10 个；min(3) 是兼容 LLM 短文偶尔输出少的容错
   keywords: z.array(z.string().min(1).max(20)).min(3).max(10),
 })
+
+const ATTRIBUTION_SYSTEM_PROMPT = `你是中文内容分类助手。
+必须严格按以下规则输出：
+- category：从 [时政, 社会, 财经, 科技, 生活, 娱乐, 体育, 其他] 中**必须选 1 个**；无法判断时选"其他"
+- keywords：5-10 个中文关键词（**实词**，禁止虚词「的、了、是、在」等），按重要性排序`
 
 export const annotateCollectedContent = inngest.createFunction(
   {
     id: 'account-analytics-annotate-content',
     concurrency: { limit: 5 },
-    retries: 2,
+    // retries: 0 配合下方 Step 3 "失败行兜底写'其他'"机制 —— 单次 step 必须把这批 50 条
+    // 全部解决（成功或兜底），不让 Inngest 自动重试。两者同时存在会导致兜底完后整函数
+    // 重跑时已无未标注行 → 拉下一批 → 再失败 → 再熔断，链路不收敛。
+    retries: 0,
   },
   [
     { event: 'account-analytics/aigc-annotate.requested' },
@@ -1597,15 +1715,11 @@ export const annotateCollectedContent = inngest.createFunction(
         try {
           const { output } = await generateText({
             model: getLanguageModel(modelConfig),
+            system: ATTRIBUTION_SYSTEM_PROMPT,
+            prompt: `请对以下内容分类并提取关键词：\n\n${text}`,
             output: Output.object({ schema: annotationSchema }),
             temperature: modelConfig.temperature,
             maxOutputTokens: modelConfig.maxTokens,
-            prompt: `你是中文内容分类助手。请阅读以下内容，输出：
-1. category：从 [时政, 社会, 财经, 科技, 生活, 娱乐, 体育, 其他] 中**必须选 1 个**，无法判断时选"其他"
-2. keywords：3-10 个中文关键词（实词，禁止虚词「的、了、是」等），按重要性排序
-
-内容：
-${text}`,
           })
           // 过滤停用词
           const filtered = output.keywords.filter((kw) => !CHINESE_STOPWORDS.has(kw) && kw.length > 1)
@@ -1621,23 +1735,24 @@ ${text}`,
     const failureRate = failureCount / results.length
 
     // 3) 批量 UPDATE（失败行也兜底写入'其他'防无限重选）
+    //    用事务 + Promise.all 并行：50 条单 UPDATE 串行会 250ms-1s round-trip，
+    //    Inngest step 在 pgbouncer 抖动下会触发超时；并行 + 事务保证原子性。
     await step.run('persist', async () => {
       const now = new Date()
-      for (const r of results) {
-        if (r.ok) {
-          await db
-            .update(collectedItems)
-            .set({
-              aigcContentCategory: r.category,
-              aigcKeywords: r.keywords,
-              aigcAnnotatedAt: now,
-              aigcAnnotationModel: MODEL_TAG,
-            })
-            .where(eq(collectedItems.id, r.id))
-        } else {
+      await db.transaction(async (tx) => {
+        await Promise.all(results.map((r) => {
+          if (r.ok) {
+            return tx.update(collectedItems)
+              .set({
+                aigcContentCategory: r.category,
+                aigcKeywords: r.keywords,
+                aigcAnnotatedAt: now,
+                aigcAnnotationModel: MODEL_TAG,
+              })
+              .where(eq(collectedItems.id, r.id))
+          }
           // 失败兜底
-          await db
-            .update(collectedItems)
+          return tx.update(collectedItems)
             .set({
               aigcContentCategory: '其他',
               aigcKeywords: [],
@@ -1645,8 +1760,8 @@ ${text}`,
               aigcAnnotationModel: `${MODEL_TAG}.failed`,
             })
             .where(eq(collectedItems.id, r.id))
-        }
-      }
+        }))
+      })
     })
 
     // 4) 熔断
