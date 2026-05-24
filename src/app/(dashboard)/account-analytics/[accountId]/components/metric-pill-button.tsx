@@ -17,7 +17,7 @@ export function MetricPillButton({ label, active, onClick }: Props) {
         'inline-flex items-center justify-center w-full px-4 py-2.5 rounded-full',
         'text-[13px] font-medium transition-all border-0 cursor-pointer',
         active
-          ? 'bg-gradient-to-r from-[#FF8B47] to-[#FF5E37] text-white shadow-md shadow-orange-200/50'
+          ? 'bg-gradient-to-r from-sky-400 to-sky-500 text-white shadow-md shadow-sky-200/50'
           : 'bg-gray-50 dark:bg-gray-800/40 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800',
       )}
     >

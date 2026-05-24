@@ -23,8 +23,8 @@ interface Props {
 }
 
 const COLOR_PALETTE = [
-  '#FF5E37', '#FFB070', '#2E75B6', '#00B5A8', '#9B59B6',
-  '#F39C12', '#16A085', '#E74C3C', '#3498DB', '#34495E',
+  '#2E75B6', '#7CB9E8', '#0EA5E9', '#00B5A8', '#9B59B6',
+  '#3498DB', '#16A085', '#1F3864', '#34495E', '#5B8DEF',
 ]
 
 export function KeywordCloud({ range, onRangeChange, loader }: Props) {
@@ -85,7 +85,7 @@ export function KeywordCloud({ range, onRangeChange, loader }: Props) {
               onClick={() => onRangeChange(r)}
               className={cn(
                 'px-3 py-1 rounded-full text-[11px] font-medium border-0 cursor-pointer transition-colors',
-                range === r ? 'bg-white text-[#FF5E37] shadow-sm' : 'text-gray-500',
+                range === r ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500',
               )}
             >
               {r === '7d' ? '近一周' : '近一月'}

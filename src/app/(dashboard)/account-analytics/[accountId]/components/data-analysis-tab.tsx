@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { GlassCard } from "@/components/shared/glass-card";
+import { LineChartCard } from "@/components/charts/line-chart-card";
 import { cn } from "@/lib/utils";
 import { useAccountAnalyticsURLState } from "./use-url-state";
 import { MetricTrendChart } from "./metric-trend-chart";
@@ -25,14 +26,20 @@ import {
 } from "@/app/actions/account-analytics-tab1";
 import type { CloudRange, TopSort } from "./use-url-state";
 
+interface TrendPoint {
+  date: string;
+  compositeScore: number;
+}
+
 interface Props {
   accountId: string;
   platform: string;
+  trend: TrendPoint[];
 }
 
 const GRANULARITIES: Granularity[] = ["day", "week", "month"];
 
-export function DataAnalysisTab({ accountId, platform }: Props) {
+export function DataAnalysisTab({ accountId, platform, trend }: Props) {
   const {
     granularity,
     metric,
@@ -85,7 +92,7 @@ export function DataAnalysisTab({ accountId, platform }: Props) {
               className={cn(
                 "px-4 py-1.5 rounded-full text-[12px] font-medium border-0 cursor-pointer transition-colors",
                 granularity === g
-                  ? "bg-white text-[#FF5E37] shadow-sm"
+                  ? "bg-white text-sky-600 shadow-sm"
                   : "text-gray-500",
               )}
             >
@@ -94,6 +101,28 @@ export function DataAnalysisTab({ accountId, platform }: Props) {
           ))}
         </div>
       </div>
+
+      {/* 30 天趋势图 · Tab 开篇 */}
+      <GlassCard padding="lg">
+        <div className="mb-4">
+          <h3 className="text-[15px] font-semibold text-[#1F3864] dark:text-blue-200">
+            综合得分趋势（近 30 天）
+          </h3>
+          <p className="text-[12px] text-gray-500 mt-0.5">
+            按业务日（Asia/Shanghai）聚合
+          </p>
+        </div>
+        <LineChartCard
+          data={trend.map((p) => ({
+            date: p.date.slice(5),
+            综合得分: Math.round(p.compositeScore),
+          }))}
+          dataKey="综合得分"
+          xKey="date"
+          color="#2E75B6"
+          height={260}
+        />
+      </GlassCard>
 
       {/* 区块 A · 关键指标趋势 */}
       <GlassCard padding="lg">

@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { GlassCard } from "@/components/shared/glass-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChartCard } from "@/components/charts/line-chart-card";
 import { crawlAccountOnDemand } from "@/app/actions/account-analytics";
 import { getPlatformMeta } from "@/lib/account-analytics/platform-meta";
 import type {
@@ -103,28 +101,6 @@ export function AccountOverviewClient({ account, overview, reports }: Props) {
         <StatCard label="转发" value={overview.totals.shares.toLocaleString("zh-CN")} />
       </div>
 
-      {/* 30 天趋势图 */}
-      <GlassCard padding="lg">
-        <div className="mb-4">
-          <h3 className="text-[15px] font-semibold text-[#1F3864] dark:text-blue-200">
-            综合得分趋势（近 30 天）
-          </h3>
-          <p className="text-[12px] text-gray-500 mt-0.5">
-            按业务日（Asia/Shanghai）聚合
-          </p>
-        </div>
-        <LineChartCard
-          data={overview.trend.map((p) => ({
-            date: p.date.slice(5),
-            综合得分: Math.round(p.compositeScore),
-          }))}
-          dataKey="综合得分"
-          xKey="date"
-          color="#2E75B6"
-          height={260}
-        />
-      </GlassCard>
-
       {/* Tabs · 数据分析 / 分析报告 */}
       <Tabs
         value={tab}
@@ -135,7 +111,11 @@ export function AccountOverviewClient({ account, overview, reports }: Props) {
           <TabsTrigger value="reports">分析报告</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics">
-          <DataAnalysisTab accountId={account.id} platform={account.platform} />
+          <DataAnalysisTab
+            accountId={account.id}
+            platform={account.platform}
+            trend={overview.trend}
+          />
         </TabsContent>
         <TabsContent value="reports">
           <ReportsTab account={account} reports={reports} />

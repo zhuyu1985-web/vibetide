@@ -47,7 +47,7 @@ export function PublishActivityCard({ granularity, summaryKeys, loader }: Props)
               <XAxis dataKey="bucket" tick={{ fontSize: 11 }} tickFormatter={(s) => s.slice(5)} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="publishCount" fill="#FFB070" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="publishCount" fill="#7CB9E8" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

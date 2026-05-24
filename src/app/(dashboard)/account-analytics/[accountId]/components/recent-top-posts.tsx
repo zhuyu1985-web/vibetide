@@ -54,7 +54,7 @@ export function RecentTopPosts({ mode, onModeChange, loader }: Props) {
               onClick={() => onModeChange(m)}
               className={cn(
                 'px-3 py-1 rounded-full text-[12px] font-medium border-0 cursor-pointer transition-colors',
-                mode === m ? 'bg-white text-[#FF5E37] shadow-sm' : 'text-gray-500',
+                mode === m ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500',
               )}
             >
               {m === 'hot' ? '最热' : '最新'}
@@ -90,7 +90,7 @@ export function RecentTopPosts({ mode, onModeChange, loader }: Props) {
                   {mode === 'hot' && (
                     <span className={cn(
                       'shrink-0 inline-flex items-center gap-1 text-[12px] font-semibold',
-                      idx === 0 ? 'text-[#FF5E37]' : 'text-orange-400',
+                      idx === 0 ? 'text-sky-600' : 'text-sky-400',
                     )}>
                       <Flame size={12} />{p.score.toFixed(2)}
                     </span>

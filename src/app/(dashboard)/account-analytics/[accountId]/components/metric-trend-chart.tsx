@@ -63,15 +63,15 @@ export function MetricTrendChart({ availability, granularity, metric, onMetricCh
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="metric-gradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF5E37" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="#FF5E37" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#2E75B6" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#2E75B6" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
               <XAxis dataKey="bucket" tick={{ fontSize: 11 }} tickFormatter={(s) => s.slice(5)} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number | undefined) => (v ?? 0).toLocaleString('zh-CN')} />
-              <Area type="monotone" dataKey="value" stroke="#FF5E37" fill="url(#metric-gradient)" strokeWidth={2} />
+              <Area type="monotone" dataKey="value" stroke="#2E75B6" fill="url(#metric-gradient)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         )}
