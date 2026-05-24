@@ -329,4 +329,19 @@ export type InngestEvents = {
     };
   };
 
+  /**
+   * Phase 2 - 批量 AIGC 标注（LLM 给 collected_items 打 aigc_content_category + aigc_keywords）
+   * - cron 触发时 data 可全空，函数会 fan-out 到每个 org 派发独立事件
+   * - 直接派发时建议指定 orgId 限定范围
+   * - chainDepth 由函数自递归时递增，单次 cron 最多链 20 次防失控
+   */
+  "account-analytics/aigc-annotate.requested": {
+    data: {
+      orgId?: string;
+      accountId?: string;
+      batchSize?: number;
+      chainDepth?: number;
+    };
+  };
+
 };
