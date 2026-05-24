@@ -94,7 +94,7 @@ export function ReportDetailClient({ accountId, detail }: Props) {
       {/* Back link only —— actions 移到 cover 右侧 */}
       <div className="flex items-center justify-between">
         <Link
-          href={`/account-analytics/${accountId}`}
+          href={`/account-analytics/${accountId}?tab=reports`}
           className="inline-flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-[#2E75B6]"
         >
           <ArrowLeft size={14} />
