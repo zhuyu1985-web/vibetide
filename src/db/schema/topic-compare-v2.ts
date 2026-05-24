@@ -42,6 +42,10 @@ export const myAccounts = pgTable(
     crawlConfig: jsonb("crawl_config").default({}),
     crawlStatus: text("crawl_status").default("manual"),
     lastCrawledAt: timestamp("last_crawled_at", { withTimezone: true }),
+    /** 是否被 accountAnalyticsCrawlCron 自动抓取（每天 05:00 SH 跑 TikHub） */
+    crawlCronEnabled: boolean("crawl_cron_enabled").notNull().default(false),
+    /** 关联到 media_outlet_dictionary.id —— 让 cron 通过 outlet.channels[] 拿到 secUid */
+    outletId: uuid("outlet_id"),
 
     postCount: integer("post_count").default(0),
     followerCount: integer("follower_count"),
@@ -173,6 +177,10 @@ export const benchmarkAccounts = pgTable(
 
     lastCrawledAt: timestamp("last_crawled_at", { withTimezone: true }),
     postCount: integer("post_count").default(0),
+    /** 是否被 accountAnalyticsCrawlCron 自动抓取 */
+    crawlCronEnabled: boolean("crawl_cron_enabled").notNull().default(false),
+    /** 关联到 media_outlet_dictionary.id */
+    outletId: uuid("outlet_id"),
 
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
