@@ -296,7 +296,7 @@ export const PLATFORM_SUMMARY_CARDS: Record<Platform, SummaryCardSpec[]> = {
 aigcContentCategory: text('aigc_content_category'),                            // 单值，8 选 1 来自 §7.2 枚举
 aigcKeywords:        jsonb('aigc_keywords').$type<string[]>().default([]),     // 5-10 个，LLM 提取
 aigcAnnotatedAt:     timestamp('aigc_annotated_at', { withTimezone: true }),   // 增量回填基准
-aigcAnnotationModel: text('aigc_annotation_model'),                            // e.g. "deepseek-chat:v3"
+aigcAnnotationModel: text('aigc_annotation_model'),                            // e.g. "deepseek.chat.v3"
 ```
 
 **关键命名说明**：
@@ -369,7 +369,7 @@ Concurrency 上限：{ limit: 5 } （与 research-annotate 的 4 错开，避免
      { aigcCategory: <8选1>, aigcKeywords: string[5..10] }
      prompt 显式要求"必须从 8 项里选 1，无法判断时选'其他'"；temperature=0
   3. 批量 UPDATE collected_items SET aigc_content_category=..., aigc_keywords=...,
-     aigc_annotated_at=NOW(), aigc_annotation_model='deepseek-chat:v3'
+     aigc_annotated_at=NOW(), aigc_annotation_model='deepseek.chat.v3'
   4. 失败行兜底（防无限循环）：LLM 返回 schema 校验失败或调用异常的行，
      仍 UPDATE aigc_annotated_at=NOW() + aigc_content_category='其他' + aigc_keywords='[]',
      避免下批被反复重选。失败次数记录在 step.log 供后期审计。
