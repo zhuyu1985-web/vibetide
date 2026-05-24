@@ -156,12 +156,10 @@ export const collectedItems = pgTable(
     // organizations.settings.accountAnalytics.compositeScoreWeights。
     compositeScore: real("composite_score").notNull().default(0),
 
-    // ── AIGC 标注字段（Phase 2，2026-05-24）─────
-    // 注：与 category text[] 行业分类无关，前缀 aigc_ 表示 LLM 二次标注产物
-    aigcContentCategory: text("aigc_content_category"),                       // 单值，8 选 1，见 src/lib/account-analytics/content-category.ts
-    aigcKeywords: jsonb("aigc_keywords").$type<string[]>().default(sql`'[]'::jsonb`),
-    aigcAnnotatedAt: timestamp("aigc_annotated_at", { withTimezone: true }),  // 增量回填基准
-    aigcAnnotationModel: text("aigc_annotation_model"),                       // e.g. "deepseek.chat.v3"
+    // ── AIGC 标注字段（迁出，2026-05-25）──
+    // 原 aigc_content_category / aigc_keywords / aigc_annotated_at / aigc_annotation_model
+    // 之前(20260524000001)误加在本表(66911 条全量舆情池)，区块 C 类型占比+词云实际应该
+    // 基于账号发文，已通过 20260525000001 迁到 my_posts + benchmark_posts。
   },
   (t) => ({
     uniqueFingerprint: unique("collected_items_org_fp_unique").on(
@@ -205,16 +203,6 @@ export const collectedItems = pgTable(
       t.organizationId,
       sql`${t.compositeScore} DESC`,
     ),
-
-    // AIGC 标注相关索引（Phase 2，2026-05-24）
-    aigcCategoryIdx: index("collected_items_aigc_category_idx")
-      .on(t.organizationId, t.accountId, t.aigcContentCategory),
-    aigcKeywordsGin: index("collected_items_aigc_keywords_gin")
-      .using("gin", t.aigcKeywords),
-    aigcAnnotatedAtIdx: index("collected_items_aigc_annotated_at_idx")
-      .on(t.aigcAnnotatedAt)
-      .where(sql`aigc_annotated_at IS NULL`),
-    // ↑ partial index 加速"待标注"扫描；历史回填完后该 index 会逐渐变小，长期保留维护成本极低
   }),
 );
 

@@ -1,13 +1,19 @@
-// src/inngest/functions/account-analytics/annotate-collected-content.ts
+// src/inngest/functions/account-analytics/annotate-account-posts.ts
 //
 // 注意：项目国内部署，使用自建 DeepSeek 接口（OPENAI_API_BASE_URL 指向 deepseek.com），
 // 不走 Vercel AI Gateway。LLM 调用统一通过 src/lib/agent/model-router 封装，
 // 与 viral-attributor.ts 保持同一模式（AI SDK v6 generateText + Output.object）。
 //
+// Phase 2 修正（2026-05-25）：本函数原名 annotate-collected-content，扫的是
+// collected_items。但区块 C 类型占比 + 词云的真实数据源是"账号实际发文"
+// —— my_posts (我方稿件) + benchmark_posts (对标账号稿件)。collected_items
+// 是 66911 条全量舆情/热点/调研池，跟账号分析无关。本次重命名 +
+// 改 UNION 扫两表，UPDATE 也按 source 分发。
+//
 import { inngest } from "@/inngest/client";
 import { db } from "@/db";
-import { collectedItems, collectedItemContents } from "@/db/schema/collection";
-import { and, eq, isNull, desc } from "drizzle-orm";
+import { myPosts, benchmarkPosts } from "@/db/schema/topic-compare-v2";
+import { eq, sql } from "drizzle-orm";
 import { generateText, Output } from "ai";
 import { z } from "zod/v4"; // 对齐 viral-attributor.ts
 import { getLanguageModel, resolveModelConfig } from "@/lib/agent/model-router";
@@ -33,10 +39,18 @@ const ATTRIBUTION_SYSTEM_PROMPT = `你是中文内容分类助手。
 - category：从 [时政, 社会, 财经, 科技, 生活, 娱乐, 体育, 其他] 中**必须选 1 个**；无法判断时选"其他"
 - keywords：5-10 个中文关键词（**实词**，禁止虚词「的、了、是、在」等），按重要性排序`;
 
-export const annotateCollectedContent = inngest.createFunction(
+type PostRow = {
+  id: string;
+  source: "my" | "benchmark";
+  title: string;
+  summary: string | null;
+  body: string | null;
+};
+
+export const annotateAccountPosts = inngest.createFunction(
   {
-    id: "account-analytics-annotate-content",
-    name: "Account Analytics · AIGC 内容标注",
+    id: "account-analytics-annotate-posts",
+    name: "Account Analytics · AIGC 账号发文标注",
     // concurrency 与 db pool max:2 对齐（src/db/index.ts:24）——更高会触发
     // ConnectionError（其他 batch 抢不到连接，connect_timeout 30s 后报错）
     concurrency: { limit: 2 },
@@ -71,10 +85,22 @@ export const annotateCollectedContent = inngest.createFunction(
     //    必须先 fan-out 到每个 org 独立派发事件，避免一次 step 跨 org 写入。
     if (!orgId) {
       const orgs = await step.run("load-orgs", async () => {
-        return db
-          .selectDistinct({ id: collectedItems.organizationId })
-          .from(collectedItems)
-          .where(isNull(collectedItems.aigcAnnotatedAt));
+        // UNION 扫 my_posts (org_id 直接) + benchmark_posts (org_id 来自 benchmark_accounts)
+        // 只取有 pending (aigc_annotated_at IS NULL) 的 org
+        const rows = (await db.execute(sql`
+          SELECT DISTINCT organization_id FROM (
+            SELECT organization_id
+            FROM my_posts
+            WHERE aigc_annotated_at IS NULL
+            UNION
+            SELECT ba.organization_id
+            FROM benchmark_posts bp
+            JOIN benchmark_accounts ba ON ba.id = bp.benchmark_account_id
+            WHERE bp.aigc_annotated_at IS NULL
+              AND ba.organization_id IS NOT NULL
+          ) x
+        `)) as unknown as Array<{ organization_id: string }>;
+        return rows.map((r) => ({ id: r.organization_id }));
       });
       for (const o of orgs) {
         await step.sendEvent(`dispatch-${o.id}`, {
@@ -85,26 +111,28 @@ export const annotateCollectedContent = inngest.createFunction(
       return { fannedOut: true, orgCount: orgs.length };
     }
 
-    // 1) 拉一批待标注
+    // 1) 拉一批待标注（UNION my_posts + benchmark_posts，按 source 标记来源）
+    //    UNION 各取 batchSize/2，合计上限 = batchSize；my_posts 数据少时 UNION 自动短少。
+    //    benchmark_accounts.organization_id 可能为 NULL（全局预设），按 spec 同样纳入 org 范围。
     const items = await step.run("load-batch", async () => {
-      const conditions = [
-        isNull(collectedItems.aigcAnnotatedAt),
-        eq(collectedItems.organizationId, orgId),
-      ];
-      return db
-        .select({
-          id: collectedItems.id,
-          title: collectedItems.title,
-          content: collectedItemContents.content,
-        })
-        .from(collectedItems)
-        .leftJoin(
-          collectedItemContents,
-          eq(collectedItemContents.itemId, collectedItems.id),
-        )
-        .where(and(...conditions))
-        .orderBy(desc(collectedItems.publishedAt))
-        .limit(batchSize);
+      const half = Math.max(1, Math.floor(batchSize / 2));
+      const rows = (await db.execute(sql`
+        (SELECT id::text AS id, 'my' AS source, title, summary, body
+         FROM my_posts
+         WHERE organization_id = ${orgId}
+           AND aigc_annotated_at IS NULL
+         ORDER BY published_at DESC NULLS LAST
+         LIMIT ${half})
+        UNION ALL
+        (SELECT bp.id::text AS id, 'benchmark' AS source, bp.title, bp.summary, bp.body
+         FROM benchmark_posts bp
+         JOIN benchmark_accounts ba ON ba.id = bp.benchmark_account_id
+         WHERE (ba.organization_id = ${orgId} OR ba.organization_id IS NULL)
+           AND bp.aigc_annotated_at IS NULL
+         ORDER BY bp.published_at DESC NULLS LAST
+         LIMIT ${half})
+      `)) as unknown as PostRow[];
+      return rows;
     });
 
     if (items.length === 0) return { done: true, processed: 0 };
@@ -119,7 +147,8 @@ export const annotateCollectedContent = inngest.createFunction(
     const results = await step.run("llm-annotate-batch", async () => {
       const rs = await Promise.all(
         items.map(async (it) => {
-          const text = `${it.title ?? ""}\n\n${(it.content ?? "").slice(0, 500)}`;
+          // title + summary + body.slice(0, 500) —— 两表都有这三个字段
+          const text = `${it.title ?? ""}\n${it.summary ?? ""}\n\n${(it.body ?? "").slice(0, 500)}`;
           try {
             const { output } = await generateText({
               model: getLanguageModel(modelConfig),
@@ -151,36 +180,42 @@ export const annotateCollectedContent = inngest.createFunction(
     const failureRate = failureCount / results.length;
 
     // 3) 批量 UPDATE（失败行也兜底写入'其他'防无限重选）
-    //    重要：postgres-js driver + prepare:false（pgbouncer transaction mode）+ max:2 pool
+    //    按 source 字段决定 UPDATE my_posts 还是 benchmark_posts。
+    //    postgres-js driver + prepare:false (pgbouncer transaction mode) + max:2 pool
     //    下，单一事务内**只能串行执行 query**——同事务连接已 busy 时另一个 query 立即 throw
     //    "another query is already running"。所以 for-loop 串行，不能 Promise.all。
     //    项目里已有 12 处 db.transaction（如 missions.ts:391）都是串行模式，照搬。
     //    Inngest 函数 concurrency:2 与 db pool max:2 对齐，避免抢连接。
+    const itemSourceById = new Map(items.map((it) => [it.id, it.source]));
     await step.run("persist", async () => {
       const now = new Date();
       await db.transaction(async (tx) => {
         for (const r of results) {
+          const source = itemSourceById.get(r.id);
+          // 防御：source 不在 map 里（不应该发生）则跳过
+          if (!source) continue;
+          const targetTable = source === "my" ? myPosts : benchmarkPosts;
           if (r.ok) {
             await tx
-              .update(collectedItems)
+              .update(targetTable)
               .set({
                 aigcContentCategory: r.category,
                 aigcKeywords: r.keywords,
                 aigcAnnotatedAt: now,
                 aigcAnnotationModel: MODEL_TAG,
               })
-              .where(eq(collectedItems.id, r.id));
+              .where(eq(targetTable.id, r.id));
           } else {
             // 失败兜底
             await tx
-              .update(collectedItems)
+              .update(targetTable)
               .set({
                 aigcContentCategory: "其他",
                 aigcKeywords: [],
                 aigcAnnotatedAt: now,
                 aigcAnnotationModel: `${MODEL_TAG}.failed`,
               })
-              .where(eq(collectedItems.id, r.id));
+              .where(eq(targetTable.id, r.id));
           }
         }
       });

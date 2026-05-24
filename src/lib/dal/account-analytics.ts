@@ -1173,11 +1173,16 @@ export async function getRecentTopPosts(opts: {
 // ---------------------------------------------------------------------------
 // getCategoryDistribution — AIGC 分类分布（区块 C 左：横向条形图）
 // ---------------------------------------------------------------------------
+// 2026-05-25 修正：数据源从 collected_items 改为 my_posts + benchmark_posts（账号实际发文）。
+//
 // 给 Tab1 数据分析模块 区块 C 用：
 //   - buckets: 按 aigc_content_category 聚合的近 30 天发文计数
 //   - annotatedRatio: 已标注 / 全部（决定是否还在 zero state）
 //
-// 安全性：所有参数走 tagged template 绑定，无 sql.raw 注入面。
+// accountId 可能是 my_accounts.id 或 benchmark_accounts.id —— UNION 自动 dispatch：
+//   * my 分支通过 my_post_distributions JOIN my_accounts 收紧到该 account
+//   * benchmark 分支直接按 benchmark_account_id 匹配
+// 多租户安全：双分支都 JOIN 账号表并校验 organization_id（benchmark 兼容预设账号 NULL）。
 
 export async function getCategoryDistribution(opts: {
   orgId: string;
@@ -1189,29 +1194,53 @@ export async function getCategoryDistribution(opts: {
   const { orgId, accountId } = opts;
 
   const rows = (await db.execute(sql`
-    SELECT
-      aigc_content_category AS category,
-      COUNT(*)::int AS count
-    FROM collected_items
-    WHERE organization_id = ${orgId}
-      AND account_id = ${accountId}
-      AND published_at >= NOW() - INTERVAL '30 days'
-      AND aigc_content_category IS NOT NULL
-    GROUP BY aigc_content_category
+    WITH posts AS (
+      SELECT mp.aigc_content_category AS category, mp.published_at, mp.aigc_annotated_at
+      FROM my_post_distributions mpd
+      JOIN my_posts mp ON mp.id = mpd.my_post_id
+      JOIN my_accounts ma ON ma.id = mpd.my_account_id
+      WHERE mpd.my_account_id = ${accountId}
+        AND ma.organization_id = ${orgId}
+        AND mp.published_at >= NOW() - INTERVAL '30 days'
+      UNION ALL
+      SELECT bp.aigc_content_category, bp.published_at, bp.aigc_annotated_at
+      FROM benchmark_posts bp
+      JOIN benchmark_accounts ba ON ba.id = bp.benchmark_account_id
+      WHERE bp.benchmark_account_id = ${accountId}
+        AND (ba.organization_id = ${orgId} OR ba.organization_id IS NULL)
+        AND bp.published_at >= NOW() - INTERVAL '30 days'
+    )
+    SELECT category, COUNT(*)::int AS count
+    FROM posts
+    WHERE category IS NOT NULL
+    GROUP BY category
     ORDER BY count DESC
   `)) as unknown as Array<Record<string, unknown>>;
 
   const ratioRows = (await db.execute(sql`
+    WITH posts AS (
+      SELECT mp.aigc_annotated_at
+      FROM my_post_distributions mpd
+      JOIN my_posts mp ON mp.id = mpd.my_post_id
+      JOIN my_accounts ma ON ma.id = mpd.my_account_id
+      WHERE mpd.my_account_id = ${accountId}
+        AND ma.organization_id = ${orgId}
+        AND mp.published_at >= NOW() - INTERVAL '30 days'
+      UNION ALL
+      SELECT bp.aigc_annotated_at
+      FROM benchmark_posts bp
+      JOIN benchmark_accounts ba ON ba.id = bp.benchmark_account_id
+      WHERE bp.benchmark_account_id = ${accountId}
+        AND (ba.organization_id = ${orgId} OR ba.organization_id IS NULL)
+        AND bp.published_at >= NOW() - INTERVAL '30 days'
+    )
     SELECT
       COALESCE(
         SUM(CASE WHEN aigc_annotated_at IS NOT NULL THEN 1 ELSE 0 END)::float
         / NULLIF(COUNT(*), 0),
         0
       ) AS ratio
-    FROM collected_items
-    WHERE organization_id = ${orgId}
-      AND account_id = ${accountId}
-      AND published_at >= NOW() - INTERVAL '30 days'
+    FROM posts
   `)) as unknown as Array<Record<string, unknown>>;
   const ratioRow = ratioRows[0] ?? {};
 
@@ -1227,12 +1256,15 @@ export async function getCategoryDistribution(opts: {
 // ---------------------------------------------------------------------------
 // getKeywordCloud — AIGC 关键词云（区块 C 右：d3-cloud）
 // ---------------------------------------------------------------------------
+// 2026-05-25 修正：数据源从 collected_items 改为 my_posts + benchmark_posts（账号实际发文）。
+//
 // 给 Tab1 数据分析模块 区块 C 用：
 //   - words: 按 aigc_keywords[] 展开 (LATERAL jsonb_array_elements_text) 后
 //            聚合 weight = COUNT(*)，取 Top 30
 //   - annotatedRatio: 已标注 / 全部（决定是否还在 zero state）
 //
 // 窗口：7d / 30d 两档（与区块 A/B 不同；词云需更长窗口才有足量样本）。
+// 多租户安全 + my/benchmark UNION 同 getCategoryDistribution。
 
 export async function getKeywordCloud(opts: {
   orgId: string;
@@ -1246,30 +1278,57 @@ export async function getKeywordCloud(opts: {
   const days = range === "7d" ? 7 : 30;
 
   const rows = (await db.execute(sql`
+    WITH posts AS (
+      SELECT mp.aigc_keywords
+      FROM my_post_distributions mpd
+      JOIN my_posts mp ON mp.id = mpd.my_post_id
+      JOIN my_accounts ma ON ma.id = mpd.my_account_id
+      WHERE mpd.my_account_id = ${accountId}
+        AND ma.organization_id = ${orgId}
+        AND mp.published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+        AND mp.aigc_keywords IS NOT NULL
+      UNION ALL
+      SELECT bp.aigc_keywords
+      FROM benchmark_posts bp
+      JOIN benchmark_accounts ba ON ba.id = bp.benchmark_account_id
+      WHERE bp.benchmark_account_id = ${accountId}
+        AND (ba.organization_id = ${orgId} OR ba.organization_id IS NULL)
+        AND bp.published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+        AND bp.aigc_keywords IS NOT NULL
+    )
     SELECT
       kw AS keyword,
       COUNT(*)::int AS weight
-    FROM collected_items,
+    FROM posts,
          LATERAL jsonb_array_elements_text(aigc_keywords) AS kw
-    WHERE organization_id = ${orgId}
-      AND account_id = ${accountId}
-      AND published_at >= NOW() - (${days}::int * INTERVAL '1 day')
-      AND aigc_keywords IS NOT NULL
     GROUP BY kw
     ORDER BY weight DESC
     LIMIT 30
   `)) as unknown as Array<Record<string, unknown>>;
 
   const ratioRows = (await db.execute(sql`
+    WITH posts AS (
+      SELECT mp.aigc_annotated_at
+      FROM my_post_distributions mpd
+      JOIN my_posts mp ON mp.id = mpd.my_post_id
+      JOIN my_accounts ma ON ma.id = mpd.my_account_id
+      WHERE mpd.my_account_id = ${accountId}
+        AND ma.organization_id = ${orgId}
+        AND mp.published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+      UNION ALL
+      SELECT bp.aigc_annotated_at
+      FROM benchmark_posts bp
+      JOIN benchmark_accounts ba ON ba.id = bp.benchmark_account_id
+      WHERE bp.benchmark_account_id = ${accountId}
+        AND (ba.organization_id = ${orgId} OR ba.organization_id IS NULL)
+        AND bp.published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+    )
     SELECT COALESCE(
       SUM(CASE WHEN aigc_annotated_at IS NOT NULL THEN 1 ELSE 0 END)::float
       / NULLIF(COUNT(*), 0),
       0
     ) AS ratio
-    FROM collected_items
-    WHERE organization_id = ${orgId}
-      AND account_id = ${accountId}
-      AND published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+    FROM posts
   `)) as unknown as Array<Record<string, unknown>>;
   const ratioRow = ratioRows[0] ?? {};
 

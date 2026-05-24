@@ -100,6 +100,13 @@ export const myPosts = pgTable(
 
     dimensionScores: jsonb("dimension_scores"),
 
+    // ── AIGC 标注字段（Phase 2 修正，2026-05-25 从 collected_items 迁来）──
+    // 区块 C 类型占比 + 词云依赖；由 Inngest accountAnalyticsAnnotateAccountPosts 写入。
+    aigcContentCategory: text("aigc_content_category"),                                 // 单值，8 选 1，见 src/lib/account-analytics/content-category.ts
+    aigcKeywords: jsonb("aigc_keywords").$type<string[]>().default(sql`'[]'::jsonb`),
+    aigcAnnotatedAt: timestamp("aigc_annotated_at", { withTimezone: true }),            // 增量回填基准
+    aigcAnnotationModel: text("aigc_annotation_model"),                                 // e.g. "deepseek.chat.v3"
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -115,6 +122,15 @@ export const myPosts = pgTable(
       "gin",
       sql`${t.title} gin_trgm_ops`,
     ),
+    // AIGC 索引（2026-05-25）
+    aigcCategoryIdx: index("my_posts_aigc_category_idx").on(
+      t.organizationId,
+      t.aigcContentCategory,
+    ),
+    aigcKeywordsGin: index("my_posts_aigc_keywords_gin").using("gin", t.aigcKeywords),
+    aigcAnnotatedAtIdx: index("my_posts_aigc_annotated_at_idx")
+      .on(t.aigcAnnotatedAt)
+      .where(sql`aigc_annotated_at IS NULL`),
   }),
 );
 
@@ -232,6 +248,12 @@ export const benchmarkPosts = pgTable(
     aiInterpretation: jsonb("ai_interpretation"),
     aiInterpretationAt: timestamp("ai_interpretation_at", { withTimezone: true }),
 
+    // ── AIGC 标注字段（Phase 2 修正，2026-05-25 从 collected_items 迁来）──
+    aigcContentCategory: text("aigc_content_category"),
+    aigcKeywords: jsonb("aigc_keywords").$type<string[]>().default(sql`'[]'::jsonb`),
+    aigcAnnotatedAt: timestamp("aigc_annotated_at", { withTimezone: true }),
+    aigcAnnotationModel: text("aigc_annotation_model"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -246,6 +268,18 @@ export const benchmarkPosts = pgTable(
       "gin",
       sql`${t.body} gin_trgm_ops`,
     ),
+    // AIGC 索引（2026-05-25）
+    aigcCategoryIdx: index("benchmark_posts_aigc_category_idx").on(
+      t.benchmarkAccountId,
+      t.aigcContentCategory,
+    ),
+    aigcKeywordsGin: index("benchmark_posts_aigc_keywords_gin").using(
+      "gin",
+      t.aigcKeywords,
+    ),
+    aigcAnnotatedAtIdx: index("benchmark_posts_aigc_annotated_at_idx")
+      .on(t.aigcAnnotatedAt)
+      .where(sql`aigc_annotated_at IS NULL`),
   }),
 );
 
