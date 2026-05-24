@@ -89,7 +89,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--glass-border)] shrink-0">
         <button
           onClick={() => toast.info("「AI 帮填」即将上线，将根据稿件正文自动填充摘要 / 关键词 / 列表样式")}
-          className="h-8 px-4 rounded-md bg-gradient-to-r from-sky-400/90 to-blue-500/90 text-white text-sm font-medium shadow-sm shadow-sky-500/15 hover:shadow-md hover:shadow-sky-500/25 transition-shadow"
+          className="h-8 px-4 rounded-md bg-gradient-to-r from-indigo-500/85 via-blue-500/85 to-sky-400/85 text-white text-sm font-medium shadow-sm shadow-indigo-500/15 hover:shadow-md hover:shadow-indigo-500/25 transition-shadow"
         >
           AI 帮填
         </button>
@@ -266,7 +266,7 @@ function FieldGroup({
 
 function AiHint() {
   return (
-    <span className="inline-flex items-center justify-center w-4 h-4 rounded-md bg-gradient-to-br from-sky-400/90 to-blue-500/90 text-white text-[9px]">
+    <span className="inline-flex items-center justify-center w-4 h-4 rounded-md bg-gradient-to-br from-indigo-500/85 via-blue-500/85 to-sky-400/85 text-white text-[9px]">
       ✦
     </span>
   );

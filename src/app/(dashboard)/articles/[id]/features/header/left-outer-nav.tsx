@@ -45,7 +45,7 @@ export function LeftOuterNav() {
             className={cn(
               "mx-2 my-0.5 py-1.5 rounded-xl flex flex-col items-center gap-1 transition-all",
               active
-                ? "text-sky-600 dark:text-sky-300"
+                ? "text-indigo-600 dark:text-sky-300"
                 : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
             )}
           >
@@ -53,7 +53,7 @@ export function LeftOuterNav() {
               className={cn(
                 "w-[52px] h-[52px] rounded-xl flex items-center justify-center transition-all",
                 active
-                  ? "bg-gradient-to-br from-sky-400/90 to-blue-500/90 text-white shadow-sm shadow-sky-500/20"
+                  ? "bg-gradient-to-br from-indigo-500/85 via-blue-500/85 to-sky-400/85 text-white shadow-sm shadow-indigo-500/20"
                   : "bg-white/60 dark:bg-white/5",
               )}
             >
