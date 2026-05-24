@@ -43,6 +43,7 @@ import {
   accountAnalyticsReportReanalyze,
   accountAnalyticsCrawlOnDemand,
   accountAnalyticsCrawlCron,
+  accountAnalyticsAnnotateCollectedContent,
 } from "./account-analytics";
 
 export const functions = [
@@ -102,4 +103,6 @@ export const functions = [
   accountAnalyticsReportReanalyze,
   accountAnalyticsCrawlOnDemand,
   accountAnalyticsCrawlCron,
+  // Account Analytics Phase 2: AIGC 内容标注 (2026-05-24)
+  accountAnalyticsAnnotateCollectedContent,
 ];
