@@ -37,6 +37,13 @@ import { skillConsistencyCheck } from "./skill-consistency-check";
 import { dailyHotBriefingCron } from "./daily-hot-briefing";
 import { ayrshareWebhookHandler } from "./ayrshare-webhook-handler";
 import { externalPublishRetry } from "./external-publish-retry";
+import {
+  accountAnalyticsDailySnapshot,
+  accountAnalyticsReportGenerator,
+  accountAnalyticsReportReanalyze,
+  accountAnalyticsCrawlOnDemand,
+  accountAnalyticsCrawlCron,
+} from "./account-analytics";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -89,4 +96,10 @@ export const functions = [
   // 海外英文发布 — Ayrshare 集成 (2026-05-22)
   ayrshareWebhookHandler,
   externalPublishRetry,
+  // Account Analytics (账号数据分析, 2026-05-23)
+  accountAnalyticsDailySnapshot,
+  accountAnalyticsReportGenerator,
+  accountAnalyticsReportReanalyze,
+  accountAnalyticsCrawlOnDemand,
+  accountAnalyticsCrawlCron,
 ];

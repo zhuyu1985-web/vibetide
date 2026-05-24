@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  real,
   text,
   timestamp,
   unique,
@@ -149,6 +150,11 @@ export const collectedItems = pgTable(
     // ── 媒体附加 ──
     coverImageUrl: text("cover_image_url"),
     durationSeconds: integer("duration_seconds"),
+
+    // ── 综合得分（账号数据分析模块入库时即时计算）──
+    // 公式默认 like*1 + comment*5 + share*5 + favorite*2，权重存于
+    // organizations.settings.accountAnalytics.compositeScoreWeights。
+    compositeScore: real("composite_score").notNull().default(0),
   },
   (t) => ({
     uniqueFingerprint: unique("collected_items_org_fp_unique").on(
@@ -188,6 +194,10 @@ export const collectedItems = pgTable(
     postRegionIdx: index("collected_items_org_post_region_idx").on(t.organizationId, t.postRegion),
     externalIdIdx: index("collected_items_org_external_id_idx").on(t.organizationId, t.externalId),
     likeRankIdx: index("collected_items_org_like_idx").on(t.organizationId, sql`${t.likeCount} DESC`),
+    compositeRankIdx: index("collected_items_org_composite_idx").on(
+      t.organizationId,
+      sql`${t.compositeScore} DESC`,
+    ),
   }),
 );
 

@@ -282,4 +282,51 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Account Analytics Events (账号数据分析, 2026-05-23) ───
+
+  /**
+   * 日报生成请求 — 由 cron 派发或 Server Action 手动派发。
+   * 由 accountAnalyticsReportGenerator 消费：拉 Top N collected_items →
+   * LLM 跑 viral attribution → distill patterns + recommendations →
+   * 写 account_analytics_reports + viral_content_attributions。
+   */
+  "account-analytics/daily-report.requested": {
+    data: {
+      organizationId: string;
+      accountId: string;
+      accountSource: "my" | "benchmark";
+      /** 'YYYY-MM-DD' Asia/Shanghai 业务日 */
+      periodStart: string;
+      periodEnd: string;
+      reportType: "daily" | "weekly" | "monthly" | "custom";
+      /** 强制重算（忽略已存在的同 key 报告） */
+      forceRefresh?: boolean;
+    };
+  };
+
+  /**
+   * 仅重跑指定报告的 LLM 归因，不重新抓取 collected_items。
+   */
+  "account-analytics/report.reanalyze": {
+    data: {
+      organizationId: string;
+      reportId: string;
+    };
+  };
+
+  /**
+   * 账号即时抓取请求 — 给一个账号触发 Collection Hub TikHub Account 模式。
+   * Phase 2 直接派发 collection/source.run-requested 给 collection adapter；
+   * 此事件作为"上游意图"层，方便审计 + 后续按账号分级控频。
+   */
+  "account-analytics/crawl.requested": {
+    data: {
+      organizationId: string;
+      accountId: string;
+      accountSource: "my" | "benchmark";
+      /** 默认抓最近 1 天，可覆盖（例如周报抓 7 天） */
+      sinceDays?: number;
+    };
+  };
+
 };
