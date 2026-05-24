@@ -667,3 +667,28 @@ export const cmsPublicationStateEnum = pgEnum("cms_publication_state", [
 ]);
 
 export const reviewTierEnum = pgEnum("review_tier", ["strict", "relaxed"]);
+
+// =====================================================================
+// Account Analytics (账号数据分析, 2026-05-23)
+// =====================================================================
+
+// 账号来源：my = 我方账号，benchmark = 对标账号
+export const accountSourceEnum = pgEnum("account_source", ["my", "benchmark"]);
+
+// 报告类型：daily 日报 / weekly 周报 / monthly 月报 / custom 自定义区间
+export const accountReportTypeEnum = pgEnum("account_report_type", [
+  "daily",
+  "weekly",
+  "monthly",
+  "custom",
+]);
+
+// 报告生命周期状态
+export const accountReportStatusEnum = pgEnum("account_report_status", [
+  "pending",
+  "crawling",
+  "scoring",
+  "analyzing",
+  "ready",
+  "failed",
+]);
