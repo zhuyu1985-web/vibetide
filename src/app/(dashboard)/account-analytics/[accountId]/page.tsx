@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
@@ -29,10 +30,14 @@ export default async function AccountOverviewPage({
   ]);
 
   return (
-    <AccountOverviewClient
-      account={account}
-      overview={overview}
-      reports={reports}
-    />
+    <Suspense
+      fallback={<div className="p-8 text-sm text-gray-400">加载中...</div>}
+    >
+      <AccountOverviewClient
+        account={account}
+        overview={overview}
+        reports={reports}
+      />
+    </Suspense>
   );
 }
