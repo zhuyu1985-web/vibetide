@@ -522,7 +522,8 @@ git commit -m "feat(account-analytics): DAL getPublishActivity 返回发布活�
 | `likeCount/commentCount/shareCount/viewCount/favoriteCount/replyCount` | int | ✓ | 0 |
 | `compositeScore` | real | ✓ | 0 |
 | `createdAt/updatedAt` | timestamptz | ✓ | now() |
-| `summary/thumbnail/sourceUrl/publishedAt` | nullable | — | NULL |
+| `summary/canonicalUrl/coverImageUrl/publishedAt` | nullable | — | NULL |
+| ⚠️ 注意：**没有** `thumbnail` 字段 → 用 `coverImageUrl`；**没有** `sourceUrl` 字段 → 用 `canonicalUrl` ||||
 
 ```ts
 import { collectedItems } from '@/db/schema'
@@ -552,7 +553,7 @@ beforeAll(async () => {
       viewCount: 10000,
       compositeScore: 90.5,
       summary: 'top1 summary',
-      sourceUrl: 'https://example.com/top1',
+      canonicalUrl: 'https://example.com/top1',  // ⚠️ collected_items 真实字段名是 canonical_url
       // sourceChannels/category/derivedModules/enrichmentStatus/contentType
       // 全部依赖默认值，无需显式传
     },
@@ -569,7 +570,7 @@ beforeAll(async () => {
       viewCount: 5000,
       compositeScore: 60.0,
       summary: 'top2 summary',
-      sourceUrl: 'https://example.com/top2',
+      canonicalUrl: 'https://example.com/top2',
     },
   ]).returning({ id: collectedItems.id })
   itemId1 = inserted[0].id
@@ -642,18 +643,20 @@ export async function getRecentTopPosts(opts: {
     ? desc(collectedItems.compositeScore)
     : desc(collectedItems.publishedAt)
 
+  // ⚠️ 真实 schema 字段：缩图叫 coverImageUrl（不叫 thumbnail），外链叫 canonicalUrl（不叫 sourceUrl）。
+  //    DAL 输出层把它们别名为 thumbnail/sourceUrl 给上层组件，保持组件契约稳定。
   const rows = await db
     .select({
       id: collectedItems.id,
       title: collectedItems.title,
       summary: collectedItems.summary,
-      thumbnail: collectedItems.thumbnail,
+      coverImageUrl: collectedItems.coverImageUrl,
       score: collectedItems.compositeScore,
       viewCount: collectedItems.viewCount,
       commentCount: collectedItems.commentCount,
       likeCount: collectedItems.likeCount,
       publishedAt: collectedItems.publishedAt,
-      sourceUrl: collectedItems.sourceUrl,
+      canonicalUrl: collectedItems.canonicalUrl,
     })
     .from(collectedItems)
     .where(and(
@@ -668,13 +671,13 @@ export async function getRecentTopPosts(opts: {
     id: r.id,
     title: r.title ?? '(无标题)',
     summary: r.summary,
-    thumbnail: r.thumbnail,
+    thumbnail: r.coverImageUrl,                    // alias: coverImageUrl → thumbnail
     score: Number(r.score ?? 0),
     viewCount: r.viewCount ?? 0,
     commentCount: r.commentCount ?? 0,
     likeCount: r.likeCount ?? 0,
     publishedAt: r.publishedAt?.toISOString() ?? '',
-    sourceUrl: r.sourceUrl ?? '',
+    sourceUrl: r.canonicalUrl ?? '',               // alias: canonicalUrl → sourceUrl
   }))
 }
 ```
@@ -834,6 +837,21 @@ git commit -m "feat(account-analytics): 新增 MetricPillButton 胶囊按钮组�
 
 **Files:**
 - Create: `src/app/(dashboard)/account-analytics/[accountId]/components/metric-trend-chart.tsx`
+
+⚠️ **Race condition 必读**（适用于 Task 1.7 / 1.8 / 1.9 三个组件，先看再写）：
+组件内 `useEffect` 触发 loader（Server Action）拿数据时，快速切换 prop（粒度/指标/模式）会导致"旧请求晚到、覆盖新请求"。React 19 transition 不自救。下方代码骨架**未实现**这块，请用以下任一模式补：
+
+```tsx
+const reqIdRef = useRef(0)
+useEffect(() => {
+  const id = ++reqIdRef.current
+  loader(metric, granularity).then((d) => {
+    if (id !== reqIdRef.current) return  // 旧请求已被新请求超越，丢弃
+    setData(d)
+    setLoading(false)
+  })
+}, [metric, granularity, loader])
+```
 
 - [ ] **Step 1: 实现**
 
@@ -1303,7 +1321,9 @@ git commit -m "feat(account-analytics): DataAnalysisTab 容器组装 4 区块 + 
 - 只剪「历史报告列表」`<GlassCard>` 那一块（含上方标题 + chip 切换 + 列表条目）到 `ReportsTab`
 
 ```bash
-grep -n "历史报告\|REPORT_TYPE_FILTER_ORDER\|filteredReports" src/app/\(dashboard\)/account-analytics/\[accountId\]/account-overview-client.tsx
+# 用更精确的 grep 避免匹到注释和文案
+grep -n "{/\* 历史报告\|GlassCard.*历史报告\|REPORT_TYPE_FILTER_ORDER" \
+  src/app/\(dashboard\)/account-analytics/\[accountId\]/account-overview-client.tsx
 ```
 
 确认起止行号后再剪。剪过去到新文件时，把以下状态/常量一并搬：`typeFilter` useState、`filteredReports` derived、`typeCounts` Map、`REPORT_TYPE_LABELS` / `REPORT_TYPE_FILTER_ORDER` / `STATUS_LABELS`（如这些常量没在别处复用）。
@@ -1644,7 +1664,7 @@ import { db } from '@/db'
 import { collectedItems, collectedItemContents } from '@/db/schema/collection'
 import { and, eq, isNull, desc } from 'drizzle-orm'
 import { generateText, Output } from 'ai'
-import { z } from 'zod'
+import { z } from 'zod/v4'  // 对齐 viral-attributor.ts 的 import 路径，避免 AI SDK v6 Output.object 类型不一致
 import { getLanguageModel, resolveModelConfig } from '@/lib/agent/model-router'
 import {
   AIGC_CONTENT_CATEGORIES,
@@ -1671,7 +1691,9 @@ const ATTRIBUTION_SYSTEM_PROMPT = `你是中文内容分类助手。
 export const annotateCollectedContent = inngest.createFunction(
   {
     id: 'account-analytics-annotate-content',
-    concurrency: { limit: 5 },
+    // concurrency 与 db pool max:2 对齐（src/db/index.ts:24）——更高会触发
+    // ConnectionError（其他 batch 抢不到连接，connect_timeout 30s 后报错）
+    concurrency: { limit: 2 },
     // retries: 0 配合下方 Step 3 "失败行兜底写'其他'"机制 —— 单次 step 必须把这批 50 条
     // 全部解决（成功或兜底），不让 Inngest 自动重试。两者同时存在会导致兜底完后整函数
     // 重跑时已无未标注行 → 拉下一批 → 再失败 → 再熔断，链路不收敛。
@@ -1685,6 +1707,25 @@ export const annotateCollectedContent = inngest.createFunction(
     const orgId = event?.data?.orgId
     const batchSize = event?.data?.batchSize ?? DEFAULT_BATCH_SIZE
     const chainDepth = event?.data?.chainDepth ?? 0
+
+    // ⚠️ cron 触发（每天 04:00）时 event.data 为 undefined → orgId = undefined
+    //    若直接进 Step 1 会跨 org 标注（多租户数据隔离漏洞）。
+    //    必须先 fan-out 到每个 org 独立派发事件，避免一次 step 跨 org 写入。
+    if (!orgId) {
+      await step.run('fan-out-orgs', async () => {
+        const orgs = await db
+          .selectDistinct({ id: collectedItems.organizationId })
+          .from(collectedItems)
+          .where(isNull(collectedItems.aigcAnnotatedAt))
+        for (const o of orgs) {
+          await step.sendEvent(`dispatch-${o.id}`, {
+            name: 'account-analytics/aigc-annotate.requested',
+            data: { orgId: o.id, batchSize, chainDepth: 0 },
+          })
+        }
+      })
+      return { fannedOut: true }
+    }
 
     // 1) 拉一批待标注
     const items = await step.run('load-batch', async () => {
@@ -1735,14 +1776,20 @@ export const annotateCollectedContent = inngest.createFunction(
     const failureRate = failureCount / results.length
 
     // 3) 批量 UPDATE（失败行也兜底写入'其他'防无限重选）
-    //    用事务 + Promise.all 并行：50 条单 UPDATE 串行会 250ms-1s round-trip，
-    //    Inngest step 在 pgbouncer 抖动下会触发超时；并行 + 事务保证原子性。
+    //
+    //    重要：postgres-js driver + prepare:false（pgbouncer transaction mode）+ max:2 pool
+    //    下，单一事务内**只能串行执行 query**——同事务连接已 busy 时另一个 query 立即 throw
+    //    "another query is already running"。所以 for-loop 串行，不能 Promise.all。
+    //    项目里已有 12 处 db.transaction（如 missions.ts:391）都是串行模式，照搬。
+    //
+    //    50 条串行 UPDATE 在已建立连接上约 50-200ms，远低于 Inngest step timeout。
+    //    Inngest 函数 concurrency:5 + db pool max:2 仍可能阻塞——见下方 concurrency 调整。
     await step.run('persist', async () => {
       const now = new Date()
       await db.transaction(async (tx) => {
-        await Promise.all(results.map((r) => {
+        for (const r of results) {
           if (r.ok) {
-            return tx.update(collectedItems)
+            await tx.update(collectedItems)
               .set({
                 aigcContentCategory: r.category,
                 aigcKeywords: r.keywords,
@@ -1750,17 +1797,18 @@ export const annotateCollectedContent = inngest.createFunction(
                 aigcAnnotationModel: MODEL_TAG,
               })
               .where(eq(collectedItems.id, r.id))
+          } else {
+            // 失败兜底
+            await tx.update(collectedItems)
+              .set({
+                aigcContentCategory: '其他',
+                aigcKeywords: [],
+                aigcAnnotatedAt: now,
+                aigcAnnotationModel: `${MODEL_TAG}.failed`,
+              })
+              .where(eq(collectedItems.id, r.id))
           }
-          // 失败兜底
-          return tx.update(collectedItems)
-            .set({
-              aigcContentCategory: '其他',
-              aigcKeywords: [],
-              aigcAnnotatedAt: now,
-              aigcAnnotationModel: `${MODEL_TAG}.failed`,
-            })
-            .where(eq(collectedItems.id, r.id))
-        }))
+        }
       })
     })
 
@@ -1855,20 +1903,20 @@ export async function getCategoryDistribution(opts: {
   annotatedRatio: number
 }> {
   const { orgId, accountId } = opts
-  const rows = await db.execute(sql.raw(`
+  const rows = await db.execute(sql`
     SELECT
       aigc_content_category AS category,
       COUNT(*)::int AS count
     FROM collected_items
-    WHERE organization_id = $1
-      AND account_id = $2
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
       AND published_at >= NOW() - INTERVAL '30 days'
       AND aigc_content_category IS NOT NULL
     GROUP BY aigc_content_category
     ORDER BY count DESC
-  `), [orgId, accountId])
+  `) as unknown as Array<Record<string, unknown>>
 
-  const [ratioRow] = await db.execute(sql.raw(`
+  const ratioRows = await db.execute(sql`
     SELECT
       COALESCE(
         SUM(CASE WHEN aigc_annotated_at IS NOT NULL THEN 1 ELSE 0 END)::float
@@ -1876,17 +1924,18 @@ export async function getCategoryDistribution(opts: {
         0
       ) AS ratio
     FROM collected_items
-    WHERE organization_id = $1
-      AND account_id = $2
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
       AND published_at >= NOW() - INTERVAL '30 days'
-  `), [orgId, accountId]) as Array<Record<string, unknown>>
+  `) as unknown as Array<Record<string, unknown>>
+  const ratioRow = ratioRows[0] ?? {}
 
   return {
-    buckets: rows.map((r: Record<string, unknown>) => ({
+    buckets: rows.map((r) => ({
       category: r.category as AigcContentCategory,
       count: Number(r.count ?? 0),
     })),
-    annotatedRatio: Number(ratioRow?.ratio ?? 0),
+    annotatedRatio: Number(ratioRow.ratio ?? 0),
   }
 }
 ```
@@ -1938,38 +1987,40 @@ export async function getKeywordCloud(opts: {
   const { orgId, accountId, range } = opts
   const days = range === '7d' ? 7 : 30
 
-  const rows = await db.execute(sql.raw(`
+  const rows = await db.execute(sql`
     SELECT
       kw AS keyword,
       COUNT(*)::int AS weight
     FROM collected_items,
          LATERAL jsonb_array_elements_text(aigc_keywords) AS kw
-    WHERE organization_id = $1
-      AND account_id = $2
-      AND published_at >= NOW() - INTERVAL '${days} days'
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND published_at >= NOW() - (${days}::int * INTERVAL '1 day')
       AND aigc_keywords IS NOT NULL
     GROUP BY kw
     ORDER BY weight DESC
     LIMIT 30
-  `), [orgId, accountId])
+  `) as unknown as Array<Record<string, unknown>>
 
-  const [ratioRow] = await db.execute(sql.raw(`
+  const ratioRows = await db.execute(sql`
     SELECT COALESCE(
       SUM(CASE WHEN aigc_annotated_at IS NOT NULL THEN 1 ELSE 0 END)::float
       / NULLIF(COUNT(*), 0),
       0
     ) AS ratio
     FROM collected_items
-    WHERE organization_id = $1 AND account_id = $2
-      AND published_at >= NOW() - INTERVAL '${days} days'
-  `), [orgId, accountId]) as Array<Record<string, unknown>>
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+  `) as unknown as Array<Record<string, unknown>>
+  const ratioRow = ratioRows[0] ?? {}
 
   return {
-    words: rows.map((r: Record<string, unknown>) => ({
+    words: rows.map((r) => ({
       keyword: String(r.keyword),
       weight: Number(r.weight ?? 0),
     })),
-    annotatedRatio: Number(ratioRow?.ratio ?? 0),
+    annotatedRatio: Number(ratioRow.ratio ?? 0),
   }
 }
 ```
