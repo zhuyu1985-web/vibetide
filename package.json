@@ -17,6 +17,7 @@
     "db:cleanup-skill-dupes": "npx tsx src/db/cleanup-legacy-skill-dupes.ts",
     "db:seed:research": "tsx scripts/seed-research.ts",
     "db:seed:mock-articles": "tsx scripts/seed-research-mock-articles.ts",
+    "db:backfill-aigc": "tsx scripts/backfill-aigc-annotations.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
