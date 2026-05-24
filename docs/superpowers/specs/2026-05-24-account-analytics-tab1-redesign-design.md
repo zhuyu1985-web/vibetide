@@ -196,7 +196,8 @@ Inngest cron 04:00 → annotate-collected-content → LLM 分类+词提取 → �
 - 类型占比：基于 `collected_items.aigc_content_category`（新字段，详见 §7.1），使用近 30 天数据
 - 词云：基于 `collected_items.aigc_keywords`（新字段，unnest），近 7d 或 30d 切换；切换同步 `?cloudRange=` URL 参数
 - 词云组件实现：使用 [d3-cloud](https://github.com/jasondavies/d3-cloud) 算法（约 50 行 React 包装），不引入已停更的 `react-tagcloud`。d3-cloud 是经过验证的 spiral 布局算法，npm 下载量稳定
-- Phase 1 上线时（Phase 2 未启动）整个区块 C 显示常驻 zero state：「正在分析该账号内容主题，预计 24 小时内可见」+ 骨架图。Phase 2 部署后，未标注比例 > 30% 时显示「分析中（已完成 X%）」；< 30% 直接显示数据
+- Phase 1 上线时（Phase 2 未启动）整个区块 C 显示常驻 zero state：「正在分析该账号内容主题，预计 24 小时内可见」+ 骨架图。
+- Phase 2 部署后阈值规则（统一表述）：**`annotatedRatio >= 0.7` 直接显示数据，否则显示「分析中（已完成 X%）」骨架**。其中 `annotatedRatio = 已标注 collected_items 数 / 近 30 天 collected_items 总数`，由 `getCategoryDistribution` 和 `getKeywordCloud` 返回
 - 两边 zero state 文案统一管理在 `src/lib/account-analytics/content-category.ts`
 
 ### 5.5 区块 D · 近期文章 TOP5（满宽）
@@ -246,16 +247,25 @@ export const FALLBACK_METRIC_AVAILABILITY = {
 ### 6.2 数字带 6 列按平台映射
 
 ```ts
+// 每个 key 都必须在 §7.4 getPublishActivity().summary 里有对应的 SQL 聚合实现
 export const PLATFORM_SUMMARY_CARDS: Record<Platform, SummaryCardSpec[]> = {
-  douyin:   ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalLikes', 'avgEngagement'],
-  kuaishou: ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalLikes', 'totalComments'],
-  bilibili: ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalFavorites', 'totalShares'],
-  weibo:    ['publishCount', 'totalLikes', 'maxLikes', 'avgLikes', 'totalComments', 'totalShares'],
-  wechat:   ['publishCount', 'tenWPlus', 'maxReads', 'totalReads', 'avgReads', 'avgWowConversion'],
-  xiaohongshu: ['publishCount', 'totalLikes', 'totalFavorites', 'avgLikes', 'totalComments', 'totalShares'],
-  tiktok:   ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalLikes', 'totalShares'],
+  douyin:      ['publishCount', 'totalViews',     'maxViews',   'avgViews',  'totalLikes',     'totalShares'],
+  kuaishou:    ['publishCount', 'totalViews',     'maxViews',   'avgViews',  'totalLikes',     'totalComments'],
+  bilibili:    ['publishCount', 'totalViews',     'maxViews',   'avgViews',  'totalFavorites', 'totalShares'],
+  weibo:       ['publishCount', 'totalLikes',     'maxLikes',   'avgLikes',  'totalComments',  'totalShares'],
+  wechat:      ['publishCount', 'totalViews',     'maxViews',   'avgViews',  'totalLikes',     'totalComments'],  // views 在 wechat 上=阅读数, likes=在看数
+  xiaohongshu: ['publishCount', 'totalLikes',     'totalFavorites', 'avgLikes', 'totalComments', 'totalShares'],
+  tiktok:      ['publishCount', 'totalViews',     'maxViews',   'avgViews',  'totalLikes',     'totalShares'],
 }
+
+// 通用 6 类聚合（实际由 getPublishActivity 在 SQL 中实现）：
+// publishCount = COUNT(*)
+// totalViews / totalLikes / totalComments / totalShares / totalFavorites = SUM(对应列)
+// maxViews / maxLikes = MAX(对应列)
+// avgViews / avgLikes = AVG(对应列)（按发布数为分母，而非全周期天数）
 ```
+
+**注**：公众号专有的"10W+ 篇数"和"在看转化率（WoW conversion）"暂未纳入数字带。这两个需要更复杂的 SQL（`COUNT(*) FILTER (WHERE view_count >= 100000)` + 历史窗口同比计算）和额外数据（"在看数"是否就是 likes 还需 audit），列入 §13 后续工作"公众号专属深度指标"独立 spec。本期公众号数字带与其他平台同口径。
 
 ### 6.3 词云 / 类型占比与平台无关
 
@@ -300,6 +310,8 @@ CREATE INDEX collected_items_aigc_category_idx ON collected_items(organization_i
 CREATE INDEX collected_items_aigc_keywords_gin ON collected_items USING gin (aigc_keywords);
 CREATE INDEX collected_items_aigc_annotated_at_idx ON collected_items(aigc_annotated_at) WHERE aigc_annotated_at IS NULL;
 -- 第三个 partial index 加速"待标注"扫描
+-- 注：历史回填完成后该 index 会变小到接近 0 行；维护成本极低可保留，
+--    若日后做 schema 大清理可考虑删除（在 collected_items 上加注释提醒）
 ```
 
 **为什么不新建表**：分类和关键词都是"每个 collected_item 一对一"的属性，聚合到主表上避免 JOIN，且 GIN 索引下查询性能足够。
@@ -349,16 +361,28 @@ Function id: account-analytics-annotate-content
 Cron 触发：每天 04:00 Asia/Shanghai（在 daily-snapshot 06:00 前完成）
 Concurrency 上限：{ limit: 5 } （与 research-annotate 的 4 错开，避免 LLM 上游过载）
 
-输入：{ orgId, accountId?, batchSize: 50 }
+输入：{ orgId, accountId?, batchSize: 50, chainDepth?: 0 }
 逻辑：
   1. 查 collected_items WHERE org_id = ? AND aigc_annotated_at IS NULL
      ORDER BY published_at DESC LIMIT 50
   2. 并行（concurrency=5）调 deepseek-chat 给每条产出：
      { aigcCategory: <8选1>, aigcKeywords: string[5..10] }
-     prompt 显式要求"必须从 8 项里选 1，无法判断时选'其他'"
+     prompt 显式要求"必须从 8 项里选 1，无法判断时选'其他'"；temperature=0
   3. 批量 UPDATE collected_items SET aigc_content_category=..., aigc_keywords=...,
      aigc_annotated_at=NOW(), aigc_annotation_model='deepseek-chat:v3'
-  4. 若还有未标注行，自递归派发下一批事件（链式调用，避免单次 step 超时）
+  4. 失败行兜底（防无限循环）：LLM 返回 schema 校验失败或调用异常的行，
+     仍 UPDATE aigc_annotated_at=NOW() + aigc_content_category='其他' + aigc_keywords='[]',
+     避免下批被反复重选。失败次数记录在 step.log 供后期审计。
+  5. 链式派发熔断：
+     - 单次 cron 触发最多链 20 次（chainDepth 累计），即 20 × 50 = 1000 条/次
+     - 单批失败率 > 50% 立即熔断、不再递归、报错到 Inngest dashboard
+     - chainDepth >= 20 时改为派发到下一次 cron（不立即续派）
+  6. 若还有未标注行 AND 未触发熔断条件，自递归派发下一批事件
+     （chainDepth+1，避免单次 step 超时）
+
+时序说明：cron 04:00 与 daily-snapshot 06:00 之间**无数据依赖**——snapshot 仅聚合
+互动指标（likes/comments/views/...），不读取 aigc_ 字段。04:00 设置只是让 LLM 调用
+避开业务高峰；即使 04:00 这批未跑完，对 06:00 snapshot 没有影响。
 
 成本估算：
   - 单条 ≈ 600 tokens 输入 + 50 tokens 输出
@@ -447,12 +471,13 @@ src/app/(dashboard)/account-analytics/[accountId]/
 ├── page.tsx                         # 微调：并行加载 + 注入 tab 默认值
 ├── account-overview-client.tsx      # 重构：包 <Tabs>，把现有报告列表归入 Tab2
 └── components/                       # 新
-    ├── account-tabs.tsx             # Tab 状态 + URL 同步
+    ├── account-tabs.tsx             # 一级 Tab 容器（数据分析 / 分析报告）
+    ├── use-url-state.ts             # URL state hook（tab/granularity/metric/topSort/cloudRange）
     ├── data-analysis-tab.tsx        # Tab1 主容器
     ├── metric-trend-chart.tsx       # 区块 A: 左按钮 + 右折线
     ├── publish-activity-card.tsx    # 区块 B: 柱状 + 数字带
     ├── category-distribution.tsx    # 区块 C-左: 横向条形
-    ├── keyword-cloud.tsx            # 区块 C-右: 词云
+    ├── keyword-cloud.tsx            # 区块 C-右: 词云（基于 d3-cloud 包装）
     └── recent-top-posts.tsx         # 区块 D: TOP5 列表
 
 src/components/account-analytics/    # 共享原子组件
@@ -521,7 +546,7 @@ function KeywordCloud({ words }: { words: Array<{ keyword: string; weight: numbe
 ### Phase 2：区块 C 类型占比 + 词云（含 LLM 后台任务）
 
 - [ ] `collected_items` 加 4 个字段（Drizzle schema + 迁移）：aigcContentCategory / aigcKeywords / aigcAnnotatedAt / aigcAnnotationModel
-- [ ] 3 个新索引（partial index on null + GIN on keywords + 复合 index）
+- [ ] 3 个新索引（见 §7.1 SQL 清单）：复合 index（org+account+category）+ GIN on aigc_keywords + partial index on aigc_annotated_at IS NULL
 - [ ] `content-category.ts` AIGC_CONTENT_CATEGORIES 常量
 - [ ] Inngest `account-analytics-annotate-content` 函数 + cron 04:00（独立事件 `account-analytics/aigc-annotate.requested`）
 - [ ] DAL `getCategoryDistribution` + `getKeywordCloud`（返回 annotatedRatio 用于 zero state）
@@ -560,7 +585,7 @@ function KeywordCloud({ words }: { words: Array<{ keyword: string; weight: numbe
 - Inngest 后台任务 dry-run（10 条 collected_items）
 - 抽样检查 LLM 分类合理性（人工肉眼审 30 条，准确率 ≥ 85%）
 - 词云无停用词污染（"的"、"了"、"是" 等不应出现）—— prompt 显式排除
-- annotatedRatio < 70% 时区块 C 显示"分析中"骨架而非空白
+- 当 `annotatedRatio < 0.7` 时区块 C 显示"分析中（已完成 X%）"骨架而非空白（与 §5.4 阈值一致）
 
 ## 11. 风险与依赖
 
@@ -588,9 +613,11 @@ function KeywordCloud({ words }: { words: Array<{ keyword: string; weight: numbe
 ## 13. 后续工作
 
 - 独立 spec：账号粉丝地域画像（TikTok 优先）
+- 独立 spec：**公众号专属深度指标** —— 10W+ 篇数（`COUNT(*) FILTER (WHERE view_count >= 100000)`）、在看转化率（需历史窗口同比计算）、"在看数"字段语义 audit
 - 跨账号对比看板（基于本期的统一 DAL）
 - 报告 PDF 导出（含 Tab1 数据）
 - 类型占比的"二级分类"（如时政可细分为政策/会议/外事）
+- 历史回填脚本上线后第 2 周做准确率抽样审计，结果回写到本 spec 附录
 
 ---
 
