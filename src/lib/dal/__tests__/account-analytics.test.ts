@@ -8,6 +8,8 @@ import { accountDailySnapshots } from '@/db/schema/account-analytics'
 import { collectedItems } from '@/db/schema/collection'
 import { eq, inArray } from 'drizzle-orm'
 import {
+  getCategoryDistribution,
+  getKeywordCloud,
   getMetricSeries,
   getPublishActivity,
   getRecentTopPosts,
@@ -232,5 +234,99 @@ describe('getRecentTopPosts', () => {
     expect(new Date(rows[0].publishedAt).getTime()).toBeGreaterThan(
       new Date(rows[1]?.publishedAt ?? 0).getTime() - 1,
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 2.5 / 2.6 · getCategoryDistribution + getKeywordCloud —— AIGC 标注产物
+// ---------------------------------------------------------------------------
+// 复用 orgId / accountId（Task 1.2 fixture）。Task 1.4 的 itemId1/itemId2 没设
+// aigc 字段,这里另起 3 条带 aigc_ 字段的 items;annotatedRatio 按"含 aigc_annotated_at"
+// 数 / 全部数 计算,所以总数会是 5(itemId1+itemId2 没标注 + 这里 3 条已标注)。
+let itemAigc1: string
+let itemAigc2: string
+let itemAigc3: string
+
+beforeAll(async () => {
+  const now = new Date()
+  const inserted = await db
+    .insert(collectedItems)
+    .values([
+      {
+        organizationId: orgId,
+        accountId,
+        contentFingerprint: randomUUID(),
+        title: 'AIGC item 1 - 时政',
+        firstSeenChannel: 'test',
+        firstSeenAt: now,
+        publishedAt: now,
+        aigcContentCategory: '时政',
+        aigcKeywords: ['房产', '楼市', '城市'],
+        aigcAnnotatedAt: now,
+        aigcAnnotationModel: 'deepseek.chat.v3',
+      },
+      {
+        organizationId: orgId,
+        accountId,
+        contentFingerprint: randomUUID(),
+        title: 'AIGC item 2 - 时政',
+        firstSeenChannel: 'test',
+        firstSeenAt: now,
+        publishedAt: now,
+        aigcContentCategory: '时政',
+        aigcKeywords: ['政策', '房产'],
+        aigcAnnotatedAt: now,
+        aigcAnnotationModel: 'deepseek.chat.v3',
+      },
+      {
+        organizationId: orgId,
+        accountId,
+        contentFingerprint: randomUUID(),
+        title: 'AIGC item 3 - 财经',
+        firstSeenChannel: 'test',
+        firstSeenAt: now,
+        publishedAt: now,
+        aigcContentCategory: '财经',
+        aigcKeywords: ['楼市', '金融'],
+        aigcAnnotatedAt: now,
+        aigcAnnotationModel: 'deepseek.chat.v3',
+      },
+    ])
+    .returning({ id: collectedItems.id })
+  itemAigc1 = inserted[0].id
+  itemAigc2 = inserted[1].id
+  itemAigc3 = inserted[2].id
+})
+
+afterAll(async () => {
+  await db
+    .delete(collectedItems)
+    .where(inArray(collectedItems.id, [itemAigc1, itemAigc2, itemAigc3]))
+})
+
+describe('getCategoryDistribution', () => {
+  it('返回 buckets + annotatedRatio', async () => {
+    const result = await getCategoryDistribution({ orgId, accountId })
+    expect(result).toMatchObject({
+      buckets: expect.any(Array),
+      annotatedRatio: expect.any(Number),
+    })
+    // 应该有时政 (2) 和财经 (1) 两个分类
+    const timeZheng = result.buckets.find((b) => b.category === '时政')
+    expect(timeZheng?.count).toBeGreaterThanOrEqual(2)
+    expect(result.annotatedRatio).toBeGreaterThan(0)
+  })
+})
+
+describe('getKeywordCloud', () => {
+  it('返回词云 + annotatedRatio', async () => {
+    const result = await getKeywordCloud({ orgId, accountId, range: '30d' })
+    expect(result).toMatchObject({
+      words: expect.any(Array),
+      annotatedRatio: expect.any(Number),
+    })
+    // 应该有 房产 / 楼市 等关键词,房产在 item1 + item2 都包含
+    const fc = result.words.find((w) => w.keyword === '房产')
+    expect(fc?.weight).toBeGreaterThanOrEqual(2)
   })
 })

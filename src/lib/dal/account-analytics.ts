@@ -17,6 +17,7 @@ import {
   type MetricKey,
   type SummaryKey,
 } from "@/lib/account-analytics/platform-meta";
+import type { AigcContentCategory } from "@/lib/account-analytics/content-category";
 
 /**
  * 判断某 outlet 是否已为指定平台填好识别符（secUid/uid/userId/ghid/domain）。
@@ -1167,4 +1168,116 @@ export async function getRecentTopPosts(opts: {
     publishedAt: r.publishedAt?.toISOString() ?? "",
     sourceUrl: r.canonicalUrl ?? "", // alias: canonicalUrl → sourceUrl
   }));
+}
+
+// ---------------------------------------------------------------------------
+// getCategoryDistribution — AIGC 分类分布（区块 C 左：横向条形图）
+// ---------------------------------------------------------------------------
+// 给 Tab1 数据分析模块 区块 C 用：
+//   - buckets: 按 aigc_content_category 聚合的近 30 天发文计数
+//   - annotatedRatio: 已标注 / 全部（决定是否还在 zero state）
+//
+// 安全性：所有参数走 tagged template 绑定，无 sql.raw 注入面。
+
+export async function getCategoryDistribution(opts: {
+  orgId: string;
+  accountId: string;
+}): Promise<{
+  buckets: Array<{ category: AigcContentCategory; count: number }>;
+  annotatedRatio: number;
+}> {
+  const { orgId, accountId } = opts;
+
+  const rows = (await db.execute(sql`
+    SELECT
+      aigc_content_category AS category,
+      COUNT(*)::int AS count
+    FROM collected_items
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND published_at >= NOW() - INTERVAL '30 days'
+      AND aigc_content_category IS NOT NULL
+    GROUP BY aigc_content_category
+    ORDER BY count DESC
+  `)) as unknown as Array<Record<string, unknown>>;
+
+  const ratioRows = (await db.execute(sql`
+    SELECT
+      COALESCE(
+        SUM(CASE WHEN aigc_annotated_at IS NOT NULL THEN 1 ELSE 0 END)::float
+        / NULLIF(COUNT(*), 0),
+        0
+      ) AS ratio
+    FROM collected_items
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND published_at >= NOW() - INTERVAL '30 days'
+  `)) as unknown as Array<Record<string, unknown>>;
+  const ratioRow = ratioRows[0] ?? {};
+
+  return {
+    buckets: rows.map((r) => ({
+      category: r.category as AigcContentCategory,
+      count: Number(r.count ?? 0),
+    })),
+    annotatedRatio: Number(ratioRow.ratio ?? 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getKeywordCloud — AIGC 关键词云（区块 C 右：d3-cloud）
+// ---------------------------------------------------------------------------
+// 给 Tab1 数据分析模块 区块 C 用：
+//   - words: 按 aigc_keywords[] 展开 (LATERAL jsonb_array_elements_text) 后
+//            聚合 weight = COUNT(*)，取 Top 30
+//   - annotatedRatio: 已标注 / 全部（决定是否还在 zero state）
+//
+// 窗口：7d / 30d 两档（与区块 A/B 不同；词云需更长窗口才有足量样本）。
+
+export async function getKeywordCloud(opts: {
+  orgId: string;
+  accountId: string;
+  range: "7d" | "30d";
+}): Promise<{
+  words: Array<{ keyword: string; weight: number }>;
+  annotatedRatio: number;
+}> {
+  const { orgId, accountId, range } = opts;
+  const days = range === "7d" ? 7 : 30;
+
+  const rows = (await db.execute(sql`
+    SELECT
+      kw AS keyword,
+      COUNT(*)::int AS weight
+    FROM collected_items,
+         LATERAL jsonb_array_elements_text(aigc_keywords) AS kw
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+      AND aigc_keywords IS NOT NULL
+    GROUP BY kw
+    ORDER BY weight DESC
+    LIMIT 30
+  `)) as unknown as Array<Record<string, unknown>>;
+
+  const ratioRows = (await db.execute(sql`
+    SELECT COALESCE(
+      SUM(CASE WHEN aigc_annotated_at IS NOT NULL THEN 1 ELSE 0 END)::float
+      / NULLIF(COUNT(*), 0),
+      0
+    ) AS ratio
+    FROM collected_items
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND published_at >= NOW() - (${days}::int * INTERVAL '1 day')
+  `)) as unknown as Array<Record<string, unknown>>;
+  const ratioRow = ratioRows[0] ?? {};
+
+  return {
+    words: rows.map((r) => ({
+      keyword: String(r.keyword),
+      weight: Number(r.weight ?? 0),
+    })),
+    annotatedRatio: Number(ratioRow.ratio ?? 0),
+  };
 }
