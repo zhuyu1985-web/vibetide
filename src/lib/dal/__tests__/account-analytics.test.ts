@@ -6,7 +6,7 @@ import { organizations } from '@/db/schema'
 import { myAccounts } from '@/db/schema/topic-compare-v2'
 import { accountDailySnapshots } from '@/db/schema/account-analytics'
 import { eq } from 'drizzle-orm'
-import { getMetricSeries } from '../account-analytics'
+import { getMetricSeries, getPublishActivity } from '../account-analytics'
 
 let orgId: string
 let accountId: string
@@ -103,5 +103,38 @@ describe('getMetricSeries', () => {
       metric: 'likes',
     })
     expect(series).toEqual([])
+  })
+})
+
+describe('getPublishActivity', () => {
+  it('返回 buckets + summary 6 项', async () => {
+    const result = await getPublishActivity({
+      orgId,
+      accountId,
+      platform: 'douyin',
+      granularity: 'day',
+    })
+    expect(result.buckets.length).toBeGreaterThan(0)
+    expect(result.buckets[0]).toMatchObject({
+      bucket: expect.any(String),
+      publishCount: expect.any(Number),
+    })
+    // 抖音平台 PLATFORM_SUMMARY_CARDS.douyin = ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalLikes', 'totalShares']
+    expect(Object.keys(result.summary).sort()).toEqual(
+      ['avgViews', 'maxViews', 'publishCount', 'totalLikes', 'totalShares', 'totalViews'].sort(),
+    )
+  })
+
+  it('未知 platform 走 fallback 6 项', async () => {
+    const result = await getPublishActivity({
+      orgId,
+      accountId,
+      platform: 'unknown-platform',
+      granularity: 'day',
+    })
+    // FALLBACK_SUMMARY_CARDS = ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalLikes', 'totalComments']
+    expect(Object.keys(result.summary).sort()).toEqual(
+      ['avgViews', 'maxViews', 'publishCount', 'totalComments', 'totalLikes', 'totalViews'].sort(),
+    )
   })
 })

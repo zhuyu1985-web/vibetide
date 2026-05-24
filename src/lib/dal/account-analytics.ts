@@ -12,8 +12,10 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { Channel } from "@/lib/media-outlet/channels";
 import {
   GRANULARITY_WINDOW_DAYS,
+  getSummaryCards,
   type Granularity,
   type MetricKey,
+  type SummaryKey,
 } from "@/lib/account-analytics/platform-meta";
 
 /**
@@ -1013,4 +1015,79 @@ export async function getMetricSeries(opts: {
     bucket: String(r.bucket),
     value: Number(r.value ?? 0),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// getPublishActivity — 发布柱状图（按粒度）+ 平台特定 6 列数字带
+// ---------------------------------------------------------------------------
+// 给 Tab1 数据分析模块的"发布活跃度"卡片用。
+//
+// 关键决策：不在 DAL 里查 platform。page.tsx 已经加载了 account 对象（含 platform），
+// 上层传入更简单，也避免 my_accounts/benchmark_accounts 跨表 JOIN
+// （两表在 topic-compare-v2.ts，namespace 拆分会导致类型问题）。
+
+export async function getPublishActivity(opts: {
+  orgId: string;
+  accountId: string;
+  /** 平台 slug；由上层传入，决定数字带的 6 列子集 */
+  platform: string;
+  granularity: Granularity;
+}): Promise<{
+  buckets: Array<{ bucket: string; publishCount: number }>;
+  summary: Partial<Record<SummaryKey, number>>;
+}> {
+  const { orgId, accountId, platform, granularity } = opts;
+  const truncUnit = TRUNC_UNIT_MAP[granularity];
+  if (!truncUnit) throw new Error(`Unknown granularity: ${granularity}`);
+  const windowDays = GRANULARITY_WINDOW_DAYS[granularity];
+  const cards = getSummaryCards(platform);
+
+  // 发布柱状图（按粒度 bucket 聚合 post_count）
+  const bucketRows = (await db.execute(sql`
+    SELECT
+      TO_CHAR(DATE_TRUNC('${sql.raw(truncUnit)}', snapshot_date), 'YYYY-MM-DD') AS bucket,
+      COALESCE(SUM(post_count), 0)::int AS publish_count
+    FROM account_daily_snapshots
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND snapshot_date >= CURRENT_DATE - (${windowDays}::int * INTERVAL '1 day')
+    GROUP BY DATE_TRUNC('${sql.raw(truncUnit)}', snapshot_date)
+    ORDER BY bucket ASC
+  `)) as unknown as Array<Record<string, unknown>>;
+
+  // 数字带 —— 一次性查 10 列（SUM/MAX/AVG），按 platform 子集挑出 6 列。
+  // SQL 列名与 SummaryKey 的 snake_case 形式一一对应。
+  const sumRows = (await db.execute(sql`
+    SELECT
+      COALESCE(SUM(post_count), 0)::int AS publish_count,
+      COALESCE(SUM(total_likes), 0)::bigint AS total_likes,
+      COALESCE(SUM(total_comments), 0)::bigint AS total_comments,
+      COALESCE(SUM(total_shares), 0)::bigint AS total_shares,
+      COALESCE(SUM(total_favorites), 0)::bigint AS total_favorites,
+      COALESCE(SUM(total_views), 0)::bigint AS total_views,
+      COALESCE(MAX(total_likes), 0)::int AS max_likes,
+      COALESCE(MAX(total_views), 0)::int AS max_views,
+      COALESCE(AVG(NULLIF(total_likes, 0)), 0)::int AS avg_likes,
+      COALESCE(AVG(NULLIF(total_views, 0)), 0)::int AS avg_views
+    FROM account_daily_snapshots
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND snapshot_date >= CURRENT_DATE - (${windowDays}::int * INTERVAL '1 day')
+  `)) as unknown as Array<Record<string, unknown>>;
+  const sumRow = sumRows[0] ?? {};
+
+  const summary: Partial<Record<SummaryKey, number>> = {};
+  for (const key of cards) {
+    // SummaryKey (camelCase) -> SQL column (snake_case)
+    const sqlKey = key.replace(/[A-Z]/g, (m) => "_" + m.toLowerCase());
+    summary[key] = Number(sumRow[sqlKey] ?? 0);
+  }
+
+  return {
+    buckets: bucketRows.map((r) => ({
+      bucket: String(r.bucket),
+      publishCount: Number(r.publish_count ?? 0),
+    })),
+    summary,
+  };
 }
