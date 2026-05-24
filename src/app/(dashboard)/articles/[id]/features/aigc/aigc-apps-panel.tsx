@@ -99,7 +99,7 @@ export function AigcAppsPanel() {
           AI 内容创作工具集，结合稿件正文一键生成图片 / 视频 / 音频 等素材。
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-1.5">
+      <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2">
         {APPS.map((app) => {
           const Icon = app.icon;
           return (
@@ -107,20 +107,17 @@ export function AigcAppsPanel() {
               key={app.id}
               onClick={() => handleClick(app)}
               className={cn(
-                "aspect-[4/3] flex flex-col items-start justify-between gap-1 p-2.5 rounded-lg bg-gradient-to-br hover:scale-[1.02] active:scale-[0.98] transition-transform overflow-hidden",
+                "aspect-[16/9] flex items-center gap-2 p-2 rounded-lg bg-gradient-to-br hover:scale-[1.02] active:scale-[0.98] transition-transform overflow-hidden",
                 app.accent,
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              <div className="flex-1 min-h-0 flex flex-col items-start gap-0.5 w-full">
-                <span className="text-xs font-medium leading-tight">{app.title}</span>
-                <span className="text-[10px] text-muted-foreground leading-snug line-clamp-2 text-left">
+              <Icon className="h-5 w-5 shrink-0" />
+              <div className="flex-1 min-w-0 flex flex-col items-start gap-0.5 text-left">
+                <span className="text-xs font-medium leading-tight truncate w-full">{app.title}</span>
+                <span className="text-[10px] text-muted-foreground leading-snug truncate w-full">
                   {app.desc}
                 </span>
               </div>
-              <span className="text-[9px] uppercase tracking-wider opacity-60 shrink-0">
-                即将上线
-              </span>
             </button>
           );
         })}

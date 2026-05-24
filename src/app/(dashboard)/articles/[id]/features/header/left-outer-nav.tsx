@@ -51,13 +51,13 @@ export function LeftOuterNav() {
           >
             <span
               className={cn(
-                "w-11 h-11 rounded-xl flex items-center justify-center transition-all",
+                "w-[52px] h-[52px] rounded-xl flex items-center justify-center transition-all",
                 active
                   ? "bg-gradient-to-br from-sky-500 via-blue-600 to-blue-700 text-white shadow-md shadow-blue-600/30"
                   : "bg-muted/30 dark:bg-white/5",
               )}
             >
-              <Icon className="h-5 w-5" strokeWidth={1.9} />
+              <Icon className="h-6 w-6" strokeWidth={1.9} />
             </span>
             <span className="text-[11px] leading-none font-medium">{cat.label}</span>
           </button>
