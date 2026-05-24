@@ -5,8 +5,13 @@ import { organizations } from '@/db/schema'
 // myAccounts 在 topic-compare-v2.ts,不在 account-analytics.ts
 import { myAccounts } from '@/db/schema/topic-compare-v2'
 import { accountDailySnapshots } from '@/db/schema/account-analytics'
-import { eq } from 'drizzle-orm'
-import { getMetricSeries, getPublishActivity } from '../account-analytics'
+import { collectedItems } from '@/db/schema/collection'
+import { eq, inArray } from 'drizzle-orm'
+import {
+  getMetricSeries,
+  getPublishActivity,
+  getRecentTopPosts,
+} from '../account-analytics'
 
 let orgId: string
 let accountId: string
@@ -135,6 +140,97 @@ describe('getPublishActivity', () => {
     // FALLBACK_SUMMARY_CARDS = ['publishCount', 'totalViews', 'maxViews', 'avgViews', 'totalLikes', 'totalComments']
     expect(Object.keys(result.summary).sort()).toEqual(
       ['avgViews', 'maxViews', 'publishCount', 'totalComments', 'totalLikes', 'totalViews'].sort(),
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 1.4 · getRecentTopPosts —— 近 30 天 TOP N（hot/latest）
+// ---------------------------------------------------------------------------
+// 复用 orgId / accountId（Task 1.2 fixture）。collected_items.accountId 是 text
+// 列，my_accounts.id 是 uuid，PG 自动 cast，跨表用同一 string 即可。
+
+let itemId1: string
+let itemId2: string
+
+beforeAll(async () => {
+  const now = new Date()
+  const fp1 = randomUUID()
+  const fp2 = randomUUID()
+  const inserted = await db
+    .insert(collectedItems)
+    .values([
+      {
+        organizationId: orgId,
+        accountId,
+        contentFingerprint: fp1,
+        title: 'Top1 Highest Score',
+        firstSeenChannel: 'test',
+        firstSeenAt: now,
+        publishedAt: now,
+        likeCount: 1000,
+        commentCount: 100,
+        viewCount: 10000,
+        compositeScore: 90.5,
+        summary: 'top1 summary',
+        canonicalUrl: 'https://example.com/top1',
+        coverImageUrl: 'https://example.com/top1-cover.jpg',
+      },
+      {
+        organizationId: orgId,
+        accountId,
+        contentFingerprint: fp2,
+        title: 'Top2 Latest',
+        firstSeenChannel: 'test',
+        firstSeenAt: new Date(now.getTime() - 86_400_000),
+        publishedAt: new Date(now.getTime() - 86_400_000),
+        likeCount: 500,
+        commentCount: 50,
+        viewCount: 5000,
+        compositeScore: 60.0,
+        summary: 'top2 summary',
+        canonicalUrl: 'https://example.com/top2',
+      },
+    ])
+    .returning({ id: collectedItems.id })
+  itemId1 = inserted[0].id
+  itemId2 = inserted[1].id
+})
+
+afterAll(async () => {
+  await db
+    .delete(collectedItems)
+    .where(inArray(collectedItems.id, [itemId1, itemId2]))
+})
+
+describe('getRecentTopPosts', () => {
+  it('mode=hot 按 compositeScore 降序', async () => {
+    const rows = await getRecentTopPosts({
+      orgId,
+      accountId,
+      mode: 'hot',
+      limit: 5,
+    })
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0].score >= (rows[1]?.score ?? 0)).toBe(true)
+    // 验证 alias 输出
+    expect(rows[0].sourceUrl).toContain('example.com')
+    // thumbnail 可能 null（item2 没设 coverImageUrl）
+    expect(
+      typeof rows[0].thumbnail === 'string' || rows[0].thumbnail === null,
+    ).toBe(true)
+  })
+
+  it('mode=latest 按 publishedAt 降序', async () => {
+    const rows = await getRecentTopPosts({
+      orgId,
+      accountId,
+      mode: 'latest',
+      limit: 5,
+    })
+    expect(rows.length).toBeGreaterThan(0)
+    expect(new Date(rows[0].publishedAt).getTime()).toBeGreaterThan(
+      new Date(rows[1]?.publishedAt ?? 0).getTime() - 1,
     )
   })
 })

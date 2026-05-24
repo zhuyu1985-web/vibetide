@@ -1091,3 +1091,80 @@ export async function getPublishActivity(opts: {
     summary,
   };
 }
+
+// ---------------------------------------------------------------------------
+// getRecentTopPosts — 近 30 天 TOP N 帖子（mode=hot/latest）
+// ---------------------------------------------------------------------------
+// 给 Tab1 数据分析模块的"近期 TOP 帖子"卡片用：
+//   - mode=hot   → ORDER BY composite_score DESC
+//   - mode=latest → ORDER BY published_at DESC
+//
+// 字段 alias 约定：
+//   - schema 真实字段 coverImageUrl → 输出 thumbnail（保持上层组件契约稳定）
+//   - schema 真实字段 canonicalUrl  → 输出 sourceUrl
+
+export async function getRecentTopPosts(opts: {
+  orgId: string;
+  accountId: string;
+  mode: "hot" | "latest";
+  limit?: number;
+}): Promise<
+  Array<{
+    id: string;
+    title: string;
+    summary: string | null;
+    thumbnail: string | null;
+    score: number;
+    viewCount: number;
+    commentCount: number;
+    likeCount: number;
+    publishedAt: string; // ISO
+    sourceUrl: string;
+  }>
+> {
+  const { orgId, accountId, mode, limit = 5 } = opts;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const orderClause =
+    mode === "hot"
+      ? desc(collectedItems.compositeScore)
+      : desc(collectedItems.publishedAt);
+
+  const rows = await db
+    .select({
+      id: collectedItems.id,
+      title: collectedItems.title,
+      summary: collectedItems.summary,
+      coverImageUrl: collectedItems.coverImageUrl,
+      score: collectedItems.compositeScore,
+      viewCount: collectedItems.viewCount,
+      commentCount: collectedItems.commentCount,
+      likeCount: collectedItems.likeCount,
+      publishedAt: collectedItems.publishedAt,
+      canonicalUrl: collectedItems.canonicalUrl,
+    })
+    .from(collectedItems)
+    .where(
+      and(
+        eq(collectedItems.organizationId, orgId),
+        eq(collectedItems.accountId, accountId),
+        gte(collectedItems.publishedAt, thirtyDaysAgo),
+      ),
+    )
+    .orderBy(orderClause)
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title ?? "(无标题)",
+    summary: r.summary,
+    thumbnail: r.coverImageUrl, // alias: coverImageUrl → thumbnail
+    score: Number(r.score ?? 0),
+    viewCount: r.viewCount ?? 0,
+    commentCount: r.commentCount ?? 0,
+    likeCount: r.likeCount ?? 0,
+    publishedAt: r.publishedAt?.toISOString() ?? "",
+    sourceUrl: r.canonicalUrl ?? "", // alias: canonicalUrl → sourceUrl
+  }));
+}
