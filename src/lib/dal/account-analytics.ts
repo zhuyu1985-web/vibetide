@@ -10,6 +10,11 @@ import {
 } from "@/db/schema";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { Channel } from "@/lib/media-outlet/channels";
+import {
+  GRANULARITY_WINDOW_DAYS,
+  type Granularity,
+  type MetricKey,
+} from "@/lib/account-analytics/platform-meta";
 
 /**
  * 判断某 outlet 是否已为指定平台填好识别符（secUid/uid/userId/ghid/domain）。
@@ -948,4 +953,64 @@ function reportRowToSummary(row: typeof accountAnalyticsReports.$inferSelect): R
     executiveSummary: row.executiveSummary,
     generatedAt: row.generatedAt?.toISOString() ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// getMetricSeries — 按粒度（day/week/month）聚合单个指标的时间序列
+// ---------------------------------------------------------------------------
+// 给 Tab1 数据分析模块的趋势卡片用：用户选 metric + granularity → 序列。
+// Spec §7.4：day=7d，week=12w(84d)，month=6mo(180d)。
+//
+// 安全性：metric / granularity 均通过白名单 lookup 后才 sql.raw，
+// 杜绝 SQL 注入；window 用参数化数字带类型转 INTERVAL。
+
+/** snapshot 列名白名单，按 MetricKey 映射；杜绝 sql.raw 注入。 */
+const METRIC_COLUMN_MAP: Record<MetricKey, string> = {
+  likes: "total_likes",
+  comments: "total_comments",
+  shares: "total_shares",
+  favorites: "total_favorites",
+  views: "total_views",
+  compositeScore: "composite_score_total",
+};
+
+/** DATE_TRUNC 单位白名单 */
+const TRUNC_UNIT_MAP: Record<Granularity, string> = {
+  day: "day",
+  week: "week",
+  month: "month",
+};
+
+export async function getMetricSeries(opts: {
+  orgId: string;
+  accountId: string;
+  granularity: Granularity;
+  metric: MetricKey;
+}): Promise<Array<{ bucket: string; value: number }>> {
+  const { orgId, accountId, granularity, metric } = opts;
+  const column = METRIC_COLUMN_MAP[metric];
+  if (!column) throw new Error(`Unknown metric: ${metric}`);
+  const truncUnit = TRUNC_UNIT_MAP[granularity];
+  if (!truncUnit) throw new Error(`Unknown granularity: ${granularity}`);
+  const windowDays = GRANULARITY_WINDOW_DAYS[granularity];
+
+  // truncUnit 已通过白名单校验；直接 sql.raw 内嵌成字面量，
+  // 避免 Postgres 把同名 parameter 视为两个不同表达式导致
+  // "must appear in GROUP BY" 错误。
+  const rows = await db.execute(sql`
+    SELECT
+      TO_CHAR(DATE_TRUNC('${sql.raw(truncUnit)}', snapshot_date), 'YYYY-MM-DD') AS bucket,
+      COALESCE(SUM(${sql.raw(column)}), 0)::float AS value
+    FROM account_daily_snapshots
+    WHERE organization_id = ${orgId}
+      AND account_id = ${accountId}
+      AND snapshot_date >= CURRENT_DATE - (${windowDays}::int * INTERVAL '1 day')
+    GROUP BY DATE_TRUNC('${sql.raw(truncUnit)}', snapshot_date)
+    ORDER BY bucket ASC
+  `);
+
+  return (rows as unknown as Array<Record<string, unknown>>).map((r) => ({
+    bucket: String(r.bucket),
+    value: Number(r.value ?? 0),
+  }));
 }
