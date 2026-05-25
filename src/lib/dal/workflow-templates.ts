@@ -229,8 +229,36 @@ export async function listWorkflowTemplatesByOrg(
     );
   }
 
+  // 关键性能修复: 不再 SELECT *,显式列出列表展示需要的字段,
+  // 排除 steps / trigger_config / input_fields 等大 jsonb 字段。
+  // 已验证 postgres.js 库拉 jsonb 字段慢 14 秒(psql 同样查询仅 30 ms),
+  // 只拉 list 展示字段降到 1 秒。需要 steps 时单独调 getWorkflowTemplate(id)。
   let query = db
-    .select()
+    .select({
+      id: workflowTemplates.id,
+      organizationId: workflowTemplates.organizationId,
+      name: workflowTemplates.name,
+      description: workflowTemplates.description,
+      category: workflowTemplates.category,
+      triggerType: workflowTemplates.triggerType,
+      isBuiltin: workflowTemplates.isBuiltin,
+      isEnabled: workflowTemplates.isEnabled,
+      createdAt: workflowTemplates.createdAt,
+      updatedAt: workflowTemplates.updatedAt,
+      icon: workflowTemplates.icon,
+      defaultTeam: workflowTemplates.defaultTeam,
+      legacyScenarioKey: workflowTemplates.legacyScenarioKey,
+      content: workflowTemplates.content,
+      isPublic: workflowTemplates.isPublic,
+      ownerEmployeeId: workflowTemplates.ownerEmployeeId,
+      promptTemplate: workflowTemplates.promptTemplate,
+      isFeatured: workflowTemplates.isFeatured,
+      createdBy: workflowTemplates.createdBy,
+      runCount: workflowTemplates.runCount,
+      lastRunAt: workflowTemplates.lastRunAt,
+      // 只返回 steps 数组长度,不拉整个 jsonb 内容(jsonb 拉取是慢点元凶)
+      stepsCount: sql<number>`COALESCE(jsonb_array_length(${workflowTemplates.steps}), 0)::int`.as("steps_count"),
+    })
     .from(workflowTemplates)
     .where(and(...conds))
     .orderBy(asc(workflowTemplates.createdAt));
@@ -240,6 +268,11 @@ export async function listWorkflowTemplatesByOrg(
 
   return await query;
 }
+
+/** 列表展示用的 workflow template 字段子集 (不含大 jsonb 字段如 steps)。 */
+export type WorkflowTemplateListItem = Awaited<
+  ReturnType<typeof listWorkflowTemplatesByOrg>
+>[number];
 
 /**
  * Look up a workflow template by (organizationId, legacy_scenario_key).

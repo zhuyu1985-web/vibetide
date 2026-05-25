@@ -20,13 +20,11 @@ export default async function DashboardLayout({
   let superAdmin = false;
 
   try {
-    // 30s timeout — Supabase ap-northeast-2 跨区冷启动 + 多 join 查询
-    // (user_profiles + user_roles + roles) 在国内访问下 5-10s 常见。
-    // 之前 3s 太短导致 fallback 频繁触发显示「演示用户」+ 空 permissions，
-    // 用户体验:登录后 UI 行为像访客模式。
+    // 8s timeout — 数据库迁到 Sealos 北京后通常 < 1s,
+    // 8s 兜底足够吸收偶发慢查询(包括 postgres.js + 远端通信延迟),又不长时间等待。
     const profile = await Promise.race([
       getCurrentUserProfile(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
     ]);
 
     if (profile) {

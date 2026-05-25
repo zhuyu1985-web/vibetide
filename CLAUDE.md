@@ -116,9 +116,43 @@ Mutations  → Server Actions (src/app/actions/) ─────────┘
 - **72 enums** in `src/db/schema/enums.ts`
 - **Key tables:** `organizations`, `user_profiles`, `ai_employees`, `skills`, `employee_skills`, `employee_memories`, `teams`, `team_members`, `workflow_templates`, `workflow_instances`, `workflow_steps`, `workflow_artifacts`, `team_messages`, `tasks`, `knowledge_bases`, `employee_knowledge_bases`, `missions`, `media_assets`, `articles`, `categories`
 - **Types** auto-derived in `src/db/types.ts` via `InferSelectModel`/`InferInsertModel`
-- **Connection** in `src/db/index.ts`: uses `postgres` driver with `{ prepare: false }` (required for Supabase PgBouncer)
+- **Connection** in `src/db/index.ts`: `postgres-js` driver,自动根据 DATABASE_URL 判断本地/远程(本地 `127.0.0.1` 自动启用 `prepare:true` 享受 prepared statement 加速,远程 pooler 自动 `prepare:false` 避免 PgBouncer transaction mode 协议冲突)
 - **Migrations** output to `supabase/migrations/`
 - Multi-tenant: all core tables have `organization_id` foreign key
+
+### Schema Migration 规范（**强制纪律**，避免 schema drift）
+
+**背景**：项目曾出现 21 个手工日期格式 SQL 文件（`20260419xxx.sql` 等）脱离 Drizzle `_journal.json` 追踪，迁库时部分漏跑（如 `idx_workflow_templates_owner_employee` 索引漏建、`missed_topics` 废表残留）。**只要遵守下面流程，schema 永远跟代码同步**。
+
+**写新 schema 变更的唯一标准流程**：
+
+```bash
+# Step 1: 改 src/db/schema/*.ts（加表/字段/索引/枚举值）
+
+# Step 2: 让 Drizzle 自动生成 migration + 更新 _journal.json
+npm run db:generate
+
+# 这会产出 supabase/migrations/NNNN_xxx.sql + 同步 meta/_journal.json + 对应 snapshot.json
+
+# Step 3: 应用到当前 DATABASE_URL
+npm run db:migrate
+```
+
+**禁止行为**：
+- ❌ 不要**手工**在 `supabase/migrations/` 里创建 `YYYYMMDD_xxx.sql` 日期格式文件 — Drizzle 不会追踪它，迁库必漏
+- ❌ 不要**绕过 Drizzle 直接 psql** 改生产 schema — 改完一定走标准流程让 journal 同步
+- ❌ 不要**手工编辑 `_journal.json`** — 必须配对的 snapshot 文件，乱改会让 `db:migrate` 报错
+
+**必须做的事**：
+- ✅ 一次 schema 变更 → 一个 `db:generate` 产出 → 一次 `db:migrate`
+- ✅ **每次切换 DATABASE_URL / 迁库后**立即跑 `bash scripts/verify-schema-sync.sh` 验证 16 个关键 fingerprint
+- ✅ 部署到生产前确认 `npm run db:migrate` 在生产环境跑过
+- ✅ 出现需要数据迁移的复杂变更（如 column 类型修改 + 数据搬运），写一个临时 `scripts/migration-NNN.ts` 脚本配合 Drizzle 标准 migration 用，不要把数据 migration 塞进 SQL 文件里
+
+**Schema drift 检查脚本**：`scripts/verify-schema-sync.sh`
+- 自动读 `.env.local` 的 DATABASE_URL
+- 16 个 fingerprint：核心表存在、关键字段、关键索引、枚举值、废表已删
+- 出现 `MISSING` / `STALE` 立即修复 — 输出对应 migration 找根因
 
 ### Auth Flow
 

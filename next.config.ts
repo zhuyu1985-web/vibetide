@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
       // Excel 导入会把前端解析后的批量行数据提交给 Server Action；默认 1MB 不够。
       bodySizeLimit: "100mb",
     },
+    // Tree-shake 重型库,减少 client bundle 体积。
+    // lucide-react / recharts / framer-motion 都被 200+ 文件 import,优化收益显著。
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "framer-motion",
+      "date-fns",
+      "@radix-ui/react-icons",
+    ],
   },
   // 允许局域网工作站访问 dev server（HMR WebSocket 跨 origin 告警消除）。
   // 注意：Next.js allowedDevOrigins 的 glob 是按 hostname label 匹配的，

@@ -71,7 +71,7 @@ import {
 } from "@/lib/constants";
 import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 import type { MissionSummary } from "@/lib/dal/missions";
-import type { WorkflowTemplateRow } from "@/db/types";
+import type { WorkflowTemplateListItem } from "@/lib/dal/workflow-templates";
 import { cn } from "@/lib/utils";
 
 /**
@@ -169,7 +169,7 @@ export function MissionsClient({
    * source of truth. Mission row rendering uses mission.scenarioLabel /
    * scenarioIcon (denormalized at DAL layer).
    */
-  workflows: WorkflowTemplateRow[];
+  workflows: WorkflowTemplateListItem[];
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -190,7 +190,7 @@ export function MissionsClient({
       const c = (wf.category ?? "custom") as OrderedCategory;
       (acc[c] ??= []).push(wf);
       return acc;
-    }, {} as Partial<Record<OrderedCategory, WorkflowTemplateRow[]>>);
+    }, {} as Partial<Record<OrderedCategory, WorkflowTemplateListItem[]>>);
   }, [workflows]);
 
   const activeCategoryTabs = useMemo(() => {
@@ -202,7 +202,7 @@ export function MissionsClient({
   // Sheet creation
   const [sheetOpen, setSheetOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowTemplateRow | null>(
+  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowTemplateListItem | null>(
     null,
   );
   const [scenarioCategory, setScenarioCategory] = useState<OrderedCategory>("news");
@@ -231,12 +231,36 @@ export function MissionsClient({
     ["queued", "planning", "executing", "consolidating"].includes(m.status)
   );
   const [, startRefreshTransition] = useTransition();
+  // 用 ref 跟踪「上次 router.refresh 是否还在 in-flight」。
+  // 注意: useTransition 的 isPending 只在 startTransition 的 callback **同步**
+  // 执行期间为 true,callback 同步返回后立即变 false。而 router.refresh() 内部
+  // 是异步 fetch,几微秒就返回 — isPending 守门完全无效!
+  // 正确做法: 用 props.missions 引用变化作为「server 端 refresh 完成」信号。
+  const inFlightRef = useRef(false);
+  useEffect(() => {
+    // 父组件 page.tsx 重渲染 → 新 missions 数组引用 → 视为 refresh 已完成,释放标志
+    inFlightRef.current = false;
+  }, [missions]);
+
   useEffect(() => {
     if (!hasActive) return;
-    const t = setInterval(() => {
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      // 关键: 上一次 router.refresh() 的 RSC 还在 server 端跑就跳过本轮,
+      // 避免「轮询周期 < server 处理周期」累积 in-flight RSC 请求拖死 server。
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       startRefreshTransition(() => { router.refresh(); });
-    }, 5000);
-    return () => clearInterval(t);
+    };
+    const t = setInterval(tick, 5000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [hasActive, router]);
 
   // Stats
@@ -411,7 +435,7 @@ export function MissionsClient({
     setTitle("");
     setInstruction("");
   }
-  function pickWorkflow(wf: WorkflowTemplateRow) {
+  function pickWorkflow(wf: WorkflowTemplateListItem) {
     setSelectedWorkflow(wf);
     // Phase 3: 直接用 workflow_templates.promptTemplate 作为"发起新任务"
     // 默认指令预填。seed-builtin-workflows.ts 已为所有 builtin 场景提供

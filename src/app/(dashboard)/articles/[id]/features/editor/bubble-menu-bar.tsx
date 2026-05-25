@@ -28,6 +28,7 @@ import {
   MessageSquarePlus,
 } from "lucide-react";
 import { useArticlePageStore } from "../../store";
+import { PromptDialog } from "@/components/shared/prompt-dialog";
 import { cn } from "@/lib/utils";
 import { AiDiffPreview, type AiEditMode } from "./ai-diff-preview";
 
@@ -91,23 +92,31 @@ const AI_ACTIONS: AiActionDef[] = [
 ];
 
 export function BubbleMenuBar({ editor }: BubbleMenuBarProps) {
-  const store = useArticlePageStore();
+  // 精选订阅 setter(setter 引用稳定),避免 store 内任意 state 变化都让本组件重渲。
+  const setSelectedText = useArticlePageStore((s) => s.setSelectedText);
+  const setLeftTab = useArticlePageStore((s) => s.setLeftTab);
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffMode, setDiffMode] = useState<AiEditMode>("polish");
   const [diffOriginal, setDiffOriginal] = useState("");
   const [diffRange, setDiffRange] = useState<{ from: number; to: number } | null>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkDefault, setLinkDefault] = useState("");
 
   if (!editor) return null;
 
   const handleLink = () => {
-    const previousUrl = editor.getAttributes("link").href;
-    const url = window.prompt("输入链接地址", previousUrl);
-    if (url === null) return;
-    if (url === "") {
+    setLinkDefault(editor.getAttributes("link").href ?? "");
+    setLinkDialogOpen(true);
+  };
+
+  const submitLink = (url: string) => {
+    setLinkDialogOpen(false);
+    const trimmed = url.trim();
+    if (!trimmed) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    editor.chain().focus().extendMarkRange("link").setLink({ href: trimmed }).run();
   };
 
   const openAiAction = (mode: AiEditMode) => {
@@ -124,8 +133,8 @@ export function BubbleMenuBar({ editor }: BubbleMenuBarProps) {
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (!selectedText.trim()) return;
-    store.setSelectedText(selectedText, { from, to });
-    store.setLeftTab("chat");
+    setSelectedText(selectedText, { from, to });
+    setLeftTab("chat");
   };
 
   const handleApply = (newText: string) => {
@@ -207,6 +216,17 @@ export function BubbleMenuBar({ editor }: BubbleMenuBarProps) {
         originalText={diffOriginal}
         fullContext={editor.getText()}
         onApply={handleApply}
+      />
+
+      <PromptDialog
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        title="插入 / 编辑链接"
+        description="留空可移除链接"
+        placeholder="https://example.com"
+        defaultValue={linkDefault}
+        confirmText="应用"
+        onConfirm={submitLink}
       />
     </>
   );

@@ -1,9 +1,9 @@
 import { getMissionsWithActiveTasks } from "@/lib/dal/missions";
 import { MissionsClient } from "./missions-client";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { cleanupStuckMissions } from "@/app/actions/missions";
 import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
-import type { WorkflowTemplateRow } from "@/db/types";
+import type { WorkflowTemplateListItem } from "@/lib/dal/workflow-templates";
+import { cleanupStuckMissions } from "@/app/actions/missions";
 import { after } from "next/server";
 
 export default async function MissionsPage() {
@@ -12,9 +12,8 @@ export default async function MissionsPage() {
   const missions = orgId ? await getMissionsWithActiveTasks(orgId) : [];
 
   // B.1 Unified Scenario Workflow — fetch enabled builtin workflow templates
-  // for this org so <MissionsClient> can render them (Task 18 consumes the
-  // prop in the "发起新任务" Sheet).
-  let workflows: WorkflowTemplateRow[] = [];
+  // for this org so <MissionsClient> can render them.
+  let workflows: WorkflowTemplateListItem[] = [];
   if (orgId) {
     try {
       workflows = await listWorkflowTemplatesByOrg(orgId, {
@@ -26,7 +25,7 @@ export default async function MissionsPage() {
     }
   }
 
-  // 页面加载时自动清理卡住的任务和员工
+  // 页面加载时自动清理卡住的任务和员工(after() 在响应 flush 后再跑,不阻塞)
   if (orgId) {
     after(async () => {
       await cleanupStuckMissions().catch(() => {});

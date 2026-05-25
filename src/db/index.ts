@@ -3,25 +3,25 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 // ---------------------------------------------------------------------------
-// Singleton postgres client that survives Next.js HMR.
+// Singleton postgres client that survives Next.js HMR。
 //
-// CRITICAL: Supabase pooler in ap-southeast-1 triggers "Circuit breaker open"
-// when too many auth attempts happen. Root causes:
-// 1. HMR re-evaluates this module → new clients (fixed by globalThis singleton)
-// 2. max pool too large → many auth attempts per process (fixed: max=1)
-// 3. Multiple dev server restarts → zombie processes (user must kill stale procs)
-//
-// With max=1, each Next.js process uses exactly 1 persistent connection.
-// The connection is pre-warmed at module load to avoid the 7-8s cold penalty.
+// DATABASE_URL 可指向:
+//   - 本地 PG(127.0.0.1 / localhost):直连模式,享受 prepared statement 加速
+//   - Supabase / Sealos pooler(远程域名):走 PgBouncer transaction mode,必须 prepare:false
+// 用 globalThis 单例,避免 HMR 重复创建客户端导致连接泄漏。
 // ---------------------------------------------------------------------------
 
+// 自动识别本地直连 PG → prepare:true 享受 prepared statement;远程 pooler → prepare:false 保守。
+const DB_URL = process.env.DATABASE_URL ?? "";
+const isLocalDb = /\/\/[^/]*?(127\.0\.0\.1|localhost)/i.test(DB_URL);
+
 function createClient() {
-  return postgres(process.env.DATABASE_URL!, {
-    prepare: false,       // Required for Supabase PgBouncer
-    connect_timeout: 30,  // Allow for slow China→Singapore connection
-    idle_timeout: 300,    // 5 min idle — keep alive as long as possible
-    max: 2,               // 2 connections — supports parallel task execution without circuit breaker risk
-    max_lifetime: 900,    // 15 min max — minimize reconnection frequency
+  return postgres(DB_URL, {
+    prepare: isLocalDb,   // 本地直连用 prepared statement;PgBouncer transaction mode 必须 false
+    connect_timeout: 10,  // 10s 兜底,吸收偶发慢握手
+    idle_timeout: 300,    // 5 min idle — 保活减少 reconnect
+    max: 10,              // home/page.tsx 一次发 10 个 tab 模板查询 + layout 2 个并发,放宽到 10 避免排队
+    max_lifetime: 900,    // 15 min — 减少 reconnect 频率
   });
 }
 

@@ -362,38 +362,48 @@ export interface MissionSummary extends Mission {
 }
 
 export async function getMissionsWithActiveTasks(
-  organizationId: string
+  organizationId: string,
+  options: { missionLimit?: number } = {},
 ): Promise<MissionSummary[]> {
-  // Run ALL queries in parallel — 1 network round-trip instead of 4 sequential.
-  // Uses org-level employee query (small table) to avoid dependency on mission results.
-  const [missionRows, taskRows, msgRows, empRows, workflowRows] = await Promise.all([
-    db.select().from(missions).where(eq(missions.organizationId, organizationId)).orderBy(desc(missions.createdAt)),
+  // 默认只取最近 50 个 mission — 任务中心列表展示无需全量。
+  // 全表拉(原 112 mission + 895 tasks + 1028 messages)会让 RSC payload 达 347KB,
+  // dev 模式下 Turbopack 编译 + 客户端反序列化叠加,首次访问 1+ 分钟。
+  const missionLimit = options.missionLimit ?? 50;
+
+  // Round 1: 并行 3 个 org-level 查询(missions 加 LIMIT,employees 和 workflow_templates 表小,全量可)
+  const [missionRows, empRows, workflowRows] = await Promise.all([
+    db.select().from(missions)
+      .where(eq(missions.organizationId, organizationId))
+      .orderBy(desc(missions.createdAt))
+      .limit(missionLimit),
+    db.select({ id: aiEmployees.id, slug: aiEmployees.slug }).from(aiEmployees)
+      .where(eq(aiEmployees.organizationId, organizationId)),
+    db.select().from(workflowTemplates)
+      .where(eq(workflowTemplates.organizationId, organizationId)),
+  ]);
+
+  if (missionRows.length === 0) return [];
+
+  const missionIds = missionRows.map((m) => m.id);
+
+  // Round 2: 并行 2 个查询,只拉这 50 个 mission 的 tasks / messages
+  const [taskRows, msgRows] = await Promise.all([
     db.select({
       missionId: missionTasks.missionId,
       status: missionTasks.status,
       title: missionTasks.title,
       assignedEmployeeId: missionTasks.assignedEmployeeId,
     }).from(missionTasks)
-      .innerJoin(missions, eq(missionTasks.missionId, missions.id))
-      .where(eq(missions.organizationId, organizationId)),
+      .where(inArray(missionTasks.missionId, missionIds)),
     db.select({
       missionId: missionMessages.missionId,
       content: missionMessages.content,
       fromEmployeeId: missionMessages.fromEmployeeId,
       createdAt: missionMessages.createdAt,
     }).from(missionMessages)
-      .innerJoin(missions, eq(missionMessages.missionId, missions.id))
-      .where(eq(missions.organizationId, organizationId))
+      .where(inArray(missionMessages.missionId, missionIds))
       .orderBy(desc(missionMessages.createdAt)),
-    db.select({ id: aiEmployees.id, slug: aiEmployees.slug }).from(aiEmployees)
-      .where(eq(aiEmployees.organizationId, organizationId)),
-    // Phase 4A: preload org's workflow templates so we can resolve
-    // `scenarioLabel` server-side (replaces SCENARIO_CONFIG lookup in client).
-    db.select().from(workflowTemplates)
-      .where(eq(workflowTemplates.organizationId, organizationId)),
   ]);
-
-  if (missionRows.length === 0) return [];
 
   const tplById = new Map<string, WorkflowTemplateRow>(
     (workflowRows as WorkflowTemplateRow[]).map((t) => [t.id, t]),

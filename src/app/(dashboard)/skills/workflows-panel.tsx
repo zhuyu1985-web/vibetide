@@ -8,10 +8,10 @@ import { SearchInput } from "@/components/shared/search-input";
 import { GlassCard } from "@/components/shared/glass-card";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { Badge } from "@/components/ui/badge";
-import type { WorkflowTemplateRow } from "@/db/types";
+import type { WorkflowTemplateListItem } from "@/lib/dal/workflow-templates";
 
 interface WorkflowsPanelProps {
-  workflows: WorkflowTemplateRow[];
+  workflows: WorkflowTemplateListItem[];
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -204,7 +204,7 @@ export function WorkflowsPanel({ workflows }: WorkflowsPanelProps) {
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
-                      <span>{(wf.steps as unknown[] | null)?.length ?? 0} 步</span>
+                      <span>{wf.stepsCount ?? 0} 步</span>
                     </div>
                   </div>
                 </GlassCard>

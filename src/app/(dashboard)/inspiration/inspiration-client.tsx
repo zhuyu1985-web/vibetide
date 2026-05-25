@@ -1189,11 +1189,12 @@ function AIKeyPointsBlock({ topic }: { topic: InspirationTopic }) {
       // 进入 in-flight 后切到 loading 状态
       // 用一个轻量 polling 检测，从 queued → loading
       const pollHandle = setInterval(() => {
+        if (document.visibilityState !== "visible") return;
         if (summarizeInFlight.has(topic.id)) {
           // 已经在跑（自己或别的组件触发的同 id 请求）
           setState((s) => (s.kind === "queued" ? { kind: "loading" } : s));
         }
-      }, 200);
+      }, 500);
 
       try {
         const res = await dedupedSummarize(topic.id);

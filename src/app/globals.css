@@ -272,7 +272,6 @@
     width: 520px;
     height: 520px;
     background: #93c5fd;
-    animation: page-blob-float 18s ease-in-out infinite;
   }
   body::after {
     bottom: -200px;
@@ -280,8 +279,6 @@
     width: 600px;
     height: 600px;
     background: #c4b5fd;
-    animation: page-blob-float 22s ease-in-out infinite reverse;
-    animation-delay: -6s;
   }
   .dark body::before {
     background: #1e40af;
@@ -290,11 +287,6 @@
   .dark body::after {
     background: #6d28d9;
     opacity: 0.28;
-  }
-  @keyframes page-blob-float {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -22px) scale(1.08); }
-    66% { transform: translate(-20px, 28px) scale(0.94); }
   }
   /* Ensure top-level layout children sit above the blobs */
   body > * {
@@ -822,7 +814,6 @@
     background: radial-gradient(ellipse 90% 70% at 45% 85%, var(--glow-3) 0%, rgba(16, 185, 129, 0.008) 40%, transparent 80%);
     pointer-events: none;
     z-index: 0;
-    filter: blur(40px);
   }
 
   /* ================================================================
@@ -1367,4 +1358,20 @@
 @keyframes skillTestShimmer {
   0%   { left: -33%; }
   100% { left: 100%; }
+}
+
+/* ================================================================
+   Reduced-motion guardrail
+   尊重系统级"减少动效"偏好;对所有动画/过渡降到不可感知的时长。
+   普通用户无感,开启该偏好的用户立即停掉全部 infinite 动画。
+   ================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

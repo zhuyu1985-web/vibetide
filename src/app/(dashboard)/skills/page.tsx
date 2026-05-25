@@ -1,12 +1,12 @@
 import { getSkillsWithBindCount } from "@/lib/dal/skills";
 import { listWorkflowTemplatesByOrg } from "@/lib/dal/workflow-templates";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import type { WorkflowTemplateRow } from "@/db/types";
+import type { WorkflowTemplateListItem } from "@/lib/dal/workflow-templates";
 import { SkillsClient } from "./skills-client";
 
 export default async function SkillsPage() {
   let skills: Awaited<ReturnType<typeof getSkillsWithBindCount>> = [];
-  let workflows: WorkflowTemplateRow[] = [];
+  let workflows: WorkflowTemplateListItem[] = [];
 
   try {
     skills = await getSkillsWithBindCount();

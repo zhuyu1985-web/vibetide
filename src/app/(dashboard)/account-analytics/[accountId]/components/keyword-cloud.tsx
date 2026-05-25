@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import cloud from 'd3-cloud'
-import { cn } from '@/lib/utils'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ZERO_STATE_PHASE1, zeroStatePhase2 } from '@/lib/account-analytics/content-category'
 import type { CloudRange } from './use-url-state'
 
@@ -27,12 +27,29 @@ const COLOR_PALETTE = [
   '#3498DB', '#16A085', '#1F3864', '#34495E', '#5B8DEF',
 ]
 
-export function KeywordCloud({ range, onRangeChange, loader }: Props) {
+// d3-cloud 布局是主线程开销,在浏览器空闲时再跑,不阻塞当前帧渲染。
+// 组件 'use client',保证在浏览器环境运行;Safari 不支持 requestIdleCallback,降级到 setTimeout。
+function scheduleIdle(cb: () => void): number {
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    return window.requestIdleCallback(cb, { timeout: 1000 })
+  }
+  return setTimeout(cb, 50) as unknown as number
+}
+function cancelIdle(handle: number) {
+  if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    window.cancelIdleCallback(handle)
+  } else {
+    clearTimeout(handle)
+  }
+}
+
+function KeywordCloudImpl({ range, onRangeChange, loader }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<LayoutWord[]>([])
   const [annotatedRatio, setAnnotatedRatio] = useState(0)
   const [loading, setLoading] = useState(true)
   const reqIdRef = useRef(0)
+  const idleHandleRef = useRef<number | null>(null)
 
   useEffect(() => {
     const id = ++reqIdRef.current
@@ -46,28 +63,37 @@ export function KeywordCloud({ range, onRangeChange, loader }: Props) {
         setLoading(false)
         return
       }
-      const width = containerRef.current?.clientWidth ?? 400
-      const height = 240
-      const maxWeight = Math.max(...d.words.map((w) => w.weight))
-      cloud<LayoutWord>()
-        .size([width, height])
-        .words(
-          d.words.map((w) => ({
-            text: w.keyword,
-            size: 12 + (w.weight / maxWeight) * 32,
-          })),
-        )
-        .padding(4)
-        .rotate(0)
-        .font('Inter, system-ui, sans-serif')
-        .fontSize((wd) => wd.size)
-        .on('end', (rendered) => {
-          if (id !== reqIdRef.current) return // 防 race：迟到回调直接丢弃
-          setLayout(rendered)
-          setLoading(false)
-        })
-        .start()
+      idleHandleRef.current = scheduleIdle(() => {
+        if (id !== reqIdRef.current) return
+        const width = containerRef.current?.clientWidth ?? 400
+        const height = 240
+        const maxWeight = Math.max(...d.words.map((w) => w.weight))
+        cloud<LayoutWord>()
+          .size([width, height])
+          .words(
+            d.words.map((w) => ({
+              text: w.keyword,
+              size: 12 + (w.weight / maxWeight) * 32,
+            })),
+          )
+          .padding(4)
+          .rotate(0)
+          .font('Inter, system-ui, sans-serif')
+          .fontSize((wd) => wd.size)
+          .on('end', (rendered) => {
+            if (id !== reqIdRef.current) return // 防 race:迟到回调直接丢弃
+            setLayout(rendered)
+            setLoading(false)
+          })
+          .start()
+      })
     })
+    return () => {
+      if (idleHandleRef.current !== null) {
+        cancelIdle(idleHandleRef.current)
+        idleHandleRef.current = null
+      }
+    }
   }, [range, loader])
 
   return (
@@ -76,22 +102,12 @@ export function KeywordCloud({ range, onRangeChange, loader }: Props) {
         <h3 className="text-[15px] font-semibold text-[#1F3864] dark:text-blue-200">
           热门词云
         </h3>
-        <div className="inline-flex rounded-full bg-gray-100 dark:bg-gray-800 p-0.5">
-          {(['7d', '30d'] as const).map((r) => (
-            // eslint-disable-next-line no-restricted-syntax
-            <button
-              key={r}
-              type="button"
-              onClick={() => onRangeChange(r)}
-              className={cn(
-                'px-3 py-1 rounded-full text-[11px] font-medium border-0 cursor-pointer transition-colors',
-                range === r ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500',
-              )}
-            >
-              {r === '7d' ? '近一周' : '近一月'}
-            </button>
-          ))}
-        </div>
+        <Tabs value={range} onValueChange={(v) => onRangeChange(v as CloudRange)}>
+          <TabsList variant="default">
+            <TabsTrigger value="7d">近一周</TabsTrigger>
+            <TabsTrigger value="30d">近一月</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       <div className="h-[240px] flex items-center justify-center">
         {loading ? (
@@ -122,3 +138,7 @@ export function KeywordCloud({ range, onRangeChange, loader }: Props) {
     </div>
   )
 }
+
+// 父组件 props 引用稳定时,React.memo 阻止不必要的重渲染。
+// 若父组件 loader/onRangeChange 每次新建,memo 失效——届时父组件需配合 useCallback。
+export const KeywordCloud = memo(KeywordCloudImpl)

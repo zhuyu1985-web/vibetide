@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import { useArticlePageStore } from "../../store";
+import { PromptDialog } from "@/components/shared/prompt-dialog";
+
+const IMAGE_REQUEST_EVENT = "vibetide:slash-insert-image";
 
 interface SlashCommandProps {
   editor: Editor | null;
@@ -85,11 +88,9 @@ const blockCommands: CommandItem[] = [
     label: "\u56FE\u7247",
     description: "\u63D2\u5165\u56FE\u7247",
     category: "block",
-    action: (e) => {
-      const url = window.prompt("\u8F93\u5165\u56FE\u7247\u5730\u5740");
-      if (url) {
-        e.chain().focus().setImage({ src: url }).run();
-      }
+    action: () => {
+      // 用事件请求宿主组件弹出 PromptDialog（避免在模块级常量中调用 window.prompt）
+      window.dispatchEvent(new CustomEvent(IMAGE_REQUEST_EVENT));
     },
   },
   {
@@ -156,8 +157,26 @@ export function SlashCommand({ editor }: SlashCommandProps) {
     left: 0,
   });
   const [triggerPos, setTriggerPos] = useState<number | null>(null);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const store = useArticlePageStore();
+  // 精选订阅 setter,避免 store 任意 state 变化都重渲本组件。
+  const setSelectedText = useArticlePageStore((s) => s.setSelectedText);
+  const setLeftTab = useArticlePageStore((s) => s.setLeftTab);
+
+  // 接收 "插入图片" 命令的请求事件
+  useEffect(() => {
+    const handler = () => setImageDialogOpen(true);
+    window.addEventListener(IMAGE_REQUEST_EVENT, handler);
+    return () => window.removeEventListener(IMAGE_REQUEST_EVENT, handler);
+  }, []);
+
+  const submitImage = (url: string) => {
+    setImageDialogOpen(false);
+    const trimmed = url.trim();
+    if (trimmed && editor) {
+      editor.chain().focus().setImage({ src: trimmed }).run();
+    }
+  };
 
   const filteredItems = allCommands.filter(
     (item) =>
@@ -208,15 +227,15 @@ export function SlashCommand({ editor }: SlashCommandProps) {
                 ? `\u8BF7\u4E3A\u4EE5\u4E0B\u5185\u5BB9\u751F\u6210\u6807\u9898\uFF1A\n${currentParagraphText}`
                 : `\u8BF7\u7FFB\u8BD1\u4EE5\u4E0B\u5185\u5BB9\uFF1A\n${currentParagraphText}`;
 
-        store.setSelectedText(instruction);
-        store.setLeftTab("chat");
+        setSelectedText(instruction);
+        setLeftTab("chat");
       } else {
         item.action(editor);
       }
 
       dismiss();
     },
-    [editor, triggerPos, dismiss, store]
+    [editor, triggerPos, dismiss, setSelectedText, setLeftTab]
   );
 
   // Listen to editor updates to detect "/" trigger
@@ -408,6 +427,16 @@ export function SlashCommand({ editor }: SlashCommandProps) {
           })}
         </>
       )}
+
+      <PromptDialog
+        open={imageDialogOpen}
+        onOpenChange={setImageDialogOpen}
+        title="插入图片"
+        description="也可以从左栏「资源库」拖入"
+        placeholder="https://example.com/image.png"
+        confirmText="插入"
+        onConfirm={submitImage}
+      />
     </div>
   );
 }

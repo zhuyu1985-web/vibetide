@@ -29,7 +29,7 @@ import { deleteSkill, getSkillsForExport } from "@/app/actions/skills";
 import { generateSkillMd } from "@/lib/skill-package";
 import type { SkillWithBindCount } from "@/lib/dal/skills";
 import type { SkillCategory } from "@/lib/types";
-import type { WorkflowTemplateRow } from "@/db/types";
+import type { WorkflowTemplateListItem } from "@/lib/dal/workflow-templates";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { WorkflowsPanel } from "./workflows-panel";
 
@@ -103,7 +103,7 @@ interface SkillsClientProps {
    * templates alongside atomic skills. Both are "能力" in the user mental
    * model (场景 = 工作流 = 员工固化的能力)。
    */
-  workflows?: WorkflowTemplateRow[];
+  workflows?: WorkflowTemplateListItem[];
 }
 
 export function SkillsClient({

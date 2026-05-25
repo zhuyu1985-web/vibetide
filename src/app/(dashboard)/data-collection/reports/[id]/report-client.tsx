@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GlassCard } from "@/components/shared/glass-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { BarChartCard } from "@/components/charts/bar-chart-card";
 import { DonutChartCard } from "@/components/charts/donut-chart-card";
 import { HorizontalBarChartCard } from "@/components/charts/horizontal-bar-chart-card";
@@ -94,6 +95,7 @@ export function ReportClient(props: Props) {
     props.initialIsAiFallback,
   );
   const [regenerating, setRegenerating] = useState(false);
+  const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
 
   // Phase 9：另存为快照 dialog 状态
   const [snapshotDialogOpen, setSnapshotDialogOpen] = useState(false);
@@ -106,10 +108,10 @@ export function ReportClient(props: Props) {
   // Phase 9：导出 / 分享 loading
   const [exporting, setExporting] = useState<"word" | "excel" | null>(null);
 
-  // Polling — 仅在 pending/generating 时跑
+  // Polling — 仅在 pending/generating 时跑;后台 tab 跳过,前台返回时立即补一次
   useEffect(() => {
     if (status !== "pending" && status !== "generating") return;
-    const timer = setInterval(async () => {
+    const doPoll = async () => {
       try {
         const r = await pollReport(props.reportId);
         setStatus(r.status);
@@ -123,13 +125,28 @@ export function ReportClient(props: Props) {
       } catch (err) {
         console.error("[report-client] poll failed", err);
       }
+    };
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void doPoll();
     }, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void doPoll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [status, props.reportId]);
 
-  async function handleRegenerate() {
+  function handleRegenerate() {
     if (regenerating) return;
-    if (!confirm("确认重新生成？现有报告内容将被覆盖。")) return;
+    setRegenConfirmOpen(true);
+  }
+
+  async function doRegenerate() {
+    setRegenConfirmOpen(false);
     setRegenerating(true);
     try {
       await regenerateReport(props.reportId);
@@ -468,6 +485,16 @@ export function ReportClient(props: Props) {
           </DialogContent>
         </Dialog>
       )}
+
+      <ConfirmDialog
+        open={regenConfirmOpen}
+        onOpenChange={setRegenConfirmOpen}
+        title="重新生成报告"
+        description="确认重新生成？现有报告内容将被覆盖。"
+        confirmText="重新生成"
+        variant="danger"
+        onConfirm={doRegenerate}
+      />
     </div>
   );
 }

@@ -48,7 +48,14 @@ export function ResourceCard({ asset, selected, selectable, onSelect }: Props) {
         {/* Thumbnail area */}
         <div className={cn("aspect-[16/10] flex items-center justify-center relative overflow-hidden", tc.bgColor)}>
           {asset.thumbnailUrl ? (
-            <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover" />
+            // eslint-disable-next-line @next/next/no-img-element -- thumbnailUrl 远程域名未在 next.config remotePatterns 配置;改 next/image 待 Sprint 4 统一处理
+            <img
+              src={asset.thumbnailUrl}
+              alt={asset.title}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
           ) : (
             <Icon size={32} className={cn(tc.color, "opacity-60")} />
           )}

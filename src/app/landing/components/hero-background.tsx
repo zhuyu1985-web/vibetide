@@ -21,8 +21,8 @@ interface Particle {
   color: number;
 }
 
-const PARTICLE_COUNT = 80;
-const CONNECTION_DIST = 160;
+const PARTICLE_COUNT = 50;
+const CONNECTION_DIST = 120;
 const CURSOR_RADIUS = 250;
 
 const PALETTE: [number, number, number][] = [
@@ -83,6 +83,12 @@ export function HeroBackground() {
       }
     };
     resize();
+
+    // ── viewport + tab visibility guard ──
+    // hero 滚出视口或浏览器 tab 切走时暂停 RAF,避免持续 GPU/CPU 占用。
+    let isInViewport = true;
+    let isPageVisible = !document.hidden;
+    const shouldRun = () => isInViewport && isPageVisible;
 
     // initialise glow to centre
     const initRect = container.getBoundingClientRect();
@@ -233,9 +239,42 @@ export function HeroBackground() {
         ctx.fill();
       }
 
-      rafRef.current = requestAnimationFrame(tick);
+      rafRef.current = shouldRun() ? requestAnimationFrame(tick) : 0;
+    };
+
+    const startIfNeeded = () => {
+      if (!rafRef.current && shouldRun()) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
     };
     tick();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          isInViewport = entry.isIntersecting;
+        }
+        if (!shouldRun()) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        } else {
+          startIfNeeded();
+        }
+      },
+      { threshold: 0.01 },
+    );
+    observer.observe(container);
+
+    const onVisibility = () => {
+      isPageVisible = !document.hidden;
+      if (!shouldRun()) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      } else {
+        startIfNeeded();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     window.addEventListener("mousemove", onPointerMove);
     window.addEventListener("touchmove", onPointerMove, { passive: true });
@@ -243,6 +282,9 @@ export function HeroBackground() {
     window.addEventListener("resize", resize);
     return () => {
       cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("mousemove", onPointerMove);
       window.removeEventListener("touchmove", onPointerMove);
       window.removeEventListener("touchend", onTouchEnd);

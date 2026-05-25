@@ -237,7 +237,29 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
   useEffect(() => {
     if (!isActive) return;
 
-    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+    // 后台 tab 不立即触发 RSC 重拉,而是记下"待刷新"标志,前台返回时再补一次
+    let pendingRefresh = false;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") {
+        pendingRefresh = true;
+        return;
+      }
+      pendingRefresh = false;
+      startTransition(() => { router.refresh(); });
+    };
+
+    // SSE 失败后用指数退避 [2,4,8,16,30]s,共 5 次;成功后重置
+    let fallbackTimeout: ReturnType<typeof setTimeout> | null = null;
+    let backoffIndex = 0;
+    const BACKOFF_MS = [2000, 4000, 8000, 16000, 30000];
+    const scheduleFallback = () => {
+      if (backoffIndex >= BACKOFF_MS.length) return;
+      const delay = BACKOFF_MS[backoffIndex++];
+      fallbackTimeout = setTimeout(() => {
+        refresh();
+        scheduleFallback();
+      }, delay);
+    };
 
     // Try SSE first
     const es = new EventSource(`/api/missions/${mission.id}/progress`);
@@ -245,28 +267,32 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
 
     es.addEventListener("mission-progress", () => {
       sseConnected = true;
-      // SSE delivers updates — do a lightweight refresh to pick up new data
-      startTransition(() => { router.refresh(); });
+      backoffIndex = 0; // SSE 重新可用时重置退避计数
+      refresh();
     });
 
     es.addEventListener("mission-completed", () => {
-      startTransition(() => { router.refresh(); });
+      refresh();
       es.close();
     });
 
     es.onerror = () => {
-      // SSE failed — fall back to polling
-      if (!sseConnected && !fallbackInterval) {
+      // SSE failed — fall back to exponential-backoff polling
+      if (!sseConnected && !fallbackTimeout) {
         es.close();
-        fallbackInterval = setInterval(() => {
-          try { startTransition(() => { router.refresh(); }); } catch { /* network error */ }
-        }, 8000);
+        scheduleFallback();
       }
     };
 
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && pendingRefresh) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       es.close();
-      if (fallbackInterval) clearInterval(fallbackInterval);
+      if (fallbackTimeout) clearTimeout(fallbackTimeout);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [isActive, mission.id, router, startTransition]);
 

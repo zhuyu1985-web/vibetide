@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
-import { OperationsPanel, type OperationsPanelProps } from "./operations-panel";
-import {
-  BusinessDashboard,
-  type BusinessDashboardProps,
-} from "./business-dashboard";
+import type { OperationsPanelProps } from "./operations-panel";
+import type { BusinessDashboardProps } from "./business-dashboard";
+
+// 两个面板互斥(tab 切换),Recharts 重型,改 dynamic 让切到的 tab 才加载对应 chunk。
+const BusinessDashboard = dynamic(
+  () => import("./business-dashboard").then((m) => m.BusinessDashboard),
+  { ssr: false },
+);
+const OperationsPanel = dynamic(
+  () => import("./operations-panel").then((m) => m.OperationsPanel),
+  { ssr: false },
+);
 
 interface MonitoringClientProps {
   operationsProps: OperationsPanelProps;
