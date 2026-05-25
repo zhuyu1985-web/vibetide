@@ -172,6 +172,9 @@ beforeAll(async () => {
       {
         organizationId: orgId,
         accountId,
+        // platform 必填:getRecentTopPosts 反查 my_accounts.platform 后会按平台过滤,
+        // 跟现实(tikhub adapter 写入时 platform=weibo/douyin/...)对齐
+        platform: 'douyin',
         contentFingerprint: fp1,
         title: 'Top1 Highest Score',
         firstSeenChannel: 'test',
@@ -188,6 +191,7 @@ beforeAll(async () => {
       {
         organizationId: orgId,
         accountId,
+        platform: 'douyin',
         contentFingerprint: fp2,
         title: 'Top2 Latest',
         firstSeenChannel: 'test',

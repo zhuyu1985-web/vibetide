@@ -62,7 +62,9 @@ const keywordConfigSchema = z.object({
   keywords: z.array(z.string().min(1)).min(1, "至少一个关键词").max(20, "最多 20 个关键词"),
   timeWindow: z.enum(["day", "week", "halfYear", "all"]).default("halfYear"),
   contentTypes: z.array(z.enum(["video", "image_text", "short_video", "image_set"])).optional(),
-  maxPagesPerRun: z.number().int().min(1).max(10).default(5),
+  // max=30 上限考虑:大 V 一天发 30-50 条,周报至少需要 7 × 50 = 350 条 ≈ 18 页;
+  //              中小账号一月 30 条,30 页 = 600 条已足够覆盖。再大就要靠 cron 累积。
+  maxPagesPerRun: z.number().int().min(1).max(30).default(5),
   resultsPerPage: z.number().int().min(10).max(50).default(20),
   monthlyBudgetUsd: z.number().min(0).max(1000).default(5),
 });
@@ -72,7 +74,8 @@ const accountConfigSchema = z.object({
   /** 引用 media_outlet_dictionary.id 列表 — 每个 outlet 必须存在且至少包含 channels[type ∈ accountPlatforms] 中的一个平台 */
   outletIds: z.array(z.string().uuid("outletId 必须是 UUID")).min(1, "至少选择一个媒体"),
   accountPlatforms: z.array(z.enum(TIKHUB_ACCOUNT_PLATFORMS)).min(1, "至少选择一个平台"),
-  maxPagesPerRun: z.number().int().min(1).max(10).default(3),
+  // max=30 上限同 keyword 模式;大 V (如北京时间) 周报需 ≥18 页,默认 3 适配中小账号 cron 增量场景
+  maxPagesPerRun: z.number().int().min(1).max(30).default(3),
   resultsPerPage: z.number().int().min(10).max(50).default(20),
   monthlyBudgetUsd: z.number().min(0).max(1000).default(5),
 });

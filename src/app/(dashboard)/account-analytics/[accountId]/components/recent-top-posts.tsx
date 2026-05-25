@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Eye, MessageCircle, Calendar, Flame } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { TopSort } from './use-url-state'
 
@@ -45,22 +46,12 @@ export function RecentTopPosts({ mode, onModeChange, loader }: Props) {
         <h3 className="text-[15px] font-semibold text-[#1F3864] dark:text-blue-200">
           近期文章 TOP5
         </h3>
-        <div className="inline-flex rounded-full bg-gray-100 dark:bg-gray-800 p-0.5">
-          {(['hot', 'latest'] as const).map((m) => (
-            // eslint-disable-next-line no-restricted-syntax
-            <button
-              key={m}
-              type="button"
-              onClick={() => onModeChange(m)}
-              className={cn(
-                'px-3 py-1 rounded-full text-[12px] font-medium border-0 cursor-pointer transition-colors',
-                mode === m ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500',
-              )}
-            >
-              {m === 'hot' ? '最热' : '最新'}
-            </button>
-          ))}
-        </div>
+        <Tabs value={mode} onValueChange={(v) => onModeChange(v as TopSort)}>
+          <TabsList variant="default">
+            <TabsTrigger value="hot">最热</TabsTrigger>
+            <TabsTrigger value="latest">最新</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {loading ? (
@@ -77,11 +68,12 @@ export function RecentTopPosts({ mode, onModeChange, loader }: Props) {
               rel="noopener noreferrer"
               className="flex gap-3 p-3 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white dark:hover:bg-gray-900/60 transition-colors"
             >
-              <div className="shrink-0 w-20 h-14 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
-                {p.thumbnail && (
+              {/* 仅在有封面图时渲染缩略图,避免空灰块占位 */}
+              {p.thumbnail && (
+                <div className="shrink-0 w-20 h-14 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
                   <Image src={p.thumbnail} alt="" fill className="object-cover" unoptimized />
-                )}
-              </div>
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-[14px] font-medium text-[#1F3864] dark:text-blue-200 line-clamp-1">

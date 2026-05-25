@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface RankingCardMetrics {
@@ -11,6 +12,8 @@ interface RankingCardProps {
   /** 1-10，超出则用浅灰边框 */
   rank: number;
   title: string;
+  /** 原文 URL,有值时标题渲染成跳转链接,带"查看原文"小标 */
+  sourceUrl?: string | null;
   metrics: RankingCardMetrics;
   whyViralSummary?: string;
   /** 完整 attribution markdown；轻量模式（无归因）不传 */
@@ -83,6 +86,7 @@ function getBadge(rank: number) {
 export function RankingCard({
   rank,
   title,
+  sourceUrl,
   metrics,
   whyViralSummary,
   attributionMarkdown,
@@ -104,7 +108,7 @@ export function RankingCard({
         className,
       )}
     >
-      {/* Header — badge + title */}
+      {/* Header — badge + title(可跳转原文) */}
       <div className={cn("flex items-start gap-3", isCompact ? "mb-3" : "mb-4")}>
         <div
           className={cn(
@@ -114,9 +118,25 @@ export function RankingCard({
         >
           {badge.emoji}
         </div>
-        <h4 className="flex-1 text-[15px] font-semibold leading-snug text-[#1F3864] dark:text-blue-200">
-          {title}
-        </h4>
+        {sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex-1 inline-flex items-start gap-1.5 text-[15px] font-semibold leading-snug text-[#1F3864] dark:text-blue-200 hover:text-[#2E75B6] dark:hover:text-blue-300 transition-colors"
+            title="点击在新标签页查看原文"
+          >
+            <span className="flex-1">{title}</span>
+            <ExternalLink
+              size={14}
+              className="shrink-0 mt-1 text-gray-400 group-hover:text-[#2E75B6] dark:group-hover:text-blue-300 transition-colors"
+            />
+          </a>
+        ) : (
+          <h4 className="flex-1 text-[15px] font-semibold leading-snug text-[#1F3864] dark:text-blue-200">
+            {title}
+          </h4>
+        )}
       </div>
 
       {/* Stat pills */}
@@ -131,7 +151,7 @@ export function RankingCard({
       {!isCompact && (
         <>
           {whyViralSummary && (
-            <div className="mb-3 rounded-lg border-l-[3px] border-[#FFD700] bg-[#FFF9E6] dark:bg-yellow-950/30 px-3 py-2 text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
+            <div className="mb-3 rounded-lg border-l-[3px] border-[#2E75B6] bg-[#EEF4FB] dark:bg-blue-950/30 px-3 py-2 text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
               {whyViralSummary}
             </div>
           )}

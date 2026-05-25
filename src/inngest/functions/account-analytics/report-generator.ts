@@ -70,6 +70,9 @@ export const accountAnalyticsReportGenerator = inngest.createFunction(
       const endExclusive = new Date(`${periodEnd}T00:00:00+08:00`);
       endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
 
+      // 匹配规则与 daily-snapshot 保持一致(三条 OR,最后一条 outletId 是 account 模式
+      // 下唯一稳定的桥 — weibo/douyin adapter 把平台 uid 写到 account_id/account_handle,
+      // 跟 my_accounts.id (UUID) / my_accounts.handle (业务短 ID) 都对不上)
       const items = await db
         .select({
           id: collectedItems.id,
@@ -88,7 +91,16 @@ export const accountAnalyticsReportGenerator = inngest.createFunction(
           and(
             eq(collectedItems.organizationId, organizationId),
             eq(collectedItems.platform, accountRow.platform),
-            sql`(${collectedItems.accountHandle} = ${accountRow.handle} OR ${collectedItems.accountId} = ${accountId})`,
+            accountRow.outletId
+              ? sql`(
+                  ${collectedItems.accountHandle} = ${accountRow.handle}
+                  OR ${collectedItems.accountId} = ${accountId}
+                  OR ${collectedItems.outletId} = ${accountRow.outletId}
+                )`
+              : sql`(
+                  ${collectedItems.accountHandle} = ${accountRow.handle}
+                  OR ${collectedItems.accountId} = ${accountId}
+                )`,
             gte(collectedItems.publishedAt, start),
             lt(collectedItems.publishedAt, endExclusive),
           ),

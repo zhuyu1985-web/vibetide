@@ -28,7 +28,7 @@ export function PatternTable({ patterns, className }: PatternTableProps) {
             <th className="bg-[#1F3864] text-white text-[13px] font-semibold px-4 py-3 text-left w-14">
               #
             </th>
-            <th className="bg-[#1F3864] text-white text-[13px] font-semibold px-4 py-3 text-left w-32">
+            <th className="bg-[#1F3864] text-white text-[13px] font-semibold px-4 py-3 text-left w-56 whitespace-nowrap">
               维度
             </th>
             <th className="bg-[#1F3864] text-white text-[13px] font-semibold px-4 py-3 text-left">
@@ -51,7 +51,7 @@ export function PatternTable({ patterns, className }: PatternTableProps) {
                   {idx + 1}
                 </span>
               </td>
-              <td className="px-4 py-3 align-top text-[13px] font-semibold text-[#1F3864] dark:text-blue-200 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+              <td className="px-4 py-3 align-top text-[13px] font-semibold text-[#1F3864] dark:text-blue-200 border-b border-gray-100 dark:border-gray-800 last:border-b-0 whitespace-nowrap">
                 {pattern.dimension}
               </td>
               <td className="px-4 py-3 align-top text-[13px] text-gray-700 dark:text-gray-300 leading-[1.7] border-b border-gray-100 dark:border-gray-800 last:border-b-0">

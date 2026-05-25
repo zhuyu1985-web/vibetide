@@ -126,7 +126,7 @@ export function mapWeiboAccountResponse(resp: unknown): RawItem[] {
     const user = post.user as
       | { screen_name?: string; idstr?: string; id?: number }
       | undefined;
-    const uid = user?.idstr ?? String(user?.id ?? "");
+    const uid = user?.idstr ?? (user?.id != null ? String(user.id) : "");
 
     // 主页 URL: https://weibo.com/{uid}/{mblogid} (mblogid 短码)
     const url = mblogid && uid
@@ -136,6 +136,10 @@ export function mapWeiboAccountResponse(resp: unknown): RawItem[] {
     // 图片(weibo CDN url 模板:从 pic_ids 拼,但 tikhub 没直接提供 wb_pic_url,先存 raw)
     const picIds = Array.isArray(post.pic_ids) ? (post.pic_ids as string[]) : [];
 
+    const likes = (post.attitudes_count as number | undefined) ?? 0;
+    const comments = (post.comments_count as number | undefined) ?? 0;
+    const reposts = (post.reposts_count as number | undefined) ?? 0;
+
     items.push({
       title: text.slice(0, 80) || "(无标题)",
       url,
@@ -143,6 +147,16 @@ export function mapWeiboAccountResponse(resp: unknown): RawItem[] {
       publishedAt: post.created_at ? parseWeiboDate(String(post.created_at)) : undefined,
       channel: "tikhub_weibo_account",
       contentType: picIds.length > 0 ? "image_set" : "image_text",
+      // 顶层身份/统计字段 — Account Analytics 模块按账号聚合,
+      // 必须把字段落到 collected_items 顶层列,不能只埋在 rawMetadata 里。
+      platform: "weibo",
+      externalId: mblogid ?? mid,
+      author: user?.screen_name,
+      accountId: uid || undefined,
+      accountHandle: uid || undefined, // uid 作为账号 canonical handle;analytics 侧通过 outlet channel.uid 反查匹配
+      likeCount: likes,
+      commentCount: comments,
+      shareCount: reposts,
       rawMetadata: {
         platform: "weibo",
         mode: "account",
@@ -150,9 +164,9 @@ export function mapWeiboAccountResponse(resp: unknown): RawItem[] {
         mblogid,
         author: user?.screen_name,
         uid,
-        reposts: post.reposts_count,
-        comments: post.comments_count,
-        likes: post.attitudes_count,
+        reposts,
+        comments,
+        likes,
         pic_count: post.pic_num,
         text_length: post.textLength,
       },
@@ -199,6 +213,11 @@ export function mapKuaishouAccountResponse(resp: unknown): RawItem[] {
     const coverUrl = feed.coverUrl as string | undefined;
     if (coverUrl) attachments.push({ kind: "thumbnail", url: coverUrl });
 
+    const likes = (feed.likeCount as number | undefined) ?? 0;
+    const plays = (feed.viewCount as number | undefined) ?? 0;
+    const comments = (feed.commentCount as number | undefined) ?? 0;
+    const shares = (feed.shareCount as number | undefined) ?? 0;
+
     items.push({
       title: caption.slice(0, 80) || "(无标题)",
       url: `https://www.kuaishou.com/short-video/${photoId}`,
@@ -207,14 +226,27 @@ export function mapKuaishouAccountResponse(resp: unknown): RawItem[] {
       channel: "tikhub_kuaishou_account",
       contentType: "short_video",
       attachments,
+      // 顶层身份/统计字段 — Account Analytics 模块按账号聚合,
+      // 必须把字段落到 collected_items 顶层列,不能只埋在 rawMetadata 里。
+      platform: "kuaishou",
+      externalId: photoId,
+      author: user?.name,
+      accountId: user?.eid,
+      accountHandle: user?.eid, // user.eid 作为账号 canonical handle,跟 outlet channel.userId 对得上
+      likeCount: likes,
+      commentCount: comments,
+      shareCount: shares,
+      viewCount: plays,
       rawMetadata: {
         platform: "kuaishou",
         mode: "account",
         photo_id: photoId,
         author: user?.name,
         user_id: user?.eid,
-        likes: feed.likeCount,
-        plays: feed.viewCount,
+        likes,
+        plays,
+        comments,
+        shares,
       },
     });
   }
@@ -241,6 +273,8 @@ interface WechatMpArticle {
   ItemUpdateTime?: number; // Unix 秒
   CoverImgUrl?: string;
   Author?: string;
+  /** 公众号 ghid(响应可能在外层 data.ghid,也可能在每条 item 上;两种都兼容) */
+  Ghid?: string;
   /** 兼容老字段名(以防 tikhub 后续改 schema) */
   title?: string;
   digest?: string;
@@ -248,7 +282,10 @@ interface WechatMpArticle {
 }
 
 export function mapWechatMpAccountResponse(resp: unknown): RawItem[] {
-  const list = (resp as WechatMpArticleListResponse).data?.list ?? [];
+  const r = (resp as WechatMpArticleListResponse).data;
+  const list = r?.list ?? [];
+  // 顶层 ghid 兜底(tikhub 响应外层可能携带 ghid)
+  const topGhid = (r as { ghid?: string } | undefined)?.ghid;
   const items: RawItem[] = [];
 
   for (const raw of list) {
@@ -257,6 +294,16 @@ export function mapWechatMpAccountResponse(resp: unknown): RawItem[] {
     const title = art.Title ?? art.title ?? "";
     const url = art.ContentUrl ?? art.url ?? "";
     if (!title || !url) continue;
+
+    // 从 ContentUrl 解析 sn(微信文章稳定唯一 ID),失败则用 url 兜底
+    let externalId: string | undefined;
+    try {
+      const u = new URL(url);
+      externalId = u.searchParams.get("sn") ?? undefined;
+    } catch {
+      // ignore
+    }
+    const ghid = art.Ghid ?? topGhid;
 
     items.push({
       title,
@@ -270,11 +317,21 @@ export function mapWechatMpAccountResponse(resp: unknown): RawItem[] {
       attachments: art.CoverImgUrl
         ? [{ kind: "thumbnail" as const, url: art.CoverImgUrl }]
         : [],
+      // 顶层身份字段 — Account Analytics 模块按账号聚合,
+      // 必须把字段落到 collected_items 顶层列,不能只埋在 rawMetadata 里。
+      platform: "wechat_oa",
+      externalId,
+      author: art.Author,
+      accountId: ghid,
+      accountHandle: ghid, // ghid 作为账号 canonical handle,跟 outlet channel.ghid 对得上
+      // 微信公众号文章列表 API 不返回阅读/在看/点赞计数,留空(=0)
       rawMetadata: {
         platform: "wechat_oa",
         mode: "account",
         item_index: art.ItemIndex,
         author: art.Author,
+        ghid,
+        sn: externalId,
       },
     });
   }

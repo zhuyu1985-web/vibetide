@@ -120,6 +120,8 @@ export interface ViralAttributionView {
     shares: number;
     views?: number;
   };
+  /** 原文 URL,前端把标题包成跳转链接;原内容已删除时为 null */
+  sourceUrl: string | null;
   primaryTags: string[];
   secondaryTags: string[];
   whyViralSummary: string;
@@ -145,6 +147,8 @@ export interface FullDataRow {
   favorites: number;
   shares: number;
   compositeScore: number;
+  /** 原文 URL,Chapter 05 表格标题列包跳转用;原内容已删除时为 null */
+  sourceUrl: string | null;
   isTop5: boolean;
 }
 
@@ -604,48 +608,61 @@ function buildPeriodOverview(args: {
 }
 
 /**
- * 取报告所属账号的 handle + avatarUrl（用于反查 collected_items + 渲染头像）。
+ * 取报告所属账号的 handle + avatarUrl + outletId(用于反查 collected_items + 渲染头像)。
  * 兼容 my_accounts 与 benchmark_accounts。
  */
 async function getAccountMetaForReport(
   accountId: string,
   source: AccountSource,
-): Promise<{ handle: string | null; avatarUrl: string | null }> {
+): Promise<{
+  handle: string | null;
+  avatarUrl: string | null;
+  outletId: string | null;
+}> {
   try {
     if (source === "my") {
       const row = await db.query.myAccounts.findFirst({
         where: eq(myAccounts.id, accountId),
-        columns: { handle: true, avatarUrl: true },
+        columns: { handle: true, avatarUrl: true, outletId: true },
       });
       return {
         handle: row?.handle ?? null,
         avatarUrl: row?.avatarUrl ?? null,
+        outletId: row?.outletId ?? null,
       };
     }
     const row = await db.query.benchmarkAccounts.findFirst({
       where: eq(benchmarkAccounts.id, accountId),
-      columns: { handle: true, avatarUrl: true },
+      columns: { handle: true, avatarUrl: true, outletId: true },
     });
     return {
       handle: row?.handle ?? null,
       avatarUrl: row?.avatarUrl ?? null,
+      outletId: row?.outletId ?? null,
     };
   } catch (err) {
     console.warn("[account-analytics] 反查账号 meta 失败:", err);
-    return { handle: null, avatarUrl: null };
+    return { handle: null, avatarUrl: null, outletId: null };
   }
 }
 
 /**
  * 构造 collected_items 的"账号+区间"筛选条件 —— Top N 与 fullData 都靠它。
- * 注意：collected_items.account_handle 在 TikHub Account 模式下被写成 secUid（mapper 设的），
- * 我们 seed 脚本会把它对齐到 my_accounts.handle (例如 'BRTV_news')；
- * 同时也用 account_id（secUid）做兜底，覆盖 mapper 写入但脚本没对齐的情况。
+ *
+ * 匹配规则与 daily-snapshot / report-generator 保持一致(3 OR,outletId 是 account 模式下唯一稳定的桥)
+ *   1. account_handle = my_accounts.handle (业务短 ID,如 'btime_weibo' — 仅历史 seed 数据用得到)
+ *   2. account_id = my_accounts.id (UUID — 仅历史 seed 数据用得到)
+ *   3. outlet_id = my_accounts.outlet_id ← weibo/douyin/kuaishou/wechat_oa adapter
+ *      把平台 uid/secUid/userId/ghid 写到 account_id/account_handle 顶层列,
+ *      跟 my_accounts.id (UUID) / my_accounts.handle (业务短 ID) 都对不上,
+ *      只能靠 outlet_id 反查。
  */
 function buildItemsWhere(args: {
   orgId: string;
   platform: string;
   handle: string;
+  accountId: string;
+  outletId: string | null;
   periodStart: string;
   periodEnd: string;
 }) {
@@ -655,7 +672,16 @@ function buildItemsWhere(args: {
   return and(
     eq(collectedItems.organizationId, args.orgId),
     eq(collectedItems.platform, args.platform),
-    sql`${collectedItems.accountHandle} = ${args.handle}`,
+    args.outletId
+      ? sql`(
+          ${collectedItems.accountHandle} = ${args.handle}
+          OR ${collectedItems.accountId} = ${args.accountId}
+          OR ${collectedItems.outletId} = ${args.outletId}
+        )`
+      : sql`(
+          ${collectedItems.accountHandle} = ${args.handle}
+          OR ${collectedItems.accountId} = ${args.accountId}
+        )`,
     sql`${collectedItems.publishedAt} >= ${start.toISOString()} AND ${collectedItems.publishedAt} < ${endExclusive.toISOString()}`,
   );
 }
@@ -673,7 +699,7 @@ export async function getAccountReportDetail(
     });
     if (!report) return null;
 
-    const { handle, avatarUrl } = await getAccountMetaForReport(
+    const { handle, avatarUrl, outletId } = await getAccountMetaForReport(
       report.accountId,
       report.accountSource,
     );
@@ -683,6 +709,8 @@ export async function getAccountReportDetail(
           orgId,
           platform: report.platform,
           handle,
+          accountId: report.accountId,
+          outletId,
           periodStart: report.periodStart,
           periodEnd: report.periodEnd,
         })
@@ -693,7 +721,7 @@ export async function getAccountReportDetail(
     const formula = getScoreFormula(report.platform);
 
     const [attrRows, firstPage, totalRow, allItems] = await Promise.all([
-      // Top N attributions（左 join 拿真实 metrics 而不是 0）
+      // Top N attributions（左 join 拿真实 metrics + 原文链接）
       db
         .select({
           attr: viralContentAttributions,
@@ -704,6 +732,7 @@ export async function getAccountReportDetail(
           itemFavorites: collectedItems.favoriteCount,
           itemShares: collectedItems.shareCount,
           itemViews: collectedItems.viewCount,
+          itemCanonicalUrl: collectedItems.canonicalUrl,
         })
         .from(viralContentAttributions)
         .leftJoin(
@@ -725,6 +754,7 @@ export async function getAccountReportDetail(
               favoriteCount: collectedItems.favoriteCount,
               viewCount: collectedItems.viewCount,
               compositeScore: collectedItems.compositeScore,
+              canonicalUrl: collectedItems.canonicalUrl,
             })
             .from(collectedItems)
             .where(itemsWhere)
@@ -739,6 +769,7 @@ export async function getAccountReportDetail(
             favoriteCount: number;
             viewCount: number;
             compositeScore: number;
+            canonicalUrl: string | null;
           }>),
 
       // total count
@@ -761,6 +792,7 @@ export async function getAccountReportDetail(
               viewCount: collectedItems.viewCount,
               favoriteCount: collectedItems.favoriteCount,
               shareCount: collectedItems.shareCount,
+              canonicalUrl: collectedItems.canonicalUrl,
             })
             .from(collectedItems)
             .where(itemsWhere)
@@ -776,6 +808,7 @@ export async function getAccountReportDetail(
               viewCount: number;
               favoriteCount: number;
               shareCount: number;
+              canonicalUrl: string | null;
             }>,
           ),
     ]);
@@ -802,6 +835,7 @@ export async function getAccountReportDetail(
           itemFavorites,
           itemShares,
           itemViews,
+          itemCanonicalUrl,
         }) => ({
           id: attr.id,
           rank: attr.rank,
@@ -816,6 +850,7 @@ export async function getAccountReportDetail(
             shares: itemShares ?? 0,
             views: itemViews ?? undefined,
           },
+          sourceUrl: itemCanonicalUrl ?? null,
           primaryTags: attr.primaryTags,
           secondaryTags: attr.secondaryTags,
           whyViralSummary: attr.whyViralSummary,
@@ -839,6 +874,7 @@ export async function getAccountReportDetail(
           favorites: r.favoriteCount,
           shares: r.shareCount,
         }),
+        sourceUrl: r.canonicalUrl ?? null,
         isTop5: topPostIdSet.has(r.id),
       })),
       fullDataTotal,
@@ -870,7 +906,7 @@ export async function getAccountReportFullDataPage(
     });
     if (!report) return { rows: [], total: 0, hasMore: false };
 
-    const { handle } = await getAccountMetaForReport(
+    const { handle, outletId } = await getAccountMetaForReport(
       report.accountId,
       report.accountSource,
     );
@@ -880,6 +916,8 @@ export async function getAccountReportFullDataPage(
       orgId,
       platform: report.platform,
       handle,
+      accountId: report.accountId,
+      outletId,
       periodStart: report.periodStart,
       periodEnd: report.periodEnd,
     });
@@ -897,6 +935,7 @@ export async function getAccountReportFullDataPage(
           shareCount: collectedItems.shareCount,
           favoriteCount: collectedItems.favoriteCount,
           viewCount: collectedItems.viewCount,
+          canonicalUrl: collectedItems.canonicalUrl,
         })
         .from(collectedItems)
         .where(where)
@@ -927,6 +966,7 @@ export async function getAccountReportFullDataPage(
           favorites: r.favoriteCount,
           shares: r.shareCount,
         }),
+        sourceUrl: r.canonicalUrl ?? null,
         isTop5: topPostIdSet.has(r.id),
       })),
       total,
@@ -1127,6 +1167,27 @@ export async function getRecentTopPosts(opts: {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+  // 反查账号 handle + outletId + platform —— account 模式下 collected_items.account_id
+  // 写的是平台 uid/secUid(weibo/douyin/kuaishou/wechat_oa),不是 my_accounts.id (UUID)
+  // 所以必须靠 outlet_id 桥接(与 daily-snapshot / report-generator 同源逻辑)
+  let acc: { handle: string | null; platform: string | null; outletId: string | null } | null = null;
+  const my = await db.query.myAccounts.findFirst({
+    where: and(eq(myAccounts.id, accountId), eq(myAccounts.organizationId, orgId)),
+    columns: { handle: true, platform: true, outletId: true },
+  });
+  if (my) {
+    acc = { handle: my.handle, platform: my.platform, outletId: my.outletId };
+  } else {
+    const bench = await db.query.benchmarkAccounts.findFirst({
+      where: eq(benchmarkAccounts.id, accountId),
+      columns: { handle: true, platform: true, outletId: true },
+    });
+    if (bench) {
+      acc = { handle: bench.handle, platform: bench.platform, outletId: bench.outletId };
+    }
+  }
+  if (!acc?.handle || !acc.platform) return [];
+
   const orderClause =
     mode === "hot"
       ? desc(collectedItems.compositeScore)
@@ -1149,7 +1210,17 @@ export async function getRecentTopPosts(opts: {
     .where(
       and(
         eq(collectedItems.organizationId, orgId),
-        eq(collectedItems.accountId, accountId),
+        eq(collectedItems.platform, acc.platform),
+        acc.outletId
+          ? sql`(
+              ${collectedItems.accountHandle} = ${acc.handle}
+              OR ${collectedItems.accountId} = ${accountId}
+              OR ${collectedItems.outletId} = ${acc.outletId}
+            )`
+          : sql`(
+              ${collectedItems.accountHandle} = ${acc.handle}
+              OR ${collectedItems.accountId} = ${accountId}
+            )`,
         gte(collectedItems.publishedAt, thirtyDaysAgo),
       ),
     )

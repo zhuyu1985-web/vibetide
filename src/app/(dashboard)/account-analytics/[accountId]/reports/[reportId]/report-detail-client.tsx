@@ -1,8 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { ArrowLeft, Download, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useState, useTransition } from "react";
+import {
+  ArrowLeft,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/shared/glass-card";
 import { DataTable } from "@/components/shared/data-table";
@@ -14,6 +23,14 @@ import { SuggestionList } from "@/components/account-analytics/suggestion-list";
 import { PeriodOverview } from "@/components/account-analytics/period-overview";
 import { loadReportFullDataPage } from "@/app/actions/account-analytics";
 import type { AccountReportDetail, FullDataRow } from "@/lib/dal/account-analytics";
+
+const PAGE_SIZE = 20;
+
+function daysBetween(start: string, end: string): number {
+  const s = new Date(`${start}T00:00:00+08:00`).getTime();
+  const e = new Date(`${end}T00:00:00+08:00`).getTime();
+  return Math.max(1, Math.round((e - s) / (24 * 3600 * 1000)) + 1);
+}
 
 const PLATFORM_LABELS: Record<string, string> = {
   douyin: "抖音",
@@ -44,50 +61,42 @@ export function ReportDetailClient({ accountId, detail }: Props) {
   const periodLabel = isSingleDay
     ? `${platformLabel}账号 · ${reportTypeLabel} · ${report.periodStart}`
     : `${platformLabel}账号 · ${reportTypeLabel} · ${report.periodStart} ~ ${report.periodEnd}`;
+  const periodDays = daysBetween(report.periodStart, report.periodEnd);
 
-  // ─── 完整数据分页状态 ────────────────────────────────────────
+  // ─── 完整数据分页状态(显式分页器,1 页 20 条;首页 SSR 直传)──────────
   const [rows, setRows] = useState<FullDataRow[]>(fullData);
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState<number>(fullDataTotal);
-  const [hasMore, setHasMore] = useState<boolean>(fullData.length < fullDataTotal);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const loadMore = useCallback(() => {
-    if (isPending || !hasMore) return;
-    setLoadError(null);
-    startTransition(async () => {
-      const res = await loadReportFullDataPage({
-        reportId: report.id,
-        offset: rows.length,
-        limit: 20,
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startIndex = (page - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(page * PAGE_SIZE, total);
+
+  const goToPage = useCallback(
+    (target: number) => {
+      if (isPending) return;
+      const clamped = Math.max(1, Math.min(totalPages, target));
+      if (clamped === page) return;
+      setLoadError(null);
+      startTransition(async () => {
+        const res = await loadReportFullDataPage({
+          reportId: report.id,
+          offset: (clamped - 1) * PAGE_SIZE,
+          limit: PAGE_SIZE,
+        });
+        if (!res.success) {
+          setLoadError(res.error);
+          return;
+        }
+        setRows(res.rows);
+        setTotal(res.total);
+        setPage(clamped);
       });
-      if (!res.success) {
-        setLoadError(res.error);
-        return;
-      }
-      // 兜底去重（同一条不会重复 push）
-      const knownIds = new Set(rows.map((r) => r.collectedItemId));
-      const fresh = res.rows.filter((r) => !knownIds.has(r.collectedItemId));
-      setRows((prev) => [...prev, ...fresh]);
-      setTotal(res.total);
-      setHasMore(res.hasMore);
-    });
-  }, [isPending, hasMore, rows, report.id]);
-
-  // 触底自动加载
-  useEffect(() => {
-    if (!sentinelRef.current || !hasMore) return;
-    const el = sentinelRef.current;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) loadMore();
-      },
-      { rootMargin: "200px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [hasMore, loadMore]);
+    },
+    [isPending, totalPages, page, report.id],
+  );
 
   return (
     <div className="space-y-6">
@@ -100,6 +109,26 @@ export function ReportDetailClient({ accountId, detail }: Props) {
           <ArrowLeft size={14} />
           返回账号概览
         </Link>
+      </div>
+
+      {/* 醒目周期 Banner —— 让读者一眼看到这份报告统计的时间窗口 */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#2E75B6]/30 bg-gradient-to-r from-[#2E75B6]/15 via-[#5BA4D8]/10 to-[#2E75B6]/5 px-5 py-3.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.4)] dark:border-blue-400/30 dark:from-blue-500/15 dark:to-blue-400/5">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#2E75B6] text-white shadow-sm">
+          <CalendarRange size={18} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#2E75B6] dark:text-blue-300">
+            本报告统计周期
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-2 text-[15px] font-semibold text-[#1F3864] dark:text-blue-100">
+            <span className="tabular-nums">{report.periodStart}</span>
+            <span className="text-gray-400">→</span>
+            <span className="tabular-nums">{report.periodEnd}</span>
+            <span className="text-[12px] font-normal text-gray-500 dark:text-gray-400">
+              共 <span className="font-semibold text-[#1F3864] dark:text-blue-200">{periodDays}</span> 天 · {reportTypeLabel}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Cover —— 紧凑版（账号信息 + 热度 + KPI 同卡片；徽章带平台 + 报告类型） */}
@@ -141,7 +170,7 @@ export function ReportDetailClient({ accountId, detail }: Props) {
       <GlassCard padding="lg">
         {/* Executive summary */}
         {report.executiveSummary && (
-          <div className="rounded-xl border-l-[3px] border-[#FFD700] bg-[#FFF9E6] dark:bg-yellow-950/30 px-4 py-3 mb-4 text-[13.5px] text-gray-700 dark:text-gray-300 leading-relaxed">
+          <div className="rounded-xl border-l-[3px] border-[#2E75B6] bg-[#EEF4FB] dark:bg-blue-950/30 px-4 py-3 mb-4 text-[13.5px] text-gray-700 dark:text-gray-300 leading-relaxed">
             <span className="font-semibold text-[#1F3864] dark:text-blue-200">本日速读 · </span>
             {report.executiveSummary}
           </div>
@@ -162,6 +191,7 @@ export function ReportDetailClient({ accountId, detail }: Props) {
               key={attr.id}
               rank={attr.rank}
               title={attr.title}
+              sourceUrl={attr.sourceUrl}
               metrics={attr.metrics}
               whyViralSummary={attr.whyViralSummary}
               attributionMarkdown={attr.attributionMarkdown}
@@ -211,16 +241,40 @@ export function ReportDetailClient({ accountId, detail }: Props) {
                 key: "title",
                 header: "标题",
                 render: (row) => (
-                  <span
-                    className={
-                      row.isTop5
-                        ? "font-medium text-[#1F3864] dark:text-blue-200"
-                        : undefined
-                    }
-                    title={row.title}
-                  >
-                    {row.title}
-                  </span>
+                  <div className="min-w-0 max-w-[420px] sm:max-w-[520px] md:max-w-[640px]">
+                    {row.sourceUrl ? (
+                      <a
+                        href={row.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={
+                          "group flex items-center gap-1 min-w-0 hover:text-[#2E75B6] transition-colors " +
+                          (row.isTop5
+                            ? "font-medium text-[#1F3864] dark:text-blue-200"
+                            : "text-gray-700 dark:text-gray-300")
+                        }
+                        title={`${row.title} · 点击查看原文`}
+                      >
+                        <span className="flex-1 min-w-0 truncate">{row.title}</span>
+                        <ExternalLink
+                          size={12}
+                          className="shrink-0 text-gray-400 group-hover:text-[#2E75B6] transition-colors"
+                        />
+                      </a>
+                    ) : (
+                      <span
+                        className={
+                          "block truncate " +
+                          (row.isTop5
+                            ? "font-medium text-[#1F3864] dark:text-blue-200"
+                            : "")
+                        }
+                        title={row.title}
+                      >
+                        {row.title}
+                      </span>
+                    )}
+                  </div>
                 ),
               },
               {
@@ -266,24 +320,51 @@ export function ReportDetailClient({ accountId, detail }: Props) {
             emptyMessage="本期暂无视频数据"
           />
 
-          {/* 分页加载更多 + 触底自动加载 */}
-          {hasMore && (
-            <div ref={sentinelRef} className="flex justify-center mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadMore}
-                disabled={isPending}
-              >
-                {isPending ? (
+          {/* 显式分页器(20 条/页) */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-[12px] text-gray-500">
+                {total > 0 ? (
                   <>
-                    <Loader2 size={14} className="mr-1.5 animate-spin" />
-                    加载中...
+                    第 <span className="font-semibold text-[#1F3864] dark:text-blue-200 tabular-nums">{startIndex}</span> ~{" "}
+                    <span className="font-semibold text-[#1F3864] dark:text-blue-200 tabular-nums">{endIndex}</span> 条 ·
+                    共 <span className="font-semibold text-[#1F3864] dark:text-blue-200 tabular-nums">{total}</span> 条
                   </>
                 ) : (
-                  <>加载更多（剩 {Math.max(total - rows.length, 0)} 条）</>
+                  "暂无数据"
                 )}
-              </Button>
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={isPending || page <= 1}
+                  aria-label="上一页"
+                >
+                  <ChevronLeft size={14} />
+                  上一页
+                </Button>
+                <span className="text-[12px] text-gray-500 tabular-nums px-2">
+                  {isPending ? (
+                    <Loader2 size={14} className="inline animate-spin" />
+                  ) : (
+                    <>
+                      第 <span className="font-semibold text-[#1F3864] dark:text-blue-200">{page}</span> / {totalPages} 页
+                    </>
+                  )}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={isPending || page >= totalPages}
+                  aria-label="下一页"
+                >
+                  下一页
+                  <ChevronRight size={14} />
+                </Button>
+              </div>
             </div>
           )}
 
@@ -292,7 +373,7 @@ export function ReportDetailClient({ accountId, detail }: Props) {
           )}
 
           <p className="mt-3 text-[11px] text-gray-400">
-            已加载 {rows.length} / 共 {total} 条 · 金色行为 Top 5 · 综合得分 = 点赞×1 + 评论×5 + 转发×5 + 收藏×2
+            金色行为 Top 5 · 综合得分 = 点赞×1 + 评论×5 + 转发×5 + 收藏×2
             {report.generatedAt &&
               ` · 报告生成时间 ${report.generatedAt.slice(0, 16).replace("T", " ")}`}
           </p>
