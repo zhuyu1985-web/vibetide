@@ -162,12 +162,14 @@ steps: [
     }),
   step(3, "深读+翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate",
     {
-      articles: "{{step2.classified_articles}}",  // step 2 输出过滤后的文章
+      articles: "{{step2.results}}",  // step 2 输出，topic_classifier 返回的 {results: ClassifiedItem[]} 字段名是 results
+                                       // mission-executor 在 renderStepParameters 里做 mapping ClassifiedItem → ArticleInput shape
+                                       // (按 confidence 阈值过滤掉 other 类)
       targetLanguage: "en",
       variantsPerTopic: "{{variants_per_topic}}",
     }),
   step(4, "入英文稿件库（待审）", "archive_to_drafts", "稿件入库", "distribution", "store",
-    { language: "en", initialStatus: "approved" }),  // 现状
+    { language: "en", category: "app_overseas_en", initialStatus: "approved" }),  // 现状保留 category 字段
 ],
 ```
 
@@ -565,7 +567,17 @@ E2E   端到端实跑 hot_topics_overseas_en 验收
 - 不动现已跑过的 mission (保留为反例对比)
 - A.3 strict tool whitelist 延后决策
 
-## 9. 后续 spec 候选
+## 9. 实施注意事项（plan 阶段必须 handle）
+
+来自 spec reviewer 的 advisory，记录在此防遗漏：
+
+1. **`renderStepParameters` primitive 字符串 fallthrough**: 参数若是单字符串如 `mode: "hot"`，JSON.parse("hot") 会抛错。实现里 try/catch 后保留原字符串，**单测必须覆盖 primitive string / array / object 三种 case**。
+
+2. **`step2.results` 字段名 mapping**: `classifyOverseasTopics` 返回 `{results: ClassifiedItem[]}`，cross_language_rewrite 期望 `articles: ArticleInput[]`。两者 shape 不同（ClassifiedItem 有 confidence/reason/category 字段，ArticleInput 需要 title/body）。`LLM_SKILL_EXECUTORS.cross_language_rewrite` 的 execute 函数里要做 mapping：从 `{{step2.results}}` 拿到的数组按 confidence 阈值过滤掉 other，并把字段重映射为 ArticleInput shape (title from t1's title, body 需要从 step 1 原始 topics 里反查 summary)。
+
+3. **LLM-skill short-circuit 副作用一致性**: 现有 invokeToolDirectly short-circuit (line 909-940) 写 outputData 之外还 `Promise.all` 三件事：(a) update mission_tasks status (b) update ai_employees idle status (c) insert mission_messages 通知。LLM-skill short-circuit 必须复制这三件事，否则 mission 走完看不到员工"完成"消息且员工状态停留在 busy。
+
+## 10. 后续 spec 候选
 
 - mission console 输出全局搜索 / CSV 导出
 - 工作流编辑器的 paramConfig UI (当前 paramConfig 只能改 seed 文件)
