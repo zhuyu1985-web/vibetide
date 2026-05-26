@@ -1204,6 +1204,26 @@ export function isToolRegistered(toolName: string): boolean {
   return !!ALL_TOOLS[toolName] && typeof ALL_TOOLS[toolName].execute === "function";
 }
 
+/**
+ * Write-type tools that mutate DB or call external write APIs.
+ * Test entry points (e.g., testSkillExecution) auto-inject `dryRun: true`
+ * for these tools to prevent test pollution.
+ *
+ * Note: as of Task 1.1 only `cms_publish` is implemented; the others are
+ * listed as expected names from the spec (Task 1.2 wires dryRun support
+ * into each tool's schema + execute body).
+ */
+export const WRITE_TOOL_SLUGS = new Set<string>([
+  "cms_publish",
+  "archive_to_drafts",
+  "cms_catalog_sync",
+  "external_publish",
+]);
+
+export function isWriteTool(toolName: string): boolean {
+  return WRITE_TOOL_SLUGS.has(toolName);
+}
+
 // ---------------------------------------------------------------------------
 // Tool parameter introspection (for step-config UI)
 //
