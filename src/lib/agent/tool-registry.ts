@@ -1297,18 +1297,17 @@ function createToolDefinitions(): ToolSet {
               continue;
             }
           }
-          // articles 表没有 metadata jsonb 列；把 workflow 元信息塞进已有列：
-          //  - language 直接落库（articles.language 默认 "zh"，这里覆写）
-          //  - sourceTopicId → translatedFromTopicId (uuid FK to hot_topics)
-          //  - variantIndex / category / culturalNotes → advisorNotes 数组
-          //    （advisorNotes 是 jsonb<string[]>，语义上算"编辑/工作流批注"，匹配）
-          const advisorNotes: string[] = [];
-          if (typeof item.variantIndex === "number") {
-            advisorNotes.push(`variantIndex:${item.variantIndex}`);
-          }
-          if (item.category) advisorNotes.push(`category:${item.category}`);
-          if (item.culturalNotes) advisorNotes.push(`culturalNotes:${item.culturalNotes}`);
-
+          // articles 表暂时没有 metadata jsonb 列（reviewer 找到的 2 个 Critical 后弃用上一版 hack）：
+          //  - 不要把 sourceTopicId(字符串如 "t1") 写进 translatedFromTopicId(uuid FK)
+          //    —— 运行时会 invalid uuid syntax crash
+          //  - 不要把 variantIndex / category / culturalNotes 拼成字符串塞进 advisorNotes
+          //    —— articles[id]/article-edit-client.tsx:646 会把它渲染成紫色"顾问"问答卡
+          //
+          // 走只写真实列的安全路径：title / body / summary / sourceUrl / tags / language
+          // 入库都过，但 sourceTopicId / variantIndex / category / culturalNotes 暂不落库
+          // （call 方仍可拿到 schema 验证、result.created[] 里有 sourceUrl 链接）。
+          // 后续 follow-up：加 articles.metadata jsonb 列（CLAUDE.md 标准 Drizzle 流程），
+          // 把这 4 个字段持久化以便统计 / 溯源。
           const [row] = await db.insert(articles).values({
             organizationId,
             title: item.title,
@@ -1320,8 +1319,6 @@ function createToolDefinitions(): ToolSet {
             mediaType: "article",
             publishedAt: null,
             language: item.language ?? "en",
-            translatedFromTopicId: item.sourceTopicId ?? null,
-            advisorNotes: advisorNotes.length > 0 ? advisorNotes : null,
           }).returning({ id: articles.id, title: articles.title });
 
           created.push({ articleId: row.id, title: row.title, sourceUrl: item.sourceUrl });
