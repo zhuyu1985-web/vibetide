@@ -1610,7 +1610,7 @@ archive_to_drafts: tool({
 }),
 ```
 
-注意：工具定义放在 `ALL_TOOLS` 对象内（同 cms_publish 同级）。如果当前文件结构是 `const ALL_TOOLS = { ... }`，加在对应位置。
+**结构提示**: `tool-registry.ts:358` 是 `function createToolDefinitions(): ToolSet { return { ...tools } }`，`tool-registry.ts:1195` 是 `const ALL_TOOLS = createToolDefinitions()`。把 `archive_to_drafts` 加到 `createToolDefinitions` 函数体内 return 对象里（与 `cms_publish` 同级）。**不要**改 ALL_TOOLS 那一行常量赋值。具体行号：找到 cms_publish 定义结束处（约 line 1200），紧接其后加 archive_to_drafts。
 
 - [ ] **Step 4: 测试 PASS + tsc**
 
