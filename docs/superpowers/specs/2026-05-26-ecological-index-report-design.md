@@ -315,10 +315,13 @@ export type EcologicalIndexAggregatesJson = {
   generatedAt: string;
 };
 
-// 3 个独立的产出文件 URL(复用现有 + 新增 1 个):
-wordFileUrl: text("word_file_url"),         // 排行榜 docx
-excelFileUrl: text("excel_file_url"),       // 19-sheet 可验证 xlsx
-contentSourceFileUrl: text("content_source_file_url"), // ← 新增列: 内容池数据源 xlsx
+// 产出文件 URL(复用现有 + 新增 1 个):
+wordFileUrl: text("word_file_url"),         // 排行榜 docx (单文件)
+excelFileUrl: text("excel_file_url"),       // 19-sheet 可验证 xlsx (单文件)
+// ← 新增列: 内容池数据源 xlsx (按 tier 拆 4 个, 避免单文件 > 100MB)
+contentSourceFileUrls: jsonb("content_source_file_urls"),
+// shape: { central: string|null, industry: string|null, municipal: string|null, district: string|null }
+// 每个值是该 tier 对应的 xlsx storage path; null 表示该 tier 未生成或失败
 ```
 
 ### 4.3 字段关系
@@ -357,6 +360,28 @@ PRE-CHECK: SELECT COUNT(*) FROM research_reports
 
 ## 5. Algorithm
 
+### 5.0 依赖的 DB 表 Contract（实施前必读）
+
+本模块的算法依赖以下既有 DB schema（已 shipped 在 Collection Hub + A3 phase）：
+
+| 表 | 字段 | 用途 |
+|---|---|---|
+| `collected_items` | `id`, `organization_id`, `outlet_id`, `published_at`, `title`, `firstSeenAt` | 主表，按 outlet_id 白名单 + 时间窗筛选 |
+| `collected_item_contents` | `item_id`, `content`, `ocr_text`, `asr_text` | LEFT JOIN 副表（内容池 xlsx 导出用） |
+| `media_outlet_dictionary` | `id`, `organization_id`, `outlet_name`, `outlet_tier`, `public_account_names[]`, `domains[]` | matcher 反查 outlet_id |
+| `research_topics` | `id`, `name`, `organization_id` | 16 个媒体类主题（含义参见体系 docx P20 § 表 3-1） |
+| `research_collected_item_topics` | `collected_item_id`, `topic_id` | 稿件 ↔ 主题命中表（多对多） |
+| `research_collected_item_districts` | `collected_item_id`, `district_id` | 稿件 ↔ 区县命中表（多对多） |
+| `research_cq_districts` | `id`, `name` | 39 标准区县字典（江北/渝北已合并入两江） |
+
+**关键索引依赖**（已 shipped）：
+- `collected_items(organization_id, published_at)` 复合索引（hot path）
+- `collected_items(outlet_id)` 已存在
+- `research_collected_item_topics(collected_item_id)` 已存在
+- `research_collected_item_districts(collected_item_id)` 已存在
+
+**TOPIC_N = 16 的常量来源**：体系 docx 表 3-1 固化列出 16 个主题。**实施时不再硬编码**，而是 `SELECT COUNT(*) FROM research_topics WHERE organization_id = ?` 动态读，然后 assert == 16（若 != 16 标 status='failed' 提示"主题数异常"）。
+
 ### 5.1 算法模块（与 Python 脚本 1:1 对齐）
 
 新建 `src/lib/research/ecological-index/`：
@@ -364,16 +389,18 @@ PRE-CHECK: SELECT COUNT(*) FROM research_reports
 ```
 ecological-index/
 ├── compute.ts           # 核心算法
-├── matcher.ts           # unit → outlet_id 反查
+├── matcher.ts           # unit → outlet_id 反查(详 §5.2.1)
 ├── xlsx-builder.ts      # 19-sheet 可验证 xlsx
-├── docx-builder.ts      # 排行榜 docx
+├── docx-builder.ts      # 排行榜 docx (用 docx npm lib, 程式构建)
 ├── chart-generator.ts   # 3 张可视化图(用 chartjs-node-canvas)
-├── content-exporter.ts  # 302MB 数据源 xlsx 流式导出
+├── content-exporter.ts  # 内容源 xlsx 按 tier 拆 4 文件
 ├── activity-parser.ts   # 活动 xlsx 解析
 ├── scope-parser.ts      # 媒体名单 xlsx 解析
 ├── types.ts             # 共享类型
 └── __tests__/...
 ```
+
+**docx 库选型**: 用 `docx` npm lib(MIT, A5 spec 已引入,见 §1.2.1),程式构建 .docx —— 39 行表格 + 段落数字 + 3 张 image embed,**无需 docxtemplater**(避开开源版不支持图片占位问题)。复用 A5 已 vetted 的 lib + 字体方案。
 
 ### 5.2 核心公式
 
@@ -424,6 +451,114 @@ tierScore = scaledCount * 0.40 + scaledRichness * 0.30 + scaledFreq * 0.30;
 composite = central * 0.45 + industry * 0.25 + municipal * 0.15
           + district * 0.08 + public * 0.07;
 ```
+
+### 5.2.1 Matcher 反查算法（unit → outlet_id）
+
+`matcher.ts` 的责任：把名单中的每个 unit 反查到 DB `media_outlet_dictionary` 的 outlet_id（一对多关系，一个 unit 可能匹配到 1-3 个 outlet）。
+
+**匹配优先级**（从高到低，命中即停）：
+
+```ts
+function matchUnitToOutletIds(
+  unit: ScopeUnit,
+  dict: OutletDictRow[],
+): { matchedOutletIds: string[]; matchReasons: string[] } {
+  const matched: Array<{ outletId: string; signal: string; priority: number }> = [];
+
+  for (const d of dict) {
+    // 优先级 1: 公众号 ghid 精确匹配(最强信号)
+    if (unit.wechatGhid && d.publicAccountNames.some(p => p === unit.wechatGhid)) {
+      matched.push({ outletId: d.id, signal: `ghid=${unit.wechatGhid}`, priority: 1 });
+      continue;
+    }
+    // 优先级 2: 微博 UID 精确匹配
+    if (unit.weiboUid && d.publicAccountNames.some(p => p === unit.weiboUid)) {
+      matched.push({ outletId: d.id, signal: `weibo_uid=${unit.weiboUid}`, priority: 2 });
+      continue;
+    }
+    // 优先级 3: 公众号名精确匹配
+    for (const wn of unit.wechatNames) {
+      if (d.publicAccountNames.includes(wn)) {
+        matched.push({ outletId: d.id, signal: `wechat_name=${wn}`, priority: 3 });
+        break;
+      }
+    }
+    // 优先级 4: 网站域名精确匹配
+    if (unit.websites.length > 0) {
+      for (const ww of unit.websites) {
+        const w = ww.replace(/^https?:\/\//, "").split("/")[0]?.toLowerCase();
+        if (w && d.domains.includes(w)) {
+          matched.push({ outletId: d.id, signal: `domain=${w}`, priority: 4 });
+          break;
+        }
+      }
+    }
+    // 优先级 5: outlet_name 模糊匹配(双向 contains, 最弱信号)
+    if (d.outlet_name && unit.name && (
+      d.outlet_name === unit.name ||
+      d.outlet_name.includes(unit.name) ||
+      unit.name.includes(d.outlet_name)
+    )) {
+      matched.push({ outletId: d.id, signal: `name~${d.outlet_name}`, priority: 5 });
+    }
+  }
+
+  // 去重: 同一个 outlet_id 可能因多个信号被多次匹配, 保留最高优先级的命中
+  const dedup = new Map<string, { outletId: string; signal: string; priority: number }>();
+  for (const m of matched) {
+    const prev = dedup.get(m.outletId);
+    if (!prev || m.priority < prev.priority) dedup.set(m.outletId, m);
+  }
+  return {
+    matchedOutletIds: [...dedup.values()].map(m => m.outletId),
+    matchReasons: [...dedup.values()].map(m => m.signal),
+  };
+}
+```
+
+**outlet_id 反向冲突仲裁**（同一 outlet 被多个 unit 匹配）：
+
+当算法跑完所有 unit 后，可能出现 outlet_id `X` 被 unit `A` 和 unit `B` 同时匹配上。此时按以下规则裁决该 outlet 归属哪个 unit：
+
+```ts
+function resolveOutletOwnership(
+  matches: Map<unitId, outletId[]>,
+  units: ScopeUnit[],
+): Map<outletId, unitId> {
+  // 反向倒排: outlet → 候选 units
+  const inv: Map<outletId, unitId[]> = invertMap(matches);
+  const owner = new Map<outletId, unitId>();
+
+  for (const [outletId, candidateUnits] of inv) {
+    if (candidateUnits.length === 1) {
+      owner.set(outletId, candidateUnits[0]);
+      continue;
+    }
+    // 冲突,按以下顺序裁决:
+    // 1. unit.tier 优先级: central > industry > municipal > district_rmt > district_gov
+    // 2. 同 tier 下, unit.xlsxRow 升序(先到先得)
+    const sorted = [...candidateUnits].sort((a, b) => {
+      const tierRank = { central: 0, industry: 1, municipal: 2, district_rmt: 3, district_gov: 4 };
+      const ta = tierRank[units.find(u => u.id === a).tier];
+      const tb = tierRank[units.find(u => u.id === b).tier];
+      if (ta !== tb) return ta - tb;
+      return units.find(u => u.id === a).xlsxRow - units.find(u => u.id === b).xlsxRow;
+    });
+    owner.set(outletId, sorted[0]);
+  }
+  return owner;
+}
+```
+
+**已知冲突的预期裁决**（来自实操数据）：
+
+| 冲突 outlet | 候选 units | 裁决 |
+|---|---|---|
+| ghid `gh_27de3a2c6bc4` 同时出现在重庆日报(L9, municipal) 和西部科学城(L48, district_rmt) | 重庆日报 (tier 优先级 2) > 西部科学城 (4) | 归"重庆日报" |
+| weibo UID `2144075181` 同时出现在美丽重庆(L12, industry) 和重庆市生态环境局(L92, district_gov) | 美丽重庆 (1) > 市生态环境局 (4) | 归"美丽重庆" |
+| weibo UID `2780124485` 同时出现在黔江发布(L53, district_rmt) 和黔江区生态环境局(L95, district_gov) | 黔江发布 (3) > 黔江生态环境局 (4) | 归"黔江发布" |
+
+冲突裁决结果写到 `research_media_scope_units.notes`（如 `"weibo UID 2144075181 与 L92 重庆市生态环境局 共用, 归本 unit"`）。
 
 ### 5.3 区县合并口径（固化）
 
@@ -477,13 +612,16 @@ function normalizeDistrict(name: string): string {
               │ 上传 storage → wordFileUrl                        │
               └────────────────────┬──────────────────────────────┘
                                    ▼
-              ┌─ Step 6: build-content-source-xlsx ──────────────┐
+              ┌─ Step 6: build-content-source-xlsx (按 tier 拆分 4 个文件) ┐
               │ (仅在 includeContentSource=true 时执行)           │
-              │ SELECT * FROM collected_items                     │
-              │ WHERE outlet_id ∈ 白名单 AND published_at ∈ ...   │
-              │ ORDER BY firstSeenAt DESC                         │
-              │ → 用现有 EXPORT_COLUMN_ORDER + exportRowToOpinionRecord
-              │ → 流式写入 + 分块上传 storage → contentSourceFileUrl
+              │ 拆为 4 个 sub-step(避免单 step OOM + 30s 超时):  │
+              │  Step 6a: 中央 tier xlsx (~50MB) - upload         │
+              │  Step 6b: 行业 tier xlsx (~5MB)  - upload         │
+              │  Step 6c: 市级 tier xlsx (~80MB) - upload         │
+              │  Step 6d: 区县 tier xlsx (~30MB) - upload         │
+              │ 每 sub-step 用 @e965/xlsx + Streaming write       │
+              │ 用现有 EXPORT_COLUMN_ORDER + exportRowToOpinionRecord
+              │ 4 个文件路径写入 contentSourceFileUrls(jsonb 数组) │
               └────────────────────┬──────────────────────────────┘
                                    ▼
               ┌─ Step 7: finalize ────────────────────────────────┐
@@ -784,20 +922,48 @@ export { ecologicalIndexGenerate } from "./ecological-index-generate";
 
 ## 13. Phased Rollout
 
+### 13.1 Phase 概览
+
 | Phase | 内容 | 估时 | 可独立部署 |
 |---|---|---|---|
-| **P1** | 3 张表 schema + migration + Drizzle types + `contentSourceFileUrl` 列 | 1 天 | ✓ |
+| **P0** | spike: `docx` lib 图片嵌入 + `chartjs-node-canvas` 字体 + Supabase Storage 50MB 边界 | 0.5 天 | — |
+| **P1** | 3 张表 schema + migration + Drizzle types + `contentSourceFileUrls` 列 | 1 天 | ✓ |
 | **P2** | 资源管理 UI（媒体名单 / 活动数据集 CRUD + 上传解析）+ Server Actions + DAL | 2 天 | ✓ |
 | **P3** | 计算引擎 + Inngest 7 步 + 单元测试 + 字体打包 | 3 天 | ✓（后端可通过 Inngest UI 触发） |
 | **P4** | Reports 列表 tab 改造 + 新建 Dialog + 详情页 4 tab + 实时预估 | 2 天 | ✓ |
 
-**总计：8 天**（含测试 + 文档）
+**总计：8.5 天**（含 spike + 测试 + 文档）
 
-每个 Phase 结束需满足：
+### 13.2 Phase 间依赖图
+
+```
+P0 (spike) ──┐
+             ▼
+P1 (schema) ──┐
+              ├─ P2 (资源管理 UI 依赖 P1)
+              ├─ P3 (计算引擎依赖 P1 schema + P2 数据)
+              └─ P4 (UI 依赖 P1 + P3 aggregatesJson 结构)
+```
+
+**关键依赖**：
+- P0 → P1：spike 结果若发现 `docx` lib 不支持某图特性,可能要改 schema(如把图片路径独立存),回改 P1 schema
+- P1 → P3：P3 算法可能发现需要 schema 新增字段(如 `dryRunSnapshot` 缓存预估结果),需回改 P1
+- P3 → P4：P4 详情页 4 tab 强依赖 P3 输出的 `aggregatesJson` 结构
+
+### 13.3 Schema 兼容性承诺
+
+- **P1 schema 在 P3 完成前打 `experimental` 标记**(写入 ADR + schema 注释):允许 P3 实施中无破坏性微调字段类型
+- **P3 完成后,schema 进入 stable**:再有变更必须走标准 Drizzle migration + 数据搬迁
+- **P4 完成后,`aggregatesJson` shape 进入 stable**:不再改动消费侧契约
+
+### 13.4 每个 Phase 完成条件
+
 - `npx tsc --noEmit` 零错误
 - `npm run build` 通过
-- 已有测试通过
-- 写 phase summary doc
+- 该 phase 引入的测试全部通过(`npm run test`)
+- 写 phase summary doc(放 `docs/superpowers/phase-reports/`)
+- P0 spike 完成需附 3 个 PoC 截图/演示
+- P3 完成后跑端到端 fixture: 上传 → 生成 → 输出对比 Python 脚本产物
 
 ## 14. Out of Scope（明确不做）
 
@@ -817,12 +983,15 @@ export { ecologicalIndexGenerate } from "./ecological-index-generate";
 - 算法 100% TS 化，不引 Python runtime
 - 每次生成新报告，不覆盖
 
-## 16. Open Questions
+## 16. Open Questions（已在 v2 修订关闭）
 
-- [ ] Q1: docxtemplater 是否需要付费版（pro 支持图片占位）？开源版可能不够用，需 spike
-- [ ] Q2: `chartjs-node-canvas` 在 Vercel Edge / Node Lambda 跑性能验证（local 5s 一图）
-- [ ] Q3: 详情页"指标明细" tab 是否要展示完整 15 sheet 数据（数据量大），还是仅 Top 2？当前 design 选 Top 2
-- [ ] Q4: 内容源 xlsx 302MB 是否可以拆为 4 个文件（中央/行业/市级/区县各一）？用户已确认默认勾选生成
+- [x] ~~Q1: docxtemplater 付费版~~ → **改用 `docx` npm lib(A5 已 vetted),不用 docxtemplater**(见 §5.1)
+- [x] ~~Q2: chartjs-node-canvas Vercel 性能~~ → **P0 spike 验证**(见 §13.1)
+- [x] Q3: 详情页"指标明细" tab 展示 Top 2 + 区间化得分(决定)
+- [x] ~~Q4: 内容源 xlsx 拆分~~ → **按 tier 拆 4 个文件(每个 ≤ 100MB),`contentSourceFileUrls` jsonb shape**(见 §4.2 + §5.4 Step 6)
+
+剩余开放(实施中决定,不阻塞 spec):
+- 详情页"梯队饼图"在前端用 Recharts 实时渲染 vs 用 Inngest 已生成的 PNG?推荐前端 Recharts(用户可交互),PNG 仅作 docx 嵌入用
 
 ## 17. Acceptance Criteria
 
