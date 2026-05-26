@@ -1,13 +1,16 @@
 /**
  * topic_classifier — 海外热榜分类
  *
- * 把一批 hot_topics 标题/摘要丢给 LLM，返回每条的分类（食/萌宠/国内科技/other）+ 置信度 + 理由。
+ * 把一批 hot_topics 标题/摘要丢给 LLM，返回每条的分类（动态运行时构造 enum）+ 置信度 + 理由。
  * 用于「海外热榜搬运」场景的 step 2: classify_overseas_categories（小雷负责）。
  *
  * AI SDK v6 — uses `generateText({ output: Output.object({ schema }) })`
  * （v6 移除了 generateObject）。
  *
- * Spec: /Users/zhuyu/.claude/plans/tophub-x-instagram-twitter-sunny-papert.md §3.2
+ * M3：schema 改运行时构造，由调用方传入 enabledCategories（用户在工作流编辑器选的分类）。
+ * 总是追加 "other" 兜底类。Phase 4 通过 sourceUrl 透传字段保留原文链接。
+ *
+ * Spec: docs/superpowers/specs/2026-05-26-overseas-hot-trend-end-to-end-design.md §4.3 M3
  */
 
 import { generateText, Output } from "ai";
@@ -15,9 +18,13 @@ import { z } from "zod/v4";
 import { getLanguageModel, resolveModelConfig } from "../model-router";
 
 // ---------------------------------------------------------------------------
-// Zod schema —— 严格 4 类枚举 + 0~1 confidence + 必填 reason
+// Zod schema 改运行时构造（M3）
 // ---------------------------------------------------------------------------
 
+/**
+ * @deprecated 仅保留兼容；新代码用动态 enabledCategories 参数。
+ * 历史海外热榜固定 4 类的常量，保留向后兼容（无 live consumer）。
+ */
 export const OVERSEAS_CATEGORY_ENUM = [
   "food",
   "pets",
@@ -25,35 +32,52 @@ export const OVERSEAS_CATEGORY_ENUM = [
   "other",
 ] as const;
 
+/** @deprecated 仅保留兼容；新代码用 string（动态 enum） */
 export type OverseasCategory = (typeof OVERSEAS_CATEGORY_ENUM)[number];
 
-const CategoryEnumSchema = z.enum(OVERSEAS_CATEGORY_ENUM);
-
-const ClassifiedItemSchema = z.object({
-  id: z.string().min(1),
-  category: CategoryEnumSchema,
-  confidence: z.number().min(0).max(1),
-  reason: z.string().min(2).max(200),
-});
-
-const TopicClassifierOutputSchema = z.object({
-  results: z.array(ClassifiedItemSchema),
-});
-
-export type TopicClassifierResult = z.infer<typeof ClassifiedItemSchema>;
+function buildClassifierSchema(categoryValues: string[]) {
+  // 总是追加 "other" 作为兜底类
+  const enumValues: [string, ...string[]] = ["other", ...categoryValues];
+  return z.object({
+    results: z.array(
+      z.object({
+        id: z.string().min(1),
+        category: z.enum(enumValues),
+        confidence: z.number().min(0).max(1),
+        reason: z.string().min(2).max(200),
+        sourceUrl: z.string().optional(), // ← Phase 4 透传字段（本 task 留口）
+      }),
+    ),
+  });
+}
 
 // ---------------------------------------------------------------------------
-// Input types
+// Input / Output types
 // ---------------------------------------------------------------------------
 
 export interface TopicInput {
   id: string;
   title: string;
   summary?: string;
+  sourceUrl?: string; // ← Phase 4 透传字段
+}
+
+export interface CategoryOption {
+  value: string;
+  label: string;
 }
 
 export interface TopicClassifierInput {
   topics: TopicInput[];
+  enabledCategories: CategoryOption[]; // ← M3: 必填
+}
+
+export interface TopicClassifierResult {
+  id: string;
+  category: string; // 动态 enum，运行时确定
+  confidence: number;
+  reason: string;
+  sourceUrl?: string;
 }
 
 export interface TopicClassifierOutput {
@@ -61,36 +85,46 @@ export interface TopicClassifierOutput {
 }
 
 // ---------------------------------------------------------------------------
-// System prompt —— 分类标准明确，与 plan §3.2 / SKILL.md 一致
+// System prompt —— 按 enabledCategories 动态拼接
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `你是「海外热榜分类员」。从中国热榜数据中筛出 3 类对海外读者有吸引力且无政策风险的话题：
+function buildSystemPrompt(categories: { value: string; label: string }[]): string {
+  const lines = categories
+    .map(
+      (c) =>
+        `**${c.value}（${c.label}）**：根据标题/摘要的语义判断；模糊不清归 other。`,
+    )
+    .join("\n");
+  return `你是「话题分类员」。从输入的中文热榜数据中筛出下列类别（不属于则归 other）：
 
-**food（美食）**：餐饮、菜谱、食材、零食、饮品、料理、美食 vlog、地方小吃、外卖、饮食文化。
-**pets（萌宠）**：猫、狗、鸟、兔、仓鼠等家养宠物，宠物视频、宠物用品、宠物医疗、撸宠互动。
-**domestic_tech（国内科技）**：中国大陆的科技公司 / 产品 / 芯片 / AI / 互联网 / 新能源车 / 航天 / 机器人。必须是「国内」（中国大陆），海外科技公司、海外产品归 other。
-**other**：以上 3 类都不算的，包括但不限于：时政、社会新闻、娱乐八卦、体育、影视综艺、教育、房产、股市、突发事件、海外动态、健康养生（非餐饮类）。
+${lines}
 
 分类规则：
-1. 每条必须给一个 category（4 选 1），不许多选。
+1. 每条必须给一个 category（n+1 选 1，n 是上面列表条数，+1 是 other），不许多选。
 2. confidence 是 0~1 浮点数，反映你对分类正确性的把握。
-3. 模糊难判（如"网红探店餐厅出事故"既涉及 food 也涉及社会新闻）→ confidence < 0.7 时归 other。
-4. reason 简短中文（≤ 100 字）：说出关键判断词，例如"标题含'宠物医院'→ pets"。
+3. 模糊难判 → confidence < 0.7 时归 other。
+4. reason 简短中文（≤ 100 字）：说出关键判断词。
 5. 输出顺序与输入顺序一致，每条都要给出（不能省略）。
-6. 严格按 schema 输出 JSON，不要附加任何解释文字。`;
+6. **若输入条目带 sourceUrl 字段，输出必须原样回填，绝对不改 / 不删**。
+7. 严格按 schema 输出 JSON，不要附加任何解释文字。`;
+}
 
 // ---------------------------------------------------------------------------
 // Skill function
 // ---------------------------------------------------------------------------
 
 /**
- * 给一批 topic 打海外分类标签。
+ * 给一批 topic 打分类标签（运行时确定分类集合）。
  *
  * @example
  * const out = await classifyOverseasTopics({
  *   topics: [
  *     { id: "t1", title: "成都串串香夜市排队 3 小时", summary: "..." },
- *     { id: "t2", title: "华为 Mate 70 Pro 卫星通信实测" },
+ *     { id: "t2", title: "小米 SU7 续航实测", sourceUrl: "https://..." },
+ *   ],
+ *   enabledCategories: [
+ *     { value: "food", label: "美食" },
+ *     { value: "auto", label: "汽车" },
  *   ],
  * });
  * // out.results[0] = { id:"t1", category:"food", confidence:0.95, reason:"..." }
@@ -101,13 +135,19 @@ export async function classifyOverseasTopics(
   if (!input.topics || input.topics.length === 0) {
     return { results: [] };
   }
+  if (!input.enabledCategories || input.enabledCategories.length === 0) {
+    throw new Error("topic_classifier 需要 enabledCategories 至少 1 项");
+  }
 
-  // 序列化 input，让 LLM 看到结构化标题列表
+  const categoryValues = input.enabledCategories.map((c) => c.value);
+  const schema = buildClassifierSchema(categoryValues);
+
   const userPayload = JSON.stringify({
     topics: input.topics.map((t) => ({
       id: t.id,
       title: t.title,
       summary: t.summary ?? "",
+      sourceUrl: t.sourceUrl ?? null,
     })),
   });
 
@@ -118,25 +158,30 @@ export async function classifyOverseasTopics(
 
   const { output } = await generateText({
     model: getLanguageModel(modelConfig),
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(input.enabledCategories),
     prompt: userPayload,
-    output: Output.object({ schema: TopicClassifierOutputSchema }),
+    output: Output.object({ schema }),
     temperature: modelConfig.temperature,
     maxOutputTokens: modelConfig.maxTokens,
   });
 
-  // 兜底：LLM 返回结果数量与输入不一致时，缺失的条目补 other
+  // 兜底：缺失条目归 other
   const returnedIds = new Set(output.results.map((r) => r.id));
   const missing: TopicClassifierResult[] = input.topics
     .filter((t) => !returnedIds.has(t.id))
     .map((t) => ({
       id: t.id,
-      category: "other" as const,
+      category: "other",
       confidence: 0,
       reason: "LLM 未返回该条分类结果，兜底归为 other",
+      sourceUrl: t.sourceUrl,
     }));
 
-  return {
-    results: [...output.results, ...missing],
-  };
+  // sourceUrl 兜底回填（如果 LLM 漏了某条的 sourceUrl）
+  const filled: TopicClassifierResult[] = output.results.map((r) => ({
+    ...r,
+    sourceUrl: r.sourceUrl ?? input.topics.find((t) => t.id === r.id)?.sourceUrl,
+  }));
+
+  return { results: [...filled, ...missing] };
 }
