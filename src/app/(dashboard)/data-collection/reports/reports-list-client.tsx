@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileText, Trash2, RefreshCw, Camera } from "lucide-react";
+import { FileText, Trash2, RefreshCw, Camera, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -95,13 +95,21 @@ export function ReportsListClient({ rows }: { rows: ReportListRow[] }) {
         title="研究报告"
         description="查看历史生成的研究报告，支持状态筛选、检索、快照与删除"
         actions={
-          <Link
-            href="/data-collection/content"
-            className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            返回内容池
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/data-collection/reports/resources">
+              <Button variant="ghost" size="sm">
+                <Database className="h-3.5 w-3.5 mr-1" />
+                资源管理
+              </Button>
+            </Link>
+            <Link
+              href="/data-collection/content"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              返回内容池
+            </Link>
+          </div>
         }
       />
 
