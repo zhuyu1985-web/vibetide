@@ -11,7 +11,7 @@ compatibleRoles: ["research_analyst", "data_analyst"]
 metadata:
   skill_kind: data_analysis
   scenario_tags: [academic, research-pivot, chart-config]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

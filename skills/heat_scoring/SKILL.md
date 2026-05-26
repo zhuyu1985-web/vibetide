@@ -9,7 +9,7 @@ metadata:
   skill_kind: analysis
   scenario_tags: [heat, scoring, prediction, ranking]
   compatibleEmployees: [xiaolei, xiaoshu, xiaoce]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, TRENDING_API_URL, TRENDING_API_KEY]
     knowledgeBases: []

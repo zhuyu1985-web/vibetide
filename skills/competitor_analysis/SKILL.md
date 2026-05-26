@@ -9,7 +9,7 @@ metadata:
   skill_kind: analysis
   scenario_tags: [competitor, benchmark, strategy, differentiation]
   compatibleEmployees: [xiaoshu, xiaoce, xiaozi]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY]
     knowledgeBases: []

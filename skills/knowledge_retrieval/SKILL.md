@@ -9,7 +9,7 @@ metadata:
   skill_kind: data_collection
   scenario_tags: [knowledge-base, context, style-guide, compliance-rules]
   compatibleEmployees: [xiaozi, xiaowen, xiaoshen, xiaoce]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [JINA_API_KEY, OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases:

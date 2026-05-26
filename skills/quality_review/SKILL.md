@@ -9,7 +9,7 @@ metadata:
   skill_kind: management
   scenario_tags: [all]
   compatibleEmployees: [xiaoshen]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []
@@ -37,7 +37,7 @@ runtimeConfig:
   type: llm_analysis
   avgLatencyMs: 12000
   maxConcurrency: 3
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
 compatibleRoles:
   - quality_reviewer
 ---

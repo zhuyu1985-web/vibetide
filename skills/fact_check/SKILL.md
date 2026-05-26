@@ -9,7 +9,7 @@ metadata:
   skill_kind: analysis
   scenario_tags: [all]
   compatibleEmployees: [xiaoshen, xiaoce, xiaozi]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY, JINA_API_KEY]
     knowledgeBases: [官方信源白名单, 新华社译名表]
@@ -34,7 +34,7 @@ runtimeConfig:
   type: llm_analysis
   avgLatencyMs: 15000
   maxConcurrency: 3
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
 compatibleRoles:
   - quality_reviewer
   - content_strategist

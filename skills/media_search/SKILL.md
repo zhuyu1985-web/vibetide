@@ -9,7 +9,7 @@ metadata:
   skill_kind: data_collection
   scenario_tags: [material, asset, copyright, video, image, audio]
   compatibleEmployees: [xiaozi, xiaojian, xiaowen]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

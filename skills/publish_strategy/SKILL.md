@@ -9,7 +9,7 @@ metadata:
   skill_kind: management
   scenario_tags: [distribution, schedule, cross-platform, operations]
   compatibleEmployees: [xiaofa, xiaoshu]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

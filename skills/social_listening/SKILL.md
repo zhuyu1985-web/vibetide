@@ -9,7 +9,7 @@ metadata:
   skill_kind: data_collection
   scenario_tags: [social, opinion, kol, risk, crisis]
   compatibleEmployees: [xiaolei, xiaoshu, xiaoshen]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL, SEARCH_PROVIDER, BOCHA_API_KEY, TAVILY_API_KEY]
     knowledgeBases: []

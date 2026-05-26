@@ -11,7 +11,7 @@ compatibleRoles: ["research_analyst"]
 metadata:
   skill_kind: content_generation
   scenario_tags: [academic, research-report]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

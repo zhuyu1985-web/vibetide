@@ -9,7 +9,7 @@ metadata:
   skill_kind: analysis
   scenario_tags: [audience, persona, segmentation, strategy]
   compatibleEmployees: [xiaoshu, xiaoce, xiaofa]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

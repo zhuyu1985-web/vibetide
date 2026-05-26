@@ -10,7 +10,7 @@ metadata:
   scenario_tags: [livelihood, podcast, daily_brief]
   compatibleEmployees: [xiaowen, xiaoshen]
   appChannel: app_livelihood_podcast
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases:

@@ -11,7 +11,7 @@ compatibleRoles: ["research_analyst", "trending_scout"]
 metadata:
   skill_kind: data_collection
   scenario_tags: [academic, research-search]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

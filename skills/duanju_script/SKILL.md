@@ -10,7 +10,7 @@ metadata:
   scenario_tags: [drama, serial_content]
   compatibleEmployees: [xiaoce, xiaowen, xiaoshen]
   appChannel: app_drama
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases:
@@ -44,7 +44,7 @@ metadata:
 - 纪录片剧本（走 `script_generate` 的 `documentary_short` 子模板）
 - 非剧本的文案创作（走 `content_generate`）
 
-**前置条件**：LLM 可用（`deepseek-chat` 默认，Claude Opus 进阶）；`广电合规红线库` KB 已绑定；`generate_episode` 模式必须有完整 `seriesBible`；输出简体中文；剧本格式遵循行业标准（场景 → 动作 → 对白）。
+**前置条件**：LLM 可用（`qwen3-max` 默认，Claude Opus 进阶）；`广电合规红线库` KB 已绑定；`generate_episode` 模式必须有完整 `seriesBible`；输出简体中文；剧本格式遵循行业标准（场景 → 动作 → 对白）。
 
 ## 输入 / 输出
 

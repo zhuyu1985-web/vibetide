@@ -9,7 +9,7 @@ metadata:
   skill_kind: analysis
   scenario_tags: [overseas, classification, hot-topics-filter]
   compatibleEmployees: [xiaolei]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []
@@ -52,7 +52,7 @@ metadata:
 | `topics` | `{id, title, summary?}[]` | ✓ | 待分类的 topic 数组 |
 | `topics[].id` | string | ✓ | topic 唯一标识（一般是 hot_topics.id） |
 | `topics[].title` | string | ✓ | 标题 |
-| `topics[].summary` | string | ✗ | 摘要（GLM-4-Plus 富化后的简短描述） |
+| `topics[].summary` | string | ✗ | 摘要（GLM-4-Plus 富化后的简短描述） | <!-- audit-allow: 描述上游 collection-hot-topic-cron 的 GLM-4-Plus 富化产物，事实记录，非本 skill 模型选择 -->
 
 **输出（zod schema）：**
 
@@ -141,6 +141,7 @@ metadata:
 
 ## 上下游协作
 
+<!-- audit-allow: 描述上游 collection-hot-topic-cron 的 GLM-4-Plus 富化产物，事实记录，非本 skill 模型选择 -->
 - **上游**：`hot_topics` 表（被 `collection-hot-topic-cron` 每小时填充，含 GLM-4-Plus 富化结果）；workflow step 1 `pull_hot_topics_24h` 拉 24h 内 aiScore ≥ 70 的 topic
 - **下游**：workflow step 3 `deep_read_and_translate` —— 仅对 category ∈ {food, pets, domestic_tech} 且 confidence ≥ 0.7 的 topic 走 `cross_language_rewrite`；其余丢弃
 

@@ -9,7 +9,7 @@ metadata:
   skill_kind: generation
   scenario_tags: [translation, localization, bilingual, cross-culture]
   compatibleEmployees: [xiaowen, xiaofa, xiaoshen]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases:

@@ -9,7 +9,7 @@ metadata:
   skill_kind: quality_review
   scenario_tags: [compliance, sensitive, legal, political, audit]
   compatibleEmployees: [xiaoshen]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases:

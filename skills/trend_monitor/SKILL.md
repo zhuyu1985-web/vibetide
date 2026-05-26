@@ -9,7 +9,7 @@ metadata:
   skill_kind: data_collection
   scenario_tags: [trending, monitoring, real-time, alert]
   compatibleEmployees: [xiaolei]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [TRENDING_API_URL, TRENDING_API_KEY, TRENDING_RESPONSE_MAPPING, OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

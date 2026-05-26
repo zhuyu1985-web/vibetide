@@ -10,7 +10,7 @@ metadata:
   scenario_tags: [variety, entertainment]
   compatibleEmployees: [xiaoce, xiaowen, xiaojian]
   appChannel: app_variety
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases:

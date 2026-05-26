@@ -9,7 +9,7 @@ metadata:
   skill_kind: generation
   scenario_tags: [news, politics, sports, variety, livelihood, drama, daily_brief]
   compatibleEmployees: [xiaowen, xiaofa]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []

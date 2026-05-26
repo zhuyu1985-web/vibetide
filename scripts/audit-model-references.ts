@@ -48,9 +48,14 @@ function scan(file: string): Violation[] {
   const lines = text.split("\n");
   const found: Violation[] = [];
   lines.forEach((line, idx) => {
-    // Allowlist: skip if this line OR the line above contains "// audit-allow:"
-    const allowOnThisLine = line.includes("// audit-allow:");
-    const allowOnLineAbove = idx > 0 && lines[idx - 1].includes("// audit-allow:");
+    // Allowlist: skip if this line OR the line above contains "// audit-allow:" (TS/JS)
+    // or "<!-- audit-allow:" (Markdown HTML comment).
+    const allowOnThisLine =
+      line.includes("// audit-allow:") || line.includes("<!-- audit-allow:");
+    const allowOnLineAbove =
+      idx > 0 &&
+      (lines[idx - 1].includes("// audit-allow:") ||
+        lines[idx - 1].includes("<!-- audit-allow:"));
     if (allowOnThisLine || allowOnLineAbove) return;
 
     for (const rx of VIOLATIONS) {

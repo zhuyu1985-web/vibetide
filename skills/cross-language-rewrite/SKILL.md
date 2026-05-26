@@ -9,7 +9,7 @@ metadata:
   skill_kind: generation
   scenario_tags: [overseas, translation, localization, rewrite]
   compatibleEmployees: [xiaowen]
-  modelDependency: deepseek:deepseek-chat
+  modelDependency: openai:qwen3-max
   requires:
     env: [OPENAI_API_KEY, OPENAI_API_BASE_URL, OPENAI_MODEL]
     knowledgeBases: []
