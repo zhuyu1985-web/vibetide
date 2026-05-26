@@ -92,11 +92,12 @@ describe("testSkillExecution write-tool dryRun", () => {
       result: { dryRun: true, wouldInsert: { title: "X", body: "Y" }, note: "dry-run, no DB write" },
     });
 
-    await testSkillExecution("skill-cms", JSON.stringify({ title: "X", body: "Y" }));
+    const res = await testSkillExecution("skill-cms", JSON.stringify({ title: "X", body: "Y" }));
     expect(invokeToolDirectlyMock).toHaveBeenCalledWith(
       "cms_publish",
       expect.objectContaining({ dryRun: true }),
       expect.anything(),
     );
+    expect(res.runtimeInfo.type).toMatch(/dryRun/);
   });
 });
