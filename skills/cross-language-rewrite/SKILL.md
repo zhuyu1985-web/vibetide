@@ -43,6 +43,17 @@ metadata:
 - targetLanguage 必须是 `"en"`（其他值直接抛错）
 - categoryHint 可选；任意字符串都接受，内置 3 种（food/pets/domestic_tech）走专属语气模板，其他值 fallback 到"保持简洁直白，无特定语气倾向"
 
+## 步骤边界 (Step Boundary)
+
+本 skill 在工作流里通常作为 **step 3 (跨语言改写)** —— **只对输入文章做翻译 + 本地化**。
+
+禁止跨步:
+- 不要替 step 4 (archive_to_drafts) 做入库决策 —— 输出稿件就行，状态/分类是下一步的事
+- 不要新增训练数据里的事实 —— 只翻译/重写输入里的内容
+- 不要凭空插入额外 hashtags/cultural_notes，跟输入相关才加
+
+`sourceUrl` / `category` 必须从输入原样 echo 到输出，**绝对不许修改或编造**。
+
 ## 输入 / 输出
 
 **输入：**

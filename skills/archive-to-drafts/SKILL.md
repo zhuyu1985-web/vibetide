@@ -34,6 +34,17 @@ metadata:
 - 要直接发到华栖云 CMS → 走 `cms_publish`
 - 要发外站（X / Instagram）→ 编辑在稿件库手动触发 `publishToAyrshareAction`
 
+## 步骤边界 (Step Boundary)
+
+本 skill 在工作流里通常作为 **step 4 (稿件入库)** —— **只把传入的稿件批量写到 articles 表**。
+
+禁止跨步:
+- 不要做发布到外部 CMS (`publishArticleToCms`) 的动作 —— 那是另一个 spec 的工作
+- 不要修改 / 重排传入的稿件 —— 保持调用方传过来的内容原样
+- 不要从训练数据补充缺失字段 —— 缺什么就缺什么，让上游解决
+
+`dedupBySourceUrl` 默认开启，遇到重复 sourceUrl 不要插入新行，写到 `skipped[]`。
+
 ## 输入
 
 | 字段 | 类型 | 必填 | 说明 |

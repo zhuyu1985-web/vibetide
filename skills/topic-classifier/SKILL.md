@@ -43,6 +43,17 @@ metadata:
 - LLM 可用（依赖 OPENAI_API_KEY）
 - summary 可选；缺失时仅按 title 分类，confidence 自动偏保守
 
+## 步骤边界 (Step Boundary)
+
+本 skill 在工作流里通常作为 **step 2 (内容过滤分类)** —— **只对输入做分类标记**。
+
+禁止跨步:
+- 不要替 step 3 (cross_language_rewrite) 做翻译改写，保留中文原文交出去
+- 不要调用 `web_search` / `trending_topics` 补充信息 —— 上一步已经提供
+- 不要从训练数据里推断 topic 的额外细节 —— 只基于输入字段判断
+
+低置信度 (`confidence < 0.7`) 直接归 `other`，不要硬塞进 enabledCategories。
+
 ## 输入 / 输出
 
 **输入：**

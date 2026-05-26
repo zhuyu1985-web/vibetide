@@ -58,6 +58,17 @@ compatibleRoles:
 - `TRENDING_RESPONSE_MAPPING` JSON 映射字段已定义
 - 网络可达第三方热榜聚合服务
 
+## 步骤边界 (Step Boundary)
+
+本 skill 在工作流里通常作为 **step 1 (数据获取)** —— **只产出原始热榜数据列表**。
+
+禁止跨步:
+- 不要替 step 2 (topic_classifier) 做分类筛选，把全量原始数据交出去就行
+- 不要调用 `heat_scoring` 工具评估热度 —— 那不是本 step 的工作
+- 不要调用 `web_search` / `news_aggregation` 补充信息 —— 工作流里有专门的 step
+
+如果真实结果为空 (0 条 topics)，**如实输出"无结果"**，不要从训练数据里补话题。
+
 ## 2. 支持的平台（2026 年 4 月清单）
 
 | 平台 | 官方域名 | 热榜性质 | 更新频率 | 典型用途 |
