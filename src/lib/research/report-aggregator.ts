@@ -29,7 +29,7 @@ import {
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import { researchTopics } from "@/db/schema/research/research-topics";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
-import type { AggregatesJson } from "@/db/schema/research/reports";
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 
 const TOP_N_PER_GROUP = 3;
 
@@ -38,13 +38,13 @@ const TOP_N_PER_GROUP = 3;
  *
  * @param organizationId   多租户 scope
  * @param hitItemIds       collected_items.id 列表（≤ 500）；空 → 零态
- * @returns AggregatesJson
+ * @returns AdvancedSearchAggregates
  * @throws  Error("HIT_ITEMS_ALL_DELETED") 当 hitItemIds 非空但全部不存在 / 不属于该 org
  */
 export async function computeReportAggregates(
   organizationId: string,
   hitItemIds: string[],
-): Promise<AggregatesJson> {
+): Promise<AdvancedSearchAggregates> {
   if (hitItemIds.length === 0) {
     return emptyAggregates();
   }
@@ -212,7 +212,7 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-function emptyAggregates(): AggregatesJson {
+function emptyAggregates(): AdvancedSearchAggregates {
   return {
     mediaTierDistribution: [],
     districtDistribution: [],

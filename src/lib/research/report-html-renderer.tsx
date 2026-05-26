@@ -11,7 +11,9 @@
 // 时区：所有日期格式化用 Asia/Shanghai (+08:00)。
 // 用户控制字段（title / topicDescription / outletName / districtName 等）一律 escape。
 
-import type { AggregatesJson } from "@/db/schema/research/reports";
+// Narrow to AdvancedSearchAggregates — HTML renderer 仅服务 A5 高级检索报告路径
+// (生态文明指数报告走独立 renderer)
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 import type { ReportParagraphs } from "./report-prompts";
 
 export interface AppendixRow {
@@ -34,7 +36,7 @@ export interface HtmlRenderInput {
   /** 报告生成时刻 ISO */
   completedAt: string;
   paragraphs: ReportParagraphs;
-  aggregates: AggregatesJson;
+  aggregates: AdvancedSearchAggregates;
   appendix: AppendixRow[];
   /** Step 3 LLM 失败降级 → true 时顶部插红黄 banner */
   isAiFallback: boolean;
@@ -167,7 +169,7 @@ function renderChapter2(input: HtmlRenderInput): string {
   </section>`;
 }
 
-function renderTierTable(agg: AggregatesJson): string {
+function renderTierTable(agg: AdvancedSearchAggregates): string {
   if (agg.mediaTierDistribution.length === 0) {
     return `<p class="empty-hint">无媒体层级数据</p>`;
   }
@@ -180,7 +182,7 @@ function renderTierTable(agg: AggregatesJson): string {
   return `<table class="data-table"><thead><tr><th>层级</th><th>报道数</th><th>占比</th><th>Top3 媒体</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function renderDistrictTable(agg: AggregatesJson): string {
+function renderDistrictTable(agg: AdvancedSearchAggregates): string {
   if (agg.districtDistribution.length === 0) {
     return `<p class="empty-hint">无区县分布数据</p>`;
   }
@@ -193,7 +195,7 @@ function renderDistrictTable(agg: AggregatesJson): string {
   return `<table class="data-table"><thead><tr><th>区县</th><th>报道数</th><th>占比</th><th>Top3 主题</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function renderTopicTable(agg: AggregatesJson): string {
+function renderTopicTable(agg: AdvancedSearchAggregates): string {
   if (agg.topicDistribution.length === 0) {
     return `<p class="empty-hint">无主题分布数据</p>`;
   }
@@ -206,7 +208,7 @@ function renderTopicTable(agg: AggregatesJson): string {
   return `<table class="data-table"><thead><tr><th>主题</th><th>报道数</th><th>占比</th><th>Top3 区县</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function renderTrendTable(agg: AggregatesJson): string {
+function renderTrendTable(agg: AdvancedSearchAggregates): string {
   if (agg.dailyTrend.length === 0) {
     return `<p class="empty-hint">无时间趋势数据</p>`;
   }

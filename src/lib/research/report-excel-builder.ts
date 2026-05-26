@@ -24,7 +24,7 @@
 
 import * as XLSX from "@e965/xlsx";
 
-import type { AggregatesJson } from "@/db/schema/research/reports";
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 
 /**
  * 单条附录行（明细 sheet 用）。
@@ -50,7 +50,7 @@ export interface ExcelAppendixRow {
 }
 
 export interface ExcelBuildInput {
-  aggregates: AggregatesJson;
+  aggregates: AdvancedSearchAggregates;
   appendix: ExcelAppendixRow[];
 }
 

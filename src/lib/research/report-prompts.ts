@@ -15,7 +15,9 @@
 
 import { z } from "zod";
 
-import type { AggregatesJson } from "@/db/schema/research/reports";
+// Narrow to AdvancedSearchAggregates — prompt 生成仅服务 A5 高级检索路径
+// (生态文明指数报告走独立 prompt builder)
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 
 /**
  * AI 输出的 3 段结构 zod schema（强约束输出 minimum / maximum 字数）
@@ -65,7 +67,7 @@ export interface PromptInput {
   /** ISO 时间窗止 */
   timeRangeEnd: string;
   /** 4 维聚合结果 */
-  aggregates: AggregatesJson;
+  aggregates: AdvancedSearchAggregates;
   /** Step 2 模板插值生成的数据简报 plain text（≈200 字） */
   templateBrief: string;
   /** 5 条命中文章标题（给 AI 当样例语料） */

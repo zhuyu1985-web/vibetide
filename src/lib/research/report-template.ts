@@ -8,7 +8,7 @@
 // Spec ref: docs/superpowers/specs/2026-05-07-a5-report-export-design.md §4.1 Step 2 + §6.4 brief_rewrite 输入
 // Plan ref: docs/superpowers/plans/2026-05-07-a5-report-export-plan.md Phase 3 Task 3.1
 
-import type { AggregatesJson } from "@/db/schema/research/reports";
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 
 export interface TemplateMeta {
   /** 时间窗起 ISO 字符串（也可 yyyy-mm-dd） */
@@ -35,7 +35,7 @@ export interface TemplateMeta {
  * 空命中（hitCount=0）走简短无命中模板，不抛错。
  */
 export function renderTemplateBrief(
-  agg: AggregatesJson,
+  agg: AdvancedSearchAggregates,
   meta: TemplateMeta,
 ): string {
   const start = formatDate(meta.timeRangeStart);
@@ -98,7 +98,7 @@ function formatDate(iso: string): string {
 }
 
 /** 媒体层级取 count 最大且 >0 的；分布全 0 时返 null */
-function pickTopTier(agg: AggregatesJson) {
+function pickTopTier(agg: AdvancedSearchAggregates) {
   if (!agg.mediaTierDistribution || agg.mediaTierDistribution.length === 0) {
     return null;
   }
@@ -109,7 +109,7 @@ function pickTopTier(agg: AggregatesJson) {
 }
 
 /** 时间趋势峰值日（多日并列时取最早） */
-function pickPeakDay(agg: AggregatesJson) {
+function pickPeakDay(agg: AdvancedSearchAggregates) {
   if (!agg.dailyTrend || agg.dailyTrend.length === 0) return null;
   const sorted = [...agg.dailyTrend].sort((a, b) => {
     if (b.count !== a.count) return b.count - a.count;

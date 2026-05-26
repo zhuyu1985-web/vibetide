@@ -10,7 +10,7 @@ import {
   listSnapshotsByParent,
 } from "@/lib/dal/research/reports";
 import { PERMISSIONS, requirePermission } from "@/lib/rbac";
-import type { AggregatesJson } from "@/db/schema/research/reports";
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 
 import { ReportClient } from "./report-client";
 
@@ -25,7 +25,9 @@ export default async function ReportPage({ params }: Props) {
   const report = await getReportById(id, organizationId);
   if (!report) notFound();
 
-  const agg = (report.aggregatesJson as AggregatesJson | null) ?? null;
+  // Narrow to AdvancedSearchAggregates — A5 报告路径只使用此分支
+  // (生态文明指数报告走独立 EcologicalIndexAggregates 路径，不复用该详情页)
+  const agg = (report.aggregatesJson as AdvancedSearchAggregates | null) ?? null;
 
   // Phase 9：仅母版报告加载快照列表（spec：快照不能再创建快照）
   const snapshots = report.isSnapshot

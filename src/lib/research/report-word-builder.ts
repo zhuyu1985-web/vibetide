@@ -32,7 +32,7 @@ import {
   WidthType,
 } from "docx";
 
-import type { AggregatesJson } from "@/db/schema/research/reports";
+import type { AdvancedSearchAggregates } from "@/db/schema/research/reports";
 import type { ReportParagraphs } from "./report-prompts";
 
 // ── 公共类型 ────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ export interface WordBuildInput {
   /** 报告完成时间（ISO timestamp） */
   completedAt: string;
   paragraphs: ReportParagraphs;
-  aggregates: AggregatesJson;
+  aggregates: AdvancedSearchAggregates;
   appendix: Array<{
     title: string;
     outletName: string | null;
@@ -227,7 +227,7 @@ function renderCover(input: WordBuildInput): Paragraph[] {
 
 // ── 表格 ────────────────────────────────────────────────────────────
 
-function renderTierTable(agg: AggregatesJson): Table {
+function renderTierTable(agg: AdvancedSearchAggregates): Table {
   return makeTable(
     ["层级", "报道数", "占比", "Top3 媒体"],
     agg.mediaTierDistribution.map((r) => [
@@ -239,7 +239,7 @@ function renderTierTable(agg: AggregatesJson): Table {
   );
 }
 
-function renderDistrictTable(agg: AggregatesJson): Table {
+function renderDistrictTable(agg: AdvancedSearchAggregates): Table {
   return makeTable(
     ["区县", "报道数", "占比", "Top3 主题"],
     agg.districtDistribution.map((r) => [
@@ -251,7 +251,7 @@ function renderDistrictTable(agg: AggregatesJson): Table {
   );
 }
 
-function renderTopicTable(agg: AggregatesJson): Table {
+function renderTopicTable(agg: AdvancedSearchAggregates): Table {
   return makeTable(
     ["主题", "报道数", "占比", "Top3 区县"],
     agg.topicDistribution.map((r) => [
@@ -263,7 +263,7 @@ function renderTopicTable(agg: AggregatesJson): Table {
   );
 }
 
-function renderTrendTable(agg: AggregatesJson): Table {
+function renderTrendTable(agg: AdvancedSearchAggregates): Table {
   return makeTable(
     ["日期", "报道数", "累计"],
     agg.dailyTrend.map((r) => [r.date, String(r.count), String(r.cumulative)]),

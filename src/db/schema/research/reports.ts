@@ -45,6 +45,12 @@ export const researchReports = pgTable(
     // 文件
     wordFileUrl: text("word_file_url"),
     excelFileUrl: text("excel_file_url"),
+    contentSourceFileUrls: jsonb("content_source_file_urls").$type<{
+      central?: string | null;
+      industry?: string | null;
+      municipal?: string | null;
+      district?: string | null;
+    }>(),
     fileExpiresAt: timestamp("file_expires_at", { withTimezone: true }),
 
     // 快照
@@ -75,10 +81,11 @@ export const researchReports = pgTable(
 );
 
 // === Discriminated union: searchSnapshot ===
-// 仅保留 advanced_search 一种(2026-05-13 起 research_task 已废弃)。
+// advanced_search:  A4 高级检索 → A5 报告(2026-05-13 起 research_task 已废弃)
+// ecological_index: 2025 重庆市生态文明传播指数报告(P1.3 新增)
 // 类型 import 引用 A4 高级检索的 condition / filter 类型，避免运行时循环依赖。
 
-export type ReportSearchSnapshot = {
+export type AdvancedSearchSnapshot = {
   kind: "advanced_search";
   conditions: import("@/app/(dashboard)/research/search-mode-types").AdvancedSearchCondition[];
   sidebarFilter: import("@/app/(dashboard)/research/search-mode-types").SidebarFilter;
@@ -86,9 +93,23 @@ export type ReportSearchSnapshot = {
   capturedAt: string; // ISO timestamp
 };
 
+export type EcologicalIndexSnapshot = {
+  kind: "ecological_index";
+  scopeId: string;
+  activityDatasetId: string;
+  year: number;
+  windowStart: string; // ISO date
+  windowEnd: string; // ISO date
+  includeContentSource: boolean;
+  capturedAt: string; // ISO timestamp
+};
+
+export type ReportSearchSnapshot = AdvancedSearchSnapshot | EcologicalIndexSnapshot;
+
 // === aggregatesJson shape ===
 
-export type AggregatesJson = {
+export type AdvancedSearchAggregates = {
+  kind?: "advanced_search"; // 可选 — 老数据无 kind 字段也兼容
   mediaTierDistribution: Array<{
     tier: string;
     count: number;
@@ -119,3 +140,71 @@ export type AggregatesJson = {
   isAiFallback: boolean;
   generatedAt: string;
 };
+
+export type EcologicalIndexAggregates = {
+  kind: "ecological_index";
+  ranked: Array<{
+    rank: number;
+    name: string;
+    central: number;
+    industry: number;
+    municipal: number;
+    district: number;
+    public: number;
+    composite: number;
+  }>;
+  rawMedia: Record<
+    string,
+    Record<
+      "central" | "industry" | "municipal" | "district",
+      {
+        count: number;
+        richness: number;
+        freq: number;
+        topicCounts: number[];
+        days: number;
+      }
+    >
+  >;
+  rawPublic: Record<
+    string,
+    {
+      count: number;
+      richness: number;
+      freq: number;
+      themes: Record<string, number>;
+      firstDate: string | null;
+      lastDate: string | null;
+      spanDays: number | null;
+    }
+  >;
+  scaledMedia: Record<
+    string,
+    Record<
+      "central" | "industry" | "municipal" | "district",
+      {
+        count: number;
+        richness: number;
+        freq: number;
+      }
+    >
+  >;
+  scaledPublic: Record<
+    string,
+    { count: number; richness: number; freq: number }
+  >;
+  stats: {
+    max: number;
+    min: number;
+    span: number;
+    mean: number;
+    median: number;
+    stdev: number;
+    tier_high: number;
+    tier_mid: number;
+    tier_low: number;
+  };
+  generatedAt: string;
+};
+
+export type AggregatesJson = AdvancedSearchAggregates | EcologicalIndexAggregates;

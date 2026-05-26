@@ -23,7 +23,10 @@ import {
 } from "@/db/schema/research/annotations";
 import { cqDistricts } from "@/db/schema/research/cq-districts";
 import { researchTopics } from "@/db/schema/research/research-topics";
-import type { ReportSearchSnapshot } from "@/db/schema/research/reports";
+import type {
+  AdvancedSearchSnapshot,
+  ReportSearchSnapshot,
+} from "@/db/schema/research/reports";
 import type { ExcelAppendixRow } from "@/lib/research/report-excel-builder";
 
 import { computeReportAggregates } from "@/lib/research/report-aggregator";
@@ -80,7 +83,9 @@ export const researchReportGenerate = inngest.createFunction(
         );
       if (!report) throw new Error(`report ${reportId} not found in org ${organizationId}`);
 
-      const snap = report.snapshot as ReportSearchSnapshot;
+      // Narrow to AdvancedSearchSnapshot — 该 Inngest 函数仅响应高级检索路径
+      // (生态文明指数报告走独立 inngest function，不复用此 pipeline)
+      const snap = report.snapshot as AdvancedSearchSnapshot;
       const hitItemIds = snap.hitItemIds ?? [];
       if (hitItemIds.length === 0) {
         await updateReportStatus(reportId, {

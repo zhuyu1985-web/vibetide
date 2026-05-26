@@ -29,6 +29,7 @@ import {
 } from "@/lib/research/report-storage";
 import { PERMISSIONS, requirePermission } from "@/lib/rbac";
 import type {
+  AdvancedSearchAggregates,
   AggregatesJson,
   ReportSearchSnapshot,
 } from "@/db/schema/research/reports";
@@ -61,7 +62,9 @@ export async function pollReport(reportId: string): Promise<ReportPollResult> {
   const r = await getReportById(reportId, organizationId);
   if (!r) throw new Error("报告不存在或已被删除");
 
-  const agg = (r.aggregatesJson as AggregatesJson | null) ?? null;
+  // Narrow to AdvancedSearchAggregates — pollReport 当前只服务 A5 高级检索报告路径
+  // (生态文明指数报告走独立轮询，不复用此 action)
+  const agg = (r.aggregatesJson as AdvancedSearchAggregates | null) ?? null;
 
   return {
     status: r.status as ReportPollStatus,
