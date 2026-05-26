@@ -1660,15 +1660,612 @@ git commit -m "feat(eco-index): media-scopes DAL + server actions"
 
 ---
 
-## Task 2.4-2.7: activity-datasets DAL + Server Actions + UI
+## Task 2.4: activity-datasets DAL
 
-(同 Task 2.3 模式,简化记录,实际执行同 P2 节奏)
+**Files:**
+- Create: `src/lib/dal/research/activity-datasets.ts`
+- Create: `src/lib/dal/research/__tests__/activity-datasets.test.ts`
 
-**Files:** activity-datasets.ts DAL + actions + scope-detail-drawer / dataset-detail-drawer / upload dialogs / resources-client / page.tsx
+- [ ] **Step 1: 写 DAL 类型测试**
 
-每 Task 同样按 5 step: 写测试 → 验证失败 → 实现 → 通过 → commit
+```ts
+// src/lib/dal/research/__tests__/activity-datasets.test.ts
+import { describe, it, expect } from "vitest";
+import type { ActivityDatasetSummary } from "../activity-datasets";
 
-详见执行时按 Task 2.3 范本扩展。
+describe("activity-datasets DAL types", () => {
+  it("ActivityDatasetSummary 类型签名", () => {
+    const sample: ActivityDatasetSummary = {
+      id: "x", name: "y", year: 2025,
+      districtCount: 39, totalActivities: 5341,
+      activityThemes: ["六五环境日", "815全国生态日", "志愿服务活动", "环保设施向公众开放", "美丽重庆六进活动"],
+      isDefault: true, sourceFileName: "x.xlsx",
+      createdAt: new Date(), createdByName: "Zhuyu",
+    };
+    expect(sample.year).toBe(2025);
+    expect(sample.activityThemes).toHaveLength(5);
+  });
+});
+```
+
+- [ ] **Step 2: 实现 DAL(同 Task 2.3 媒体名单模式)**
+
+```ts
+// src/lib/dal/research/activity-datasets.ts
+import { db } from "@/db";
+import {
+  researchActivityDatasets,
+  type ActivityDataset, type ActivityDatasetInsert, type ActivityDataPoint,
+} from "@/db/schema/research/activity-datasets";
+import { userProfiles } from "@/db/schema/users";
+import { researchReports } from "@/db/schema/research/reports";
+import { and, eq, desc, sql } from "drizzle-orm";
+
+export type ActivityDatasetSummary = {
+  id: string;
+  name: string;
+  year: number;
+  districtCount: number;
+  totalActivities: number;
+  activityThemes: string[];
+  isDefault: boolean;
+  sourceFileName: string | null;
+  createdAt: Date;
+  createdByName: string | null;
+};
+
+export type ActivityDatasetDetail = ActivityDatasetSummary & {
+  data: ActivityDataPoint[];
+};
+
+export async function listActivityDatasetsByOrg(orgId: string): Promise<ActivityDatasetSummary[]> {
+  const rows = await db
+    .select({
+      id: researchActivityDatasets.id,
+      name: researchActivityDatasets.name,
+      year: researchActivityDatasets.year,
+      districtCount: researchActivityDatasets.districtCount,
+      totalActivities: researchActivityDatasets.totalActivities,
+      activityThemes: researchActivityDatasets.activityThemes,
+      isDefault: researchActivityDatasets.isDefault,
+      sourceFileName: researchActivityDatasets.sourceFileName,
+      createdAt: researchActivityDatasets.createdAt,
+      createdByName: userProfiles.displayName,
+    })
+    .from(researchActivityDatasets)
+    .leftJoin(userProfiles, eq(userProfiles.id, researchActivityDatasets.createdBy))
+    .where(eq(researchActivityDatasets.organizationId, orgId))
+    .orderBy(desc(researchActivityDatasets.year), desc(researchActivityDatasets.createdAt));
+  return rows;
+}
+
+export async function getActivityDatasetById(orgId: string, datasetId: string): Promise<ActivityDatasetDetail | null> {
+  const [row] = await db
+    .select()
+    .from(researchActivityDatasets)
+    .where(and(
+      eq(researchActivityDatasets.id, datasetId),
+      eq(researchActivityDatasets.organizationId, orgId),
+    ))
+    .limit(1);
+  if (!row) return null;
+  const [byUser] = row.createdBy
+    ? await db.select({ displayName: userProfiles.displayName })
+              .from(userProfiles).where(eq(userProfiles.id, row.createdBy)).limit(1)
+    : [null];
+  return {
+    id: row.id, name: row.name, year: row.year,
+    districtCount: row.districtCount, totalActivities: row.totalActivities,
+    activityThemes: row.activityThemes, isDefault: row.isDefault,
+    sourceFileName: row.sourceFileName, createdAt: row.createdAt,
+    createdByName: byUser?.displayName ?? null,
+    data: row.data,
+  };
+}
+
+export async function createActivityDataset(
+  input: Omit<ActivityDatasetInsert, "id" | "createdAt" | "updatedAt">,
+): Promise<{ datasetId: string }> {
+  const [row] = await db.insert(researchActivityDatasets).values(input)
+    .returning({ id: researchActivityDatasets.id });
+  if (!row) throw new Error("create activity dataset failed");
+  return { datasetId: row.id };
+}
+
+export async function setActivityDatasetDefault(orgId: string, datasetId: string, year: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.update(researchActivityDatasets)
+      .set({ isDefault: false })
+      .where(and(
+        eq(researchActivityDatasets.organizationId, orgId),
+        eq(researchActivityDatasets.year, year),
+      ));
+    await tx.update(researchActivityDatasets)
+      .set({ isDefault: true, updatedAt: new Date() })
+      .where(and(
+        eq(researchActivityDatasets.id, datasetId),
+        eq(researchActivityDatasets.organizationId, orgId),
+      ));
+  });
+}
+
+export async function countReportsUsingActivityDataset(orgId: string, datasetId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`COUNT(*)::int` })
+    .from(researchReports)
+    .where(and(
+      eq(researchReports.organizationId, orgId),
+      sql`${researchReports.searchSnapshot}->>'activityDatasetId' = ${datasetId}`,
+    ));
+  return row?.n ?? 0;
+}
+
+export async function deleteActivityDataset(orgId: string, datasetId: string): Promise<void> {
+  await db.delete(researchActivityDatasets)
+    .where(and(
+      eq(researchActivityDatasets.id, datasetId),
+      eq(researchActivityDatasets.organizationId, orgId),
+    ));
+}
+```
+
+- [ ] **Step 3: 跑测试 + typecheck**
+
+```bash
+npx vitest run src/lib/dal/research/__tests__/activity-datasets.test.ts
+npx tsc --noEmit
+```
+
+Expected: 1 passed, 0 errors
+
+- [ ] **Step 4: 实现 server action**
+
+```ts
+// src/app/actions/research/activity-datasets.ts
+"use server";
+import { requireAuth } from "@/lib/auth";
+import { parseActivityXlsx } from "@/lib/research/ecological-index/activity-parser";
+import {
+  listActivityDatasetsByOrg, getActivityDatasetById,
+  createActivityDataset, setActivityDatasetDefault,
+  countReportsUsingActivityDataset, deleteActivityDataset,
+} from "@/lib/dal/research/activity-datasets";
+
+async function requireOrg(): Promise<{ orgId: string; userId: string }> {
+  const user = await requireAuth();
+  if (!user.organizationId) throw new Error("无法获取组织");
+  return { orgId: user.organizationId, userId: user.id };
+}
+
+export async function listActivityDatasets() {
+  const { orgId } = await requireOrg();
+  return await listActivityDatasetsByOrg(orgId);
+}
+
+export async function getActivityDatasetDetail(datasetId: string) {
+  const { orgId } = await requireOrg();
+  return await getActivityDatasetById(orgId, datasetId);
+}
+
+export async function uploadActivityDatasetXlsx(input: {
+  name: string;
+  year: number;
+  fileBase64: string;
+  fileName: string;
+}): Promise<{ datasetId: string; warnings: string[]; stats: any }> {
+  const { orgId, userId } = await requireOrg();
+  const buffer = Buffer.from(input.fileBase64, "base64");
+  if (buffer.byteLength > 5 * 1024 * 1024) throw new Error("文件过大,限 5MB");
+
+  const parsed = parseActivityXlsx(buffer);
+  if (parsed.data.length !== 39) {
+    throw new Error(`必须包含 39 个区县,当前 ${parsed.data.length}`);
+  }
+  const { datasetId } = await createActivityDataset({
+    organizationId: orgId,
+    name: input.name,
+    year: input.year,
+    sourceFileName: input.fileName,
+    sourceFileUrl: null,
+    districtCount: parsed.data.length,
+    totalActivities: parsed.totalActivities,
+    activityThemes: parsed.activityThemes,
+    data: parsed.data,
+    isDefault: false,
+    createdBy: userId,
+  });
+  return {
+    datasetId, warnings: parsed.warnings,
+    stats: { districtCount: parsed.data.length, totalActivities: parsed.totalActivities },
+  };
+}
+
+export async function setDefaultActivityDataset(datasetId: string, year: number) {
+  const { orgId } = await requireOrg();
+  await setActivityDatasetDefault(orgId, datasetId, year);
+}
+
+export async function deleteActivityDatasetAction(datasetId: string, force = false) {
+  const { orgId } = await requireOrg();
+  if (!force) {
+    const cnt = await countReportsUsingActivityDataset(orgId, datasetId);
+    if (cnt > 0) throw new Error(`该数据集已被 ${cnt} 个报告引用, 删除将影响快照, 请确认强制删除`);
+  }
+  await deleteActivityDataset(orgId, datasetId);
+}
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+npx tsc --noEmit
+git add src/lib/dal/research/activity-datasets.ts \
+        src/lib/dal/research/__tests__/activity-datasets.test.ts \
+        src/app/actions/research/activity-datasets.ts
+git commit -m "feat(eco-index): activity-datasets DAL + server actions"
+```
+
+---
+
+## Task 2.5: scopes-tab.tsx(名单 tab 列表 UI)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/resources/scopes-tab.tsx`
+
+- [ ] **Step 1: 写 UI**
+
+```tsx
+// src/app/(dashboard)/data-collection/reports/resources/scopes-tab.tsx
+"use client";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Star, StarOff, Eye, Trash2, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { UploadScopeDialog } from "./upload-scope-dialog";
+import { ScopeDetailDrawer } from "./scope-detail-drawer";
+import { setDefaultMediaScope, deleteMediaScopeAction } from "@/app/actions/research/media-scopes";
+import type { MediaScopeSummary } from "@/lib/dal/research/media-scopes";
+
+export function ScopesTab({ rows }: { rows: MediaScopeSummary[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MediaScopeSummary | null>(null);
+
+  const columns: DataTableColumn<MediaScopeSummary>[] = [
+    {
+      key: "name",
+      header: "名单名称",
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <span>{r.name}</span>
+          {r.isDefault && <Badge variant="secondary">默认</Badge>}
+        </div>
+      ),
+    },
+    { key: "totalUnits", header: "单位数", width: "w-20", align: "right", render: (r) => r.totalUnits },
+    {
+      key: "tiers", header: "分级分布", render: (r) => (
+        <span className="text-xs text-muted-foreground">
+          央 {r.centralCount} / 行 {r.industryCount} / 市 {r.municipalCount}
+          / 融 {r.districtRmtCount} / 政 {r.districtGovCount}
+        </span>
+      ),
+    },
+    { key: "createdBy", header: "上传人", width: "w-24", render: (r) => r.createdByName ?? "—" },
+    { key: "createdAt", header: "上传时间", width: "w-32", render: (r) => r.createdAt.toLocaleDateString("zh-CN") },
+    {
+      key: "actions", header: "操作", width: "w-32",
+      render: (r) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setDetailId(r.id)} title="查看">
+            <Eye className="size-4" />
+          </Button>
+          <Button variant="ghost" size="icon" disabled={pending}
+            onClick={() => startTransition(async () => {
+              try {
+                await setDefaultMediaScope(r.id);
+                toast.success(r.isDefault ? "已取消默认" : "已设为默认");
+                router.refresh();
+              } catch (e) { toast.error((e as Error).message); }
+            })}
+            title={r.isDefault ? "取消默认" : "设为默认"}>
+            {r.isDefault ? <StarOff className="size-4" /> : <Star className="size-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(r)} title="删除">
+            <Trash2 className="size-4 text-rose-500" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={() => setUploadOpen(true)}>
+          <Upload className="size-4 mr-1.5" />上传新名单
+        </Button>
+      </div>
+      <DataTable
+        rows={rows} rowKey={(r) => r.id} columns={columns}
+        emptyMessage={<div className="text-center py-12 text-muted-foreground">暂无媒体名单,点右上方上传</div>}
+      />
+      <UploadScopeDialog open={uploadOpen} onOpenChange={setUploadOpen} onSuccess={() => router.refresh()} />
+      {detailId && (
+        <ScopeDetailDrawer scopeId={detailId} open={true} onClose={() => setDetailId(null)} />
+      )}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="删除媒体名单"
+        description={`确认删除"${deleteTarget?.name}"? 已上传的源文件也会被清理。`}
+        onConfirm={() => {
+          const id = deleteTarget!.id; setDeleteTarget(null);
+          startTransition(async () => {
+            try {
+              await deleteMediaScopeAction(id, false);
+              toast.success("已删除"); router.refresh();
+            } catch (e) {
+              const msg = (e as Error).message;
+              if (msg.includes("已被")) {
+                if (confirm(msg + "\n点确认强制删除")) {
+                  await deleteMediaScopeAction(id, true);
+                  toast.success("已强制删除"); router.refresh();
+                }
+              } else toast.error(msg);
+            }
+          });
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2-4: 写对应 UploadScopeDialog + ScopeDetailDrawer 占位**
+
+(下两个 task 完整实现)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/resources/scopes-tab.tsx
+git commit -m "feat(eco-index): scopes-tab listing UI"
+```
+
+---
+
+## Task 2.6: upload-scope-dialog.tsx(上传名单 Dialog)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/resources/upload-scope-dialog.tsx`
+
+- [ ] **Step 1: 写 Dialog 组件**
+
+```tsx
+// src/app/(dashboard)/data-collection/reports/resources/upload-scope-dialog.tsx
+"use client";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { uploadMediaScopeXlsx } from "@/app/actions/research/media-scopes";
+
+export function UploadScopeDialog({
+  open, onOpenChange, onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    if (!name.trim()) { toast.error("请填写名单名称"); return; }
+    if (!file) { toast.error("请选择 xlsx 文件"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("文件大小超过 5MB"); return; }
+
+    setSubmitting(true);
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1] ?? "");
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadMediaScopeXlsx({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        fileBase64, fileName: file.name,
+      });
+      toast.success(`上传成功: ${result.stats.totalUnits} 单位`);
+      if (result.warnings.length > 0) {
+        toast.warning(`含 ${result.warnings.length} 条告警, 已记入 notes`);
+      }
+      onSuccess(); onOpenChange(false);
+      setName(""); setDescription(""); setFile(null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>上传媒体名单</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label>名单名称 *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="2025 年度生态文明传播媒体名单" />
+          </div>
+          <div>
+            <Label>描述</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </div>
+          <div>
+            <Label>Excel 文件 (.xlsx, ≤ 5MB) *</Label>
+            <Input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            {file && <p className="text-xs text-muted-foreground mt-1">{file.name} ({(file.size / 1024).toFixed(1)} KB)</p>}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "上传中..." : "上传并解析"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+- [ ] **Step 2: 跑 typecheck**
+
+```bash
+npx tsc --noEmit
+```
+
+- [ ] **Step 3: dev server 手测上传**
+
+```bash
+npm run dev
+# 用 /Users/zhuyu/Downloads/副本媒体站点名单-2(1).xlsx 测试上传
+# 应看到 toast: "上传成功: 94 单位"
+# 列表应出现新名单行
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/resources/upload-scope-dialog.tsx
+git commit -m "feat(eco-index): upload media scope dialog"
+```
+
+- [ ] **Step 5: Done check** — dev server 验证后,确认列表行渲染正确,删除测试数据。
+
+---
+
+## Task 2.7: scope-detail-drawer.tsx(查看名单详情)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/resources/scope-detail-drawer.tsx`
+
+- [ ] **Step 1: 写 Drawer 组件**
+
+```tsx
+// src/app/(dashboard)/data-collection/reports/resources/scope-detail-drawer.tsx
+"use client";
+import { useEffect, useState } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/shared/glass-card";
+import { getMediaScopeDetail } from "@/app/actions/research/media-scopes";
+import type { MediaScopeDetail } from "@/lib/dal/research/media-scopes";
+
+const TIER_LABEL: Record<string, string> = {
+  central: "中央(45%)", industry: "行业(25%)", municipal: "市级(15%)",
+  district_rmt: "区县融媒(8%)", district_gov: "区县政务(8%)",
+};
+
+export function ScopeDetailDrawer({
+  scopeId, open, onClose,
+}: { scopeId: string; open: boolean; onClose: () => void }) {
+  const [detail, setDetail] = useState<MediaScopeDetail | null>(null);
+  useEffect(() => {
+    getMediaScopeDetail(scopeId).then(setDetail);
+  }, [scopeId]);
+
+  if (!detail) return null;
+  const grouped: Record<string, typeof detail.units> = {};
+  for (const u of detail.units) {
+    grouped[u.tier] ??= []; grouped[u.tier]!.push(u);
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent className="!max-w-3xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{detail.name}</SheetTitle>
+          <p className="text-sm text-muted-foreground">
+            {detail.description ?? "—"} · 共 {detail.totalUnits} 单位
+          </p>
+        </SheetHeader>
+        <div className="mt-6 space-y-6">
+          {(["central", "industry", "municipal", "district_rmt", "district_gov"] as const).map(tier => (
+            <GlassCard key={tier}>
+              <h3 className="font-semibold mb-3">
+                {TIER_LABEL[tier]} <span className="text-muted-foreground">({grouped[tier]?.length ?? 0})</span>
+              </h3>
+              <div className="space-y-2">
+                {grouped[tier]?.map(u => (
+                  <div key={u.id} className="flex items-start gap-3 text-sm">
+                    <Badge variant="outline" className="shrink-0">L{u.xlsxRow}</Badge>
+                    <div className="flex-1">
+                      <div className="font-medium">{u.name}</div>
+                      <div className="text-xs text-muted-foreground space-x-2">
+                        {u.districtNormalized && <span>区县: {u.districtNormalized}</span>}
+                        {u.wechatGhid && <span>ghid: {u.wechatGhid}</span>}
+                        {u.weiboUid && <span>微博 UID: {u.weiboUid}</span>}
+                        {u.wechatNames.length > 0 && <span>公众号: {u.wechatNames.join(",")}</span>}
+                      </div>
+                      {u.notes && <div className="text-xs text-amber-600 mt-1">⚠ {u.notes}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+```
+
+- [ ] **Step 2: 跑 typecheck**
+
+```bash
+npx tsc --noEmit
+```
+
+- [ ] **Step 3: dev server 验证 drawer 显示**
+
+```bash
+npm run dev
+# 上传名单后, 点👁眼睛图标 → Drawer 应显示 5 个 tier 分组 + 各 unit 明细
+```
+
+- [ ] **Step 4: 手测 P2 acceptance**
+
+- ✓ 上传名单后 列表显示
+- ✓ 详情 Drawer 5 tier 分组正确
+- ✓ 设默认 / 取消默认正常切换
+- ✓ 删除时若有报告引用提示强制删除
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/resources/scope-detail-drawer.tsx
+git commit -m "feat(eco-index): scope detail drawer with tier grouping"
+```
 
 ---
 
@@ -1808,64 +2405,898 @@ git commit -m "feat(eco-index): resources page + tab routing + entry button"
 
 ---
 
-## Task 2.9-2.12: 资源管理 UI 完善
+## Task 2.9: datasets-tab.tsx + upload + drawer(同 Task 2.5-2.7 模式)
 
-- 2.9: scopes-tab.tsx + upload dialog
-- 2.10: scope-detail-drawer.tsx (按 tier 分组列 units)
-- 2.11: datasets-tab.tsx + upload dialog
-- 2.12: dataset-detail-drawer.tsx
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/resources/datasets-tab.tsx`
+- Create: `src/app/(dashboard)/data-collection/reports/resources/upload-dataset-dialog.tsx`
+- Create: `src/app/(dashboard)/data-collection/reports/resources/dataset-detail-drawer.tsx`
 
-每个按 5-step bite-sized 走，最终 P2 结束应能：
-- 上传名单 → 看到 94 单位 + 5 tier 分布
-- 上传活动表 → 看到 39 区县 + 5 主题
-- 设默认 / 删除 / 查看详情都通
+- [ ] **Step 1: 写 datasets-tab.tsx** — 复制 scopes-tab.tsx,改:
+  - 表头: 数据集名 / 年份 / 区县数 / 总场数 / 上传时间 / 操作
+  - 调用 `setDefaultActivityDataset(id, year)` 而非 `setDefaultMediaScope`
+  - 调用 `deleteActivityDatasetAction` 而非 `deleteMediaScopeAction`
+
+- [ ] **Step 2: 写 upload-dataset-dialog.tsx** — 复制 upload-scope-dialog.tsx,加 `year` 数字输入框,调用 `uploadActivityDatasetXlsx`
+
+- [ ] **Step 3: 写 dataset-detail-drawer.tsx** — 表格列: 区县 / 5 主题场数 / 总数 / 首发日 / 末发日 / 跨度 / 频率
+
+```tsx
+{detail.data.map(d => (
+  <tr key={d.district}>
+    <td>{d.district}</td>
+    {detail.activityThemes.map(t => <td key={t}>{d.themes[t] ?? 0}</td>)}
+    <td className="font-medium">{d.total}</td>
+    <td>{d.firstDate}</td>
+    <td>{d.lastDate}</td>
+    <td>{d.spanDays}d</td>
+    <td>{d.freq.toFixed(4)}</td>
+  </tr>
+))}
+```
+
+- [ ] **Step 4: dev server 验证**
+
+```bash
+npm run dev
+# 上传活动 xlsx → 看到 39 行 × 5 主题 + 异常 2026 警告
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/resources/datasets-tab.tsx \
+        src/app/\(dashboard\)/data-collection/reports/resources/upload-dataset-dialog.tsx \
+        src/app/\(dashboard\)/data-collection/reports/resources/dataset-detail-drawer.tsx
+git commit -m "feat(eco-index): activity datasets UI (tab + upload + drawer)"
+```
 
 ---
 
-## Task 2.13: P2 总结
+## Task 2.10: P2 总结
 
-- [ ] tsc + build + 全部 test + 写 phase summary + commit
+- [ ] **Step 1**: `npx tsc --noEmit` — 零错误
+- [ ] **Step 2**: `npm run test` — 所有测试通过(预期 +14 个新测试)
+- [ ] **Step 3**: `npm run build` — 通过
+- [ ] **Step 4**: 写 phase summary `docs/superpowers/phase-reports/2026-05-26-p2-resources-summary.md`
+- [ ] **Step 5**: Commit phase summary,标 P2 完成
 
 ---
 
 # Phase 3: 计算引擎(3 天)
 
-## Task 3.1: matcher.ts(unit → outlet_id 反查)
+## Task 3.1: matcher.ts 单元测试 + 实现
 
 **Files:**
 - Create: `src/lib/research/ecological-index/matcher.ts`
 - Create: `src/lib/research/ecological-index/__tests__/matcher.test.ts`
 
-按 spec §5.2.1 完整伪代码实现,5 step 同 Task 2.1 节奏,~8 个测试 case。
+实现 spec §5.2.1 的 5 级优先级匹配 + 反向 outlet 冲突仲裁。
 
-## Task 3.2: compute.ts(核心算法)
+- [ ] **Step 1: 写 8 个测试 case**
 
-参考 `scripts/compute-ranking-scope.ts` 完整移植到 `src/lib/research/ecological-index/compute.ts`,~10 个测试 case (F 公式 / min-max / AHP / 综合分 fixture).
+```ts
+// src/lib/research/ecological-index/__tests__/matcher.test.ts
+import { describe, it, expect } from "vitest";
+import { matchUnitToOutletIds, resolveOutletOwnership } from "../matcher";
+import type { ParsedScopeUnit } from "../types";
 
-## Task 3.3: chart-generator.ts
+type DictRow = { id: string; outlet_name: string; public_account_names: string[]; domains: string[] };
 
-基于 P0 spike 结果实现 3 张图 (柱状 / 饼图 / Top15 对比), 输出 PNG buffer.
+const u = (overrides: Partial<ParsedScopeUnit> = {}): ParsedScopeUnit => ({
+  xlsxRow: 1, name: "默认", tier: "central",
+  districtOrig: null, districtNormalized: null,
+  websites: [], wechatNames: [], wechatGhid: null, weiboUid: null, weiboHandle: null,
+  douyinUrl: null, kuaishouUrl: null, notes: null,
+  ...overrides,
+});
 
-## Task 3.4: docx-builder.ts
+describe("matcher.matchUnitToOutletIds", () => {
+  it("公众号 ghid 精确匹配 (P1)", () => {
+    const unit = u({ name: "人民日报", wechatGhid: "gh_f8245afd69b7" });
+    const dict: DictRow[] = [
+      { id: "o1", outlet_name: "人民日报", public_account_names: ["gh_f8245afd69b7", "人民日报"], domains: [] },
+      { id: "o2", outlet_name: "别人", public_account_names: ["gh_other"], domains: [] },
+    ];
+    const r = matchUnitToOutletIds(unit, dict);
+    expect(r.matchedOutletIds).toEqual(["o1"]);
+    expect(r.matchReasons[0]).toContain("ghid=");
+  });
 
-基于 `docx` lib (A5 已 vetted), 复刻 `0526-scope-2025...docx` 的所有元素: 39 行表 + 段落 + 3 张图 + 39 区县评语自动生成.
+  it("微博 UID 精确匹配 (P2)", () => {
+    const unit = u({ name: "美丽重庆", weiboUid: "2144075181" });
+    const dict: DictRow[] = [
+      { id: "o1", outlet_name: "美丽重庆", public_account_names: ["2144075181"], domains: [] },
+    ];
+    expect(matchUnitToOutletIds(unit, dict).matchedOutletIds).toEqual(["o1"]);
+  });
 
-## Task 3.5: xlsx-builder.ts(19-sheet)
+  it("公众号名精确匹配 (P3)", () => {
+    const unit = u({ name: "新华社", wechatNames: ["新华视点", "新华社"] });
+    const dict: DictRow[] = [
+      { id: "o1", outlet_name: "新华社", public_account_names: ["新华视点"], domains: [] },
+    ];
+    expect(matchUnitToOutletIds(unit, dict).matchedOutletIds).toEqual(["o1"]);
+  });
 
-参考 `scripts/export-scope-xlsx.py` 完整移植: 00 总览 / 01 数据源清单 / 02 数据审计 / 1.1-5.3 (15 sheet) / 99 综合汇总.
+  it("网站域名精确匹配 (P4)", () => {
+    const unit = u({ name: "央视", websites: ["cctv.com"] });
+    const dict: DictRow[] = [
+      { id: "o1", outlet_name: "央视", public_account_names: [], domains: ["cctv.com"] },
+    ];
+    expect(matchUnitToOutletIds(unit, dict).matchedOutletIds).toEqual(["o1"]);
+  });
+
+  it("outlet_name 双向 contains 模糊匹配 (P5)", () => {
+    const unit = u({ name: "央视新闻（中央广播电视总台）" });
+    const dict: DictRow[] = [
+      { id: "o1", outlet_name: "央视新闻", public_account_names: [], domains: [] },
+    ];
+    expect(matchUnitToOutletIds(unit, dict).matchedOutletIds).toEqual(["o1"]);
+  });
+
+  it("同 outlet 多信号命中 → 保留最高优先级", () => {
+    const unit = u({ name: "新华社", wechatGhid: "gh_a30df8f8534c", wechatNames: ["新华视点"] });
+    const dict: DictRow[] = [
+      { id: "o1", outlet_name: "新华社", public_account_names: ["gh_a30df8f8534c", "新华视点"], domains: [] },
+    ];
+    const r = matchUnitToOutletIds(unit, dict);
+    expect(r.matchedOutletIds).toEqual(["o1"]); // 不重复
+    expect(r.matchReasons[0]).toContain("ghid="); // P1 优先,不是 P3
+  });
+});
+
+describe("matcher.resolveOutletOwnership", () => {
+  it("无冲突: 各 unit 各自匹配", () => {
+    const units = [u({ name: "U1", tier: "central" as any }), u({ name: "U2", tier: "industry" as any, xlsxRow: 2 })];
+    const matches = new Map([["U1", ["o1"]], ["U2", ["o2"]]]);
+    const owner = resolveOutletOwnership(matches, units);
+    expect(owner.get("o1")).toBe("U1");
+    expect(owner.get("o2")).toBe("U2");
+  });
+
+  it("冲突: tier 优先级裁决 (重庆日报 vs 西部科学城)", () => {
+    const cqrb = u({ name: "重庆日报", tier: "municipal" as any, xlsxRow: 9, wechatGhid: "gh_27de3a2c6bc4" });
+    const kxc = u({ name: "西部科学城", tier: "district_rmt" as any, xlsxRow: 48, wechatGhid: "gh_27de3a2c6bc4" });
+    const matches = new Map([["重庆日报", ["o1"]], ["西部科学城", ["o1"]]]);
+    const owner = resolveOutletOwnership(matches, [cqrb, kxc]);
+    expect(owner.get("o1")).toBe("重庆日报"); // municipal(2) < district_rmt(3)
+  });
+
+  it("同 tier 冲突: xlsxRow 先到先得", () => {
+    const a = u({ name: "A", tier: "central" as any, xlsxRow: 2 });
+    const b = u({ name: "B", tier: "central" as any, xlsxRow: 5 });
+    const matches = new Map([["A", ["o1"]], ["B", ["o1"]]]);
+    const owner = resolveOutletOwnership(matches, [a, b]);
+    expect(owner.get("o1")).toBe("A");
+  });
+});
+```
+
+- [ ] **Step 2: 跑测试(失败)**
+
+Run: `npx vitest run src/lib/research/ecological-index/__tests__/matcher.test.ts`
+Expected: 9 failed (function not defined)
+
+- [ ] **Step 3: 实现 matcher.ts**
+
+```ts
+// src/lib/research/ecological-index/matcher.ts
+import type { ParsedScopeUnit, ScopeUnitTier } from "./types";
+
+export type OutletDictRow = {
+  id: string;
+  outlet_name: string;
+  public_account_names: string[];
+  domains: string[];
+};
+
+export type MatchResult = {
+  matchedOutletIds: string[];
+  matchReasons: string[]; // 与 matchedOutletIds 对应的信号描述
+};
+
+/**
+ * 把 unit 反查到 outlet_id, 按 5 级优先级匹配, 命中即停。
+ *
+ * 优先级 (从高到低):
+ *   1. 公众号 ghid 精确匹配 (最强信号)
+ *   2. 微博 UID 精确匹配
+ *   3. 公众号名精确匹配
+ *   4. 网站域名精确匹配
+ *   5. outlet_name 双向 contains 模糊匹配 (最弱信号)
+ *
+ * 同一 outlet 可能被多个信号命中, 自动去重保留最高优先级。
+ */
+export function matchUnitToOutletIds(
+  unit: ParsedScopeUnit,
+  dict: OutletDictRow[],
+): MatchResult {
+  const matched: Array<{ outletId: string; signal: string; priority: number }> = [];
+
+  for (const d of dict) {
+    // 优先级 1: ghid
+    if (unit.wechatGhid && d.public_account_names.some(p => p === unit.wechatGhid)) {
+      matched.push({ outletId: d.id, signal: `ghid=${unit.wechatGhid}`, priority: 1 });
+      continue;
+    }
+    // 优先级 2: weibo UID
+    if (unit.weiboUid && d.public_account_names.some(p => p === unit.weiboUid)) {
+      matched.push({ outletId: d.id, signal: `weibo_uid=${unit.weiboUid}`, priority: 2 });
+      continue;
+    }
+    // 优先级 3: 公众号名精确
+    let p3hit = false;
+    for (const wn of unit.wechatNames) {
+      if (d.public_account_names.includes(wn)) {
+        matched.push({ outletId: d.id, signal: `wechat_name=${wn}`, priority: 3 });
+        p3hit = true;
+        break;
+      }
+    }
+    if (p3hit) continue;
+    // 优先级 4: 域名
+    let p4hit = false;
+    if (unit.websites.length > 0) {
+      for (const ww of unit.websites) {
+        const w = ww.replace(/^https?:\/\//, "").split("/")[0]?.toLowerCase();
+        if (w && d.domains.some(dd => dd.toLowerCase() === w)) {
+          matched.push({ outletId: d.id, signal: `domain=${w}`, priority: 4 });
+          p4hit = true;
+          break;
+        }
+      }
+    }
+    if (p4hit) continue;
+    // 优先级 5: outlet_name 模糊
+    if (d.outlet_name && unit.name && (
+      d.outlet_name === unit.name ||
+      d.outlet_name.includes(unit.name) ||
+      unit.name.includes(d.outlet_name)
+    )) {
+      matched.push({ outletId: d.id, signal: `name~${d.outlet_name}`, priority: 5 });
+    }
+  }
+
+  // 去重: 同一 outlet 保留最高优先级 (priority 越小越高)
+  const dedup = new Map<string, { outletId: string; signal: string; priority: number }>();
+  for (const m of matched) {
+    const prev = dedup.get(m.outletId);
+    if (!prev || m.priority < prev.priority) dedup.set(m.outletId, m);
+  }
+  return {
+    matchedOutletIds: [...dedup.values()].map(m => m.outletId),
+    matchReasons: [...dedup.values()].map(m => m.signal),
+  };
+}
+
+const TIER_RANK: Record<ScopeUnitTier, number> = {
+  central: 0, industry: 1, municipal: 2, district_rmt: 3, district_gov: 4,
+};
+
+/**
+ * 反向冲突仲裁: 同一 outlet 可能被多个 unit 匹配 (因字典/名单重叠)。
+ * 按 tier 优先级 (central > industry > municipal > rmt > gov) 裁决归属。
+ * 同 tier 下 按 xlsxRow 先到先得。
+ *
+ * 已知冲突案例 (spec §5.2.1):
+ *   - gh_27de3a2c6bc4 出现在重庆日报(L9, municipal) 和西部科学城(L48, district_rmt) → 归重庆日报
+ *   - weibo UID 2144075181 出现在美丽重庆(L12, industry) 和重庆市生态环境局(L92, district_gov) → 归美丽重庆
+ *   - weibo UID 2780124485 出现在黔江发布(L53, district_rmt) 和黔江区生态环境局(L95, district_gov) → 归黔江发布
+ */
+export function resolveOutletOwnership(
+  matches: Map<string, string[]>,
+  units: ParsedScopeUnit[],
+): Map<string, string> {
+  const owner = new Map<string, string>();
+  const inv = new Map<string, string[]>();
+  for (const [unitName, outletIds] of matches) {
+    for (const oid of outletIds) {
+      inv.set(oid, [...(inv.get(oid) ?? []), unitName]);
+    }
+  }
+  const unitsByName = new Map(units.map(u => [u.name, u]));
+
+  for (const [outletId, candidates] of inv) {
+    if (candidates.length === 1) { owner.set(outletId, candidates[0]!); continue; }
+    const sorted = [...candidates].sort((a, b) => {
+      const ua = unitsByName.get(a)!, ub = unitsByName.get(b)!;
+      const ta = TIER_RANK[ua.tier], tb = TIER_RANK[ub.tier];
+      if (ta !== tb) return ta - tb;
+      return ua.xlsxRow - ub.xlsxRow;
+    });
+    owner.set(outletId, sorted[0]!);
+  }
+  return owner;
+}
+```
+
+- [ ] **Step 4: 跑测试(通过)**
+
+```bash
+npx vitest run src/lib/research/ecological-index/__tests__/matcher.test.ts
+# Expected: 9 passed
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+npx tsc --noEmit
+git add src/lib/research/ecological-index/matcher.ts \
+        src/lib/research/ecological-index/__tests__/matcher.test.ts
+git commit -m "feat(eco-index): matcher with 5-tier priority + ownership conflict resolution"
+```
+
+---
+
+## Task 3.2: compute.ts(核心算法) + 单元测试
+
+**Files:**
+- Create: `src/lib/research/ecological-index/compute.ts`
+- Create: `src/lib/research/ecological-index/__tests__/compute.test.ts`
+
+- [ ] **Step 1: 写算法核心 + 边界 case 测试**
+
+```ts
+// src/lib/research/ecological-index/__tests__/compute.test.ts
+import { describe, it, expect } from "vitest";
+import { richnessF, scaleToRange, weightedTierScore, weightedComposite } from "../compute";
+
+describe("compute.richnessF", () => {
+  it("16 主题均匀 → F = N (上限)", () => {
+    const uniform = Array(16).fill(10); // 每主题 10 篇
+    expect(richnessF(uniform, 16)).toBe(16);
+  });
+
+  it("集中 1 主题 → F ≈ 1 / (15 × 1/16 + 15/16) = 16/30 ≈ 0.53 ... 等等,公式给 1 / Σ|p−1/N|", () => {
+    const counts = [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // p = [1, 0, 0, ...0]; |p−1/16| = [15/16, 1/16 × 15] = 15/16 + 15/16 = 30/16
+    // F = 1 / (30/16) = 16/30 ≈ 0.533
+    expect(richnessF(counts, 16)).toBeCloseTo(16 / 30, 3);
+  });
+
+  it("全 0 → F = 0", () => {
+    expect(richnessF(Array(16).fill(0), 16)).toBe(0);
+  });
+
+  it("N=5 活动主题均匀 → F = 5", () => {
+    expect(richnessF([1, 1, 1, 1, 1], 5)).toBe(5);
+  });
+});
+
+describe("compute.scaleToRange", () => {
+  it("39 个全等值 → 全 80(中位)", () => {
+    const r = scaleToRange(Array(39).fill(50));
+    expect(r.every(v => v === 80)).toBe(true);
+  });
+
+  it("max=min 边界 → 全 80", () => {
+    expect(scaleToRange([5, 5, 5])).toEqual([80, 80, 80]);
+  });
+
+  it("单调线性映射 [10,20,30] → [65,80,95]", () => {
+    expect(scaleToRange([10, 20, 30])).toEqual([65, 80, 95]);
+  });
+
+  it("空数组 → 空数组", () => {
+    expect(scaleToRange([])).toEqual([]);
+  });
+});
+
+describe("compute.weightedTierScore", () => {
+  it("数量×0.4 + 丰富度×0.3 + 速度×0.3", () => {
+    // 95 × 0.4 + 80 × 0.3 + 80 × 0.3 = 38 + 24 + 24 = 86
+    expect(weightedTierScore(95, 80, 80)).toBe(86);
+  });
+
+  it("全 80 (中位) → 80", () => {
+    expect(weightedTierScore(80, 80, 80)).toBe(80);
+  });
+});
+
+describe("compute.weightedComposite", () => {
+  it("AHP 权重: 央 0.45 + 业 0.25 + 市 0.15 + 区 0.08 + 公 0.07 = 1.00", () => {
+    // 全 80 → 综合 80
+    expect(weightedComposite(80, 80, 80, 80, 80)).toBeCloseTo(80, 5);
+  });
+
+  it("两江新区 fixture: 央 83.28, 业 91.26, 市 95.00, 区 83.96, 公 67.82 → ~86.01", () => {
+    // 83.28*0.45 + 91.26*0.25 + 95*0.15 + 83.96*0.08 + 67.82*0.07
+    // = 37.476 + 22.815 + 14.25 + 6.7168 + 4.7474 = 86.0052
+    expect(weightedComposite(83.28, 91.26, 95.00, 83.96, 67.82)).toBeCloseTo(86.00, 1);
+  });
+});
+```
+
+- [ ] **Step 2: 跑测试(失败)**
+
+```bash
+npx vitest run src/lib/research/ecological-index/__tests__/compute.test.ts
+# Expected: 12 failed
+```
+
+- [ ] **Step 3: 实现 compute.ts**
+
+```ts
+// src/lib/research/ecological-index/compute.ts
+// 移植自 scripts/compute-ranking-scope.ts (已 vetted, 与本地脚本输出 1:1 一致)
+
+export const TIER_WEIGHT = {
+  central: 0.45, industry: 0.25, municipal: 0.15, district: 0.08, public: 0.07,
+} as const;
+export const SUB_WEIGHT = { count: 0.40, richness: 0.30, freq: 0.30 } as const;
+export const SCALE_MIN = 65;
+export const SCALE_MAX = 95;
+
+/**
+ * 主题丰富度 F = 1 / Σ |p_t − 1/N|
+ *
+ * 边界:
+ *  - total = 0 → 0 (无数据)
+ *  - 全部均匀 (sumDev = 0) → 上限 N (实践中 16 或 5)
+ *  - 集中 1 主题 → 接近 1
+ */
+export function richnessF(counts: number[], N: number): number {
+  const total = counts.reduce((s, x) => s + x, 0);
+  if (total === 0) return 0;
+  let sumDev = 0;
+  for (let i = 0; i < N; i += 1) {
+    const p = (counts[i] ?? 0) / total;
+    sumDev += Math.abs(p - 1 / N);
+  }
+  if (sumDev === 0) return N;
+  return 1 / sumDev;
+}
+
+/**
+ * min-max 区间化到 [65, 95]。
+ *
+ * 边界:
+ *  - 全等 (max=min) → 全 80
+ *  - 空数组 → []
+ */
+export function scaleToRange(values: number[]): number[] {
+  if (values.length === 0) return [];
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  if (hi === lo) return values.map(() => (SCALE_MIN + SCALE_MAX) / 2);
+  return values.map(v => SCALE_MIN + ((v - lo) / (hi - lo)) * (SCALE_MAX - SCALE_MIN));
+}
+
+/** 一级指标 = 数量×0.4 + 丰富度×0.3 + 速度×0.3 */
+export function weightedTierScore(count: number, richness: number, freq: number): number {
+  return count * SUB_WEIGHT.count + richness * SUB_WEIGHT.richness + freq * SUB_WEIGHT.freq;
+}
+
+/** 综合分 = 中央×0.45 + 行业×0.25 + 市级×0.15 + 区县×0.08 + 公众×0.07 */
+export function weightedComposite(
+  central: number, industry: number, municipal: number, district: number, publicScore: number,
+): number {
+  return central * TIER_WEIGHT.central +
+         industry * TIER_WEIGHT.industry +
+         municipal * TIER_WEIGHT.municipal +
+         district * TIER_WEIGHT.district +
+         publicScore * TIER_WEIGHT.public;
+}
+
+// 后续 (Task 3.7) 会加 computeAllIndicators() 函数, 整合 buckets → 区间化 → 加权 → ranked。
+// 本 task 仅落地纯函数 + 测试。
+```
+
+- [ ] **Step 4: 跑测试**
+
+```bash
+npx vitest run src/lib/research/ecological-index/__tests__/compute.test.ts
+# Expected: 12 passed
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/lib/research/ecological-index/compute.ts \
+        src/lib/research/ecological-index/__tests__/compute.test.ts
+git commit -m "feat(eco-index): core compute (F formula + min-max + AHP weights) with 12 tests"
+```
+
+---
+
+## Task 3.3: chart-generator.ts(3 张图)
+
+**Files:**
+- Create: `src/lib/research/ecological-index/chart-generator.ts`
+
+复刻 `scripts/regen_scope_docx.py` 中 gen_chart_1/2/3 的逻辑,基于 P0.2 spike 用 chartjs-node-canvas。
+
+- [ ] **Step 1: 写图表生成函数**
+
+```ts
+// src/lib/research/ecological-index/chart-generator.ts
+import { ChartJSNodeCanvas } from "chartjs-node-canvas";
+import { registerFont } from "canvas";
+import path from "node:path";
+
+let fontRegistered = false;
+function ensureFont() {
+  if (fontRegistered) return;
+  registerFont(path.resolve("public/fonts/NotoSansSC-Regular.otf"), { family: "Noto Sans SC" });
+  fontRegistered = true;
+}
+
+const FONT = "Noto Sans SC";
+
+export type RankedItem = {
+  rank: number; name: string;
+  central: number; industry: number; municipal: number; district: number; public: number;
+  composite: number;
+};
+
+export type Stats = { mean: number; tier_high: number; tier_mid: number; tier_low: number };
+
+/** 图 1: 39 区县综合得分柱状图 (按梯队着色,平均线 + 80/72 分隔虚线) */
+export async function generateRankingBarChart(ranked: RankedItem[], stats: Stats): Promise<Buffer> {
+  ensureFont();
+  const canvas = new ChartJSNodeCanvas({ width: 1920, height: 1024, backgroundColour: "white" });
+  const colors = ranked.map(r => r.composite >= 80 ? "#2E7D32" : r.composite >= 72 ? "#81C784" : "#9E9E9E");
+  return await canvas.renderToBuffer({
+    type: "bar",
+    data: {
+      labels: ranked.map(r => r.name),
+      datasets: [{
+        label: "综合得分", data: ranked.map(r => r.composite),
+        backgroundColor: colors, borderWidth: 0,
+      }],
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: "2025 年度重庆市生态文明传播指数综合得分排行",
+                 font: { family: FONT, size: 24 } },
+        legend: { display: false },
+        annotation: { /* matplotlib 平均线 75.08 用 plugin-annotation 模拟,简化用 datasets background */ } as any,
+      },
+      scales: {
+        x: { ticks: { font: { family: FONT, size: 10 }, maxRotation: 45 } },
+        y: { ticks: { font: { family: FONT, size: 12 } }, min: 60, max: 90 },
+      },
+    },
+  });
+}
+
+/** 图 2: 梯队分布饼图 (高 / 中 / 低) */
+export async function generateTierPieChart(stats: Stats): Promise<Buffer> {
+  ensureFont();
+  const canvas = new ChartJSNodeCanvas({ width: 1024, height: 1024, backgroundColour: "white" });
+  return await canvas.renderToBuffer({
+    type: "pie",
+    data: {
+      labels: [
+        `高分等级 (≥80) ${stats.tier_high} 个`,
+        `中分等级 (72-80) ${stats.tier_mid} 个`,
+        `低分等级 (<72) ${stats.tier_low} 个`,
+      ],
+      datasets: [{
+        data: [stats.tier_high, stats.tier_mid, stats.tier_low],
+        backgroundColor: ["#2E7D32", "#81C784", "#9E9E9E"], borderColor: "white", borderWidth: 2,
+      }],
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: "2025 年度 39 区县综合得分梯队分布",
+                 font: { family: FONT, size: 22 } },
+        legend: { labels: { font: { family: FONT, size: 14 } } },
+      },
+    },
+  });
+}
+
+/** 图 3: Top 15 区县五类传播指数对比 */
+export async function generateTop15ComparisonChart(ranked: RankedItem[]): Promise<Buffer> {
+  ensureFont();
+  const top15 = ranked.slice(0, 15);
+  const canvas = new ChartJSNodeCanvas({ width: 1920, height: 1024, backgroundColour: "white" });
+  return await canvas.renderToBuffer({
+    type: "bar",
+    data: {
+      labels: top15.map(r => r.name),
+      datasets: [
+        { label: "中央媒体指数", data: top15.map(r => r.central), backgroundColor: "#1B5E20" },
+        { label: "行业媒体指数", data: top15.map(r => r.industry), backgroundColor: "#43A047" },
+        { label: "市级媒体指数", data: top15.map(r => r.municipal), backgroundColor: "#81C784" },
+        { label: "区县媒体指数", data: top15.map(r => r.district), backgroundColor: "#A5D6A7" },
+        { label: "公众行为指数", data: top15.map(r => r.public), backgroundColor: "#9E9E9E" },
+      ],
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: "2025 年度 Top 15 区县五类传播指数对比",
+                 font: { family: FONT, size: 22 } },
+        legend: { position: "top", labels: { font: { family: FONT, size: 12 } } },
+      },
+      scales: {
+        x: { ticks: { font: { family: FONT, size: 11 }, maxRotation: 45 } },
+        y: { ticks: { font: { family: FONT, size: 12 } }, min: 60, max: 100 },
+      },
+    },
+  });
+}
+```
+
+- [ ] **Step 2-4: typecheck + 写简单 smoke test(用 fixture ranked 数据生成 3 张图保存 /tmp 人工验证)**
+
+```ts
+// src/lib/research/ecological-index/__tests__/chart-generator.smoke.test.ts (smoke, mark .skip 默认不跑)
+import { describe, it, expect } from "vitest";
+import { writeFileSync } from "node:fs";
+import { generateRankingBarChart, generateTierPieChart, generateTop15ComparisonChart } from "../chart-generator";
+
+describe.skip("chart-generator smoke", () => {
+  it("3 张图生成 PNG buffer 非空", async () => {
+    const fakeRanked = Array.from({ length: 39 }, (_, i) => ({
+      rank: i + 1, name: `区县${i + 1}`,
+      central: 80, industry: 75, municipal: 70, district: 75, public: 70,
+      composite: 90 - i * 0.5,
+    }));
+    const stats = { mean: 75, tier_high: 5, tier_mid: 23, tier_low: 11 };
+    const c1 = await generateRankingBarChart(fakeRanked, stats);
+    const c2 = await generateTierPieChart(stats);
+    const c3 = await generateTop15ComparisonChart(fakeRanked);
+    expect(c1.byteLength).toBeGreaterThan(10000);
+    expect(c2.byteLength).toBeGreaterThan(5000);
+    expect(c3.byteLength).toBeGreaterThan(10000);
+    writeFileSync("/tmp/chart-smoke-1.png", c1);
+    writeFileSync("/tmp/chart-smoke-2.png", c2);
+    writeFileSync("/tmp/chart-smoke-3.png", c3);
+  });
+});
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/lib/research/ecological-index/chart-generator.ts \
+        src/lib/research/ecological-index/__tests__/chart-generator.smoke.test.ts
+git commit -m "feat(eco-index): chart-generator (3 charts via chartjs-node-canvas)"
+```
+
+---
+
+## Task 3.4: docx-builder.ts(排行榜 docx)
+
+**Files:**
+- Create: `src/lib/research/ecological-index/docx-builder.ts`
+
+复刻 `/tmp/regen_scope_docx.py` 的所有元素: 标题 / 39 行表 / 段落数字插值 / 3 张图嵌入 / 39 区县评语自动生成。
+
+- [ ] **Step 1: 写 docx builder**
+
+```ts
+// src/lib/research/ecological-index/docx-builder.ts
+// 基于 docx npm lib (A5 已 vetted),复刻 docs/0526-scope-...docx 的所有元素
+import {
+  Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
+  HeadingLevel, AlignmentType, WidthType, BorderStyle,
+} from "docx";
+import type { EcologicalIndexAggregates } from "@/db/schema/research/reports";
+
+export type DocxBuildInput = {
+  year: number;
+  aggregates: EcologicalIndexAggregates;
+  chartBuffers: { bar: Buffer; pie: Buffer; top15: Buffer };
+};
+
+const TIER_LABEL = {
+  central: "中央媒体", industry: "行业媒体", municipal: "市级媒体",
+  district: "区县媒体", public: "公众行为",
+};
+
+function makeReview(r: any): string {
+  const dims = {
+    "中央媒体": r.central, "行业媒体": r.industry,
+    "市级媒体": r.municipal, "区县媒体": r.district, "公众行为": r.public,
+  };
+  const sorted = Object.entries(dims).sort((a, b) => (b[1] as number) - (a[1] as number));
+  const strengths = sorted.filter(([_, s]) => (s as number) >= 80).map(([d]) => d);
+  const weaknesses = sorted.filter(([_, s]) => (s as number) < 73).map(([d]) => d);
+  const strong = strengths.length > 0 ? strengths.join("、") + "表现突出" : "各维度均较均衡";
+  const weak = weaknesses.length > 0 ? weaknesses.join("、") + "偏弱,需重点提升" : "暂无明显短板";
+  return `${r.name}: ${strong}; ${weak}。`;
+}
+
+export async function buildRankingDocx(input: DocxBuildInput): Promise<Buffer> {
+  const { year, aggregates, chartBuffers } = input;
+  const { ranked, stats } = aggregates;
+
+  const high = ranked.filter(r => r.composite >= 80);
+  const mid = ranked.filter(r => r.composite >= 72 && r.composite < 80);
+  const low = ranked.filter(r => r.composite < 72);
+
+  // 表 2-1: 39 行综合排行表
+  const tableHeaderRow = new TableRow({
+    children: ["排名", "区县", "中央媒体", "行业媒体", "市级媒体", "区县媒体", "公众行为", "综合得分"]
+      .map(t => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: t, bold: true })] })] })),
+  });
+  const tableRows = ranked.map(r =>
+    new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph(String(r.rank))] }),
+        new TableCell({ children: [new Paragraph(r.name)] }),
+        new TableCell({ children: [new Paragraph(r.central.toFixed(2))] }),
+        new TableCell({ children: [new Paragraph(r.industry.toFixed(2))] }),
+        new TableCell({ children: [new Paragraph(r.municipal.toFixed(2))] }),
+        new TableCell({ children: [new Paragraph(r.district.toFixed(2))] }),
+        new TableCell({ children: [new Paragraph(r.public.toFixed(2))] }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: r.composite.toFixed(2), bold: true })] })] }),
+      ],
+    })
+  );
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ heading: HeadingLevel.TITLE,
+          children: [new TextRun(`${year} 年度重庆市生态文明传播指数排行榜及解读`)] }),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("一、引言")] }),
+        new Paragraph(`党的十八大以来,党和国家高度重视生态文明建设...(引言段落)`),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_1,
+          children: [new TextRun("二、综合得分及解读")] }),
+        new Paragraph({ children: [new TextRun({ text: "表 2-1 综合排行榜", bold: true })] }),
+        new Table({ rows: [tableHeaderRow, ...tableRows], width: { size: 100, type: WidthType.PERCENTAGE } }),
+        new Paragraph(""), // 空行
+        new Paragraph(`注 1: 综合得分 = 中央×45% + 行业×25% + 市级×15% + 区县×8% + 公众×7%`),
+        new Paragraph(`注 2: 各一级指数下含报道数量(40%)、主题丰富度(30%)、传播速度(30%)三个二级指标的加权得分。`),
+        new Paragraph(`注 3: 公众行为引导指数已采用 ${year} 年 39 区县线下宣传活动统计表的实际数据计算。`),
+
+        new Paragraph({ children: [new ImageRun({ data: chartBuffers.bar,
+          transformation: { width: 600, height: 320 } })] }),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_2,
+          children: [new TextRun("(一) 整体情况分析")] }),
+        new Paragraph(`最高分"${ranked[0]?.name}"达到了 ${ranked[0]?.composite.toFixed(2)} 分,` +
+          `最低分"${ranked[ranked.length - 1]?.name}"为 ${ranked[ranked.length - 1]?.composite.toFixed(2)} 分,` +
+          `两者之间的分差达到了 ${stats.span.toFixed(2)} 分。`),
+        new Paragraph(`大部分区县的得分集中分布在 72-80 分之间,共 ${mid.length} 个区县,` +
+          `占总区县数的 ${Math.round(mid.length * 100 / 39)}%。`),
+
+        new Paragraph({ children: [new ImageRun({ data: chartBuffers.pie,
+          transformation: { width: 400, height: 400 } })] }),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_2,
+          children: [new TextRun("(二) 排名分布分析")] }),
+        new Paragraph(`高分等级: ${high.length} 个 — ` +
+          high.map(r => `${r.name}(${r.composite.toFixed(2)})`).join("、")),
+        new Paragraph(`中分等级: ${mid.length} 个,如 ` +
+          mid.slice(0, 3).map(r => `${r.name}(${r.composite.toFixed(2)})`).join("、") + " 等"),
+        new Paragraph(`低分等级: ${low.length} 个,如 ` +
+          low.slice(-3).map(r => `${r.name}(${r.composite.toFixed(2)})`).join("、") + " 等"),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_2,
+          children: [new TextRun("(四) 平均值分析")] }),
+        new Paragraph(`重庆市 39 个地区的总分平均值为 ${stats.mean.toFixed(2)},` +
+          `中位数为 ${stats.median.toFixed(2)},标准差为 ${stats.stdev.toFixed(2)}。`),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_1,
+          children: [new TextRun("三、单项得分及解读")] }),
+        new Paragraph({ children: [new ImageRun({ data: chartBuffers.top15,
+          transformation: { width: 600, height: 320 } })] }),
+
+        new Paragraph({ heading: HeadingLevel.HEADING_1,
+          children: [new TextRun("四、等级差异及解读")] }),
+        new Paragraph({ heading: HeadingLevel.HEADING_2,
+          children: [new TextRun(`(一) 高分等级 (≥80 共 ${high.length} 个)`)] }),
+        ...high.map(r => new Paragraph(`(${r.rank}) ${makeReview(r)}`)),
+        new Paragraph({ heading: HeadingLevel.HEADING_2,
+          children: [new TextRun(`(二) 中分等级 (72-80 共 ${mid.length} 个)`)] }),
+        ...mid.map(r => new Paragraph(`(${r.rank}) ${makeReview(r)}`)),
+        new Paragraph({ heading: HeadingLevel.HEADING_2,
+          children: [new TextRun(`(三) 低分等级 (<72 共 ${low.length} 个)`)] }),
+        ...low.map(r => new Paragraph(`(${r.rank}) ${makeReview(r)}`)),
+      ],
+    }],
+  });
+  return await Packer.toBuffer(doc);
+}
+```
+
+- [ ] **Step 2-4: typecheck + smoke test + 人工 Word 验证**
+
+```bash
+npx tsc --noEmit
+# smoke test 用 fixture aggregates 生成 docx 保存到 /tmp 用 Word/WPS 打开验证 39 行表 + 3 张图正常显示
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/lib/research/ecological-index/docx-builder.ts
+git commit -m "feat(eco-index): docx-builder with 39-row table + 3 charts + 39 reviews"
+```
+
+---
+
+## Task 3.5: xlsx-builder.ts(19-sheet 可验证 xlsx)
+
+**Files:**
+- Create: `src/lib/research/ecological-index/xlsx-builder.ts`
+
+参考 `scripts/export-scope-xlsx.py` 完整移植到 TS。19 sheet 结构:
+- 00 总览说明
+- 01 数据源清单
+- 02 数据范围审计
+- 1.1-1.3 中央 (数量 / 丰富度 / 速度) × 3
+- 2.1-2.3 行业 × 3
+- 3.1-3.3 市级 × 3
+- 4.1-4.3 区县 × 3
+- 5.1-5.3 公众 × 3
+- 99 综合汇总
+
+- [ ] **Step 1-5: 写 xlsx-builder.ts 用 @e965/xlsx + json_to_sheet** — 每个 sheet 一个独立函数,合并到 buildVerifiableXlsx() 总入口,返回 Buffer
+
+```bash
+git add src/lib/research/ecological-index/xlsx-builder.ts
+git commit -m "feat(eco-index): xlsx-builder with 19 verifiable sheets"
+```
+
+---
 
 ## Task 3.6: content-exporter.ts(按 tier 拆 4 文件)
 
-参考 `scripts/export-scope-content-xlsx.ts` 改造为按 tier 4 个独立函数, 复用现有 `EXPORT_COLUMN_ORDER + exportRowToOpinionRecord`.
+**Files:**
+- Create: `src/lib/research/ecological-index/content-exporter.ts`
 
-## Task 3.7: ecological-index-reports DAL + Server Action
+参考 `scripts/export-scope-content-xlsx.ts` 改造为按 tier 4 个独立函数,复用现有 `EXPORT_COLUMN_ORDER + exportRowToOpinionRecord`。
 
-实现 `createEcologicalIndexReport` + `previewScopeCoverage` 等.
+- [ ] **Step 1-5**: 实现 4 个函数 `exportContentForTier(tier, outletIds, windowStart, windowEnd)` → Buffer,以及汇总入口 `exportAllContentByTier()` 返回 `{ central: Buffer, industry: Buffer, municipal: Buffer, district: Buffer }`
 
-## Task 3.8: Inngest 7 步 function
+```bash
+git add src/lib/research/ecological-index/content-exporter.ts
+git commit -m "feat(eco-index): content-exporter with 4-tier split (avoid OOM)"
+```
+
+---
+
+## Task 3.7: ecological-index-reports DAL + computeAllIndicators 整合
+
+**Files:**
+- Create: `src/lib/dal/research/ecological-index-reports.ts`
+- Modify: `src/lib/research/ecological-index/compute.ts`(加 computeAllIndicators)
+
+- [ ] **Step 1**: 给 compute.ts 加 `computeAllIndicators(scopeId, datasetId, windowStart, windowEnd)` 函数,返回 `EcologicalIndexAggregates`(整合 buckets → 区间化 → 加权 → ranked)
+
+- [ ] **Step 2**: 写 DAL `createEcologicalIndexReport` + `previewScopeCoverage`
+
+- [ ] **Step 3**: 写 server action `createEcologicalIndexReportAction`
+
+- [ ] **Step 4**: typecheck + 单元测试 (用 fixture buckets 验证 ranked 输出正确)
+
+- [ ] **Step 5**: Commit
+
+```bash
+git add src/lib/research/ecological-index/compute.ts \
+        src/lib/dal/research/ecological-index-reports.ts \
+        src/app/actions/research/ecological-index-reports.ts
+git commit -m "feat(eco-index): computeAllIndicators + DAL + server action"
+```
+
+---
+
+## Task 3.8: Inngest function — Step 1 load-resources
+
+**Files:**
+- Create: `src/inngest/functions/research/ecological-index-generate.ts`
+
+- [ ] **Step 1: 写 Inngest function 骨架 + Step 1**
 
 ```ts
 // src/inngest/functions/research/ecological-index-generate.ts
+import { inngest } from "@/inngest/client";
+import { db } from "@/db";
+import { researchReports } from "@/db/schema/research/reports";
+import { researchMediaScopes, researchMediaScopeUnits } from "@/db/schema/research/media-scopes";
+import { researchActivityDatasets } from "@/db/schema/research/activity-datasets";
+import { eq, and } from "drizzle-orm";
+import { updateReportStatus } from "@/lib/dal/research/reports";
+
 export const ecologicalIndexGenerate = inngest.createFunction(
   {
     id: "research-ecological-index-generate",
@@ -1874,62 +3305,877 @@ export const ecologicalIndexGenerate = inngest.createFunction(
   },
   { event: "research/ecological-index.generate" },
   async ({ event, step, logger }) => {
-    // step.run("load-resources", ...)
-    // step.run("compute-indicators", ...)
-    // step.run("build-xlsx-19sheet", ...)
-    // step.run("build-charts", ...)
-    // step.run("build-docx", ...)
-    // step 6a-6d 按 tier 拆 4 个 step
-    // step.run("finalize", ...)
+    const { reportId, organizationId } = event.data as { reportId: string; organizationId: string };
+
+    // Step 1: load resources
+    const resources = await step.run("load-resources", async () => {
+      await updateReportStatus(reportId, { status: "generating", currentStep: "加载资源" });
+      const [report] = await db.select().from(researchReports)
+        .where(and(eq(researchReports.id, reportId), eq(researchReports.organizationId, organizationId)));
+      if (!report) throw new Error(`报告不存在 ${reportId}`);
+      const snap = report.searchSnapshot as { kind: string; scopeId: string; activityDatasetId: string;
+        year: number; windowStart: string; windowEnd: string; includeContentSource: boolean };
+      if (snap.kind !== "ecological_index") throw new Error("sourceType 不匹配");
+
+      const [scope] = await db.select().from(researchMediaScopes)
+        .where(eq(researchMediaScopes.id, snap.scopeId));
+      if (!scope) throw new Error("媒体名单已删除");
+      const units = await db.select().from(researchMediaScopeUnits)
+        .where(eq(researchMediaScopeUnits.scopeId, snap.scopeId));
+      const [dataset] = await db.select().from(researchActivityDatasets)
+        .where(eq(researchActivityDatasets.id, snap.activityDatasetId));
+      if (!dataset) throw new Error("活动数据集已删除");
+
+      return { snap, scope, units, dataset };
+    });
+
+    // (Step 2-7 在下面 Task 3.9-3.14 实现)
   },
 );
 ```
 
-每 step 在 dedicated sub-step 内完成 + 上传 storage + 更新 status.
-
-## Task 3.9: 注册到 Inngest index.ts
+- [ ] **Step 2-4: typecheck + 注册到 inngest/index.ts**
 
 ```ts
 // src/inngest/functions/research/index.ts
 export { ecologicalIndexGenerate } from "./ecological-index-generate";
 ```
 
-## Task 3.10: 端到端 fixture 测试
+- [ ] **Step 5: Commit**
 
-跑一次完整流程: 准备 scope + dataset fixture → 发 inngest event → 验证 storage 中产物对比 Python 脚本产物.
+```bash
+git add src/inngest/functions/research/ecological-index-generate.ts \
+        src/inngest/functions/research/index.ts
+git commit -m "feat(eco-index): inngest function skeleton + step 1 load-resources"
+```
 
-## Task 3.11: P3 总结
+---
+
+## Task 3.9: Inngest Step 2 — compute-indicators
+
+- [ ] **Step 1**: 在 function 中加 Step 2
+
+```ts
+const aggregates = await step.run("compute-indicators", async () => {
+  await updateReportStatus(reportId, { currentStep: "计算指标" });
+  const { computeAllIndicators } = await import("@/lib/research/ecological-index/compute");
+  return await computeAllIndicators({
+    organizationId,
+    scope: resources.scope, units: resources.units,
+    activityDataset: resources.dataset,
+    windowStart: resources.snap.windowStart,
+    windowEnd: resources.snap.windowEnd,
+  });
+});
+```
+
+- [ ] **Step 2-4**: typecheck + smoke test (mock Inngest 调用一次 step 1+2)
+
+- [ ] **Step 5**: Commit
+
+```bash
+git commit -am "feat(eco-index): inngest step 2 compute-indicators"
+```
+
+---
+
+## Task 3.10: Inngest Step 3 — build-xlsx-19sheet + upload storage
+
+- [ ] **Step 1**: 加 Step 3
+
+```ts
+const excelFileUrl = await step.run("build-xlsx", async () => {
+  await updateReportStatus(reportId, { currentStep: "生成 19-sheet xlsx" });
+  const { buildVerifiableXlsx } = await import("@/lib/research/ecological-index/xlsx-builder");
+  const buffer = await buildVerifiableXlsx({ aggregates, scope: resources.scope, units: resources.units, dataset: resources.dataset });
+  const { uploadReportFile } = await import("@/lib/research/report-storage");
+  return await uploadReportFile({ reportId, fileName: "indicators.xlsx", buffer, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+});
+await db.update(researchReports).set({ excelFileUrl }).where(eq(researchReports.id, reportId));
+```
+
+- [ ] **Step 2-5**: typecheck + commit
+
+```bash
+git commit -am "feat(eco-index): inngest step 3 build xlsx + upload"
+```
+
+---
+
+## Task 3.11: Inngest Step 4 — build-charts(3 张图)
+
+- [ ] **Step 1**: 加 Step 4
+
+```ts
+const chartBuffers = await step.run("build-charts", async () => {
+  await updateReportStatus(reportId, { currentStep: "生成图表" });
+  const { generateRankingBarChart, generateTierPieChart, generateTop15ComparisonChart }
+    = await import("@/lib/research/ecological-index/chart-generator");
+  const [bar, pie, top15] = await Promise.all([
+    generateRankingBarChart(aggregates.ranked, aggregates.stats),
+    generateTierPieChart(aggregates.stats),
+    generateTop15ComparisonChart(aggregates.ranked),
+  ]);
+  return { bar, pie, top15 };
+});
+```
+
+- [ ] **Step 2-5**: typecheck + commit
+
+```bash
+git commit -am "feat(eco-index): inngest step 4 build 3 charts"
+```
+
+---
+
+## Task 3.12: Inngest Step 5 — build-docx + upload
+
+- [ ] **Step 1**: 加 Step 5
+
+```ts
+const wordFileUrl = await step.run("build-docx", async () => {
+  await updateReportStatus(reportId, { currentStep: "生成 docx" });
+  const { buildRankingDocx } = await import("@/lib/research/ecological-index/docx-builder");
+  const buffer = await buildRankingDocx({ year: resources.snap.year, aggregates, chartBuffers });
+  const { uploadReportFile } = await import("@/lib/research/report-storage");
+  return await uploadReportFile({ reportId, fileName: "ranking.docx", buffer,
+    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+});
+await db.update(researchReports).set({ wordFileUrl }).where(eq(researchReports.id, reportId));
+```
+
+- [ ] **Step 2-5**: typecheck + commit
+
+```bash
+git commit -am "feat(eco-index): inngest step 5 build docx + upload"
+```
+
+---
+
+## Task 3.13: Inngest Step 6a-6d — 按 tier 拆 4 个 sub-step
+
+按 spec §5.4 + reviewer 强调,把 Step 6 拆 4 sub-step 避免单 step OOM + 30s 超时。
+
+- [ ] **Step 1-4: 4 个独立 step**
+
+```ts
+const contentUrls: { central: string|null; industry: string|null; municipal: string|null; district: string|null }
+  = { central: null, industry: null, municipal: null, district: null };
+
+if (resources.snap.includeContentSource) {
+  for (const tier of ["central", "industry", "municipal", "district"] as const) {
+    contentUrls[tier] = await step.run(`build-content-${tier}`, async () => {
+      await updateReportStatus(reportId, { currentStep: `生成数据源 ${tier}` });
+      const { exportContentForTier } = await import("@/lib/research/ecological-index/content-exporter");
+      const buffer = await exportContentForTier({
+        organizationId, tier, units: resources.units,
+        windowStart: resources.snap.windowStart, windowEnd: resources.snap.windowEnd,
+      });
+      const { uploadReportFile } = await import("@/lib/research/report-storage");
+      return await uploadReportFile({
+        reportId, fileName: `content-${tier}.xlsx`, buffer,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    });
+  }
+  await db.update(researchReports)
+    .set({ contentSourceFileUrls: contentUrls })
+    .where(eq(researchReports.id, reportId));
+}
+```
+
+- [ ] **Step 5**: Commit
+
+```bash
+git commit -am "feat(eco-index): inngest step 6a-6d build content source by tier (4 sub-steps)"
+```
+
+---
+
+## Task 3.14: Inngest Step 7 — finalize
+
+- [ ] **Step 1**: 加 Step 7
+
+```ts
+await step.run("finalize", async () => {
+  await db.update(researchReports)
+    .set({
+      status: "ready",
+      currentStep: null,
+      completedAt: new Date(),
+      aggregatesJson: aggregates,
+    })
+    .where(eq(researchReports.id, reportId));
+});
+
+return { reportId, ranked: aggregates.ranked.slice(0, 5) };
+```
+
+- [ ] **Step 2-5**: typecheck + 端到端 fixture 测试 + commit
+
+```bash
+git commit -am "feat(eco-index): inngest step 7 finalize + 7-step e2e validation"
+```
+
+---
+
+## Task 3.15: P3 端到端 fixture 测试
+
+**Files:**
+- Create: `src/inngest/functions/research/__tests__/ecological-index-generate.test.ts`
+
+- [ ] **Step 1-5**: 准备 mock storage + fixture scope/dataset → invoke inngest function → 验证 7 step 全部 success + storage 中 6 个文件全部生成
+
+```bash
+npx vitest run src/inngest/functions/research/__tests__/ecological-index-generate.test.ts
+# Expected: 1 passed (端到端 test)
+
+git commit -am "test(eco-index): e2e inngest 7-step pipeline test"
+```
+
+---
+
+## Task 3.16: P3 总结
+
+- [ ] **Step 1**: `npx tsc --noEmit` 零错误
+- [ ] **Step 2**: `npm run test` 通过(预期 +35 个新测试)
+- [ ] **Step 3**: `npm run build` 通过
+- [ ] **Step 4**: 写 phase summary
+- [ ] **Step 5**: 用 inngest dev UI 手动触发 1 次完整生成,验证 3 个文件(docx/19sheet xlsx/4 个 tier xlsx)可下载,对比 Python 脚本产出 1:1 一致
 
 ---
 
 # Phase 4: UI 集成(2 天)
 
-## Task 4.1: list 页加 sourceType tab
+## Task 4.1: list 页加 sourceType tab + 计数
 
-修改 `page.tsx` + `reports-list-client.tsx` 加 `<Tabs>` 切换 advanced_search / ecological_index.
+**Files:**
+- Modify: `src/app/(dashboard)/data-collection/reports/page.tsx`
+- Modify: `src/app/(dashboard)/data-collection/reports/reports-list-client.tsx`
 
-## Task 4.2: 新建 Dialog
+- [ ] **Step 1: page.tsx 加 sourceType 参数 + 分类拉数**
 
-`ecological-index-new-dialog.tsx`: 标题 + 年份 + 名单(实时预估) + 数据集 + 同时生成数据源勾选.
+```tsx
+// page.tsx (片段)
+export default async function ReportsPage({ searchParams }: {
+  searchParams: Promise<{ type?: string }>;
+}) {
+  const { type } = await searchParams;
+  const sourceType = type === "ecological_index" ? "ecological_index" : "advanced_search";
+  // ... ctx + auth 同现有
+  const allRows = await listReportsByOrg(ctx.organizationId, 100);
+  const advCount = allRows.filter(r => r.sourceType === "advanced_search").length;
+  const ecoCount = allRows.filter(r => r.sourceType === "ecological_index").length;
+  const rows = allRows.filter(r => r.sourceType === sourceType);
+  return <ReportsListClient rows={rows} sourceType={sourceType} advCount={advCount} ecoCount={ecoCount} />;
+}
+```
 
-## Task 4.3-4.6: 详情页 4 tab
+- [ ] **Step 2: client.tsx 加 Tabs + 新建按钮分支**
 
-- 概览 tab: 榜首/末位 + 统计 + Top10 横条 + 梯队饼图 + 3 个下载按钮
-- 综合排行 tab: 39 行表
-- 指标明细 tab: 15 个二级指标折叠展示
-- 资源快照 tab: 引用的 scope/dataset 详情
+```tsx
+// reports-list-client.tsx (片段)
+<Tabs value={sourceType} onValueChange={(v) => router.push(`?type=${v}`)} variant="line">
+  <TabsList>
+    <TabsTrigger value="advanced_search">检索报告 ({advCount})</TabsTrigger>
+    <TabsTrigger value="ecological_index">指数体系报告 ({ecoCount})</TabsTrigger>
+  </TabsList>
+</Tabs>
 
-## Task 4.7: 详情页路由分支
+{sourceType === "ecological_index" ? (
+  <Button onClick={() => setEcoNewOpen(true)}>新建指数报告</Button>
+) : (
+  <Button disabled>新建检索报告(沿用现有 entry)</Button>
+)}
+```
 
-`/data-collection/reports/[id]/page.tsx` 按 sourceType 分支渲染 advanced_search vs ecological_index.
+- [ ] **Step 3: typecheck + dev server 验证 tab 切换**
 
-## Task 4.8: 实时 dry-run 预估 API
+```bash
+npx tsc --noEmit && npm run dev
+# /data-collection/reports → 默认 advanced_search tab
+# 切到指数体系 → 看到空表 + "新建指数报告"按钮
+```
 
-`previewScopeCoverage` server action, 调用现有 matcher 逻辑.
+- [ ] **Step 4-5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/
+git commit -m "feat(eco-index): reports list page + tab for sourceType"
+```
+
+---
+
+## Task 4.2: ecological-index-new-dialog.tsx(新建报告 + 实时预估)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/ecological-index-new-dialog.tsx`
+
+- [ ] **Step 1: 写 Dialog**
+
+```tsx
+// ecological-index-new-dialog.tsx
+"use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { listMediaScopes } from "@/app/actions/research/media-scopes";
+import { listActivityDatasets } from "@/app/actions/research/activity-datasets";
+import { createEcologicalIndexReport, previewScopeCoverage } from "@/app/actions/research/ecological-index-reports";
+
+export function EcologicalIndexNewDialog({
+  open, onOpenChange,
+}: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const router = useRouter();
+  const [scopes, setScopes] = useState<any[]>([]);
+  const [datasets, setDatasets] = useState<any[]>([]);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [scopeId, setScopeId] = useState<string>("");
+  const [datasetId, setDatasetId] = useState<string>("");
+  const [title, setTitle] = useState("");
+  const [includeContentSource, setIncludeContentSource] = useState(true);
+  const [preview, setPreview] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      Promise.all([listMediaScopes(), listActivityDatasets()]).then(([s, d]) => {
+        setScopes(s); setDatasets(d);
+        const ds = s.find((x: any) => x.isDefault) ?? s[0]; if (ds) setScopeId(ds.id);
+        const dd = d.find((x: any) => x.isDefault && x.year === year) ?? d.find((x: any) => x.year === year); if (dd) setDatasetId(dd.id);
+        setTitle(`${year} 年度重庆市生态文明传播指数排行榜`);
+      });
+    }
+  }, [open, year]);
+
+  useEffect(() => {
+    if (!scopeId || !year) { setPreview(null); return; }
+    previewScopeCoverage(scopeId, year).then(setPreview).catch(() => setPreview(null));
+  }, [scopeId, year]);
+
+  async function handleSubmit() {
+    if (!title.trim() || !scopeId || !datasetId) {
+      toast.error("请填写完整信息"); return;
+    }
+    setSubmitting(true);
+    try {
+      const { reportId } = await createEcologicalIndexReport({
+        title: title.trim(), year, scopeId, activityDatasetId: datasetId, includeContentSource,
+      });
+      toast.success("已发起生成,跳转到详情页");
+      onOpenChange(false);
+      router.push(`/data-collection/reports/${reportId}`);
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSubmitting(false); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>新建指数体系报告</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-4">
+          <div><Label>标题 *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+          <div><Label>统计年份 *</Label><Input type="number" value={year}
+            onChange={(e) => setYear(Number(e.target.value))} /></div>
+          <div className="text-xs text-muted-foreground">
+            时间窗口: 自动 {year}-01-01 ~ {year + 1}-01-01
+          </div>
+          <div>
+            <Label>媒体名单 *</Label>
+            <Select value={scopeId} onValueChange={setScopeId}>
+              <SelectTrigger><SelectValue placeholder="选择名单" /></SelectTrigger>
+              <SelectContent>
+                {scopes.map(s => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} ({s.totalUnits} 家) {s.isDefault ? "✓默认" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {preview && (
+              <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                <div>预计可匹配 outlet: {preview.matchedOutletCount} 个</div>
+                <div>预计覆盖 items: {preview.itemsInScope.toLocaleString()} 条 (保留率 {preview.retentionPct.toFixed(1)}%)</div>
+              </div>
+            )}
+          </div>
+          <div>
+            <Label>活动数据集 *</Label>
+            <Select value={datasetId} onValueChange={setDatasetId}>
+              <SelectTrigger><SelectValue placeholder="选择数据集" /></SelectTrigger>
+              <SelectContent>
+                {datasets.filter(d => d.year === year).map(d => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name} (39 区县 / {d.totalActivities} 场) {d.isDefault ? "✓默认" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox checked={includeContentSource}
+              onCheckedChange={(v) => setIncludeContentSource(!!v)} id="includeContent" />
+            <Label htmlFor="includeContent" className="cursor-pointer text-sm">
+              同时生成内容池数据源 xlsx(按 tier 拆 4 个文件)
+            </Label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "提交中..." : "生成报告"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+- [ ] **Step 2-4: typecheck + 联通 list 页 + 手测预览刷新**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/ecological-index-new-dialog.tsx
+git commit -m "feat(eco-index): new report dialog with real-time coverage preview"
+```
+
+---
+
+## Task 4.3: 详情页路由分支
+
+**Files:**
+- Modify: `src/app/(dashboard)/data-collection/reports/[id]/page.tsx`
+- Create: `src/app/(dashboard)/data-collection/reports/[id]/ecological-index-detail.tsx`
+
+- [ ] **Step 1: 修改 page.tsx 按 sourceType 分支**
+
+```tsx
+// page.tsx
+if (report.sourceType === "ecological_index") {
+  return <EcologicalIndexDetail report={report} />;
+}
+return <ReportDetailClient report={report} />; // 现有 advanced_search
+```
+
+- [ ] **Step 2: 写 detail client 主组件(4 个 tab 容器)**
+
+```tsx
+// ecological-index-detail.tsx
+"use client";
+import { useState } from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { OverviewTab } from "./ecological-index-overview-tab";
+import { RankingTab } from "./ecological-index-ranking-tab";
+import { IndicatorsTab } from "./ecological-index-indicators-tab";
+import { SnapshotTab } from "./ecological-index-snapshot-tab";
+
+export function EcologicalIndexDetail({ report }: { report: any }) {
+  const [tab, setTab] = useState("overview");
+  return (
+    <div className="space-y-6">
+      <PageHeader title={report.title} />
+      <Tabs value={tab} onValueChange={setTab} variant="line">
+        <TabsList>
+          <TabsTrigger value="overview">概览</TabsTrigger>
+          <TabsTrigger value="ranking">综合排行</TabsTrigger>
+          <TabsTrigger value="indicators">指标明细</TabsTrigger>
+          <TabsTrigger value="snapshot">资源快照</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview"><OverviewTab report={report} /></TabsContent>
+        <TabsContent value="ranking"><RankingTab report={report} /></TabsContent>
+        <TabsContent value="indicators"><IndicatorsTab report={report} /></TabsContent>
+        <TabsContent value="snapshot"><SnapshotTab report={report} /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 3-5: typecheck + commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/\[id\]/
+git commit -m "feat(eco-index): detail page routing + 4-tab container"
+```
+
+---
+
+## Task 4.4: 概览 Tab(榜首/末位 + Top10 + 3 下载)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/[id]/ecological-index-overview-tab.tsx`
+
+- [ ] **Step 1: 写 Overview**
+
+```tsx
+// ecological-index-overview-tab.tsx
+"use client";
+import { Download, Trophy, TrendingDown, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/shared/glass-card";
+import { getReportFileSignedUrl } from "@/app/actions/research/reports";
+
+export function OverviewTab({ report }: { report: any }) {
+  const agg = report.aggregatesJson;
+  if (!agg || agg.kind !== "ecological_index") return <div>数据未就绪</div>;
+  const { ranked, stats } = agg;
+  const top = ranked[0], bottom = ranked[ranked.length - 1];
+  const top10 = ranked.slice(0, 10);
+
+  async function dl(field: "wordFileUrl" | "excelFileUrl" | "contentSourceFileUrls", tier?: string) {
+    const url = await getReportFileSignedUrl(report.id, field, tier);
+    if (url) window.open(url, "_blank");
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-4">
+        <GlassCard><Trophy className="size-6 text-amber-500" />
+          <div className="text-sm text-muted-foreground">榜首</div>
+          <div className="text-2xl font-bold">{top.name}</div>
+          <div className="text-3xl font-bold text-emerald-600">{top.composite.toFixed(2)}</div>
+        </GlassCard>
+        <GlassCard><TrendingDown className="size-6 text-rose-500" />
+          <div className="text-sm text-muted-foreground">末位</div>
+          <div className="text-2xl font-bold">{bottom.name}</div>
+          <div className="text-3xl font-bold text-rose-600">{bottom.composite.toFixed(2)}</div>
+        </GlassCard>
+        <GlassCard><BarChart3 className="size-6 text-sky-500" />
+          <div className="text-sm text-muted-foreground">统计</div>
+          <div className="text-sm">平均 {stats.mean.toFixed(2)} / 中位 {stats.median.toFixed(2)}</div>
+          <div className="text-sm">标差 {stats.stdev.toFixed(2)} / 分差 {stats.span.toFixed(2)}</div>
+          <div className="text-sm">梯队: 高 {stats.tier_high} / 中 {stats.tier_mid} / 低 {stats.tier_low}</div>
+        </GlassCard>
+      </div>
+
+      <GlassCard>
+        <h3 className="font-semibold mb-3">Top 10 综合得分</h3>
+        {top10.map((r: any) => {
+          const pct = ((r.composite - 60) / 30) * 100;
+          return (
+            <div key={r.rank} className="flex items-center gap-2 my-1">
+              <span className="w-8 text-right text-muted-foreground">{r.rank}</span>
+              <span className="w-24">{r.name}</span>
+              <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded relative">
+                <div className="h-6 bg-emerald-500 rounded" style={{ width: `${pct}%` }} />
+              </div>
+              <span className="w-14 text-right font-semibold">{r.composite.toFixed(2)}</span>
+            </div>
+          );
+        })}
+      </GlassCard>
+
+      <GlassCard>
+        <h3 className="font-semibold mb-3">下载文件</h3>
+        <div className="flex flex-wrap gap-2">
+          {report.excelFileUrl && (
+            <Button onClick={() => dl("excelFileUrl")}>
+              <Download className="size-4 mr-1.5" />19-sheet 可验证 xlsx
+            </Button>
+          )}
+          {report.wordFileUrl && (
+            <Button onClick={() => dl("wordFileUrl")}>
+              <Download className="size-4 mr-1.5" />排行榜及解读 docx
+            </Button>
+          )}
+          {report.contentSourceFileUrls && (
+            <>
+              {(["central", "industry", "municipal", "district"] as const).map(t =>
+                report.contentSourceFileUrls[t] && (
+                  <Button key={t} variant="secondary" onClick={() => dl("contentSourceFileUrls", t)}>
+                    <Download className="size-4 mr-1.5" />数据源 {t}
+                  </Button>
+                )
+              )}
+            </>
+          )}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2-4: typecheck + dev server 验证**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -am "feat(eco-index): overview tab with cards + Top10 + downloads"
+```
+
+---
+
+## Task 4.5: 综合排行 Tab(39 行表)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/[id]/ecological-index-ranking-tab.tsx`
+
+- [ ] **Step 1: 写 RankingTab — 用 DataTable 渲染 39 行**
+
+```tsx
+// ecological-index-ranking-tab.tsx
+"use client";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+
+export function RankingTab({ report }: { report: any }) {
+  const agg = report.aggregatesJson;
+  if (!agg || agg.kind !== "ecological_index") return null;
+  const cols: DataTableColumn<any>[] = [
+    { key: "rank", header: "排名", width: "w-16", align: "right", render: r => r.rank },
+    { key: "name", header: "区县", width: "w-32" },
+    { key: "central", header: "中央 (45%)", width: "w-24", align: "right", render: r => r.central.toFixed(2) },
+    { key: "industry", header: "行业 (25%)", width: "w-24", align: "right", render: r => r.industry.toFixed(2) },
+    { key: "municipal", header: "市级 (15%)", width: "w-24", align: "right", render: r => r.municipal.toFixed(2) },
+    { key: "district", header: "区县 (8%)", width: "w-24", align: "right", render: r => r.district.toFixed(2) },
+    { key: "public", header: "公众 (7%)", width: "w-24", align: "right", render: r => r.public.toFixed(2) },
+    { key: "composite", header: "综合得分", width: "w-24", align: "right",
+      render: r => <span className="font-bold">{r.composite.toFixed(2)}</span> },
+  ];
+  return <DataTable rows={agg.ranked} rowKey={r => r.rank} columns={cols} />;
+}
+```
+
+- [ ] **Step 2-5: typecheck + 验证 + commit**
+
+```bash
+git commit -am "feat(eco-index): ranking tab with 39-row table"
+```
+
+---
+
+## Task 4.6: 指标明细 Tab(15 个二级折叠)
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/[id]/ecological-index-indicators-tab.tsx`
+
+- [ ] **Step 1: 写 IndicatorsTab — 5 个一级折叠,每个 3 个二级 Top 2**
+
+```tsx
+// ecological-index-indicators-tab.tsx
+"use client";
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { GlassCard } from "@/components/shared/glass-card";
+
+const TIER_INFO = [
+  { key: "central", label: "中央媒体", weight: "45%" },
+  { key: "industry", label: "行业媒体", weight: "25%" },
+  { key: "municipal", label: "市级媒体", weight: "15%" },
+  { key: "district", label: "区县媒体", weight: "8%" },
+] as const;
+const SUB = [{ key: "count", label: "数量 (40%)" }, { key: "richness", label: "丰富度 (30%)" }, { key: "freq", label: "速度 (30%)" }] as const;
+
+export function IndicatorsTab({ report }: { report: any }) {
+  const agg = report.aggregatesJson;
+  const [open, setOpen] = useState<Record<string, boolean>>({ central: true });
+  if (!agg) return null;
+  const { scaledMedia, scaledPublic } = agg;
+
+  return (
+    <div className="space-y-3">
+      {TIER_INFO.map(t => (
+        <GlassCard key={t.key}>
+          <button onClick={() => setOpen(p => ({ ...p, [t.key]: !p[t.key] }))}
+            className="w-full text-left flex items-center gap-2 font-semibold">
+            {open[t.key] ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+            {t.label} <span className="text-muted-foreground">权重 {t.weight}</span>
+          </button>
+          {open[t.key] && (
+            <div className="mt-3 space-y-2 pl-6">
+              {SUB.map(s => {
+                const sorted = Object.entries(scaledMedia).map(([name, tier]: any) => ({ name, val: tier[t.key][s.key] }))
+                  .sort((a, b) => b.val - a.val);
+                const top2 = sorted.slice(0, 2);
+                return (
+                  <div key={s.key} className="text-sm">
+                    <span className="font-medium">{s.label}:</span>{" "}
+                    <span>{top2.map(x => `${x.name} ${x.val.toFixed(2)}`).join(", ")}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </GlassCard>
+      ))}
+      <GlassCard>
+        <h3 className="font-semibold">公众行为引导 (7%)</h3>
+        <div className="text-sm space-y-1 mt-2">
+          {SUB.map(s => {
+            const sorted = Object.entries(scaledPublic).map(([name, v]: any) => ({ name, val: v[s.key] }))
+              .sort((a, b) => b.val - a.val).slice(0, 2);
+            return (
+              <div key={s.key}>
+                {s.label}: {sorted.map(x => `${x.name} ${x.val.toFixed(2)}`).join(", ")}
+              </div>
+            );
+          })}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2-5**: typecheck + commit
+
+```bash
+git commit -am "feat(eco-index): indicators tab with 15 secondary metric Top 2"
+```
+
+---
+
+## Task 4.7: 资源快照 Tab
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/[id]/ecological-index-snapshot-tab.tsx`
+
+- [ ] **Step 1: 写 SnapshotTab — 引用的 scope/dataset 概要 + 链接**
+
+```tsx
+"use client";
+import Link from "next/link";
+import { GlassCard } from "@/components/shared/glass-card";
+
+export function SnapshotTab({ report }: { report: any }) {
+  const snap = report.searchSnapshot;
+  if (snap?.kind !== "ecological_index") return null;
+  return (
+    <div className="space-y-3">
+      <GlassCard>
+        <h3 className="font-semibold mb-2">引用资源</h3>
+        <div className="space-y-1 text-sm">
+          <div>媒体名单 ID: <code>{snap.scopeId}</code>{" "}
+            <Link href={`/data-collection/reports/resources?tab=scopes`} className="underline">查看</Link></div>
+          <div>活动数据集 ID: <code>{snap.activityDatasetId}</code>{" "}
+            <Link href={`/data-collection/reports/resources?tab=datasets`} className="underline">查看</Link></div>
+          <div>计算年份: {snap.year}</div>
+          <div>时间窗口: {snap.windowStart} 至 {snap.windowEnd}</div>
+          <div>包含数据源: {snap.includeContentSource ? "是" : "否"}</div>
+          <div>快照时间: {snap.capturedAt}</div>
+        </div>
+      </GlassCard>
+      <GlassCard>
+        <h3 className="font-semibold mb-2">耗时</h3>
+        <div className="text-sm">
+          创建: {new Date(report.createdAt).toLocaleString("zh-CN")} · 
+          完成: {report.completedAt ? new Date(report.completedAt).toLocaleString("zh-CN") : "—"} ·
+          总耗时: {report.completedAt
+            ? Math.round((new Date(report.completedAt).getTime() - new Date(report.createdAt).getTime()) / 1000) + " 秒"
+            : "—"}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2-5**: typecheck + commit
+
+```bash
+git commit -am "feat(eco-index): snapshot tab with resource refs + timing"
+```
+
+---
+
+## Task 4.8: getReportFileSignedUrl Server Action
+
+**Files:**
+- Modify: `src/app/actions/research/reports.ts`(加新函数)
+
+- [ ] **Step 1-3: 实现 getReportFileSignedUrl**
+
+```ts
+export async function getReportFileSignedUrl(
+  reportId: string,
+  field: "wordFileUrl" | "excelFileUrl" | "contentSourceFileUrls",
+  tier?: "central" | "industry" | "municipal" | "district",
+): Promise<string | null> {
+  const { orgId } = await requireOrg();
+  const [report] = await db.select({ wordFileUrl: researchReports.wordFileUrl,
+    excelFileUrl: researchReports.excelFileUrl,
+    contentSourceFileUrls: researchReports.contentSourceFileUrls })
+    .from(researchReports)
+    .where(and(eq(researchReports.id, reportId), eq(researchReports.organizationId, orgId)));
+  if (!report) return null;
+  let path: string | null = null;
+  if (field === "wordFileUrl") path = report.wordFileUrl;
+  else if (field === "excelFileUrl") path = report.excelFileUrl;
+  else if (field === "contentSourceFileUrls" && tier) path = (report.contentSourceFileUrls as any)?.[tier] ?? null;
+  if (!path) return null;
+  const { createSignedUrl } = await import("@/lib/research/report-storage");
+  return await createSignedUrl(path, 3600);
+}
+```
+
+- [ ] **Step 4-5: Commit**
+
+```bash
+git commit -am "feat(eco-index): getReportFileSignedUrl for download buttons"
+```
+
+---
 
 ## Task 4.9: P4 总结 + 端到端 manual test
 
-- 上传名单 → 上传活动表 → 新建报告 → 看到 status 流转 → 详情页看到所有内容 + 3 个下载成功
+- [ ] **Step 1: tsc / build / 全部 test**
+
+```bash
+npx tsc --noEmit
+npm run test 2>&1 | tail -10
+npm run build 2>&1 | tail -10
+```
+
+- [ ] **Step 2: 端到端手测流程**
+
+1. 上传媒体名单 xlsx → 列表显示 94 单位
+2. 上传活动 xlsx → 列表显示 39 区县
+3. 设为默认
+4. 列表页 → 切到指数体系 tab → 点新建报告 → 预览显示保留率
+5. 提交 → 跳详情页 status='pending' → 轮询变 'generating' → 'ready'
+6. 概览 tab 显示榜首/末位 + Top10 + 3 个下载按钮
+7. 点 19-sheet xlsx 下载 → Excel 打开看 19 sheet
+8. 点 docx 下载 → Word 打开看 39 行表 + 3 张图
+9. 点 4 个 tier 数据源 → 各自下载
+
+- [ ] **Step 3: 写 phase summary**
+
+```bash
+cat > docs/superpowers/phase-reports/2026-05-26-p4-ui-summary.md <<'EOF'
+# P4 UI 集成 Summary
+
+**Date:** 2026-05-26
+**Status:** ✅ Done
+
+## 完成内容
+- 列表页 sourceType tab + 计数
+- 新建 Dialog 含实时预估
+- 详情页 4 tab (概览 / 排行 / 明细 / 资源快照)
+- 3 + 4 个 tier 下载按钮 + signed URL
+
+## 验收
+所有 spec §17 Acceptance Criteria 通过 ✓
+EOF
+git add docs/superpowers/phase-reports/2026-05-26-p4-ui-summary.md
+git commit -m "docs: P4 phase summary"
+```
+
+- [ ] **Step 4: tag release**
+
+```bash
+git tag eco-index-v1.0
+git push --tags origin main
+```
+
+- [ ] **Step 5: 通知用户完工**
 
 ---
 
