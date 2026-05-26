@@ -60,6 +60,23 @@ import type { SkillDetailWithFiles, PluginConfigData, SkillUsageStats, SkillRunt
 import type { SkillCategory } from "@/lib/types";
 import type { SkillFileRow, SkillVersionRow } from "@/db/types";
 
+const TEST_INPUT_EXAMPLES: Record<string, string> = {
+  trending_topics: JSON.stringify({ mode: "hot", limit: 20 }, null, 2),
+  topic_classifier: JSON.stringify({
+    topics: [{ id: "t1", title: "成都串串香排队 3 小时" }],
+    enabledCategories: [{ value: "food", label: "美食" }],
+  }, null, 2),
+  cross_language_rewrite: JSON.stringify({
+    articles: [{ id: "t1", title: "成都串串香", body: "..." }],
+    targetLanguage: "en",
+    variantsPerTopic: 1,
+  }, null, 2),
+  cms_publish: JSON.stringify({ title: "测试稿件", body: "正文 ..." }, null, 2),
+  archive_to_drafts: JSON.stringify({
+    articles: [{ title: "Test", body: "..." }],
+  }, null, 2),
+};
+
 const categoryLabels: Record<SkillCategory, string> = {
   web_search: "全网检索",
   data_collection: "数据采集",
@@ -733,6 +750,15 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
               <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
                 测试输入
               </label>
+              {TEST_INPUT_EXAMPLES[skill.name] && (
+                <button
+                  type="button"
+                  onClick={() => setTestInput(TEST_INPUT_EXAMPLES[skill.name])}
+                  className="text-[11px] text-blue-500 hover:text-blue-600 mb-1"
+                >
+                  填入示例参数
+                </button>
+              )}
               <textarea
                 className="w-full min-h-[80px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 resize-none"
                 placeholder="输入测试参数或文本内容..."
@@ -827,7 +853,14 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
                 </div>
 
                 <div className="p-3 rounded-lg bg-green-50/50 dark:bg-green-950/25 border border-green-100/50 dark:border-green-800/30">
-                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">预期行为</h4>
+                  {testResult.runtimeInfo.type.includes("dryRun") && (
+                    <div className="mb-2 rounded-md bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      ⚠️ 写入型 skill 已自动禁用真实落库 / 外部调用，仅展示参数与映射结果。
+                    </div>
+                  )}
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    {testResult.runtimeInfo.type.startsWith("Tool") ? "真实输出" : "预期行为"}
+                  </h4>
                   <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">
                     {testResult.expectedBehavior}
                   </pre>
