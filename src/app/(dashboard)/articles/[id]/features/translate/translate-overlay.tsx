@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ArrowLeftRight, Loader2, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SourceUrlPill } from "@/components/shared/source-url-pill";
 import type { ArticleDetail } from "@/lib/types";
 
 interface TranslateOverlayProps {
@@ -99,13 +100,16 @@ export function TranslateOverlay({ article, onClose }: TranslateOverlayProps) {
     <div className="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-xl flex flex-col animate-in fade-in-0 zoom-in-[0.98] duration-300 ease-out">
       {/* 顶栏 */}
       <div className="h-14 flex items-center justify-between px-6 border-b border-border shrink-0">
-        <button
-          onClick={onClose}
-          className="h-9 flex items-center gap-1.5 pl-2 pr-3 rounded-full bg-background/80 hover:bg-background shadow-sm ring-1 ring-border text-sm font-medium text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          返回
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="h-9 flex items-center gap-1.5 pl-2 pr-3 rounded-full bg-background/80 hover:bg-background shadow-sm ring-1 ring-border text-sm font-medium text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回
+          </button>
+          <SourceUrlPill url={article.sourceUrl} variant="compact" />
+        </div>
 
         <div className="flex items-center gap-3">
           {/* 方向切换 */}
