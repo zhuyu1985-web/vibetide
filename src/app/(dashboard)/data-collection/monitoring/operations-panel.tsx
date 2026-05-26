@@ -198,9 +198,9 @@ export function OperationsPanel({
                         }}
                       />
                       <Legend />
-                      <Line type="monotone" dataKey="inserted" stroke="#3b82f6" name="新增" dot={false} />
-                      <Line type="monotone" dataKey="merged" stroke="#a1a1aa" name="合并" dot={false} />
-                      <Line type="monotone" dataKey="failed" stroke="#ef4444" name="失败" dot={false} />
+                      <Line type="monotone" dataKey="inserted" stroke="#3b82f6" name="新增" dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="merged" stroke="#a1a1aa" name="合并" dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="failed" stroke="#ef4444" name="失败" dot={false} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

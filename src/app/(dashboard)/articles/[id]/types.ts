@@ -65,7 +65,17 @@ export interface ArticleDetailClientProps {
 
 export type ViewMode = "read" | "edit";
 export type ContentType = "article" | "video";
-export type ActiveView = "immersive" | "web" | "brief" | "archive";
+// preview: 稿件预览（默认）—— 中央显示正文，保留左右侧栏
+// immersive: 沉浸阅读 —— 全屏遮罩，只显示正文
+// translate: 翻译 —— 全屏遮罩，左右双栏（原文 / 译文）
+// web / brief / archive: 原始网页 / AI 速览 / 网页存档
+export type ActiveView =
+  | "preview"
+  | "immersive"
+  | "web"
+  | "brief"
+  | "translate"
+  | "archive";
 export type LeftTab = "outline" | "chat" | "history" | "library" | "aigc";
 export type RightTab = "analysis" | "annotations" | "transcript" | "info" | "channels";
 

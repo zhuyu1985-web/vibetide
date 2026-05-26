@@ -36,6 +36,7 @@ import {
   Type,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PromptDialog } from "@/components/shared/prompt-dialog";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -248,6 +249,11 @@ export function EditorToolbar({
     toast.info(`「${feature}」即将上线`);
   }, []);
 
+  // 链接 / 图片 弹窗状态
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkDefault, setLinkDefault] = useState("");
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
   if (!editor) return null;
 
   // ── 段落级别（正文 / H1-H4） ──
@@ -342,20 +348,29 @@ export function EditorToolbar({
 
   // ── 链接 / 图片 ──
   const handleLink = () => {
-    const previousUrl = editor.getAttributes("link").href;
-    const url = window.prompt("输入链接地址", previousUrl);
-    if (url === null) return;
-    if (url === "") {
+    setLinkDefault(editor.getAttributes("link").href ?? "");
+    setLinkDialogOpen(true);
+  };
+
+  const submitLink = (url: string) => {
+    setLinkDialogOpen(false);
+    const trimmed = url.trim();
+    if (!trimmed) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    editor.chain().focus().extendMarkRange("link").setLink({ href: trimmed }).run();
   };
 
   const handleImage = () => {
-    const url = window.prompt("输入图片地址（也可以从左栏「资源库」拖入）");
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
+    setImageDialogOpen(true);
+  };
+
+  const submitImage = (url: string) => {
+    setImageDialogOpen(false);
+    const trimmed = url.trim();
+    if (trimmed) {
+      editor.chain().focus().setImage({ src: trimmed }).run();
     }
   };
 
@@ -696,6 +711,27 @@ export function EditorToolbar({
         {String(isSaving)}{String(isDirty)}{typeof onSave}{typeof onSaveAndSubmit}{typeof onCancel}
       </span>
     </div>
+
+    <PromptDialog
+      open={linkDialogOpen}
+      onOpenChange={setLinkDialogOpen}
+      title="插入 / 编辑链接"
+      description="留空可移除链接"
+      placeholder="https://example.com"
+      defaultValue={linkDefault}
+      confirmText="应用"
+      onConfirm={submitLink}
+    />
+
+    <PromptDialog
+      open={imageDialogOpen}
+      onOpenChange={setImageDialogOpen}
+      title="插入图片"
+      description="也可以从左栏「资源库」拖入"
+      placeholder="https://example.com/image.png"
+      confirmText="插入"
+      onConfirm={submitImage}
+    />
     </div>
   );
 }

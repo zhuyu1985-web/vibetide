@@ -5,11 +5,11 @@ import { useMemo, useState } from "react";
 import { FileText } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type {
   AnalyzableAccountRow,
   ReportSummary,
 } from "@/lib/dal/account-analytics";
-import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<ReportSummary["status"], string> = {
   pending: "排队中",
@@ -72,35 +72,28 @@ export function ReportsTab({ account, reports }: Props) {
             支持按周期类型筛选：日报 / 周报 / 月报 / 自定义
           </p>
         </div>
-        {/* reportType 切换 chip */}
-        <div className="flex flex-wrap gap-1.5">
-          {REPORT_TYPE_FILTER_ORDER.map((t) => {
-            const active = typeFilter === t;
-            const count =
-              t === "all"
-                ? reports.length
-                : (typeCounts.get(t as ReportSummary["reportType"]) ?? 0);
-            return (
-              // eslint-disable-next-line no-restricted-syntax
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTypeFilter(t)}
-                className={cn(
-                  "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors border-0 cursor-pointer",
-                  active
-                    ? "bg-[#2E75B6] text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
-                )}
-              >
-                {t === "all"
-                  ? "全部"
-                  : REPORT_TYPE_LABELS[t as ReportSummary["reportType"]]}
-                <span className="text-[10px] opacity-70">{count}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* reportType 切换 */}
+        <Tabs
+          value={typeFilter}
+          onValueChange={(v) => setTypeFilter(v as ReportTypeFilter)}
+        >
+          <TabsList variant="default">
+            {REPORT_TYPE_FILTER_ORDER.map((t) => {
+              const count =
+                t === "all"
+                  ? reports.length
+                  : (typeCounts.get(t as ReportSummary["reportType"]) ?? 0);
+              return (
+                <TabsTrigger key={t} value={t}>
+                  {t === "all"
+                    ? "全部"
+                    : REPORT_TYPE_LABELS[t as ReportSummary["reportType"]]}
+                  <span className="ml-1 text-[10px] opacity-70">{count}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
       </div>
       {filteredReports.length === 0 ? (
         <p className="text-center text-sm text-gray-500 py-8">

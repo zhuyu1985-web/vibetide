@@ -57,6 +57,7 @@ export function RadarChartCard({
               stroke={s.color}
               fill={s.color}
               fillOpacity={s.fillOpacity ?? 0.2}
+              isAnimationActive={false}
             />
           ))}
           {series.length > 1 && (

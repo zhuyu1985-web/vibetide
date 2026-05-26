@@ -164,6 +164,14 @@ export function mapWeiboResponse(response: WeiboSearchResponse): RawItem[] {
       channel: "tikhub_weibo",
       contentType,
       attachments,
+      // 顶级字段：daily-snapshot 聚合 / 详情页 KPI 都依赖这些列
+      externalId: mblogId,
+      platform: "weibo",
+      author: m.user?.screen_name,
+      accountId: userId != null ? String(userId) : undefined,
+      likeCount: m.attitudes_count ?? 0,
+      commentCount: m.comments_count ?? 0,
+      shareCount: m.reposts_count ?? 0,
       rawMetadata: {
         platform: "weibo",
         mblog_id: mblogId,

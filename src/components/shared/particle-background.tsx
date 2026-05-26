@@ -54,21 +54,41 @@ interface ParticleBackgroundProps {
   colors?: string[];
   cursorGlow?: boolean;
   className?: string;
+  /**
+   * 外部暂停信号。fixed 定位时 IntersectionObserver 失效,需要由父组件
+   * 根据 scroll 位置 / chat 模式等条件主动 pause。pause=true 时立即停 RAF。
+   */
+  paused?: boolean;
 }
 
 /* ── component ──────────────────────────────────────────────────── */
 
 export function ParticleBackground({
-  particleCount = 80,
+  particleCount = 60,
   colors = ["#6366f1", "#06b6d4", "#8b5cf6"],
   cursorGlow = true,
   className,
+  paused = false,
 }: ParticleBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const rafRef = useRef(0);
+  const pausedRef = useRef(paused);
+  const startRef = useRef<() => void>(() => {});
   const prefersReducedMotion = useReducedMotion();
+
+  // 让 paused 变化能在不重建 effect 的情况下被 tick 看到
+  pausedRef.current = paused;
+
+  // paused 从 true → false 时唤醒动画
+  useEffect(() => {
+    if (!paused) startRef.current();
+    else {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+  }, [paused]);
 
   useEffect(() => {
     if (prefersReducedMotion) return;
@@ -97,6 +117,14 @@ export function ParticleBackground({
     };
     resize();
 
+    // ── viewport + tab visibility + external pause guard ──
+    // 注意:fixed 定位时 IntersectionObserver 无效(永远在视口),所以加 pausedRef
+    // 让父组件根据 scroll 位置等条件主动 pause。
+    let isInViewport = true;
+    let isPageVisible = !document.hidden;
+    let frame = 0;
+    const shouldRun = () => isInViewport && isPageVisible && !pausedRef.current;
+
     const onPointerMove = (e: MouseEvent | TouchEvent) => {
       const rect = canvas.getBoundingClientRect();
       let cx: number, cy: number;
@@ -117,6 +145,11 @@ export function ParticleBackground({
     const isDark = () => document.documentElement.classList.contains("dark");
 
     const tick = () => {
+      // 30fps 降频(每 2 帧画 1 帧),粒子动画肉眼无差,CPU 减半
+      if (++frame % 2 === 1) {
+        rafRef.current = shouldRun() ? requestAnimationFrame(tick) : 0;
+        return;
+      }
       const W = canvas.clientWidth;
       const H = canvas.clientHeight;
       ctx.clearRect(0, 0, W, H);
@@ -245,9 +278,46 @@ export function ParticleBackground({
         }
       }
 
-      rafRef.current = requestAnimationFrame(tick);
+      rafRef.current = shouldRun() ? requestAnimationFrame(tick) : 0;
     };
+
+    const startIfNeeded = () => {
+      if (!rafRef.current && shouldRun()) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    // 暴露给外层 effect 用于响应 paused prop 变化
+    startRef.current = startIfNeeded;
     tick();
+
+    // 注意:canvas 用 fixed 定位时 IntersectionObserver 永远 isIntersecting=true,
+    // 此 observer 主要为非 fixed 用法(如 modal 关闭)兜底,fixed 用法靠 paused prop。
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          isInViewport = entry.isIntersecting;
+        }
+        if (!shouldRun()) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        } else {
+          startIfNeeded();
+        }
+      },
+      { threshold: 0.01 },
+    );
+    observer.observe(canvas);
+
+    const onVisibility = () => {
+      isPageVisible = !document.hidden;
+      if (!shouldRun()) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      } else {
+        startIfNeeded();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     window.addEventListener("mousemove", onPointerMove);
     window.addEventListener("touchmove", onPointerMove, { passive: true });
@@ -256,6 +326,9 @@ export function ParticleBackground({
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("mousemove", onPointerMove);
       window.removeEventListener("touchmove", onPointerMove);
       window.removeEventListener("touchend", onTouchEnd);

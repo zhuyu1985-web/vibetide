@@ -99,11 +99,20 @@ export async function ensureTikHubAccountSource(
   };
 
   if (existing) {
-    // 已存在 → 确保 enabled + config 是最新的
-    if (!existing.enabled || JSON.stringify(existing.config) !== JSON.stringify(cfg)) {
+    // 已存在 → 确保 enabled + config 最新 + outlet_id 列回填（治理历史 source）
+    if (
+      !existing.enabled ||
+      JSON.stringify(existing.config) !== JSON.stringify(cfg) ||
+      existing.outletId !== outletId
+    ) {
       await db
         .update(collectionSources)
-        .set({ enabled: true, config: cfg, updatedAt: new Date() })
+        .set({
+          enabled: true,
+          config: cfg,
+          outletId,
+          updatedAt: new Date(),
+        })
         .where(eq(collectionSources.id, existing.id));
     }
     return { ok: true, sourceId: existing.id, created: false };
@@ -118,6 +127,7 @@ export async function ensureTikHubAccountSource(
       name: sourceName,
       enabled: true,
       config: cfg,
+      outletId,
       targetModules: ["hot_topics"],
       defaultTags: [`account-analytics:${accountSource}`],
     })

@@ -10,6 +10,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { DataTable } from "@/components/shared/data-table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PromptDialog } from "@/components/shared/prompt-dialog";
 import {
   runMissedTopicDetection,
   confirmMissedTopic,
@@ -59,6 +60,7 @@ export function MissingTopicsClient({ items, kpis }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [excludeDialogTopicId, setExcludeDialogTopicId] = useState<string | null>(null);
 
   function handleDetect() {
     startTransition(async () => {
@@ -85,12 +87,18 @@ export function MissingTopicsClient({ items, kpis }: Props) {
   }
 
   function handleExclude(id: string) {
-    const reason = prompt("排除原因（选填）") ?? "";
+    setExcludeDialogTopicId(id);
+  }
+
+  function confirmExclude(reason: string) {
+    const id = excludeDialogTopicId;
+    setExcludeDialogTopicId(null);
+    if (!id) return;
     startTransition(async () => {
       const res = await excludeMissedTopic({
         topicId: id,
         reasonCode: "manual_excluded",
-        reasonText: reason || undefined,
+        reasonText: reason.trim() || undefined,
       });
       if (res.success) {
         toast.success("已排除");
@@ -312,6 +320,17 @@ export function MissingTopicsClient({ items, kpis }: Props) {
           ]}
         />
       )}
+
+      <PromptDialog
+        open={excludeDialogTopicId !== null}
+        onOpenChange={(open) => !open && setExcludeDialogTopicId(null)}
+        title="排除该选题"
+        description="可填写排除原因（选填）"
+        placeholder="例如：与现有报道重复"
+        multiline
+        confirmText="确认排除"
+        onConfirm={confirmExclude}
+      />
     </div>
   );
 }

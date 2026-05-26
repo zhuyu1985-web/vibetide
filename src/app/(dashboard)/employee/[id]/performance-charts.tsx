@@ -177,6 +177,7 @@ export function PerformanceCharts({ trendData }: PerformanceChartsProps) {
                 stroke={metric.color}
                 strokeWidth={2}
                 fill={`url(#perfGradient-${metric.key})`}
+                isAnimationActive={false}
               />
             )
           )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { Target, MessageSquare, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -36,7 +37,8 @@ function RelativeTime({ isoString }: { isoString: string }) {
   );
 }
 
-export function RecentSection({ missions, conversations }: RecentSectionProps) {
+// memo: 父组件 keystroke 高频重 render,recent 数据只在 router.refresh() 后变
+export const RecentSection = memo(function RecentSection({ missions, conversations }: RecentSectionProps) {
   const recentMissions = missions.slice(0, 5);
   const recentConversations = conversations.slice(0, 5);
 
@@ -142,4 +144,4 @@ export function RecentSection({ missions, conversations }: RecentSectionProps) {
       </div>
     </div>
   );
-}
+});

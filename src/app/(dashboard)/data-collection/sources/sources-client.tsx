@@ -74,10 +74,11 @@ const TARGET_MODULE_OPTIONS = [
   { value: "knowledge", label: "知识库 (knowledge)" },
 ];
 
-// Polling 2s × 150 = 5 分钟。覆盖整站采集等长任务(实测 cbg.cn 2 栏目 ≈ 3-6 分钟)。
+// Polling 3s × 100 = 5 分钟。覆盖整站采集等长任务(实测 cbg.cn 2 栏目 ≈ 3-6 分钟)。
 // 真正"长跑超时"的 toast 是 info 提示,不是失败,run 在后台继续。
-const POLL_INTERVAL_MS = 2000;
-const POLL_MAX_ATTEMPTS = 150;
+// tab 隐藏时 tick 跳过 fetch 但保留 schedule,visible 后立即恢复。
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_ATTEMPTS = 100;
 
 export function SourcesClient({ initialSources, adapterMetas, outlets }: SourcesClientProps) {
   const router = useRouter();
@@ -109,6 +110,10 @@ export function SourcesClient({ initialSources, adapterMetas, outlets }: Sources
     const baseline = baselineRunIds.current.get(sourceId) ?? null;
     let attempts = 0;
     const tick = async () => {
+      if (document.hidden) {
+        setTimeout(tick, POLL_INTERVAL_MS);
+        return;
+      }
       attempts++;
       let latest: LatestRunStatus;
       try {

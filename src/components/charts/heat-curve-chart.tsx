@@ -47,6 +47,7 @@ export function HeatCurveChart({ data, height = 120 }: HeatCurveChartProps) {
           stroke="#ef4444"
           strokeWidth={2}
           fill="url(#heatGradient)"
+          isAnimationActive={false}
         />
       </AreaChart>
     </ResponsiveContainer>

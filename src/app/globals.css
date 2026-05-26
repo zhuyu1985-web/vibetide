@@ -1220,6 +1220,23 @@
 }
 .avatar-eye-2 { animation-delay: -0.05s; }
 
+/* .avatar-static 守门 — 小尺寸头像(xs / sm)默认应用,关掉所有 SVG 内部动画。
+   场景:TemplateCard 团队成员小头像 35 个 × 4-5 个 .avatar-anim-* 动画 = ~150
+   个 infinite 动画在跑,是 home 页 CPU 大头。这些小头像 32px,用户看不到动画
+   细节,静态化对视觉无影响。大尺寸(md/lg/xl)如员工快速面板保持完整动画。 */
+.avatar-static .avatar-anim-float,
+.avatar-static .avatar-anim-pulse,
+.avatar-static .avatar-anim-blink,
+.avatar-static .avatar-anim-spin,
+.avatar-static .avatar-anim-bounce,
+.avatar-static .avatar-anim-sway,
+.avatar-static .avatar-anim-scan-x,
+.avatar-static .avatar-anim-wave,
+.avatar-static .avatar-anim-shimmer,
+.avatar-static .avatar-eye {
+  animation: none;
+}
+
 /* Typewriter cursor blink */
 @keyframes blink {
   0%, 100% { opacity: 1; }

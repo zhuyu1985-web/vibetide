@@ -48,7 +48,7 @@ export function AreaChartCard({
             fontSize: "12px",
           }}
         />
-        <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} />
+        <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );

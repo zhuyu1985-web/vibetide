@@ -364,6 +364,7 @@ export function BusinessDashboard({
                         stroke={LINE_COLORS[i % LINE_COLORS.length]}
                         dot={false}
                         strokeWidth={2}
+                        isAnimationActive={false}
                       />
                     ))}
                   </LineChart>

@@ -88,11 +88,11 @@ export function AnalysisContent({
     <div className="flex flex-col h-full">
       {/* Sentiment badge + timestamp */}
       {(sentiment || generatedAt) && (
-        <div className="flex items-center gap-2 px-3 pt-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 px-4 pt-3 shrink-0 flex-wrap">
           {sentiment && (
             <span
               className={cn(
-                "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                "text-[11px] px-2 py-0.5 rounded-full font-medium",
                 SENTIMENT_MAP[sentiment].className
               )}
             >
@@ -100,7 +100,7 @@ export function AnalysisContent({
             </span>
           )}
           {generatedAt && (
-            <span className="text-[10px] text-muted-foreground/60 ml-auto">
+            <span className="text-[11px] text-muted-foreground/60 ml-auto">
               {formatDate(generatedAt)}
             </span>
           )}
@@ -108,15 +108,15 @@ export function AnalysisContent({
       )}
 
       {/* Content area */}
-      <div className="flex-1 overflow-y-auto px-3 py-2">
+      <div className="flex-1 overflow-y-auto px-4 py-3">
         {isGenerating && !displayText && <LoadingDots />}
         {displayText && (
-          <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/90">
+          <p className="text-sm leading-[1.75] whitespace-pre-wrap text-foreground/90">
             {displayText}
           </p>
         )}
         {isGenerating && displayText && (
-          <span className="inline-block w-0.5 h-3 bg-blue-400 animate-pulse ml-0.5 align-middle" />
+          <span className="inline-block w-0.5 h-4 bg-blue-400 animate-pulse ml-0.5 align-middle" />
         )}
       </div>
     </div>

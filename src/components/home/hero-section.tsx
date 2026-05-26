@@ -1,10 +1,13 @@
 "use client";
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { MessageSquare, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-export function HeroSection() {
+// memo: 父组件 home-client 每个 keystroke 都重 render,而 HeroSection 完全静态,
+// 不需要跟着重 render(motion 入场动画也只在 mount 时跑一次)。
+export const HeroSection = memo(function HeroSection() {
   return (
     <div className="flex flex-col items-center gap-3 pt-4 pb-2">
       {/* Status badge */}
@@ -88,4 +91,4 @@ export function HeroSection() {
       </motion.div>
     </div>
   );
-}
+});

@@ -244,7 +244,10 @@ function TemplateCard({
 
 // ─── ScenarioGrid ───────────────────────────────────────────────────
 
-export function ScenarioGrid({
+// memo: 父组件 home-client 持有 chatInput / inputValue 等高频 state,
+// 每个 keystroke 都会让 ScenarioGrid 重 render。templatesByTab 来自 server props
+// 引用稳定,memo 后 keystroke 不再下穿。
+export const ScenarioGrid = React.memo(function ScenarioGrid({
   templatesByTab,
   canManageHomepage = false,
 }: ScenarioGridProps) {
@@ -499,4 +502,4 @@ export function ScenarioGrid({
       )}
     </div>
   );
-}
+});

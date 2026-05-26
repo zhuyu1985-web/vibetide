@@ -52,7 +52,7 @@ interface ArticlePageStore {
 export const useArticlePageStore = create<ArticlePageStore>((set) => ({
   viewMode: "read",
   contentType: "article",
-  activeView: "immersive",
+  activeView: "preview",
   leftPanelOpen: true,
   rightPanelOpen: true,
   leftTab: "chat",

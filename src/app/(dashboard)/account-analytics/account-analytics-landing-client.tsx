@@ -1,14 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { BarChart3, TrendingUp, Calendar } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { BarChart3, Loader2, Plus, TrendingUp, Calendar, Wrench } from "lucide-react";
+import { toast } from "sonner";
+import { cleanupInvalidOutletTiers } from "@/app/actions/account-analytics";
 import { GlassCard } from "@/components/shared/glass-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlatformAvatar } from "@/components/account-analytics/platform-avatar";
 import { CrawlCronToggle } from "@/components/account-analytics/crawl-cron-toggle";
+import {
+  BindAccountDialog,
+  type OutletOption,
+} from "@/components/account-analytics/bind-account-dialog";
 import { getPlatformMeta } from "@/lib/account-analytics/platform-meta";
 import type { AnalyzableAccountRow } from "@/lib/dal/account-analytics";
 import { cn } from "@/lib/utils";
@@ -28,9 +37,11 @@ const SOURCE_LABELS: Record<"my" | "benchmark", string> = {
 
 interface Props {
   accounts: AnalyzableAccountRow[];
+  outlets: OutletOption[];
 }
 
-export function AccountAnalyticsLandingClient({ accounts }: Props) {
+export function AccountAnalyticsLandingClient({ accounts, outlets }: Props) {
+  const router = useRouter();
   const [keyword, setKeyword] = useState("");
   // 默认聚焦我方账号；切到「对标」才看 60+ 个全国预设账号池
   const [sourceFilter, setSourceFilter] = useState<"all" | "my" | "benchmark">(
@@ -38,6 +49,25 @@ export function AccountAnalyticsLandingClient({ accounts }: Props) {
   );
   // 平台筛选 —— 'all' 表示不限平台
   const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [bindOpen, setBindOpen] = useState(false);
+  const [cleaning, startCleanup] = useTransition();
+
+  function handleCleanup() {
+    if (cleaning) return;
+    startCleanup(async () => {
+      const res = await cleanupInvalidOutletTiers();
+      if (!res.success) {
+        toast.error(res.error ?? "修复失败");
+        return;
+      }
+      if (res.fixed && res.fixed > 0) {
+        toast.success(`已修复 ${res.fixed} 条 outlet_tier 脏数据`);
+      } else {
+        toast.info("没有发现需要修复的脏数据");
+      }
+      router.refresh();
+    });
+  }
 
   // 按 source 预筛后 → 计算每个平台的账号数（chip 上显示），再用 platformFilter 过滤
   const sourceFiltered = useMemo(
@@ -73,6 +103,40 @@ export function AccountAnalyticsLandingClient({ accounts }: Props) {
       <PageHeader
         title="账号数据分析"
         description="选择一个账号查看每日 / 自定义区间的爆款归因报告"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCleanup}
+              disabled={cleaning}
+              title="把媒体字典里 outlet_tier 为非法值 (city / provincial / self_media) 的历史记录批量映射到合法枚举值"
+            >
+              {cleaning ? (
+                <>
+                  <Loader2 size={14} className="mr-1.5 animate-spin" />
+                  修复中...
+                </>
+              ) : (
+                <>
+                  <Wrench size={14} className="mr-1.5" />
+                  修复 outlet 脏数据
+                </>
+              )}
+            </Button>
+            <Button variant="default" size="sm" onClick={() => setBindOpen(true)}>
+              <Plus size={14} className="mr-1.5" />
+              绑定账号
+            </Button>
+          </div>
+        }
+      />
+
+      <BindAccountDialog
+        open={bindOpen}
+        onOpenChange={setBindOpen}
+        outlets={outlets}
+        onSuccess={() => router.refresh()}
       />
 
       {/* 顶部 filter 区 */}
@@ -86,23 +150,20 @@ export function AccountAnalyticsLandingClient({ accounts }: Props) {
               placeholder="搜索账号名 / 平台 / handle..."
               className="sm:max-w-xs"
             />
-            <div className="flex flex-wrap gap-1.5">
-              {(["all", "my", "benchmark"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSourceFilter(s)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors border-0 cursor-pointer",
-                    sourceFilter === s
-                      ? "bg-[#2E75B6] text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
-                  )}
-                >
-                  {s === "all" ? "全部" : SOURCE_LABELS[s]}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              value={sourceFilter}
+              onValueChange={(v) =>
+                setSourceFilter(v as "all" | "my" | "benchmark")
+              }
+            >
+              <TabsList variant="default">
+                <TabsTrigger value="all">全部</TabsTrigger>
+                <TabsTrigger value="my">{SOURCE_LABELS.my}</TabsTrigger>
+                <TabsTrigger value="benchmark">
+                  {SOURCE_LABELS.benchmark}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="sm:ml-auto text-[12px] text-gray-500">
               共 {filtered.length} 个账号
             </div>
@@ -160,9 +221,23 @@ export function AccountAnalyticsLandingClient({ accounts }: Props) {
       {/* 账号卡片网格 */}
       {filtered.length === 0 ? (
         <GlassCard padding="lg">
-          <p className="text-center text-sm text-gray-500 py-8">
-            暂无可分析账号。请先在「同题对比 / 我方账号」或「对标账号池」中添加。
-          </p>
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <p className="text-sm text-gray-500">
+              {accounts.length === 0
+                ? "暂无账号，点击「绑定账号」从媒体字典挑选或手动添加"
+                : "当前筛选下没有匹配账号，可以试试切换平台或来源"}
+            </p>
+            {accounts.length === 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setBindOpen(true)}
+              >
+                <Plus size={14} className="mr-1.5" />
+                绑定第一个账号
+              </Button>
+            )}
+          </div>
         </GlassCard>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

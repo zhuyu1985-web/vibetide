@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,6 +9,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { crawlAccountOnDemand } from "@/app/actions/account-analytics";
+import { CrawlRunStatusCard } from "@/components/account-analytics/crawl-run-status-card";
 import { getPlatformMeta } from "@/lib/account-analytics/platform-meta";
 import type {
   AccountAnalyticsOverview,
@@ -29,6 +30,7 @@ export function AccountOverviewClient({ account, overview, reports }: Props) {
   const platformLabel = getPlatformMeta(account.platform).label;
 
   const [crawling, startCrawl] = useTransition();
+  const [refreshToken, setRefreshToken] = useState(0);
   const { tab, setTab } = useAccountAnalyticsURLState();
 
   function handleCrawlAndReport() {
@@ -43,9 +45,10 @@ export function AccountOverviewClient({ account, overview, reports }: Props) {
         return;
       }
       toast.success(
-        "已派发抓取任务 · 预计 3-5 分钟后报告自动生成，可稍后刷新页面查看",
+        "已派发抓取任务 · 下方进度卡会实时刷新；抓取完成后报告通常会在 1-3 分钟内生成",
         { duration: 6000 },
       );
+      setRefreshToken((n) => n + 1);
     });
   }
 
@@ -86,6 +89,13 @@ export function AccountOverviewClient({ account, overview, reports }: Props) {
             )}
           </Button>
         }
+      />
+
+      {/* 抓取进度卡 —— 显示最近一次 collection_run 状态 */}
+      <CrawlRunStatusCard
+        accountId={account.id}
+        accountSource={account.source}
+        refreshToken={refreshToken}
       />
 
       {/* 30 天累计 KPI */}

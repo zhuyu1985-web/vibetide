@@ -258,16 +258,29 @@ export function ArticleEditor({
   }, [isSaving, isDirty, setEditorState]);
 
   // 把 save / saveAndSubmit / cancel handler 注册到 store
+  // 用 ref 跟踪最新引用，effect 只在 mount 时注册一次稳定的包装函数。
+  // 否则父组件订阅整个 store 会因 setEditorHandlers 触发 re-render，再
+  // 让 inline onExitEdit 重建，进而让 handle* 依赖链反复变化 → 无限循环。
+  const handlersRef = useRef({
+    save: handleManualSave,
+    saveAndSubmit: handleSaveAndSubmit,
+    cancel: handleCancel,
+  });
+  handlersRef.current = {
+    save: handleManualSave,
+    saveAndSubmit: handleSaveAndSubmit,
+    cancel: handleCancel,
+  };
   useEffect(() => {
     setEditorHandlers({
-      save: handleManualSave,
-      saveAndSubmit: handleSaveAndSubmit,
-      cancel: handleCancel,
+      save: () => handlersRef.current.save(),
+      saveAndSubmit: () => handlersRef.current.saveAndSubmit(),
+      cancel: () => handlersRef.current.cancel(),
     });
     return () => {
       setEditorHandlers(null);
     };
-  }, [handleManualSave, handleSaveAndSubmit, handleCancel, setEditorHandlers]);
+  }, [setEditorHandlers]);
 
   // Title change triggers dirty state + auto-save
   const handleTitleChange = (newTitle: string) => {

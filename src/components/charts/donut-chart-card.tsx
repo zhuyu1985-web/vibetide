@@ -26,6 +26,7 @@ export function DonutChartCard({
           outerRadius={outerRadius}
           paddingAngle={2}
           dataKey="value"
+          isAnimationActive={false}
         >
           {data.map((entry, i) => (
             <Cell key={i} fill={entry.color} />

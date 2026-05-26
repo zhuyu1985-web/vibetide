@@ -69,6 +69,15 @@ export const runCollectionSource = inngest.createFunction(
           },
         });
 
+        // 兜底：旧 account-mode source 顶级 outlet_id 列没填，但 config.outletIds[0] 有
+        // 历史数据治理：让 writer 还能识别出 outlet 避免 collected_items.outlet_id NULL
+        const cfg = source.config as { outletIds?: unknown } | null;
+        const fallbackOutletId =
+          source.outletId ??
+          (cfg && Array.isArray(cfg.outletIds) && typeof cfg.outletIds[0] === "string"
+            ? (cfg.outletIds[0] as string)
+            : null);
+
         const writeResult = await writeItems({
           runId,
           sourceId,
@@ -78,7 +87,7 @@ export const runCollectionSource = inngest.createFunction(
             targetModules: source.targetModules,
             defaultCategory: source.defaultCategory,
             defaultTags: source.defaultTags,
-            outletId: source.outletId,
+            outletId: fallbackOutletId,
             defaultOutletTier: source.defaultOutletTier,
             defaultOutletRegion: source.defaultOutletRegion,
           },

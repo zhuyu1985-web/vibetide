@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
 import { AnalysisProgress, type AnalysisPhase } from "@/components/topic-compare/analysis-progress";
+import { PromptDialog } from "@/components/shared/prompt-dialog";
 import {
   confirmMissedTopic,
   excludeMissedTopic,
@@ -82,6 +83,7 @@ export function MissingTopicDetailClient({ detail }: Props) {
   const [progressMsg, setProgressMsg] = useState("");
   const [liveReportCount, setLiveReportCount] = useState<number | undefined>();
   const [actionPending, setActionPending] = useState(false);
+  const [excludeDialogOpen, setExcludeDialogOpen] = useState(false);
 
   const allReports: MissingTopicBenchmarkReport[] = [
     ...(detail.primaryReport ? [detail.primaryReport] : []),
@@ -179,14 +181,18 @@ export function MissingTopicDetailClient({ detail }: Props) {
     }
   }
 
-  async function handleExclude() {
-    const reason = prompt("排除原因（选填）") ?? "";
+  function handleExclude() {
+    setExcludeDialogOpen(true);
+  }
+
+  async function confirmExclude(reason: string) {
+    setExcludeDialogOpen(false);
     setActionPending(true);
     try {
       const res = await excludeMissedTopic({
         topicId: detail.id,
         reasonCode: "manual_excluded",
-        reasonText: reason || undefined,
+        reasonText: reason.trim() || undefined,
       });
       if (res.success) {
         toast.success("已排除");
@@ -350,6 +356,17 @@ export function MissingTopicDetailClient({ detail }: Props) {
           </GlassCard>
         </div>
       </div>
+
+      <PromptDialog
+        open={excludeDialogOpen}
+        onOpenChange={setExcludeDialogOpen}
+        title="排除该选题"
+        description="可填写排除原因（选填）"
+        placeholder="例如：与现有报道重复"
+        multiline
+        confirmText="确认排除"
+        onConfirm={confirmExclude}
+      />
     </div>
   );
 }

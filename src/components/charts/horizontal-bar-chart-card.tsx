@@ -55,7 +55,7 @@ export function HorizontalBarChartCard({
             fontSize: "12px",
           }}
         />
-        <Bar dataKey={dataKey} fill={color} radius={[0, 4, 4, 0]} />
+        <Bar dataKey={dataKey} fill={color} radius={[0, 4, 4, 0]} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   );

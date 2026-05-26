@@ -63,6 +63,9 @@ scripts/tikhub-probe-output/
 .agents/
 .codex/
 
+# Supabase CLI 自动写入的临时状态(版本号、缓存)— 由 CLI 维护,不入仓
+supabase/.temp/
+
 # 大体积数据/演示文档(476MB json + 51MB presentations 等,不入仓)
 docs/data.xlsx
 docs/test-site.xlsx

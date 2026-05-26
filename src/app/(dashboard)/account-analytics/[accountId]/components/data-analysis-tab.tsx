@@ -1,15 +1,20 @@
 "use client";
 
 import { useCallback } from "react";
+import dynamic from "next/dynamic";
 import { GlassCard } from "@/components/shared/glass-card";
 import { LineChartCard } from "@/components/charts/line-chart-card";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAccountAnalyticsURLState } from "./use-url-state";
 import { MetricTrendChart } from "./metric-trend-chart";
 import { PublishActivityCard } from "./publish-activity-card";
 import { RecentTopPosts } from "./recent-top-posts";
 import { CategoryDistribution } from "./category-distribution";
-import { KeywordCloud } from "./keyword-cloud";
+// d3-cloud 主线程 O(n²) 布局成本大,改为 client-only 懒加载,首次进 tab 时再加载
+const KeywordCloud = dynamic(
+  () => import("./keyword-cloud").then((m) => m.KeywordCloud),
+  { ssr: false },
+);
 import {
   getMetricAvailability,
   getSummaryCards,
@@ -82,24 +87,18 @@ export function DataAnalysisTab({ accountId, platform, trend }: Props) {
     <div className="space-y-6">
       {/* 顶部工具条 · 粒度切换 */}
       <div className="flex items-center justify-between">
-        <div className="inline-flex rounded-full bg-gray-100 dark:bg-gray-800 p-0.5">
-          {GRANULARITIES.map((g) => (
-            // eslint-disable-next-line no-restricted-syntax
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGranularity(g)}
-              className={cn(
-                "px-4 py-1.5 rounded-full text-[12px] font-medium border-0 cursor-pointer transition-colors",
-                granularity === g
-                  ? "bg-white text-sky-600 shadow-sm"
-                  : "text-gray-500",
-              )}
-            >
-              {GRANULARITY_LABELS[g]}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          value={granularity}
+          onValueChange={(v) => setGranularity(v as Granularity)}
+        >
+          <TabsList variant="default">
+            {GRANULARITIES.map((g) => (
+              <TabsTrigger key={g} value={g}>
+                {GRANULARITY_LABELS[g]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* 30 天趋势图 · Tab 开篇 */}

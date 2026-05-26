@@ -100,6 +100,7 @@ export function KBDetailClient({ kb, initialItems, bindings, syncLogs }: Props) 
   useEffect(() => {
     if (currentStatus !== "processing" && currentStatus !== "pending") return;
     const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       startRefreshTransition(() => { router.refresh(); });
     }, 5000);
     return () => clearInterval(interval);

@@ -27,6 +27,7 @@ export function DimensionRadar({ data, height = 280 }: Props) {
           stroke="#0ea5e9"
           fill="#0ea5e9"
           fillOpacity={0.3}
+          isAnimationActive={false}
         />
       </RadarChart>
     </ResponsiveContainer>

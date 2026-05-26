@@ -69,6 +69,7 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
           platform: myAccounts.platform,
           handle: myAccounts.handle,
           name: myAccounts.name,
+          outletId: myAccounts.outletId,
         })
         .from(myAccounts)
         .where(eq(myAccounts.isEnabled, true));
@@ -80,6 +81,7 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
           platform: benchmarkAccounts.platform,
           handle: benchmarkAccounts.handle,
           name: benchmarkAccounts.name,
+          outletId: benchmarkAccounts.outletId,
         })
         .from(benchmarkAccounts)
         .where(eq(benchmarkAccounts.isEnabled, true));
@@ -90,6 +92,7 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
         platform: string;
         handle: string;
         name: string;
+        outletId: string | null;
         source: "my" | "benchmark";
       }> = [];
       for (const r of myRows) {
@@ -104,6 +107,7 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
           platform: r.platform,
           handle: r.handle,
           name: r.name,
+          outletId: r.outletId,
           source: "benchmark",
         });
       }
@@ -124,8 +128,12 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
       const aggregated = await step.run(
         `aggregate-${target.id}`,
         async () => {
-          // 用 accountId 匹配 collected_items.accountId（注意 collected_items 是字符串 accountId）
-          // 兼容 handle 匹配（很多源里 accountId 字段对齐外部平台 ID 而非内部 UUID）
+          // 匹配规则（OR）：
+          //   1. collected_items.account_handle = my_accounts.handle (自定义短 ID)
+          //   2. collected_items.account_id = my_accounts.id (UUID)
+          //   3. collected_items.outlet_id = my_accounts.outlet_id (账号模式下唯一稳定的桥)
+          //      ← weibo/douyin adapter 把 uid 写到 account_id，跟 my_accounts.id UUID 对不上,
+          //         必须靠 outlet_id 桥接才能聚合到正确的账号
           const rows = await db
             .select({
               id: collectedItems.id,
@@ -142,7 +150,16 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
               and(
                 eq(collectedItems.organizationId, target.organizationId!),
                 eq(collectedItems.platform, target.platform),
-                sql`(${collectedItems.accountHandle} = ${target.handle} OR ${collectedItems.accountId} = ${target.id})`,
+                target.outletId
+                  ? sql`(
+                      ${collectedItems.accountHandle} = ${target.handle}
+                      OR ${collectedItems.accountId} = ${target.id}
+                      OR ${collectedItems.outletId} = ${target.outletId}
+                    )`
+                  : sql`(
+                      ${collectedItems.accountHandle} = ${target.handle}
+                      OR ${collectedItems.accountId} = ${target.id}
+                    )`,
                 gte(collectedItems.publishedAt, new Date(windowStart)),
                 lt(collectedItems.publishedAt, new Date(windowEnd)),
               ),

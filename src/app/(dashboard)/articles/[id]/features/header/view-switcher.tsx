@@ -5,9 +5,11 @@ import type { ActiveView } from "../../types";
 import { cn } from "@/lib/utils";
 
 const views: { key: ActiveView; label: string }[] = [
+  { key: "preview", label: "稿件预览" },
   { key: "immersive", label: "沉浸阅读" },
   { key: "web", label: "原始网页" },
   { key: "brief", label: "AI速览" },
+  { key: "translate", label: "翻译模式" },
   { key: "archive", label: "网页存档" },
 ];
 

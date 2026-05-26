@@ -54,13 +54,19 @@ export function EmployeeAvatar({
   const bgColor = meta?.bgColor ?? "rgba(107,114,128,0.12)";
   const s = sizeMap[size];
   const SvgAvatar = EMPLOYEE_AVATAR_MAP[employeeId as EmployeeId];
+  // 小尺寸(xs/sm)默认静态 — 它们出现在 TemplateCard 团队成员等密集场景,
+  // 35+ 个 × 5 个 SVG 内部 infinite 动画是 home 页 CPU 大头。32px 看不到细节。
+  // animated=true 时显式覆盖,强制激活动画。
+  const isSmall = size === "xs" || size === "sm";
+  const useStatic = isSmall && !animated;
 
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
       <div
         className={cn(
           s.container,
-          "rounded-full overflow-hidden flex items-center justify-center"
+          "rounded-full overflow-hidden flex items-center justify-center",
+          useStatic && "avatar-static"
         )}
         style={SvgAvatar ? undefined : { backgroundColor: bgColor }}
       >

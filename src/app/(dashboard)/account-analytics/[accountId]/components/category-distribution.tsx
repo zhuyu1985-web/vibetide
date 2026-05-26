@@ -60,7 +60,7 @@ export function CategoryDistribution({ loader }: Props) {
           <XAxis type="number" tick={{ fontSize: 11 }} />
           <YAxis type="category" dataKey="category" tick={{ fontSize: 12 }} width={60} />
           <Tooltip />
-          <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+          <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
             {data.buckets.map((entry) => (
               <Cell key={entry.category} fill={AIGC_CATEGORY_COLORS[entry.category]} />
             ))}

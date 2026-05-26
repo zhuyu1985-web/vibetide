@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { Sparkles } from "lucide-react";
 import { useArticlePageStore } from "./store";
 import { useAppearance } from "./hooks/use-article-context";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
@@ -11,11 +11,17 @@ import { cn } from "@/lib/utils";
 import { ArticleHeader } from "./features/header/article-header";
 import { EditorTopBar } from "./features/header/editor-top-bar";
 import { LeftOuterNav } from "./features/header/left-outer-nav";
-import { RightOuterNav } from "./features/header/right-outer-nav";
 import { ArticleReader } from "./features/reader/article-reader";
-import { ArticleEditor } from "./features/editor/article-editor";
+// Tiptap 23 个 extension 同步加载成本高,改为 client-only 懒加载减小首屏 chunk。
+const ArticleEditor = dynamic(
+  () => import("./features/editor/article-editor").then((m) => m.ArticleEditor),
+  { ssr: false },
+);
 import { AIChatPanel } from "./features/ai-chat/ai-chat-panel";
 import { AIAnalysisPanel } from "./features/ai-analysis/ai-analysis-panel";
+import { BriefView } from "./features/brief/brief-view";
+import { ImmersiveOverlay } from "./features/immersive/immersive-overlay";
+import { TranslateOverlay } from "./features/translate/translate-overlay";
 import { AnnotationsPanel } from "./features/annotations/annotations-panel";
 import { FloatingNote } from "./features/annotations/floating-note";
 import { useAnnotations } from "./features/annotations/use-annotations";
@@ -25,6 +31,7 @@ import { ExternalPublishPanel } from "@/components/articles/external-publish-pan
 // Phase 2.3 — 4 个新 panel
 import { ArticleInfoPanel } from "./features/info/article-info-panel";
 import { ChannelRewritePanel } from "./features/channels/channel-rewrite-panel";
+import { ChannelButtonGrid } from "./features/channels/channel-button-grid";
 import { MediaLibraryPanel } from "./features/library/media-library-panel";
 import { AigcAppsPanel } from "./features/aigc/aigc-apps-panel";
 import {
@@ -44,13 +51,16 @@ export default function ArticleDetailClient({
     viewMode,
     setViewMode,
     activeView,
+    setActiveView,
     leftPanelOpen,
     rightPanelOpen,
     zenMode,
     rightTab,
     leftCategory,
     rightCategory,
+    setRightCategory,
     activeChannel,
+    setActiveChannel,
     toggleLeftPanel,
     toggleRightPanel,
     setRightTab,
@@ -217,22 +227,23 @@ export default function ArticleDetailClient({
                 seekRef={videoSeekRef}
               />
             </div>
-          ) : activeView === "immersive" ? (
-            viewMode === "edit" ? (
-              <ArticleEditor
+          ) : viewMode === "edit" ? (
+            <ArticleEditor
+              article={article}
+              appearance={appearance}
+              onExitEdit={() => setViewMode("read")}
+            />
+          ) : activeView === "preview" ||
+            activeView === "immersive" ||
+            activeView === "translate" ? (
+            // 沉浸阅读 / 翻译 都是 overlay；中央保持 preview 内容
+            <div ref={centerRef} className="h-full overflow-y-auto">
+              <ArticleReader
                 article={article}
                 appearance={appearance}
-                onExitEdit={() => setViewMode("read")}
+                organizationId={organizationId}
               />
-            ) : (
-              <div ref={centerRef} className="h-full overflow-y-auto">
-                <ArticleReader
-                  article={article}
-                  appearance={appearance}
-                  organizationId={organizationId}
-                />
-              </div>
-            )
+            </div>
           ) : activeView === "web" ? (
             <div className="flex-1 flex flex-col h-full">
               {article.sourceAssetId ? (
@@ -248,15 +259,11 @@ export default function ArticleDetailClient({
               )}
             </div>
           ) : activeView === "brief" ? (
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="max-w-[600px] text-center">
-                <Sparkles className="w-8 h-8 mx-auto mb-4 text-blue-500" />
-                <p className="text-sm text-muted-foreground">AI 速览视图</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  点击右侧 AI 解读面板查看分析结果
-                </p>
-              </div>
-            </div>
+            <BriefView
+              articleId={article.id}
+              articleContent={article.body ?? ""}
+              initialCache={initialAIAnalysis}
+            />
           ) : activeView === "archive" ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="max-w-[600px] text-center">
@@ -278,6 +285,23 @@ export default function ArticleDetailClient({
           {rightPanelOpen ? (
             viewMode === "edit" ? (
               <div className="flex flex-col h-full">
+                {/* 顶部 tab：信息 / 渠道（统一为预览模式样式） */}
+                <div className="flex border-b border-[var(--glass-border)] text-[12px]">
+                  {(["info", "channel"] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      className={cn(
+                        "flex-1 text-center py-2 transition-colors",
+                        rightCategory === cat
+                          ? "text-blue-500 border-b-2 border-blue-500"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setRightCategory(cat)}
+                    >
+                      {cat === "info" ? "信息" : "渠道"}
+                    </button>
+                  ))}
+                </div>
                 <div className="flex-1 overflow-hidden flex flex-col">
                   {rightCategory === "info" && (
                     <ArticleInfoPanel
@@ -294,11 +318,19 @@ export default function ArticleDetailClient({
                     />
                   )}
                   {rightCategory === "channel" && (
-                    <ChannelRewritePanel
-                      articleId={article.id}
-                      initialPlatform={activeChannel}
-                      hidePlatformPicker
-                    />
+                    <div className="flex flex-col h-full overflow-hidden">
+                      <ChannelButtonGrid
+                        active={activeChannel}
+                        onChange={setActiveChannel}
+                      />
+                      <div className="flex-1 overflow-hidden">
+                        <ChannelRewritePanel
+                          articleId={article.id}
+                          initialPlatform={activeChannel}
+                          hidePlatformPicker
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
                 {/* 海外英文稿件专属面板 */}
@@ -367,7 +399,19 @@ export default function ArticleDetailClient({
                     />
                   )}
                   {rightTab === "channels" && (
-                    <ChannelRewritePanel articleId={article.id} />
+                    <div className="flex flex-col h-full overflow-hidden">
+                      <ChannelButtonGrid
+                        active={activeChannel}
+                        onChange={setActiveChannel}
+                      />
+                      <div className="flex-1 overflow-hidden">
+                        <ChannelRewritePanel
+                          articleId={article.id}
+                          initialPlatform={activeChannel}
+                          hidePlatformPicker
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
                 {articleLanguage === "en" && (
@@ -391,8 +435,6 @@ export default function ArticleDetailClient({
           )}
         </div>
 
-        {/* 最右侧 80px 渠道 nav，仅 edit 模式显示 */}
-        {viewMode === "edit" && <RightOuterNav />}
       </div>
 
       {/* Floating sticky notes — rendered above everything via fixed positioning */}
@@ -409,6 +451,24 @@ export default function ArticleDetailClient({
             }
           />
         ))}
+
+      {/* 沉浸阅读全屏遮罩 */}
+      {viewMode === "read" && activeView === "immersive" && !isVideo && (
+        <ImmersiveOverlay
+          article={article}
+          appearance={appearance}
+          organizationId={organizationId}
+          onClose={() => setActiveView("preview")}
+        />
+      )}
+
+      {/* 翻译全屏遮罩 */}
+      {viewMode === "read" && activeView === "translate" && !isVideo && (
+        <TranslateOverlay
+          article={article}
+          onClose={() => setActiveView("preview")}
+        />
+      )}
     </div>
   );
 }

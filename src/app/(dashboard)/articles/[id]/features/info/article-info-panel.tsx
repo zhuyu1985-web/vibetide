@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Eye, HelpCircle, Plus, RefreshCw, Loader2 } from "lucide-react";
 import { updateArticle } from "@/app/actions/articles";
 import { cn } from "@/lib/utils";
+import { PromptDialog } from "@/components/shared/prompt-dialog";
 
 const LIST_STYLE_OPTIONS = [
   { value: "default", label: "默认" },
@@ -59,6 +60,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
   const [listStyle, setListStyle] = useState(initial.listStyle ?? "default");
   const [pending, startTransition] = useTransition();
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [coverDialogOpen, setCoverDialogOpen] = useState(false);
 
   const handleSave = () => {
     const keywords = keywordsRaw
@@ -215,10 +217,7 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
             </div>
           ) : (
             <button
-              onClick={() => {
-                const url = window.prompt("请输入封面图 URL（后续接资源库选择器）");
-                if (url) setCoverUrl(url);
-              }}
+              onClick={() => setCoverDialogOpen(true)}
               className="w-full aspect-video border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground hover:border-blue-400/50 hover:bg-blue-50/40 dark:hover:bg-blue-500/[0.05] transition-colors"
             >
               <Plus className="h-5 w-5" />
@@ -228,6 +227,20 @@ export function ArticleInfoPanel({ articleId, initial }: ArticleInfoPanelProps) 
           )}
         </FieldGroup>
       </div>
+
+      <PromptDialog
+        open={coverDialogOpen}
+        onOpenChange={setCoverDialogOpen}
+        title="设置封面图"
+        description="后续将接入资源库选择器"
+        placeholder="https://example.com/cover.png"
+        confirmText="应用"
+        onConfirm={(url) => {
+          setCoverDialogOpen(false);
+          const trimmed = url.trim();
+          if (trimmed) setCoverUrl(trimmed);
+        }}
+      />
     </div>
   );
 }

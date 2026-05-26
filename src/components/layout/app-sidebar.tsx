@@ -125,6 +125,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: "热点发现", href: "/inspiration", icon: Lightbulb },
       { label: "同题对比", href: "/topic-compare", icon: Compass },
       { label: "漏题筛查", href: "/missing-topics", icon: SearchX },
+      { label: "账号分析", href: "/account-analytics", icon: TrendingUp },
       { label: "超级创作", href: "/super-creation", icon: PenTool },
       { label: "精品聚合", href: "/premium-content", icon: Gem },
       { label: "短视频工厂", href: "/video-batch", icon: Film },

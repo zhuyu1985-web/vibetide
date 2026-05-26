@@ -56,9 +56,10 @@ const TARGET_MODULES = [
   { value: "knowledge", label: "知识库 (knowledge)" },
 ];
 
-// Polling 2s × 150 = 5 分钟。整站采集等长任务实测 3-6 分钟,90s 太短会误报"超时"。
-const POLL_INTERVAL_MS = 2000;
-const POLL_MAX_ATTEMPTS = 150;
+// Polling 3s × 100 = 5 分钟。整站采集等长任务实测 3-6 分钟,90s 太短会误报"超时"。
+// tab 隐藏时 tick 跳过 fetch 但保留 schedule,visible 后立即恢复。
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_ATTEMPTS = 100;
 
 export interface SourceDetail {
   id: string;
@@ -155,6 +156,10 @@ export function SourceDetailClient({ source, runs, items, outlets, configFields 
   const pollUntilDone = async () => {
     let attempts = 0;
     const tick = async () => {
+      if (document.hidden) {
+        setTimeout(tick, POLL_INTERVAL_MS);
+        return;
+      }
       attempts++;
       let latest: LatestRunStatus;
       try {

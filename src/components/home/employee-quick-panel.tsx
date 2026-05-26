@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
@@ -37,7 +38,8 @@ const cardVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" as const } },
 };
 
-export function EmployeeQuickPanel({
+// memo: 父组件 keystroke 高频重 render,只有 activeEmployee 切换时才需要更新
+export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
   activeEmployee,
   onEmployeeClick,
 }: EmployeeQuickPanelProps) {
@@ -104,4 +106,4 @@ export function EmployeeQuickPanel({
       </motion.div>
     </div>
   );
-}
+});

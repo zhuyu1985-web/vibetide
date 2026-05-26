@@ -7,7 +7,6 @@
  *   [logo + 智能编辑器]                          [☁ 同步指示] [关闭][预览][保存][保存并提交][⚙]
  */
 
-import { useRouter } from "next/navigation";
 import { Cloud, Settings, X } from "lucide-react";
 import { useArticlePageStore } from "../../store";
 import { cn } from "@/lib/utils";
@@ -17,17 +16,19 @@ interface EditorTopBarProps {
 }
 
 export function EditorTopBar({ articleId }: EditorTopBarProps) {
-  const router = useRouter();
   const setViewMode = useArticlePageStore((s) => s.setViewMode);
   const editorIsSaving = useArticlePageStore((s) => s.editorIsSaving);
   const editorIsDirty = useArticlePageStore((s) => s.editorIsDirty);
   const editorHandlers = useArticlePageStore((s) => s.editorHandlers);
 
+  // 关闭 = 退出编辑模式，回到预览。
+  // 若有未保存改动，走编辑器的 cancel handler（弹"放弃修改"确认框）；
+  // 没改动则直接切回 read。
   const handleClose = () => {
-    router.push("/articles");
-  };
-
-  const handlePreview = () => {
+    if (editorIsDirty && editorHandlers) {
+      editorHandlers.cancel();
+      return;
+    }
     setViewMode("read");
   };
 
@@ -79,31 +80,16 @@ export function EditorTopBar({ articleId }: EditorTopBarProps) {
         </button>
 
         <button
-          onClick={handlePreview}
-          className="h-8 px-3 rounded-md text-xs font-medium text-muted-foreground bg-muted/30 dark:bg-white/5 hover:text-foreground hover:bg-muted/60 transition-colors"
-        >
-          预览
-        </button>
-
-        <button
           onClick={() => editorHandlers?.save()}
           disabled={editorIsSaving || !editorIsDirty}
           className={cn(
-            "h-8 px-3 rounded-md text-xs font-medium transition-colors",
+            "h-8 px-4 rounded-md text-xs font-medium transition-colors shadow-sm",
             editorIsDirty && !editorIsSaving
-              ? "text-blue-600 bg-blue-50 dark:bg-blue-500/15 hover:bg-blue-100 dark:hover:bg-blue-500/25"
-              : "text-muted-foreground bg-muted/30 dark:bg-white/5 opacity-60",
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-blue-500/40 text-white opacity-70 cursor-not-allowed",
           )}
         >
           {editorIsSaving ? "保存中…" : "保存"}
-        </button>
-
-        <button
-          onClick={() => editorHandlers?.saveAndSubmit()}
-          disabled={editorIsSaving}
-          className="h-8 px-4 rounded-md text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-60"
-        >
-          保存并提交
         </button>
 
         <button
