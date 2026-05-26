@@ -109,6 +109,11 @@ export interface StepOutput {
     wordCount?: number;
   };
   status: "success" | "partial" | "needs_approval";
+  // 工具/LLM-skill 真实结果直出场景（mission-executor 短路分支）会把
+  // invocation.result 的结构化字段（topics / results / articles 等）spread 进
+  // outputData，让下游步骤的 {{stepN.field}} 模板能引用。Index signature 让
+  // 这些额外字段在类型层合法。
+  [extraField: string]: unknown;
 }
 
 // ---------------------------------------------------------------------------

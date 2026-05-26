@@ -359,14 +359,18 @@ export async function loadDependencyOutputs(
     .filter((t) => t && t.outputData)
     .map((t) => {
       const output = t!.outputData as StepOutput;
+      // 保留 outputData 全部字段（如 topics / results / articles），只为缺失的
+      // StepOutput 必填字段补 default。让 {{stepN.field}} 模板能引用工具/skill
+      // 真实输出的字段（A.1.2.5 修：原版显式重映射会 strip 未知字段）。
       return {
+        ...output,
         stepKey: t!.id,
         employeeSlug: (output.employeeSlug || "xiaolei") as EmployeeId,
         summary: output.summary || "",
         artifacts: output.artifacts || [],
         metrics: output.metrics,
         status: output.status || "success",
-      } satisfies StepOutput;
+      } as StepOutput;
     });
 }
 

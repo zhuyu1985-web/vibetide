@@ -58,3 +58,28 @@ describe("renderStepParameters", () => {
     expect(rendered.foo).toBe("");
   });
 });
+
+describe("renderStepParameters with real-world StepOutput shape", () => {
+  it("从 StepOutput 含 topics 字段能取到 (verify A.1.2.5 fix)", () => {
+    // Mock production-like previousSteps shape: StepOutput with extra fields
+    const previousSteps = [
+      {
+        outputData: {
+          stepKey: "task-1",
+          employeeSlug: "xiaolei",
+          summary: "拉到 30 条",
+          artifacts: [],
+          metrics: {},
+          status: "success",
+          topics: [{ id: "t1", title: "X" }], // 额外字段，A.1.2.5 修后应保留
+        },
+      },
+    ];
+    const rendered = renderStepParameters(
+      { topics: "{{step1.topics}}" },
+      { inputParams: {} } as never,
+      previousSteps,
+    );
+    expect(rendered.topics).toEqual([{ id: "t1", title: "X" }]);
+  });
+});

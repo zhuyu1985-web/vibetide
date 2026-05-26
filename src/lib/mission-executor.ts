@@ -734,6 +734,10 @@ async function executeTaskDirect(
     let preExecUsedTool = false;
     let preExecEmpty = false; // 预执行跑完且结果为 0 条 —— 触发 LLM 跳过路径
     let preExecParams: Record<string, unknown> = {};
+    // 保留 invocation.result 到外层 scope —— deterministicOutput 在 short-circuit
+    // 分支需要把它 spread 进 outputData，让 {{stepN.field}} 模板能引用工具/skill
+    // 真实返回的结构化字段（topics / results / articles 等）。
+    let preExecResult: unknown = null;
     if (mission.workflowTemplateId && task.assignedRole) {
       try {
         const tpl = await db.query.workflowTemplates.findFirst({
@@ -846,6 +850,7 @@ async function executeTaskDirect(
           preExecParams = rendered;
           if (invocation.ok) {
             preExecUsedTool = true;
+            preExecResult = invocation.result;
             const serialized = JSON.stringify(invocation.result, null, 2);
             // 过长会吃掉上下文预算；截断到 8000 字符（上游 skillSpec + SKILL.md
             // 已占位，这里保守一点）。
@@ -964,7 +969,16 @@ async function executeTaskDirect(
         rawResultBlock: preExecResultBlock,
       });
 
+      // 把 invocation.result 的结构化字段 spread 进 outputData（让 {{stepN.field}}
+      // 模板能引用真实输出字段，如 topics / results / articles）。
+      // 注意：spread 必须在固定字段之前，避免 result 误覆盖 stepKey/summary 等保留字段。
+      const resultFields =
+        preExecResult && typeof preExecResult === "object"
+          ? (preExecResult as Record<string, unknown>)
+          : {};
+
       const deterministicOutput = {
+        ...resultFields,
         stepKey: task.id,
         employeeSlug: agent.slug,
         summary: preExecEmpty
