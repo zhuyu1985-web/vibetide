@@ -13,6 +13,7 @@ import {
   getSkillCombo,
 } from "@/lib/dal/employee-advanced";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { invokeToolDirectly, isToolRegistered } from "@/lib/agent/tool-registry";
 // ---------------------------------------------------------------------------
 // Helper: snapshot current employee config
 // ---------------------------------------------------------------------------
@@ -197,7 +198,7 @@ export async function testSkillExecution(
   skillId: string,
   testInput: string
 ) {
-  await requireAuth();
+  const user = await requireAuth();
 
   const skill = await db.query.skills.findFirst({
     where: eq(skills.id, skillId),
@@ -212,6 +213,97 @@ export async function testSkillExecution(
     maxConcurrency?: number;
     modelDependency?: string;
   } | null;
+
+  // ─── 真工具优先路径(M1) ─────────────────────────────────────────────
+  // 当 skill.name 在 tool-registry 注册(如 trending_topics / topic_classifier
+  // / archive_to_drafts),直接 server-side 调真工具,不走 LLM 编故事。
+  const WRITE_TOOLS = new Set([
+    "cms_publish",
+    "archive_to_drafts",
+    "cms_catalog_sync",
+    "external_publish",
+  ]);
+
+  if (isToolRegistered(skill.name)) {
+    // 1. 解析 testInput:JSON 优先,否则尝试默认值
+    let parsedInput: Record<string, unknown> = {};
+    const trimmed = testInput.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        parsedInput = JSON.parse(trimmed);
+      } catch {
+        parsedInput = {};
+      }
+    }
+
+    // 2. 写入型工具强制 dryRun
+    const isWriteTool = WRITE_TOOLS.has(skill.name);
+    if (isWriteTool) {
+      parsedInput.dryRun = true;
+    }
+
+    // 3. 调用真工具
+    const startTime = Date.now();
+    const invocation = await invokeToolDirectly(skill.name, parsedInput, {
+      organizationId: undefined,  // 测试入口当前无 mission 上下文;写入型自带 dryRun 短路
+      operatorId: user.id,
+    });
+    const durationMs = Date.now() - startTime;
+
+    const serialized = invocation.ok
+      ? JSON.stringify(invocation.result, null, 2)
+      : `Tool 调用失败: ${invocation.error}`;
+    const truncated = serialized.length > 8000
+      ? serialized.slice(0, 8000) + "\n... (结果过长已截断)"
+      : serialized;
+
+    return {
+      skillName: skill.name,
+      skillCategory: skill.category,
+      skillVersion: skill.version,
+      description: skill.description,
+      testInput,
+      inputSchema,
+      outputSchema,
+      runtimeInfo: {
+        type: `Tool (真实接口${isWriteTool ? " · dryRun" : ""})`,
+        estimatedLatency: `${durationMs}ms`,
+        maxConcurrency: 1,
+        modelDependency: skill.name,
+      },
+      expectedBehavior: invocation.ok
+        ? `[真实调用] ${skill.name} 已成功执行,返回结构化数据见下方 output`
+        : `[真实调用失败] ${skill.name}: ${(invocation as { error?: string }).error ?? "unknown"}`,
+      executionResult: {
+        success: invocation.ok,
+        output: truncated,
+        error: invocation.ok ? undefined : (invocation as { error?: string }).error,
+        durationMs,
+      },
+      validationChecks: [
+        {
+          check: "工具发现",
+          status: "pass" as const,
+          detail: `tool-registry 命中 ${skill.name}${isWriteTool ? "(自动 dryRun 防污染)" : ""}`,
+        },
+        {
+          check: "参数校验",
+          status: invocation.ok ? ("pass" as const) : ("fail" as const),
+          detail: invocation.ok
+            ? `输入参数已传给工具:${JSON.stringify(parsedInput).slice(0, 200)}`
+            : `工具拒绝参数: ${(invocation as { error?: string }).error ?? "unknown"}`,
+        },
+        {
+          check: "外部接口",
+          status: invocation.ok ? ("pass" as const) : ("fail" as const),
+          detail: invocation.ok
+            ? `调用成功,耗时 ${durationMs}ms`
+            : `调用失败: ${(invocation as { error?: string }).error ?? "unknown"}`,
+        },
+      ],
+    };
+  }
+  // ─── 旧 LLM 演示路径保持不变(下方 systemPromptParts 构造继续) ─────
 
   // Build system prompt from skill metadata + SKILL.md content
   const systemPromptParts: string[] = [
