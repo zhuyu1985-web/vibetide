@@ -52,14 +52,61 @@
 - Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/llm-skill-dispatch.ts`
 - Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/__tests__/llm-skill-dispatch.test.ts`
 
-- [ ] **Step 1: 先 export ClassifiedItem 别名 (topic-classifier.ts)**
+- [ ] **Step 1: topic-classifier.ts 加 title/summary echo + ClassifiedItem alias**
 
-修改 `src/lib/agent/skills/topic-classifier.ts` 末尾加：
+修改 `src/lib/agent/skills/topic-classifier.ts`:
+
+a) `TopicClassifierResult` interface 加 `title?: string; summary?: string;` 字段（echo 输入的对应字段，让下游 cross_language_rewrite 不用反查 step1.topics）：
+
+```ts
+export interface TopicClassifierResult {
+  id: string;
+  category: string;
+  confidence: number;
+  reason: string;
+  sourceUrl?: string;
+  title?: string;     // ← 新：echo 输入的 title
+  summary?: string;   // ← 新：echo 输入的 summary
+}
+```
+
+b) schema 同步加 title/summary optional：
+
+```ts
+const ClassifiedItemBase = {
+  id: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  reason: z.string().min(2).max(200),
+  sourceUrl: z.string().optional(),
+  title: z.string().optional(),      // ← 新
+  summary: z.string().optional(),    // ← 新
+};
+```
+
+c) prompt 加引导：「输入 topic 的 title 必须原样 echo 到输出；summary 若有则一并 echo（让下游翻译时不用反查）。」
+
+d) `classifyOverseasTopics` 内部回填逻辑，在 missing 兜底 + sourceUrl 兜底之后也兜底 title/summary：
+
+```ts
+const filled: TopicClassifierResult[] = output.results.map((r) => {
+  const inputTopic = input.topics.find((t) => t.id === r.id);
+  return {
+    ...r,
+    sourceUrl: r.sourceUrl ?? inputTopic?.sourceUrl,
+    title: r.title ?? inputTopic?.title,
+    summary: r.summary ?? inputTopic?.summary,
+  };
+});
+```
+
+e) 末尾加 type alias export：
 
 ```ts
 // 别名 export：dispatch / renderer 用 ClassifiedItem 更语义化
 export type ClassifiedItem = TopicClassifierResult;
 ```
+
+这样 dispatch 拿到 step2.results 时每条都有 title/summary，不用反查 step1.topics。
 
 - [ ] **Step 2: 写测试 (failing)**
 
@@ -207,13 +254,14 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
           (a.confidence ?? 0) >= CLASSIFIER_CONFIDENCE_THRESHOLD,
       );
       // map 为 ArticleInput shape
-      // 注意：ClassifiedItem 不带 title/body 本身，但 dispatch caller (mission-executor)
-      // 应在 input builder 时把 step1.topics 的 title/summary 合并过来。
-      // 在这里假设 caller 已合并 → article 含 .title / .summary
+      // ClassifiedItem 在 A.1.1 Step 1 已经加了 title/summary 字段（topic_classifier 输出
+      // 时从输入 echo 回去），所以这里直接读即可，不用反查 step1.topics。
+      // body fallback：summary 缺失时 fallback 到 title 重复（cross_language_rewrite
+      // schema body min length=10，确保过校验）。
       const articles = filtered.map((a) => ({
         id: a.id,
-        title: (a as ClassifiedItem & { title?: string }).title ?? a.id,
-        body: (a as ClassifiedItem & { summary?: string }).summary ?? "",
+        title: a.title ?? a.id,
+        body: a.summary && a.summary.length >= 10 ? a.summary : (a.title ?? a.id).repeat(2),
         sourceUrl: a.sourceUrl,
         category: a.category,
       }));
@@ -455,13 +503,18 @@ const rendered = renderStepParameters(rawParams, mission, previousSteps);
 Run: `npx vitest run src/lib/__tests__/mission-executor-short-circuit.test.ts`
 Expected: 6 PASS
 
-- [ ] **Step 5: 加 LLM-skill dispatch 分支**
+- [ ] **Step 5: 加 LLM-skill dispatch 分支 + 复用现有 short-circuit 副作用**
 
-在 mission-executor.ts 的 pre-exec 分支 (line 767 附近 `const invocation = await invokeToolDirectly(...)`) 前加：
+**关键约束** (来自 spec §9.3 + reviewer Issue #2): 现有 `invokeToolDirectly` short-circuit (line 909-940) 写 outputData 之后还有 Promise.all 3 件事：(a) update mission_tasks status (b) update ai_employees idle (c) insert mission_messages 通知。LLM-skill short-circuit **必须复用同样代码**，否则员工会卡在 busy 状态 + 通知缺失。
+
+策略：让 LLM-skill 跟 invokeToolDirectly 走**同一段** short-circuit 代码（line 885-946），只是 invocation 的来源不同。这样 Promise.all 副作用天然共享。
+
+在 mission-executor.ts pre-exec 分支 (line 767 附近 `const invocation = await invokeToolDirectly(...)`) 改造：
 
 ```ts
 // 在 invokeToolDirectly 之前先查 LLM-skill 注册
-const { isLLMSkillRegistered, invokeLLMSkillDirectly } = await import("@/lib/agent/llm-skill-dispatch");
+// import 顶层加: import { isLLMSkillRegistered, invokeLLMSkillDirectly } from "@/lib/agent/llm-skill-dispatch";
+// (不要 dynamic import，因为 short-circuit 调用频繁，dynamic import 每次 module resolution 开销)
 
 let invocation: Awaited<ReturnType<typeof invokeToolDirectly>>;
 if (isLLMSkillRegistered(task.assignedRole)) {
@@ -477,7 +530,33 @@ if (isLLMSkillRegistered(task.assignedRole)) {
   );
 }
 preExecParams = rendered;
-// ... 接现有 if (invocation.ok) 分支
+// 下面的 if (invocation.ok) { preExecUsedTool = true; ... } 分支保持不变
+// 因为 invocation 类型一致 ({ ok, toolName, params, result } | { ok, ..., error })，
+// 后续 short-circuit 逻辑 (line 885-946) 跟 invokeToolDirectly 流程完全共享
+```
+
+**验证 short-circuit 触发条件**: line 885 是 `if (preExecUsedTool && task.assignedRole && isToolRegistered(task.assignedRole))`。LLM-skill 的 `task.assignedRole` (如 `topic_classifier`) **不在 tool-registry 里注册**，`isToolRegistered` 返回 false → short-circuit **不会触发** → 走原 executeAgent → 浪费 LLM 调用。**Fix：** 把 line 885 条件改为：
+
+```ts
+if (
+  preExecUsedTool &&
+  task.assignedRole &&
+  (isToolRegistered(task.assignedRole) || isLLMSkillRegistered(task.assignedRole))
+) {
+  // ... 现有 deterministicOutput + Promise.all 不变 ...
+}
+```
+
+这样 LLM-skill 命中也会走 short-circuit，Promise.all 三件事自动复制。
+
+**额外**: deterministicOutput 的 `summary` 文案对 LLM-skill 略不同 (line 900-902):
+
+```ts
+summary: preExecEmpty
+  ? `${task.assignedRole} 真实返回 0 条 —— 请调整参数`
+  : isLLMSkillRegistered(task.assignedRole)
+    ? `${task.assignedRole} LLM-skill 真实调用完成，结果已直出（未经二次 LLM 包装）`
+    : `${task.assignedRole} 真实调用完成，结果已直出（未经 LLM）`,
 ```
 
 - [ ] **Step 6: 写测试 LLM-skill short-circuit 流程 + Promise.all 副作用**
@@ -903,7 +982,7 @@ export function TrendingTopicsRenderer({ outputData }: TrendingTopicsRendererPro
       </div>
       <DataTable
         rows={topics}
-        rowKey={(t, idx) => `${t.platform ?? "?"}-${t.rank ?? idx}`}
+        rowKey={(t) => `${t.platform ?? "?"}-${t.rank ?? t.title ?? Math.random()}`}
         columns={[
           { key: "rank", header: "#", width: "w-12", align: "right", render: (t) => t.rank ?? "—" },
           {
@@ -933,7 +1012,7 @@ export function TrendingTopicsRenderer({ outputData }: TrendingTopicsRendererPro
 }
 ```
 
-注意：检查 `DataTable` 的 `rowKey` 签名是否接受 `(row, idx) => string` 还是只接受 `(row) => string`。若只接 1 arg，把 fallback `${idx}` 写在 row 数据里。
+注意：`DataTable.rowKey` 签名是 `(row: T) => string` (单 arg)。rowKey 用平台 + rank 组合保证唯一性；极端兜底用 `Math.random()` (实际数据应该总有 rank 或 title)。
 
 - [ ] **Step 5: 测试 PASS + tsc**
 
@@ -1499,7 +1578,22 @@ import { CrossLanguageRewriteRenderer } from "@/components/missions/step-rendere
 )}
 ```
 
-改为：
+改为先抽个 helper boolean，再 switch dispatch + 同步 generic guards：
+
+```tsx
+// 顶部（在 TaskDetailSheet body 渲染前）
+const DEDICATED_STEP_RENDERERS = new Set([
+  "trending_topics",
+  "topic_classifier",
+  "cross_language_rewrite",
+  "archive_to_drafts",
+]);
+const hasDedicatedRenderer = task.assignedRole
+  ? DEDICATED_STEP_RENDERERS.has(task.assignedRole)
+  : false;
+```
+
+把 B.4 留的 `{task.assignedRole === "archive_to_drafts" && ...}` 替换为 dispatch switch:
 
 ```tsx
 {(() => {
@@ -1513,12 +1607,20 @@ import { CrossLanguageRewriteRenderer } from "@/components/missions/step-rendere
     case "archive_to_drafts":
       return <ArchiveToDraftsRenderer outputData={task.outputData} />;
     default:
-      return null;  // 其他 step 走下面的 generic 渲染
+      return null;
   }
 })()}
 ```
 
-确保 generic 渲染分支（artifactContent / fullSummary / 等）仍然存在，作为 default case 的兜底。
+**关键 fix（Reviewer Issue #4）**: Phase 5 Task 5.4 给 mission-console-client.tsx 的 3 个 generic blocks (artifactContent at line ~1129, fullSummary at line ~1137, fullOutputText at line ~1145) 加了 `task.assignedRole !== "archive_to_drafts"` 守卫，防止 archive_to_drafts 同时显示 dedicated + generic。B.5 加 3 个新 dedicated renderer 后，这些 guards 也要排除新 step：
+
+把这 3 处 `task.assignedRole !== "archive_to_drafts"` 全部改为：
+
+```tsx
+!hasDedicatedRenderer
+```
+
+(覆盖 4 个 dedicated step 的同时排除 generic 双重渲染。其他 step 仍走 generic 兜底。)
 
 - [ ] **Step 2: tsc + 测试**
 
