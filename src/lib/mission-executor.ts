@@ -29,6 +29,10 @@ import {
   invokeToolDirectly,
   isToolRegistered,
 } from "@/lib/agent/tool-registry";
+import {
+  isLLMSkillRegistered,
+  invokeLLMSkillDirectly,
+} from "@/lib/agent/llm-skill-dispatch";
 import { getLanguageModel } from "@/lib/agent/model-router";
 import { generateText } from "ai";
 import { loadSkillContent } from "@/lib/skill-loader";
@@ -269,10 +273,19 @@ export async function leaderPlanDirect(
         })
         .where(eq(missions.id, missionId));
 
-      // Materialize the leader "任务分解与分配" pseudo-task immediately as
-      // in_progress so the task board shows 任务总监 actively working instead
-      // of sitting on "等待中" for 5-15s while the coordination LLM runs.
-      // Pinned to priority=0 so it's the first row.
+      // Materialize the leader "任务分解与分配" pseudo-task as in_progress so
+      // the task board shows 任务总监 actively working while the coordination
+      // LLM runs. Pinned to priority=0 so it's the first row.
+      //
+      // Real tasks stay `pending` until the leader pseudo-task completes —
+      // earlier behavior marked zero-dep real tasks `ready` in parallel,
+      // which lit up two rows as "执行中" at the same time and made the
+      // timeline rail look like work was flowing before the leader even
+      // finished planning. The fix is to serialize: leader plans → first
+      // real step starts. The 5-15s leader LLM call now blocks the rest of
+      // `leaderPlanDirect`, but the caller (`executeMissionDirect`) is
+      // already fire-and-forget from the user's perspective (SSE drives the
+      // UI), so end-to-end latency is unchanged.
       const [leaderTask] = await db
         .insert(missionTasks)
         .values({
@@ -291,25 +304,9 @@ export async function leaderPlanDirect(
         })
         .returning({ id: missionTasks.id });
 
-      // Mark zero-dependency tasks ready NOW so the task executor can start
-      // picking them up in parallel with the leader's coordination LLM call.
-      const allTasks = await db
-        .select()
-        .from(missionTasks)
-        .where(eq(missionTasks.missionId, missionId));
-      for (const task of allTasks) {
-        const deps = (task.dependencies as string[]) || [];
-        if (deps.length === 0 && task.status === "pending") {
-          await db
-            .update(missionTasks)
-            .set({ status: "ready" })
-            .where(eq(missionTasks.id, task.id));
-        }
-      }
-
-      // Fire-and-forget the coordination LLM call. When it returns we insert
-      // the mission message and mark the leader pseudo-task complete. Failure
-      // is non-fatal — we fall back to a canned completion.
+      // Run leader coordination synchronously. `generateLeaderCoordinationMessage`
+      // already handles LLM failure internally and always resolves with a
+      // structured fallback string.
       const leaderDispatchCtx = {
         missionTitle: mission.title,
         userInstruction: mission.userInstruction,
@@ -329,51 +326,53 @@ export async function leaderPlanDirect(
         fallbackCount: stepIdToTaskId.size,
         fallbackTeamSize: selectedEmployeeIds.size,
       };
-      void generateLeaderCoordinationMessage(leaderDispatchCtx)
-        .then(async (leaderContent) => {
-          await db.insert(missionMessages).values({
-            missionId,
-            fromEmployeeId: mission.leaderEmployeeId,
-            messageType: "coordination",
-            content: leaderContent,
-          });
+      const leaderContent =
+        await generateLeaderCoordinationMessage(leaderDispatchCtx);
+
+      await db.insert(missionMessages).values({
+        missionId,
+        fromEmployeeId: mission.leaderEmployeeId,
+        messageType: "coordination",
+        content: leaderContent,
+      });
+      await db
+        .update(missionTasks)
+        .set({
+          status: "completed",
+          progress: 100,
+          completedAt: new Date(),
+          outputData: {
+            summary: "任务分解与分配已完成",
+            artifacts: [
+              {
+                id: `leader-coordination-${Date.now()}`,
+                type: "generic",
+                title: "任务分解与分配",
+                content: leaderContent,
+              },
+            ],
+            metrics: { wordCount: leaderContent.length },
+            status: "success",
+          },
+        })
+        .where(eq(missionTasks.id, leaderTask.id));
+
+      // Leader is done — promote zero-dependency real tasks to ready so the
+      // main loop can pick them up.
+      const allTasks = await db
+        .select()
+        .from(missionTasks)
+        .where(eq(missionTasks.missionId, missionId));
+      for (const task of allTasks) {
+        if (task.id === leaderTask.id) continue;
+        const deps = (task.dependencies as string[]) || [];
+        if (deps.length === 0 && task.status === "pending") {
           await db
             .update(missionTasks)
-            .set({
-              status: "completed",
-              progress: 100,
-              completedAt: new Date(),
-              outputData: {
-                summary: "任务分解与分配已完成",
-                artifacts: [
-                  {
-                    id: `leader-coordination-${Date.now()}`,
-                    type: "generic",
-                    title: "任务分解与分配",
-                    content: leaderContent,
-                  },
-                ],
-                metrics: { wordCount: leaderContent.length },
-                status: "success",
-              },
-            })
-            .where(eq(missionTasks.id, leaderTask.id));
-        })
-        .catch((err) => {
-          console.error("[leader-coordination] async update failed:", err);
-          void db
-            .update(missionTasks)
-            .set({
-              status: "completed",
-              progress: 100,
-              completedAt: new Date(),
-              outputData: {
-                summary: "任务分解与分配已完成（降级）",
-                status: "success",
-              },
-            })
-            .where(eq(missionTasks.id, leaderTask.id));
-        });
+            .set({ status: "ready" })
+            .where(eq(missionTasks.id, task.id));
+        }
+      }
 
       return { taskCount: stepIdToTaskId.size, teamSize: selectedEmployeeIds.size };
     }
@@ -492,6 +491,69 @@ export async function leaderPlanDirect(
 // 产出沿用 execution.ts 里约定的【执行摘要】/【执行过程】/【产出结果】三段，
 // 保证下游 mission-console UI 不破。
 // ---------------------------------------------------------------------------
+/**
+ * 渲染 step.config.parameters 里的 `{{key}}` 模板。
+ *
+ * 支持：
+ * - `{{key}}` = mission.inputParams[key] (primitive / array / object)
+ * - `{{stepN.field}}` = previousSteps[N-1].outputData[field] (1-indexed)
+ * - 未找到的 key → 替换为空字符串
+ *
+ * 结果尝试 JSON.parse 字符串值（让 array/object 还原），仅在结果是 object/array 时接受 parse 结果，
+ * 否则保留原 string（防止 "30" → 30 number 等不期望的类型变化）。
+ *
+ * Export 为 module-level 函数主要为单测覆盖。
+ */
+export function renderStepParameters(
+  template: Record<string, unknown>,
+  mission: { inputParams: Record<string, unknown> | null | undefined },
+  previousSteps: Array<{ outputData?: unknown }>,
+): Record<string, unknown> {
+  const src = mission.inputParams ?? {};
+  const rendered: Record<string, unknown> = {};
+  for (const [k, rawV] of Object.entries(template)) {
+    if (typeof rawV !== "string") {
+      rendered[k] = rawV;
+      continue;
+    }
+    const replaced = rawV.replace(/\{\{([^}]+)\}\}/g, (_, expr: string) => {
+      const trimmedExpr = expr.trim();
+      const stepMatch = trimmedExpr.match(/^step(\d+)\.(.+)$/);
+      if (stepMatch) {
+        const stepIdx = parseInt(stepMatch[1], 10) - 1;
+        const field = stepMatch[2];
+        const stepOutput = previousSteps[stepIdx]?.outputData;
+        if (
+          stepOutput &&
+          typeof stepOutput === "object" &&
+          field in (stepOutput as Record<string, unknown>)
+        ) {
+          const v = (stepOutput as Record<string, unknown>)[field];
+          if (v === undefined || v === null) return "";
+          if (typeof v === "object") return JSON.stringify(v);
+          return String(v);
+        }
+        return "";
+      }
+      const v = src[trimmedExpr];
+      if (v === undefined || v === null) return "";
+      if (typeof v === "object") return JSON.stringify(v);
+      return String(v);
+    });
+    try {
+      const parsed = JSON.parse(replaced);
+      if (typeof parsed === "object" && parsed !== null) {
+        rendered[k] = parsed;
+        continue;
+      }
+    } catch {
+      // primitive or non-JSON → keep replaced string
+    }
+    rendered[k] = replaced;
+  }
+  return rendered;
+}
+
 function formatPreExecOutputDeterministic(opts: {
   toolName: string;
   params: Record<string, unknown>;
@@ -751,32 +813,35 @@ async function executeTaskDirect(
 
         // 预执行触发：显式绑定了参数，或 auto-bind 生效
         if (Object.keys(rawParams).length > 0) {
-          // 渲染 Mustache 占位符
-          const rendered: Record<string, unknown> = {};
-          const src = missionInputParams ?? {};
-          for (const [k, rawV] of Object.entries(rawParams)) {
-            if (typeof rawV === "string") {
-              rendered[k] = rawV.replace(/\{\{(\w+)\}\}/g, (_, name) => {
-                const v = src[name];
-                if (v === undefined || v === null) return "";
-                if (typeof v === "object") return JSON.stringify(v);
-                return String(v);
-              });
-            } else {
-              rendered[k] = rawV;
-            }
-          }
-          // 直接调用工具
-          // 注入 org / operator 上下文 —— cms_publish 等多租户写入型工具
-          // 需要这两个字段（用户在"参数配置"里无需填）。
-          const invocation = await invokeToolDirectly(
-            task.assignedRole,
-            rendered,
-            {
-              organizationId: mission.organizationId ?? undefined,
-              operatorId: task.assignedEmployeeId ?? undefined,
-            },
+          // 渲染 step.config.parameters 模板（支持 {{key}} 和 {{stepN.field}}）
+          // previousSteps 是 StepOutput[]，包装一层 outputData 以匹配
+          // renderStepParameters 的签名 —— 这样 {{step1.summary}} 等会查找到
+          // StepOutput 自身字段。A.1.3 起 LLM-skill 会在 outputData 中带上
+          // topics / variants 等业务字段，本入口届时自动透出。
+          const previousStepsForRender = previousSteps.map((s) => ({
+            outputData: s,
+          }));
+          const rendered = renderStepParameters(
+            rawParams,
+            { inputParams: missionInputParams ?? null },
+            previousStepsForRender,
           );
+          // 直接调用工具或 LLM-skill
+          // 工具走 invokeToolDirectly（注入 org/operator 上下文）；
+          // LLM-skill（topic_classifier / cross_language_rewrite）走 invokeLLMSkillDirectly。
+          let invocation: Awaited<ReturnType<typeof invokeToolDirectly>>;
+          if (isLLMSkillRegistered(task.assignedRole)) {
+            invocation = await invokeLLMSkillDirectly(task.assignedRole, rendered);
+          } else {
+            invocation = await invokeToolDirectly(
+              task.assignedRole,
+              rendered,
+              {
+                organizationId: mission.organizationId ?? undefined,
+                operatorId: task.assignedEmployeeId ?? undefined,
+              },
+            );
+          }
           void autoBound; // 记录用 —— tool 实现里会利用同一 query 参数
           preExecParams = rendered;
           if (invocation.ok) {
@@ -890,7 +955,7 @@ async function executeTaskDirect(
     if (
       preExecUsedTool &&
       task.assignedRole &&
-      isToolRegistered(task.assignedRole)
+      (isToolRegistered(task.assignedRole) || isLLMSkillRegistered(task.assignedRole))
     ) {
       const deterministicText = formatPreExecOutputDeterministic({
         toolName: task.assignedRole,
@@ -904,7 +969,9 @@ async function executeTaskDirect(
         employeeSlug: agent.slug,
         summary: preExecEmpty
           ? `${task.assignedRole} 真实返回 0 条 —— 请调整参数`
-          : `${task.assignedRole} 真实调用完成，结果已直出（未经 LLM）`,
+          : isLLMSkillRegistered(task.assignedRole)
+            ? `${task.assignedRole} LLM-skill 真实调用完成，结果已直出（未经二次 LLM 包装）`
+            : `${task.assignedRole} 真实调用完成，结果已直出（未经 LLM）`,
         artifacts: [],
         metrics: { qualityScore: preExecEmpty ? 60 : 85 },
         status: "success" as const,
