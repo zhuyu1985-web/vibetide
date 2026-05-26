@@ -173,32 +173,22 @@ export async function startTopicMission(
     event_time: new Date().toISOString().slice(0, 10),
   };
 
-  const res = await startMissionFromTemplate(template.id, inputs);
+  // source + titleOverride 写在 INSERT 里，由 missions_source_dedup_uidx 拦截
+  // 并发重复点击；旧的 post-INSERT backfill 因 race 会留下 sourceModule=null
+  // 的孤儿 mission，已废弃。
+  const res = await startMissionFromTemplate(template.id, inputs, {
+    source: {
+      module: "hot_topics",
+      entityId: topicId,
+      entityType: "hot_topic",
+    },
+    titleOverride: `热点追踪：${topic.title}`,
+  });
   if (!res.ok) {
     throw new Error(
       `启动热点追踪失败：${Object.values(res.errors).join("; ")}`,
     );
   }
-
-  // 回填 source 关联 + 用热点标题改写 mission.title。
-  // - title：默认从模板取（统一为"突发新闻"），UX 上无法区分各热点；改写为
-  //   "热点追踪：${topic.title}" 与历史 mission 标题保持一致。
-  // - sourceModule/sourceEntityId：DAL 反查这两个字段判断热点是否被追踪。
-  // missions_source_dedup_uidx 是 partial unique，并发重复点击会拒绝第二次写入；
-  // 此时 topic 已经有 mission，吞掉错误即可（前面的 existingMission 查重也会在
-  // router.refresh() 后挡住后续调用）。
-  await db
-    .update(missions)
-    .set({
-      title: `热点追踪：${topic.title}`,
-      sourceModule: "hot_topics",
-      sourceEntityId: topicId,
-      sourceEntityType: "hot_topic",
-    })
-    .where(eq(missions.id, res.missionId))
-    .catch((err) => {
-      console.warn("[hot-topics] backfill source link failed:", err);
-    });
 
   // Mark topic as P0 (being tracked)
   await db
@@ -490,7 +480,16 @@ export async function updateTopicHeatScore(
           urgency_level: "critical",
           event_time: new Date().toISOString().slice(0, 10),
         };
-        const res = await startMissionFromTemplate(template.id, inputs);
+        // 同 startTopicMission 一样把 source 塞 INSERT 里：webhook 重投 + 热度
+        // 来回波动越过阈值都可能并发到这里，靠 unique 索引保证只产一个 mission。
+        const res = await startMissionFromTemplate(template.id, inputs, {
+          source: {
+            module: "hot_topics",
+            entityId: id,
+            entityType: "hot_topic",
+          },
+          titleOverride: `热点追踪：${topic.title}`,
+        });
         if (!res.ok) {
           console.error(
             "[hot-topics] auto-trigger failed:",
@@ -1479,20 +1478,19 @@ export async function startOverseasRepost(topicId: string): Promise<{ id: string
     variants_per_topic: 1,
   };
 
-  const res = await startMissionFromTemplate(template.id, inputs);
+  // source + titleOverride 写在 INSERT 里：missions_source_dedup_uidx 在并发
+  // 重复点击时拦截第二个 INSERT，startMissionFromTemplate 复用赢家 mission.id。
+  const res = await startMissionFromTemplate(template.id, inputs, {
+    source: {
+      module: "hot_topics_overseas",
+      entityId: topicId,
+      entityType: "hot_topic",
+    },
+    titleOverride: `海外转发：${topic.title}`,
+  });
   if (!res.ok) {
     throw new Error(`启动海外转发失败：${Object.values(res.errors).join("; ")}`);
   }
-
-  // 回填 source 关联 + mission 标题
-  await db.update(missions).set({
-    title: `海外转发：${topic.title}`,
-    sourceModule: "hot_topics_overseas",
-    sourceEntityId: topicId,
-    sourceEntityType: "hot_topic",
-  }).where(eq(missions.id, res.missionId)).catch((err) => {
-    console.warn("[overseas-repost] backfill source failed:", err);
-  });
 
   revalidatePath("/missions");
   return { id: res.missionId };

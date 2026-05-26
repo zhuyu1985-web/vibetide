@@ -25,7 +25,7 @@ vi.mock("@/db", () => ({
     })),
   },
 }));
-vi.mock("@/db/schema/articles", () => ({ articles: { organizationId: "x", sourceUrl: "y" } }));
+vi.mock("@/db/schema/articles", () => ({ articles: { organizationId: "x", sourceUrl: "y", metadata: "z" } }));
 
 import { invokeToolDirectly } from "../tool-registry";
 

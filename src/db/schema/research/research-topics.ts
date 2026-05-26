@@ -20,6 +20,7 @@ export const researchTopics = pgTable(
   },
   (t) => ({
     orgNameUq: uniqueIndex("research_topics_org_name_uq").on(t.organizationId, t.name),
+    orgGroupIdx: index("research_topics_org_group_idx").on(t.organizationId, t.groupName),
   }),
 );
 

@@ -96,6 +96,15 @@ export const articles = pgTable("articles", {
   transcript: jsonb("transcript"),
   chapters: jsonb("chapters"),
 
+  metadata: jsonb("metadata").$type<{
+    sourceTopicId?: string;
+    variantIndex?: number;
+    language?: string;
+    category?: string;
+    culturalNotes?: string;
+    createdByWorkflow?: boolean;
+  }>(),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

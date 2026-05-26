@@ -12,6 +12,7 @@ import type { InputFieldDef } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 import { executeMissionDirect } from "@/lib/mission-executor";
 import { getOrProvisionLeader } from "@/app/actions/missions";
+import { isUniqueViolation } from "@/lib/db/pg-errors";
 
 /**
  * Replace `{{key}}` placeholders in a prompt template with values from `params`.
@@ -59,6 +60,30 @@ export type StartMissionResult =
   | { ok: true; missionId: string }
   | { ok: false; errors: Record<string, string> };
 
+export interface StartMissionOptions {
+  /**
+   * Cross-module trigger source. When provided, the three fields participate
+   * in the `missions_source_dedup_uidx` partial unique index so concurrent
+   * inserts for the same (org, module, entity) are rejected at the DB layer
+   * — callers no longer race between dedup-check and INSERT.
+   *
+   * On unique-violation we either reuse the winner's mission id (race case)
+   * or — when the existing row is `failed` — clear its source link and retry
+   * once (retry-after-failure case). Omit `source` to skip dedup entirely.
+   */
+  source?: {
+    module: string;
+    entityId: string;
+    entityType: string;
+  };
+  /**
+   * Override `mission.title`; defaults to `template.name`. Callers use this to
+   * give each mission a topic-specific title ("热点追踪：xxx") instead of the
+   * generic template label.
+   */
+  titleOverride?: string;
+}
+
 /**
  * Task 2.1 — Start a mission from a `workflow_templates` row.
  *
@@ -70,7 +95,10 @@ export type StartMissionResult =
  *   5. Build `user_instruction` by rendering `prompt_template` (or fallback param dump).
  *   6. Insert mission row with denormalized `scenario` = template.name (spec §3.3),
  *      `workflowTemplateId` = template.id, and `inputParams` = cleaned values.
- *   7. Fire `mission/created` Inngest event so the existing executor picks it up.
+ *      When `options.source` is set, write it atomically here so the partial
+ *      unique index prevents race-duplicates and we never leave rows with
+ *      `sourceModule=null` from a failed backfill.
+ *   7. Fire-and-forget execution via `executeMissionDirect`.
  *
  * Returns either `{ok:true, missionId}` or `{ok:false, errors}` — errors can
  * be per-field (from validateInputs) or `{_global: "..."}` for higher-level
@@ -79,6 +107,7 @@ export type StartMissionResult =
 export async function startMissionFromTemplate(
   templateId: string,
   inputs: Record<string, unknown>,
+  options?: StartMissionOptions,
 ): Promise<StartMissionResult> {
   await requireAuth();
 
@@ -145,20 +174,65 @@ export async function startMissionFromTemplate(
   // read `mission.scenario` keep working until B.2 migrates them to
   // `workflowTemplateId`. Using template.name here (human-readable) rather
   // than a slug because the slug lookup now lives on `workflowTemplateId`.
-  const [created] = await db
-    .insert(missions)
-    .values({
-      organizationId: orgId,
-      title: template.name,
-      scenario: template.name,
-      userInstruction,
-      leaderEmployeeId: leader.id,
-      workflowTemplateId: template.id,
-      inputParams: cleaned,
-      status: "queued",
-      teamMembers: teamEmployeeIds,
-    })
-    .returning({ id: missions.id });
+  const insertValues = {
+    organizationId: orgId,
+    title: options?.titleOverride ?? template.name,
+    scenario: template.name,
+    userInstruction,
+    leaderEmployeeId: leader.id,
+    workflowTemplateId: template.id,
+    inputParams: cleaned,
+    status: "queued" as const,
+    teamMembers: teamEmployeeIds,
+    sourceModule: options?.source?.module,
+    sourceEntityId: options?.source?.entityId,
+    sourceEntityType: options?.source?.entityType,
+  };
+
+  const tryInsert = () =>
+    db.insert(missions).values(insertValues).returning({ id: missions.id });
+
+  let missionId: string;
+  try {
+    const [created] = await tryInsert();
+    missionId = created.id;
+  } catch (err) {
+    // The partial unique index `missions_source_dedup_uidx` only covers rows
+    // with a non-null source_entity_id; without options.source there's
+    // nothing to dedup against, so re-throw any error untouched.
+    if (!isUniqueViolation(err) || !options?.source) throw err;
+
+    // Index hit → another row already claims this (org, module, entity).
+    // Decide based on its status:
+    //   - non-failed → a concurrent caller won; reuse their id (race fix)
+    //   - failed    → user wants to retry; release the slot then re-insert
+    const existing = await db.query.missions.findFirst({
+      where: and(
+        eq(missions.organizationId, orgId),
+        eq(missions.sourceModule, options.source.module),
+        eq(missions.sourceEntityId, options.source.entityId),
+      ),
+      columns: { id: true, status: true },
+    });
+    if (!existing) throw err;
+
+    if (existing.status === "failed") {
+      await db
+        .update(missions)
+        .set({
+          sourceModule: null,
+          sourceEntityId: null,
+          sourceEntityType: null,
+        })
+        .where(eq(missions.id, existing.id));
+      const [retry] = await tryInsert();
+      missionId = retry.id;
+    } else {
+      revalidatePath("/missions");
+      revalidatePath("/workflows");
+      return { ok: true, missionId: existing.id };
+    }
+  }
 
   // Bump workflow_templates run stats so the "我的工作流" card reflects the
   // latest activity. Keeps parity with the legacy executeWorkflow() path.
@@ -174,11 +248,11 @@ export async function startMissionFromTemplate(
 
   // Fire-and-forget inline execution（对齐 src/app/actions/missions.ts:170 的 startMission 老路径）：
   // dev 环境下不依赖 Inngest dev server 也能推进 mission；production 同样走 executeMissionDirect。
-  executeMissionDirect(created.id, orgId)
-    .then(() => console.log(`[workflow-launch] mission ${created.id} completed`))
+  executeMissionDirect(missionId, orgId)
+    .then(() => console.log(`[workflow-launch] mission ${missionId} completed`))
     .catch(async (err) => {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[workflow-launch] mission ${created.id} failed:`, err);
+      console.error(`[workflow-launch] mission ${missionId} failed:`, err);
       await db
         .update(missions)
         .set({
@@ -190,11 +264,11 @@ export async function startMissionFromTemplate(
             failedAt: new Date().toISOString(),
           },
         })
-        .where(eq(missions.id, created.id))
+        .where(eq(missions.id, missionId))
         .catch(() => {});
     });
 
   revalidatePath("/missions");
   revalidatePath("/workflows");
-  return { ok: true, missionId: created.id };
+  return { ok: true, missionId };
 }
