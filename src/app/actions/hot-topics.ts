@@ -10,6 +10,7 @@ import {
   missions,
   missionTasks,
   aiEmployees,
+  workflowTemplates,
 } from "@/db/schema";
 import { and, eq, isNotNull, ne, inArray } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
@@ -1429,5 +1430,71 @@ ${categorySectionsExample}
     topicCount: topics.length,
     cmsResult,
   };
+}
+
+/**
+ * Start an "Overseas Repost" mission from a single hot topic.
+ * 跟 startTopicMission（快速追踪）共存：sourceModule 不同（hot_topics_overseas）
+ * 避免 missions_source_dedup_uidx 唯一索引冲突。
+ */
+export async function startOverseasRepost(topicId: string): Promise<{ id: string }> {
+  const user = await requireAuth();
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+  if (!profile?.organizationId) throw new Error("No organization found");
+
+  const topic = await db.query.hotTopics.findFirst({
+    where: eq(hotTopics.id, topicId),
+  });
+  if (!topic) throw new Error("Topic not found");
+
+  // 同 topic 已转发则复用现有 mission（区别于快速追踪：sourceModule="hot_topics_overseas"）
+  const existing = await db.query.missions.findFirst({
+    where: and(
+      eq(missions.organizationId, profile.organizationId),
+      eq(missions.sourceModule, "hot_topics_overseas"),
+      eq(missions.sourceEntityId, topicId),
+      ne(missions.status, "failed"),
+    ),
+    columns: { id: true },
+  });
+  if (existing) return { id: existing.id };
+
+  const template = await db.query.workflowTemplates.findFirst({
+    where: and(
+      eq(workflowTemplates.organizationId, profile.organizationId),
+      eq(workflowTemplates.legacyScenarioKey, "hot_topic_single_overseas_repost"),
+    ),
+  });
+  if (!template) {
+    throw new Error("海外转发模板未 seed，请联系管理员同步 builtin workflows");
+  }
+
+  const inputs = {
+    source_topic_id: topicId,
+    source_title: topic.title,
+    source_body: topic.summary ?? topic.title,
+    source_url: topic.sourceUrl ?? "",
+    variants_per_topic: 1,
+  };
+
+  const res = await startMissionFromTemplate(template.id, inputs);
+  if (!res.ok) {
+    throw new Error(`启动海外转发失败：${Object.values(res.errors).join("; ")}`);
+  }
+
+  // 回填 source 关联 + mission 标题
+  await db.update(missions).set({
+    title: `海外转发：${topic.title}`,
+    sourceModule: "hot_topics_overseas",
+    sourceEntityId: topicId,
+    sourceEntityType: "hot_topic",
+  }).where(eq(missions.id, res.missionId)).catch((err) => {
+    console.warn("[overseas-repost] backfill source failed:", err);
+  });
+
+  revalidatePath("/missions");
+  return { id: res.missionId };
 }
 
