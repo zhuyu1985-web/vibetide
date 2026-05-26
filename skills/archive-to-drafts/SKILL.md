@@ -21,24 +21,72 @@ metadata:
 
 # 稿件入库（archive_to_drafts）
 
-把改写好的英文/中文稿件批量入 articles 表，等待编辑后续处理。
+把改写好的英文/中文稿件批量入 articles 表，等待编辑后续处理。**只入本地 DB，不调任何外部 CMS / 发布接口**。
 
 ## 使用条件
 
-当 workflow 走「海外热榜搬运」step 4 / 「海外转发」step 2，或编辑想批量把生成稿件落库待审时调用。
+✅ **应调用场景**：
+- 「海外热榜搬运」workflow step 4（cross_language_rewrite 产出 N 个 variant 后批量入库）
+- 「海外转发」workflow step 2（单条改写产出后入库）
+- 编辑批量把生成稿件落库待审
+
+❌ **不应调用场景**：
+- 要直接发到华栖云 CMS → 走 `cms_publish`
+- 要发外站（X / Instagram）→ 编辑在稿件库手动触发 `publishToAyrshareAction`
 
 ## 输入
 
-- `articles[]` (1-20)：每条含 title / body / summary / sourceUrl / sourceTopicId / variantIndex / language / category / tags / hashtags / culturalNotes
-- `dedupBySourceUrl` (default true)：sourceUrl 已存在则 skip
-- `initialStatus` (default "approved")：入库时的状态
-- `dryRun` (optional)：测试入口自动注入，跳过所有 DB 操作
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `articles` | object[] (1-20) | ✓ | 待入库稿件数组 |
+| `articles[].title` | string (1-200) | ✓ | 稿件标题 |
+| `articles[].body` | string (≥ 10) | ✓ | 正文 |
+| `articles[].summary` | string | ✗ | 摘要 |
+| `articles[].sourceUrl` | string | ✗ | 原文链接，去重的关键字段 |
+| `articles[].sourceTopicId` | string | ✗ | 来源 topic id（来自 cross_language_rewrite 输出） |
+| `articles[].variantIndex` | 0\|1\|2 | ✗ | variant 索引（来自 cross_language_rewrite 输出） |
+| `articles[].language` | "zh" \| "en" | ✗ | 默认 "en"，会落 articles.language 列 |
+| `articles[].category` | string | ✗ | 上游分类（topic_classifier 输出） |
+| `articles[].tags` | string[] | ✗ | 中文 tag |
+| `articles[].hashtags` | string[] | ✗ | 英文 hashtag（与 tags 合并后落 articles.tags） |
+| `articles[].culturalNotes` | string | ✗ | 本地化决策注解 |
+| `dedupBySourceUrl` | boolean | ✗ | 默认 true，sourceUrl 已存在则 skip |
+| `initialStatus` | "draft" \| "approved" | ✗ | 默认 "approved"，入库时的 article.status |
+| `dryRun` | boolean | ✗ | 测试入口自动注入，跳过所有 DB 操作 |
 
 ## 输出
 
 - `totalRequested / totalCreated / totalSkipped`
-- `created[]`: 新建稿件的 articleId + title + sourceUrl
-- `skipped[]`: 去重跳过的 sourceUrl + 现有 articleId + reason
+- `created[]`: 新建稿件的 `articleId + title + sourceUrl`
+- `skipped[]`: 去重跳过的 `sourceUrl + existingArticleId + reason="duplicate_source_url"`
+
+## 持久化字段
+
+**当前真正写入 articles 表的列**（来自 HEAD 的 tool-registry.ts 实现）：
+
+| articles 列 | 来源 | 备注 |
+|---|---|---|
+| `organization_id` | 上下文注入 | 多租户隔离 |
+| `title` | input.title | |
+| `body` | input.body | |
+| `summary` | input.summary ?? null | |
+| `source_url` | input.sourceUrl ?? null | dedupBySourceUrl 的依据 |
+| `status` | initialStatus（默认 approved） | |
+| `tags` | [...input.tags, ...input.hashtags] | 中英 tag 合并 |
+| `media_type` | "article" | 硬编码 |
+| `published_at` | null | 始终为 null，跟"未发布"语义对齐 |
+| `language` | input.language ?? "en" | |
+
+**当前 NOT 持久化的字段**（仅在 tool 返回的 `created[]` 里有 sourceUrl 链接，其余完全丢失）：
+
+- `sourceTopicId`
+- `variantIndex`
+- `category`
+- `culturalNotes`
+
+> 待办：加 `articles.metadata` jsonb 列后这 4 个字段可以一并落库（CLAUDE.md 标准 Drizzle 流程）。schema drift 已在 commit `8c36095` 追平到 0039 snapshot，下一个 follow-up commit 加 metadata 列后即可启用。**历史 hack 已撤回**（commit `16830be`）：
+> - `sourceTopicId` 是普通 string（如 `"t1"`），不能写进 `translated_from_topic_id`（uuid FK to hot_topics）—— 运行时会 invalid uuid syntax crash
+> - `variantIndex` / `category` / `culturalNotes` 不能拼成字符串塞 `advisor_notes` —— 该列被 `articles/[id]/article-edit-client.tsx:646` 渲染成紫色"顾问"问答卡，会污染用户 UI
 
 ## 与 cms_publish 的区别
 
@@ -48,11 +96,12 @@ metadata:
 
 ## 质量把关
 
-- sourceUrl 去重防止反复跑同一热点污染稿件库
-- 工作流元信息分散落已有列：language → `articles.language`；sourceTopicId → `articles.translated_from_topic_id`（uuid FK to hot_topics）；variantIndex / category / culturalNotes → `articles.advisor_notes`（jsonb string[]）
-- publishedAt 始终为 null（不算"已发布"，跟稿件库 status 过滤对齐）
+- `sourceUrl` 去重防止反复跑同一热点污染稿件库（cross_language_rewrite 输出多个 variant 共用同一 sourceUrl 时，第 1 个 variant 入库、其余 skip——按 source 去重的设计）
+- `published_at` 始终为 null（不算"已发布"，跟稿件库 status 过滤对齐）
+- `dryRun=true` 必须在所有 DB 操作之前短路返回（跟 cms_publish 一致），防止测试入口污染 articles 表
+- 缺 `organizationId` 直接返回 error code `missing_context`，不允许跨租户写入
 
 ## 上下游协作
 
-- 上游：`cross_language_rewrite`（提供英文稿）或 `style_rewrite`（中文稿）
-- 下游：编辑在稿件库 `/articles` 列表手动审核
+- **上游**：`cross_language_rewrite`（提供英文 variant 数组）或 `style_rewrite`（中文稿）
+- **下游**：编辑在稿件库 `/articles` 列表手动审核；如要发外站可触发 `publishToAyrshareAction`
