@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { SourceUrlPill } from "@/components/shared/source-url-pill";
 import type { ArticleDetail } from "@/lib/types";
 
 interface MetaHeaderProps {
@@ -65,6 +66,12 @@ export function MetaHeader({ article }: MetaHeaderProps) {
           <>
             <span className="text-border">|</span>
             <span>{article.wordCount!.toLocaleString()} 字</span>
+          </>
+        )}
+        {article.sourceUrl && (
+          <>
+            <span className="text-border">|</span>
+            <SourceUrlPill url={article.sourceUrl} variant="default" />
           </>
         )}
       </div>
