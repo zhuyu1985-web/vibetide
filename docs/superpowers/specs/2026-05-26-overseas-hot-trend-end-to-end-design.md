@@ -153,6 +153,7 @@ testSkillExecution(skillId, testInput)
 **写入型 dryRun**:
 - 在工具 `execute` 内识别 `dryRun=true` → 不调 DB.insert / publishArticleToCms，返回 "如果真跑会发生什么" 的 payload
 - UI 在测试结果顶部黄色横幅提示
+- **实现陷阱**: `cms_publish` 当前实现是先 `db.insert(articles)` 再调 `publishArticleToCms`（`tool-registry.ts:1113`）。dryRun 必须**在 articles insert 之前短路**，否则测试仍会污染 articles 表（验收 SQL 会失败）。`archive_to_drafts` 同理 — dryRun 分支必须在 insert 之前 return mock payload。
 
 **UI 微调**:
 - 测试输入框旁加折叠的"参数示例"区，按 skill.name 注入示例 JSON
