@@ -2405,55 +2405,348 @@ git commit -m "feat(eco-index): resources page + tab routing + entry button"
 
 ---
 
-## Task 2.9: datasets-tab.tsx + upload + drawer(同 Task 2.5-2.7 模式)
+## Task 2.9: datasets-tab.tsx(数据集 tab 列表 UI)
 
 **Files:**
 - Create: `src/app/(dashboard)/data-collection/reports/resources/datasets-tab.tsx`
-- Create: `src/app/(dashboard)/data-collection/reports/resources/upload-dataset-dialog.tsx`
-- Create: `src/app/(dashboard)/data-collection/reports/resources/dataset-detail-drawer.tsx`
 
-- [ ] **Step 1: 写 datasets-tab.tsx** — 复制 scopes-tab.tsx,改:
-  - 表头: 数据集名 / 年份 / 区县数 / 总场数 / 上传时间 / 操作
-  - 调用 `setDefaultActivityDataset(id, year)` 而非 `setDefaultMediaScope`
-  - 调用 `deleteActivityDatasetAction` 而非 `deleteMediaScopeAction`
-
-- [ ] **Step 2: 写 upload-dataset-dialog.tsx** — 复制 upload-scope-dialog.tsx,加 `year` 数字输入框,调用 `uploadActivityDatasetXlsx`
-
-- [ ] **Step 3: 写 dataset-detail-drawer.tsx** — 表格列: 区县 / 5 主题场数 / 总数 / 首发日 / 末发日 / 跨度 / 频率
+- [ ] **Step 1: 写 datasets-tab.tsx**
 
 ```tsx
-{detail.data.map(d => (
-  <tr key={d.district}>
-    <td>{d.district}</td>
-    {detail.activityThemes.map(t => <td key={t}>{d.themes[t] ?? 0}</td>)}
-    <td className="font-medium">{d.total}</td>
-    <td>{d.firstDate}</td>
-    <td>{d.lastDate}</td>
-    <td>{d.spanDays}d</td>
-    <td>{d.freq.toFixed(4)}</td>
-  </tr>
-))}
+// src/app/(dashboard)/data-collection/reports/resources/datasets-tab.tsx
+"use client";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Star, StarOff, Eye, Trash2, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { UploadDatasetDialog } from "./upload-dataset-dialog";
+import { DatasetDetailDrawer } from "./dataset-detail-drawer";
+import { setDefaultActivityDataset, deleteActivityDatasetAction } from "@/app/actions/research/activity-datasets";
+import type { ActivityDatasetSummary } from "@/lib/dal/research/activity-datasets";
+
+export function DatasetsTab({ rows }: { rows: ActivityDatasetSummary[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ActivityDatasetSummary | null>(null);
+
+  const columns: DataTableColumn<ActivityDatasetSummary>[] = [
+    {
+      key: "name", header: "数据集名",
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <span>{r.name}</span>
+          {r.isDefault && <Badge variant="secondary">默认</Badge>}
+        </div>
+      ),
+    },
+    { key: "year", header: "年份", width: "w-16", render: (r) => r.year },
+    { key: "districtCount", header: "区县数", width: "w-16", align: "right", render: (r) => r.districtCount },
+    { key: "totalActivities", header: "总场数", width: "w-20", align: "right", render: (r) => r.totalActivities.toLocaleString() },
+    {
+      key: "themes", header: "活动主题", render: (r) => (
+        <span className="text-xs text-muted-foreground">{r.activityThemes.length} 个主题</span>
+      ),
+    },
+    { key: "createdBy", header: "上传人", width: "w-24", render: (r) => r.createdByName ?? "—" },
+    { key: "createdAt", header: "上传时间", width: "w-32", render: (r) => r.createdAt.toLocaleDateString("zh-CN") },
+    {
+      key: "actions", header: "操作", width: "w-32",
+      render: (r) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setDetailId(r.id)} title="查看">
+            <Eye className="size-4" />
+          </Button>
+          <Button variant="ghost" size="icon" disabled={pending}
+            onClick={() => startTransition(async () => {
+              try {
+                await setDefaultActivityDataset(r.id, r.year); // 注意: 同年份内仅 1 个默认
+                toast.success(r.isDefault ? "已取消默认" : `已设为 ${r.year} 年默认`);
+                router.refresh();
+              } catch (e) { toast.error((e as Error).message); }
+            })}
+            title={r.isDefault ? "取消默认" : "设为默认"}>
+            {r.isDefault ? <StarOff className="size-4" /> : <Star className="size-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(r)} title="删除">
+            <Trash2 className="size-4 text-rose-500" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={() => setUploadOpen(true)}>
+          <Upload className="size-4 mr-1.5" />上传活动表
+        </Button>
+      </div>
+      <DataTable
+        rows={rows} rowKey={(r) => r.id} columns={columns}
+        emptyMessage={<div className="text-center py-12 text-muted-foreground">暂无活动数据集</div>}
+      />
+      <UploadDatasetDialog open={uploadOpen} onOpenChange={setUploadOpen} onSuccess={() => router.refresh()} />
+      {detailId && (
+        <DatasetDetailDrawer datasetId={detailId} open={true} onClose={() => setDetailId(null)} />
+      )}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="删除活动数据集"
+        description={`确认删除"${deleteTarget?.name}"?`}
+        onConfirm={() => {
+          const id = deleteTarget!.id; setDeleteTarget(null);
+          startTransition(async () => {
+            try {
+              await deleteActivityDatasetAction(id, false);
+              toast.success("已删除"); router.refresh();
+            } catch (e) {
+              const msg = (e as Error).message;
+              if (msg.includes("已被")) {
+                if (confirm(msg + "\n点确认强制删除")) {
+                  await deleteActivityDatasetAction(id, true);
+                  toast.success("已强制删除"); router.refresh();
+                }
+              } else toast.error(msg);
+            }
+          });
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+}
 ```
 
-- [ ] **Step 4: dev server 验证**
+- [ ] **Step 2-4: typecheck + dev server 验证空表显示**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/resources/datasets-tab.tsx
+git commit -m "feat(eco-index): activity datasets-tab UI"
+```
+
+---
+
+## Task 2.10: upload-dataset-dialog.tsx
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/resources/upload-dataset-dialog.tsx`
+
+- [ ] **Step 1: 写 Dialog 含 year 校验**
+
+```tsx
+// src/app/(dashboard)/data-collection/reports/resources/upload-dataset-dialog.tsx
+"use client";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { uploadActivityDatasetXlsx } from "@/app/actions/research/activity-datasets";
+
+export function UploadDatasetDialog({
+  open, onOpenChange, onSuccess,
+}: { open: boolean; onOpenChange: (v: boolean) => void; onSuccess: () => void }) {
+  const [name, setName] = useState("");
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    if (!name.trim()) { toast.error("请填写名称"); return; }
+    // 关键校验: year 必须是合理的 4 位数 (1900-2100)
+    if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+      toast.error("年份必须在 1900-2100 之间"); return;
+    }
+    if (!file) { toast.error("请选择 xlsx 文件"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("文件大小超过 5MB"); return; }
+
+    setSubmitting(true);
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(((reader.result as string).split(",")[1]) ?? "");
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadActivityDatasetXlsx({
+        name: name.trim(), year, fileBase64, fileName: file.name,
+      });
+      toast.success(`上传成功: ${result.stats.districtCount} 区县 / ${result.stats.totalActivities} 场`);
+      if (result.warnings.length > 0) {
+        // 年份异常告警 (如 2026 录入错误) 单独显示
+        toast.warning(`含 ${result.warnings.length} 条告警, 如: ${result.warnings[0]}`);
+      }
+      onSuccess(); onOpenChange(false);
+      setName(""); setYear(new Date().getFullYear()); setFile(null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>上传活动数据集</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label>数据集名称 *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="2025 年线下生态宣传活动统计表" />
+          </div>
+          <div>
+            <Label>年份 * (1900-2100)</Label>
+            <Input type="number" min={1900} max={2100} value={year}
+              onChange={(e) => setYear(Number(e.target.value))} />
+          </div>
+          <div>
+            <Label>Excel 文件 (.xlsx, ≤ 5MB) *</Label>
+            <Input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            {file && <p className="text-xs text-muted-foreground mt-1">{file.name} ({(file.size / 1024).toFixed(1)} KB)</p>}
+            <p className="text-xs text-muted-foreground mt-1">
+              要求: 39 区县 × 5 主题(六五环境日/815全国生态日/志愿服务活动/环保设施向公众开放/美丽重庆六进活动)
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "上传中..." : "上传并解析"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+- [ ] **Step 2-4: typecheck + dev server 手测**
 
 ```bash
 npm run dev
-# 上传活动 xlsx → 看到 39 行 × 5 主题 + 异常 2026 警告
+# 用 /Users/zhuyu/Downloads/副本2025年线下生态宣传活动统计表(1).xlsx 测试上传
+# 应看到 toast: "上传成功: 39 区县 / 5341 场"
+# 异常告警: "含 1 条告警, 如: 两江新区 (L43): 日期范围含 2026 年"
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/app/\(dashboard\)/data-collection/reports/resources/datasets-tab.tsx \
-        src/app/\(dashboard\)/data-collection/reports/resources/upload-dataset-dialog.tsx \
-        src/app/\(dashboard\)/data-collection/reports/resources/dataset-detail-drawer.tsx
-git commit -m "feat(eco-index): activity datasets UI (tab + upload + drawer)"
+git add src/app/\(dashboard\)/data-collection/reports/resources/upload-dataset-dialog.tsx
+git commit -m "feat(eco-index): upload activity dataset dialog with year validation"
 ```
 
 ---
 
-## Task 2.10: P2 总结
+## Task 2.11: dataset-detail-drawer.tsx
+
+**Files:**
+- Create: `src/app/(dashboard)/data-collection/reports/resources/dataset-detail-drawer.tsx`
+
+- [ ] **Step 1: 写 Drawer 含 39 行 × 5 主题 + 异常日期高亮**
+
+```tsx
+// src/app/(dashboard)/data-collection/reports/resources/dataset-detail-drawer.tsx
+"use client";
+import { useEffect, useState } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/shared/glass-card";
+import { getActivityDatasetDetail } from "@/app/actions/research/activity-datasets";
+import type { ActivityDatasetDetail } from "@/lib/dal/research/activity-datasets";
+
+export function DatasetDetailDrawer({
+  datasetId, open, onClose,
+}: { datasetId: string; open: boolean; onClose: () => void }) {
+  const [detail, setDetail] = useState<ActivityDatasetDetail | null>(null);
+  useEffect(() => { getActivityDatasetDetail(datasetId).then(setDetail); }, [datasetId]);
+  if (!detail) return null;
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent className="!max-w-5xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{detail.name}</SheetTitle>
+          <div className="flex gap-2 mt-1">
+            <Badge variant="outline">{detail.year} 年</Badge>
+            <Badge variant="outline">{detail.districtCount} 区县</Badge>
+            <Badge variant="outline">{detail.totalActivities.toLocaleString()} 场总计</Badge>
+            {detail.isDefault && <Badge variant="secondary">默认</Badge>}
+          </div>
+        </SheetHeader>
+        <GlassCard className="mt-6">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 sticky top-0">
+              <tr>
+                <th className="text-left p-2">区县</th>
+                {detail.activityThemes.map(t => <th key={t} className="text-right p-2">{t}</th>)}
+                <th className="text-right p-2 font-bold">总数</th>
+                <th className="text-right p-2">首发日</th>
+                <th className="text-right p-2">末发日</th>
+                <th className="text-right p-2">跨度</th>
+                <th className="text-right p-2">频率(场/天)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detail.data.map((d, i) => {
+                // 异常年份: firstDate 或 lastDate 不在 dataset.year 内 → 红色标注
+                const yr = String(detail.year);
+                const isAbnormal = !d.firstDate.startsWith(yr) || !d.lastDate.startsWith(yr);
+                return (
+                  <tr key={d.district} className={i % 2 === 0 ? "bg-muted/20" : ""}>
+                    <td className="p-2">{d.district}</td>
+                    {detail.activityThemes.map(t => (
+                      <td key={t} className="text-right p-2">{d.themes[t] ?? 0}</td>
+                    ))}
+                    <td className="text-right p-2 font-medium">{d.total}</td>
+                    <td className={`text-right p-2 ${isAbnormal ? "text-rose-600 font-medium" : ""}`}>
+                      {d.firstDate}
+                    </td>
+                    <td className={`text-right p-2 ${isAbnormal ? "text-rose-600 font-medium" : ""}`}>
+                      {d.lastDate}
+                    </td>
+                    <td className="text-right p-2">{d.spanDays}d</td>
+                    <td className="text-right p-2">{d.freq.toFixed(4)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {detail.data.some(d => !d.firstDate.startsWith(String(detail.year))
+              || !d.lastDate.startsWith(String(detail.year))) && (
+            <div className="text-xs text-rose-600 mt-2">
+              ⚠ 红色标注的日期不在 {detail.year} 年范围内,可能 xlsx 录入错误
+            </div>
+          )}
+        </GlassCard>
+      </SheetContent>
+    </Sheet>
+  );
+}
+```
+
+- [ ] **Step 2-4: typecheck + dev server 手测异常日期高亮**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/\(dashboard\)/data-collection/reports/resources/dataset-detail-drawer.tsx
+git commit -m "feat(eco-index): dataset detail drawer with abnormal date highlight"
+```
+
+---
+
+## Task 2.12: P2 总结
 
 - [ ] **Step 1**: `npx tsc --noEmit` — 零错误
 - [ ] **Step 2**: `npm run test` — 所有测试通过(预期 +14 个新测试)
@@ -2569,6 +2862,36 @@ describe("matcher.resolveOutletOwnership", () => {
     const matches = new Map([["A", ["o1"]], ["B", ["o1"]]]);
     const owner = resolveOutletOwnership(matches, [a, b]);
     expect(owner.get("o1")).toBe("A");
+  });
+
+  it("已知冲突 1 (gh_27de3a2c6bc4): 重庆日报(municipal) > 西部科学城(district_rmt)", () => {
+    const cqrb = u({ name: "重庆日报", tier: "municipal" as any, xlsxRow: 9, wechatGhid: "gh_27de3a2c6bc4" });
+    const kxc = u({ name: "西部科学城", tier: "district_rmt" as any, xlsxRow: 48, wechatGhid: "gh_27de3a2c6bc4" });
+    const owner = resolveOutletOwnership(
+      new Map([["重庆日报", ["o-cqrb"]], ["西部科学城", ["o-cqrb"]]]),
+      [cqrb, kxc],
+    );
+    expect(owner.get("o-cqrb")).toBe("重庆日报");
+  });
+
+  it("已知冲突 2 (weibo 2144075181): 美丽重庆(industry) > 重庆市生态环境局(district_gov)", () => {
+    const mlcq = u({ name: "美丽重庆", tier: "industry" as any, xlsxRow: 12, weiboUid: "2144075181" });
+    const cqenv = u({ name: "重庆市生态环境局", tier: "district_gov" as any, xlsxRow: 92, weiboUid: "2144075181" });
+    const owner = resolveOutletOwnership(
+      new Map([["美丽重庆", ["o-mlcq"]], ["重庆市生态环境局", ["o-mlcq"]]]),
+      [mlcq, cqenv],
+    );
+    expect(owner.get("o-mlcq")).toBe("美丽重庆"); // industry(1) < district_gov(4)
+  });
+
+  it("已知冲突 3 (weibo 2780124485): 黔江发布(district_rmt) > 黔江区生态环境局(district_gov)", () => {
+    const qjfb = u({ name: "黔江发布", tier: "district_rmt" as any, xlsxRow: 53, weiboUid: "2780124485" });
+    const qjgov = u({ name: "黔江区生态环境局", tier: "district_gov" as any, xlsxRow: 95, weiboUid: "2780124485" });
+    const owner = resolveOutletOwnership(
+      new Map([["黔江发布", ["o-qj"]], ["黔江区生态环境局", ["o-qj"]]]),
+      [qjfb, qjgov],
+    );
+    expect(owner.get("o-qj")).toBe("黔江发布"); // rmt(3) < gov(4)
   });
 });
 ```
@@ -3230,11 +3553,176 @@ git commit -m "feat(eco-index): docx-builder with 39-row table + 3 charts + 39 r
 - 5.1-5.3 公众 × 3
 - 99 综合汇总
 
-- [ ] **Step 1-5: 写 xlsx-builder.ts 用 @e965/xlsx + json_to_sheet** — 每个 sheet 一个独立函数,合并到 buildVerifiableXlsx() 总入口,返回 Buffer
+- [ ] **Step 1: 写 sheet 生成器骨架(00 / 01 / 02 / 媒体类 12 sheet / 公众类 3 sheet / 99 综合)**
+
+```ts
+// src/lib/research/ecological-index/xlsx-builder.ts
+import * as XLSX from "@e965/xlsx";
+import type { EcologicalIndexAggregates } from "@/db/schema/research/reports";
+import type { MediaScope, MediaScopeUnit } from "@/db/schema/research/media-scopes";
+import type { ActivityDataset } from "@/db/schema/research/activity-datasets";
+
+export type XlsxBuildInput = {
+  aggregates: EcologicalIndexAggregates;
+  scope: MediaScope; units: MediaScopeUnit[]; dataset: ActivityDataset;
+};
+
+function sheet00Overview(): XLSX.WorkSheet {
+  return XLSX.utils.aoa_to_sheet([
+    ["项目", "值"],
+    ["权重 - 中央", "45%"], ["权重 - 行业", "25%"], ["权重 - 市级", "15%"],
+    ["权重 - 区县", "8%"], ["权重 - 公众行为", "7%"],
+    [], ["二级权重", "数量 40% / 丰富度 30% / 速度 30%"],
+    ["丰富度公式", "F = 1 / Σ |p_t - 1/N|"],
+    ["传播速度公式", "freq = 报道总数 / 发布天数"],
+    ["综合公式", "综合 = 中央×0.45 + 行业×0.25 + 市级×0.15 + 区县×0.08 + 公众×0.07"],
+    ["区间化", "min-max 到 [65, 95]"],
+  ]);
+}
+
+function sheet01DataSources(input: XlsxBuildInput): XLSX.WorkSheet {
+  const rows: any[][] = [["#", "类别", "媒体名", "区县", "公众号名", "ghid", "微博 UID", "网站"]];
+  input.units.forEach((u, i) => {
+    rows.push([i + 1, u.tier, u.name, u.districtNormalized ?? "—",
+      u.wechatNames.join("、") || "—", u.wechatGhid ?? "—",
+      u.weiboUid ?? "—", u.websites.join("、") || "—"]);
+  });
+  return XLSX.utils.aoa_to_sheet(rows);
+}
+
+function sheet02Audit(input: XlsxBuildInput): XLSX.WorkSheet {
+  const a = input.aggregates;
+  return XLSX.utils.aoa_to_sheet([
+    ["项目", "数值"],
+    ["生成时间", a.generatedAt],
+    ["总单位数", input.units.length],
+    ["最高分", a.ranked[0]?.name + " " + a.ranked[0]?.composite.toFixed(2)],
+    ["最低分", a.ranked.at(-1)?.name + " " + a.ranked.at(-1)?.composite.toFixed(2)],
+    ["平均", a.stats.mean.toFixed(2)], ["中位", a.stats.median.toFixed(2)],
+    ["标差", a.stats.stdev.toFixed(2)],
+    ["分层", `高 ${a.stats.tier_high} / 中 ${a.stats.tier_mid} / 低 ${a.stats.tier_low}`],
+  ]);
+}
+
+function sheetMediaTier(
+  input: XlsxBuildInput,
+  tier: "central" | "industry" | "municipal" | "district",
+  sub: "count" | "richness" | "freq",
+): XLSX.WorkSheet {
+  const subLabel = { count: "报道数量", richness: "主题丰富度", freq: "传播速度" }[sub];
+  const tierLabel = { central: "中央", industry: "行业", municipal: "市级", district: "区县" }[tier];
+  const rows: any[][] = [
+    [`${tierLabel}媒体 - ${subLabel}`],
+    ["排名", "区县", "原始值", "区间化得分 (65-95)"],
+  ];
+  const items = input.aggregates.ranked.map(r => ({
+    name: r.name,
+    raw: input.aggregates.rawMedia[r.name]?.[tier]?.[sub] ?? 0,
+    scaled: input.aggregates.scaledMedia[r.name]?.[tier]?.[sub] ?? 0,
+  })).sort((a, b) => b.raw - a.raw);
+  items.forEach((it, i) => rows.push([i + 1, it.name, it.raw.toFixed(2), it.scaled.toFixed(2)]));
+  return XLSX.utils.aoa_to_sheet(rows);
+}
+
+function sheetPublic(input: XlsxBuildInput, sub: "count" | "richness" | "freq"): XLSX.WorkSheet {
+  const subLabel = { count: "活动数量", richness: "活动主题丰富度", freq: "活动传播速度" }[sub];
+  const rows: any[][] = [[`公众行为引导 - ${subLabel}`], ["排名", "区县", "原始值", "区间化得分"]];
+  const items = input.aggregates.ranked.map(r => ({
+    name: r.name,
+    raw: input.aggregates.rawPublic[r.name]?.[sub] ?? 0,
+    scaled: input.aggregates.scaledPublic[r.name]?.[sub] ?? 0,
+  })).sort((a, b) => b.raw - a.raw);
+  items.forEach((it, i) => rows.push([i + 1, it.name, it.raw.toFixed(2), it.scaled.toFixed(2)]));
+  return XLSX.utils.aoa_to_sheet(rows);
+}
+
+function sheet99Summary(input: XlsxBuildInput): XLSX.WorkSheet {
+  const rows: any[][] = [
+    ["排名", "区县", "中央(45%)", "行业(25%)", "市级(15%)", "区县(8%)", "公众(7%)", "综合"],
+  ];
+  input.aggregates.ranked.forEach(r => rows.push([
+    r.rank, r.name,
+    r.central.toFixed(2), r.industry.toFixed(2), r.municipal.toFixed(2),
+    r.district.toFixed(2), r.public.toFixed(2), r.composite.toFixed(2),
+  ]));
+  return XLSX.utils.aoa_to_sheet(rows);
+}
+
+export async function buildVerifiableXlsx(input: XlsxBuildInput): Promise<Buffer> {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet00Overview(), "00 总览说明");
+  XLSX.utils.book_append_sheet(wb, sheet01DataSources(input), "01 数据源清单");
+  XLSX.utils.book_append_sheet(wb, sheet02Audit(input), "02 数据范围审计");
+  for (const tier of ["central", "industry", "municipal", "district"] as const) {
+    const tNum = { central: 1, industry: 2, municipal: 3, district: 4 }[tier];
+    for (const sub of ["count", "richness", "freq"] as const) {
+      const sNum = { count: 1, richness: 2, freq: 3 }[sub];
+      const sLabel = { count: "数量", richness: "丰富度", freq: "速度" }[sub];
+      const tLabel = { central: "中央", industry: "行业", municipal: "市级", district: "区县" }[tier];
+      XLSX.utils.book_append_sheet(wb, sheetMediaTier(input, tier, sub), `${tNum}.${sNum} ${tLabel}-${sLabel}`);
+    }
+  }
+  for (const sub of ["count", "richness", "freq"] as const) {
+    const sNum = { count: 1, richness: 2, freq: 3 }[sub];
+    const sLabel = { count: "数量", richness: "丰富度", freq: "速度" }[sub];
+    XLSX.utils.book_append_sheet(wb, sheetPublic(input, sub), `5.${sNum} 公众-${sLabel}`);
+  }
+  XLSX.utils.book_append_sheet(wb, sheet99Summary(input), "99 综合汇总");
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+}
+```
+
+- [ ] **Step 2: 写测试 (用 fixture aggregates 生成 → 验证 19 个 sheet)**
+
+```ts
+// src/lib/research/ecological-index/__tests__/xlsx-builder.test.ts
+import { describe, it, expect } from "vitest";
+import * as XLSX from "@e965/xlsx";
+import { buildVerifiableXlsx } from "../xlsx-builder";
+
+describe("xlsx-builder", () => {
+  it("生成 19 个 sheet 含 00/01/02/1.1-5.3/99", async () => {
+    const fakeAgg: any = {
+      kind: "ecological_index",
+      ranked: [{ rank: 1, name: "两江新区", central: 83, industry: 91, municipal: 95, district: 84, public: 68, composite: 86 }],
+      rawMedia: { "两江新区": { central: { count: 100, richness: 1.5, freq: 0.5 }, industry: {}, municipal: {}, district: {} } },
+      rawPublic: { "两江新区": { count: 50, richness: 2.0, freq: 0.2 } },
+      scaledMedia: { "两江新区": { central: { count: 95, richness: 80, freq: 75 }, industry: {}, municipal: {}, district: {} } },
+      scaledPublic: { "两江新区": { count: 90, richness: 80, freq: 70 } },
+      stats: { max: 86, min: 69, span: 17, mean: 75, median: 74, stdev: 4, tier_high: 5, tier_mid: 23, tier_low: 11 },
+      generatedAt: "2025-05-26T00:00:00Z",
+    };
+    const buf = await buildVerifiableXlsx({
+      aggregates: fakeAgg,
+      scope: { id: "s1", name: "测试", totalUnits: 1 } as any,
+      units: [{ name: "央视", tier: "central", wechatNames: ["央视新闻"], websites: ["cctv.com"], districtNormalized: null, wechatGhid: null, weiboUid: null } as any],
+      dataset: { activityThemes: ["六五环境日"], data: [] } as any,
+    });
+    const wb = XLSX.read(buf, { type: "buffer" });
+    expect(wb.SheetNames).toHaveLength(19);
+    expect(wb.SheetNames[0]).toBe("00 总览说明");
+    expect(wb.SheetNames[18]).toBe("99 综合汇总");
+  });
+});
+```
+
+- [ ] **Step 3: 跑测试 + typecheck**
 
 ```bash
-git add src/lib/research/ecological-index/xlsx-builder.ts
-git commit -m "feat(eco-index): xlsx-builder with 19 verifiable sheets"
+npx vitest run src/lib/research/ecological-index/__tests__/xlsx-builder.test.ts
+npx tsc --noEmit
+```
+
+Expected: 1 passed, 0 errors
+
+- [ ] **Step 4: 手测 — 用 fixture 写出 xlsx 到 /tmp,Excel 打开看每个 sheet 格式正确**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/lib/research/ecological-index/xlsx-builder.ts \
+        src/lib/research/ecological-index/__tests__/xlsx-builder.test.ts
+git commit -m "feat(eco-index): xlsx-builder with 19 verifiable sheets + smoke test"
 ```
 
 ---
@@ -3246,12 +3734,114 @@ git commit -m "feat(eco-index): xlsx-builder with 19 verifiable sheets"
 
 参考 `scripts/export-scope-content-xlsx.ts` 改造为按 tier 4 个独立函数,复用现有 `EXPORT_COLUMN_ORDER + exportRowToOpinionRecord`。
 
-- [ ] **Step 1-5**: 实现 4 个函数 `exportContentForTier(tier, outletIds, windowStart, windowEnd)` → Buffer,以及汇总入口 `exportAllContentByTier()` 返回 `{ central: Buffer, industry: Buffer, municipal: Buffer, district: Buffer }`
+- [ ] **Step 1: 写 content-exporter(按 tier 拆 4 文件,避免 OOM)**
+
+```ts
+// src/lib/research/ecological-index/content-exporter.ts
+import * as XLSX from "@e965/xlsx";
+import { db } from "@/db";
+import { collectedItems, collectedItemContents } from "@/db/schema/collection";
+import { and, eq, gte, lt, inArray, desc, getTableColumns } from "drizzle-orm";
+import { exportRowToOpinionRecord, EXPORT_COLUMN_ORDER } from "@/lib/collection/bulk-export/opinion-export";
+import type { MediaScopeUnit } from "@/db/schema/research/media-scopes";
+
+type Tier = "central" | "industry" | "municipal" | "district";
+
+const TIER_INCLUDE: Record<Tier, MediaScopeUnit["tier"][]> = {
+  central: ["central"], industry: ["industry"], municipal: ["municipal"],
+  district: ["district_rmt", "district_gov"],
+};
+
+export type ContentExportInput = {
+  organizationId: string;
+  tier: Tier;
+  units: MediaScopeUnit[];
+  windowStart: string;  // 'YYYY-MM-DD'
+  windowEnd: string;
+};
+
+/**
+ * 导出某个 tier 的全部稿件为 xlsx。
+ * 用 unit.resolvedOutletIds 做 outlet 白名单(P2 已缓存)。
+ * 复用现有 EXPORT_COLUMN_ORDER + exportRowToOpinionRecord(已 vetted)。
+ */
+export async function exportContentForTier(input: ContentExportInput): Promise<Buffer> {
+  const tiersToInclude = TIER_INCLUDE[input.tier];
+  const targetUnits = input.units.filter(u => tiersToInclude.includes(u.tier));
+  const outletIds = [...new Set(targetUnits.flatMap(u => u.resolvedOutletIds))];
+  if (outletIds.length === 0) {
+    // 空 tier 返回仅含表头的 xlsx
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...EXPORT_COLUMN_ORDER]]), "舆情数据");
+    return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+  }
+
+  const rows = await db
+    .select({
+      ...getTableColumns(collectedItems),
+      content: collectedItemContents.content,
+      ocrText: collectedItemContents.ocrText,
+      asrText: collectedItemContents.asrText,
+    })
+    .from(collectedItems)
+    .leftJoin(collectedItemContents, eq(collectedItemContents.itemId, collectedItems.id))
+    .where(and(
+      eq(collectedItems.organizationId, input.organizationId),
+      gte(collectedItems.publishedAt, new Date(input.windowStart)),
+      lt(collectedItems.publishedAt, new Date(input.windowEnd)),
+      inArray(collectedItems.outletId, outletIds),
+    ))
+    .orderBy(desc(collectedItems.firstSeenAt));
+
+  const records = rows.map((row: any, i: number) => exportRowToOpinionRecord(row, i + 1));
+  const sheet = XLSX.utils.json_to_sheet(records, { header: [...EXPORT_COLUMN_ORDER] });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, "舆情数据");
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+}
+```
+
+- [ ] **Step 2: 写测试(空 outlet → 仅表头)**
+
+```ts
+// src/lib/research/ecological-index/__tests__/content-exporter.test.ts
+import { describe, it, expect, vi } from "vitest";
+import * as XLSX from "@e965/xlsx";
+import { exportContentForTier } from "../content-exporter";
+
+vi.mock("@/db", () => ({
+  db: { select: () => ({ from: () => ({ leftJoin: () => ({ where: () => ({ orderBy: () => Promise.resolve([]) }) }) }) }) },
+}));
+
+describe("content-exporter", () => {
+  it("空 outletIds → 仅表头 xlsx", async () => {
+    const buf = await exportContentForTier({
+      organizationId: "org-1", tier: "industry", units: [],
+      windowStart: "2025-01-01", windowEnd: "2026-01-01",
+    });
+    const wb = XLSX.read(buf, { type: "buffer" });
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]!]!, { header: 1 });
+    expect((data as any[]).length).toBe(1); // 仅表头
+  });
+});
+```
+
+- [ ] **Step 3: 跑测试 + typecheck**
 
 ```bash
-git add src/lib/research/ecological-index/content-exporter.ts
+npx vitest run src/lib/research/ecological-index/__tests__/content-exporter.test.ts
+npx tsc --noEmit
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/lib/research/ecological-index/content-exporter.ts \
+        src/lib/research/ecological-index/__tests__/content-exporter.test.ts
 git commit -m "feat(eco-index): content-exporter with 4-tier split (avoid OOM)"
 ```
+
+- [ ] **Step 5: 在 Task 3.13 Inngest Step 6 中循环调用 4 次,分别上传 storage**
 
 ---
 
@@ -3261,21 +3851,306 @@ git commit -m "feat(eco-index): content-exporter with 4-tier split (avoid OOM)"
 - Create: `src/lib/dal/research/ecological-index-reports.ts`
 - Modify: `src/lib/research/ecological-index/compute.ts`(加 computeAllIndicators)
 
-- [ ] **Step 1**: 给 compute.ts 加 `computeAllIndicators(scopeId, datasetId, windowStart, windowEnd)` 函数,返回 `EcologicalIndexAggregates`(整合 buckets → 区间化 → 加权 → ranked)
+- [ ] **Step 1: 在 compute.ts 追加 computeAllIndicators 函数**
 
-- [ ] **Step 2**: 写 DAL `createEcologicalIndexReport` + `previewScopeCoverage`
+```ts
+// 追加到 src/lib/research/ecological-index/compute.ts
+import { db } from "@/db";
+import { collectedItems } from "@/db/schema/collection";
+import { researchCollectedItemDistricts, researchCollectedItemTopics } from "@/db/schema/research/annotations";
+import { researchCqDistricts } from "@/db/schema/research/cq-districts";
+import { researchTopics } from "@/db/schema/research/research-topics";
+import { and, eq, gte, lt, inArray } from "drizzle-orm";
+import type { EcologicalIndexAggregates } from "@/db/schema/research/reports";
+import type { MediaScopeUnit } from "@/db/schema/research/media-scopes";
+import type { ActivityDataset } from "@/db/schema/research/activity-datasets";
 
-- [ ] **Step 3**: 写 server action `createEcologicalIndexReportAction`
+type ComputeTier = "central" | "industry" | "municipal" | "district";
 
-- [ ] **Step 4**: typecheck + 单元测试 (用 fixture buckets 验证 ranked 输出正确)
+export type ComputeInput = {
+  organizationId: string;
+  units: MediaScopeUnit[];
+  activityDataset: ActivityDataset;
+  windowStart: string;  // 'YYYY-MM-DD'
+  windowEnd: string;
+};
 
-- [ ] **Step 5**: Commit
+/**
+ * 完整算法链路:
+ *   1) outlet → tier 映射 (用 resolvedOutletIds 缓存)
+ *   2) SQL 拉 collected_items × annotations
+ *   3) 内存按 (district 归并, tier) 分桶
+ *   4) 每桶算 count/richness/freq
+ *   5) 39 区县间 min-max 区间化每个二级指标
+ *   6) 加权得 5 一级 + 综合分 → ranked
+ */
+export async function computeAllIndicators(input: ComputeInput): Promise<EcologicalIndexAggregates> {
+  // Step 1: outlet → tier
+  const outletToTier = new Map<string, ComputeTier>();
+  const TIER_MAP: Record<MediaScopeUnit["tier"], ComputeTier> = {
+    central: "central", industry: "industry", municipal: "municipal",
+    district_rmt: "district", district_gov: "district",
+  };
+  for (const u of input.units) {
+    const tier = TIER_MAP[u.tier];
+    for (const oid of u.resolvedOutletIds) outletToTier.set(oid, tier);
+  }
+  const outletIds = [...outletToTier.keys()];
+
+  // Step 2: 字典
+  const districts = await db.select({ id: researchCqDistricts.id, name: researchCqDistricts.name })
+    .from(researchCqDistricts);
+  const topics = await db.select({ id: researchTopics.id, name: researchTopics.name })
+    .from(researchTopics).where(eq(researchTopics.organizationId, input.organizationId));
+  if (topics.length !== 16) throw new Error(`期望 16 个主题, 实际 ${topics.length}`);
+
+  const topicIdxMap = new Map(topics.map((t, i) => [t.id, i]));
+  const districtIdMap = new Map(districts.map(d => [d.id, d.name]));
+  function normD(name: string): string {
+    return (name === "江北区" || name === "渝北区") ? "两江新区" : name;
+  }
+  const allDistricts = [...new Set(districts.map(d => normD(d.name)))];
+
+  // SQL 聚合
+  const rawRows = outletIds.length === 0 ? [] : await db
+    .select({
+      itemId: collectedItems.id,
+      outletId: collectedItems.outletId,
+      publishedAt: collectedItems.publishedAt,
+      districtId: researchCollectedItemDistricts.districtId,
+      topicId: researchCollectedItemTopics.topicId,
+    })
+    .from(collectedItems)
+    .innerJoin(researchCollectedItemDistricts, eq(researchCollectedItemDistricts.itemId, collectedItems.id))
+    .innerJoin(researchCollectedItemTopics, eq(researchCollectedItemTopics.itemId, collectedItems.id))
+    .where(and(
+      eq(collectedItems.organizationId, input.organizationId),
+      gte(collectedItems.publishedAt, new Date(input.windowStart)),
+      lt(collectedItems.publishedAt, new Date(input.windowEnd)),
+      inArray(collectedItems.outletId, outletIds),
+    ));
+
+  // Step 3: 分桶
+  type Bucket = { itemIds: Set<string>; topicCounts: number[]; publishDays: Set<string> };
+  const buckets = new Map<string, Bucket>();
+  for (const row of rawRows) {
+    const dName = districtIdMap.get(row.districtId);
+    if (!dName) continue;
+    const dNorm = normD(dName);
+    const tier = outletToTier.get(row.outletId!);
+    if (!tier) continue;
+    const key = `${dNorm}::${tier}`;
+    let b = buckets.get(key);
+    if (!b) { b = { itemIds: new Set(), topicCounts: Array(16).fill(0), publishDays: new Set() }; buckets.set(key, b); }
+    b.itemIds.add(row.itemId);
+    const tIdx = topicIdxMap.get(row.topicId);
+    if (tIdx !== undefined) b.topicCounts[tIdx]!++;
+    if (row.publishedAt) b.publishDays.add(row.publishedAt.toISOString().slice(0, 10));
+  }
+
+  // Step 4: 算 raw 三元组
+  const rawMedia: EcologicalIndexAggregates["rawMedia"] = {};
+  for (const d of allDistricts) {
+    rawMedia[d] = {} as any;
+    for (const tier of ["central", "industry", "municipal", "district"] as const) {
+      const b = buckets.get(`${d}::${tier}`) ?? { itemIds: new Set(), topicCounts: Array(16).fill(0), publishDays: new Set() };
+      const count = b.itemIds.size, days = b.publishDays.size;
+      rawMedia[d]![tier] = {
+        count, richness: richnessF(b.topicCounts, 16),
+        freq: days > 0 ? count / days : 0,
+        topicCounts: b.topicCounts, days,
+      };
+    }
+  }
+  const rawPublic: EcologicalIndexAggregates["rawPublic"] = {};
+  for (const d of allDistricts) {
+    const point = input.activityDataset.data.find(p => p.district === d);
+    if (point) {
+      const themeCounts = input.activityDataset.activityThemes.map(t => point.themes[t] ?? 0);
+      rawPublic[d] = {
+        count: point.total, richness: richnessF(themeCounts, 5), freq: point.freq,
+        themes: point.themes, firstDate: point.firstDate, lastDate: point.lastDate, spanDays: point.spanDays,
+      };
+    } else {
+      rawPublic[d] = { count: 0, richness: 0, freq: 0, themes: {}, firstDate: null, lastDate: null, spanDays: null };
+    }
+  }
+
+  // Step 5: 区间化
+  const scaledMedia: EcologicalIndexAggregates["scaledMedia"] = {};
+  const scaledPublic: EcologicalIndexAggregates["scaledPublic"] = {};
+  for (const d of allDistricts) { scaledMedia[d] = {} as any; scaledPublic[d] = { count: 0, richness: 0, freq: 0 }; }
+  for (const sub of ["count", "richness", "freq"] as const) {
+    for (const tier of ["central", "industry", "municipal", "district"] as const) {
+      const vals = allDistricts.map(d => rawMedia[d]![tier][sub]);
+      const scaled = scaleToRange(vals);
+      allDistricts.forEach((d, i) => {
+        if (!scaledMedia[d]![tier]) scaledMedia[d]![tier] = { count: 0, richness: 0, freq: 0 };
+        scaledMedia[d]![tier][sub] = scaled[i]!;
+      });
+    }
+    const pVals = allDistricts.map(d => rawPublic[d]![sub]);
+    const pScaled = scaleToRange(pVals);
+    allDistricts.forEach((d, i) => { scaledPublic[d]![sub] = pScaled[i]!; });
+  }
+
+  // Step 6: 加权 + ranked
+  const ranked = allDistricts.map(d => {
+    const m = scaledMedia[d]!, p = scaledPublic[d]!;
+    const central = weightedTierScore(m.central.count, m.central.richness, m.central.freq);
+    const industry = weightedTierScore(m.industry.count, m.industry.richness, m.industry.freq);
+    const municipal = weightedTierScore(m.municipal.count, m.municipal.richness, m.municipal.freq);
+    const district = weightedTierScore(m.district.count, m.district.richness, m.district.freq);
+    const publicScore = weightedTierScore(p.count, p.richness, p.freq);
+    const composite = weightedComposite(central, industry, municipal, district, publicScore);
+    return { name: d, central, industry, municipal, district, public: publicScore, composite };
+  }).sort((a, b) => b.composite - a.composite).map((r, i) => ({ rank: i + 1, ...r }));
+
+  const scores = ranked.map(r => r.composite);
+  const mean = scores.reduce((s, x) => s + x, 0) / scores.length;
+  const sorted = [...scores].sort((a, b) => a - b);
+  const median = sorted[Math.floor(scores.length / 2)]!;
+  const stdev = Math.sqrt(scores.reduce((s, x) => s + (x - mean) ** 2, 0) / scores.length);
+
+  return {
+    kind: "ecological_index",
+    ranked, rawMedia, rawPublic, scaledMedia, scaledPublic,
+    stats: {
+      max: Math.max(...scores), min: Math.min(...scores),
+      span: Math.max(...scores) - Math.min(...scores),
+      mean, median, stdev,
+      tier_high: scores.filter(s => s >= 80).length,
+      tier_mid: scores.filter(s => s >= 72 && s < 80).length,
+      tier_low: scores.filter(s => s < 72).length,
+    },
+    generatedAt: new Date().toISOString(),
+  };
+}
+```
+
+- [ ] **Step 2: 写 DAL + previewScopeCoverage**
+
+```ts
+// src/lib/dal/research/ecological-index-reports.ts
+import { db } from "@/db";
+import { researchReports, type ReportSearchSnapshot } from "@/db/schema/research/reports";
+import { researchMediaScopeUnits } from "@/db/schema/research/media-scopes";
+import { collectedItems } from "@/db/schema/collection";
+import { and, eq, sql } from "drizzle-orm";
+
+export async function createEcologicalIndexReport(input: {
+  organizationId: string; userId: string;
+  title: string; scopeId: string; activityDatasetId: string;
+  year: number; includeContentSource: boolean;
+}): Promise<{ reportId: string }> {
+  const snap: ReportSearchSnapshot = {
+    kind: "ecological_index",
+    scopeId: input.scopeId, activityDatasetId: input.activityDatasetId,
+    year: input.year,
+    windowStart: `${input.year}-01-01`,
+    windowEnd: `${input.year + 1}-01-01`,
+    includeContentSource: input.includeContentSource,
+    capturedAt: new Date().toISOString(),
+  };
+  const [row] = await db.insert(researchReports).values({
+    organizationId: input.organizationId,
+    sourceType: "ecological_index",
+    title: input.title,
+    status: "pending",
+    searchSnapshot: snap,
+    generatedBy: input.userId,
+  }).returning({ id: researchReports.id });
+  if (!row) throw new Error("create report failed");
+  return { reportId: row.id };
+}
+
+export async function previewScopeCoverage(input: {
+  organizationId: string; scopeId: string; year: number;
+}): Promise<{ matchedOutletCount: number; itemsInScope: number; itemsTotal: number; retentionPct: number }> {
+  const units = await db.select().from(researchMediaScopeUnits)
+    .where(eq(researchMediaScopeUnits.scopeId, input.scopeId));
+  const outletIds = [...new Set(units.flatMap(u => u.resolvedOutletIds))];
+  const windowStart = `${input.year}-01-01`, windowEnd = `${input.year + 1}-01-01`;
+  if (outletIds.length === 0) {
+    return { matchedOutletCount: 0, itemsInScope: 0, itemsTotal: 0, retentionPct: 0 };
+  }
+  const [inScopeRow] = await db.select({ n: sql<number>`COUNT(*)::int` })
+    .from(collectedItems).where(and(
+      eq(collectedItems.organizationId, input.organizationId),
+      sql`${collectedItems.publishedAt} >= ${windowStart}::date`,
+      sql`${collectedItems.publishedAt} < ${windowEnd}::date`,
+      sql`${collectedItems.outletId} = ANY(ARRAY[${sql.join(outletIds.map(id => sql`${id}::uuid`), sql`, `)}])`,
+    ));
+  const [totalRow] = await db.select({ n: sql<number>`COUNT(*)::int` })
+    .from(collectedItems).where(and(
+      eq(collectedItems.organizationId, input.organizationId),
+      sql`${collectedItems.publishedAt} >= ${windowStart}::date`,
+      sql`${collectedItems.publishedAt} < ${windowEnd}::date`,
+    ));
+  const inScope = inScopeRow?.n ?? 0;
+  const total = totalRow?.n ?? 0;
+  return {
+    matchedOutletCount: outletIds.length, itemsInScope: inScope, itemsTotal: total,
+    retentionPct: total > 0 ? (inScope / total) * 100 : 0,
+  };
+}
+```
+
+- [ ] **Step 3: 写 server action + 触发 Inngest**
+
+```ts
+// src/app/actions/research/ecological-index-reports.ts
+"use server";
+import { requireAuth } from "@/lib/auth";
+import { inngest } from "@/inngest/client";
+import {
+  createEcologicalIndexReport as dalCreate,
+  previewScopeCoverage as dalPreview,
+} from "@/lib/dal/research/ecological-index-reports";
+
+async function requireOrg() {
+  const u = await requireAuth();
+  if (!u.organizationId) throw new Error("无组织");
+  return { orgId: u.organizationId, userId: u.id };
+}
+
+export async function previewScopeCoverage(scopeId: string, year: number) {
+  const { orgId } = await requireOrg();
+  return await dalPreview({ organizationId: orgId, scopeId, year });
+}
+
+export async function createEcologicalIndexReport(input: {
+  title: string; year: number; scopeId: string; activityDatasetId: string; includeContentSource: boolean;
+}) {
+  const { orgId, userId } = await requireOrg();
+  const { reportId } = await dalCreate({ organizationId: orgId, userId, ...input });
+  await inngest.send({
+    name: "research/ecological-index.generate",
+    data: { reportId, organizationId: orgId },
+  });
+  return { reportId };
+}
+```
+
+- [ ] **Step 4: 写 computeAllIndicators 集成测试 (mock DB,fixture units + activityDataset → 验证 ranked 输出 + stats 计算)**
+
+```ts
+// src/lib/research/ecological-index/__tests__/compute-integration.test.ts (略, 用 vi.mock 模拟 db.select)
+```
+
+```bash
+npx tsc --noEmit
+npx vitest run src/lib/research/ecological-index/__tests__/compute-integration.test.ts
+```
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/lib/research/ecological-index/compute.ts \
         src/lib/dal/research/ecological-index-reports.ts \
-        src/app/actions/research/ecological-index-reports.ts
-git commit -m "feat(eco-index): computeAllIndicators + DAL + server action"
+        src/app/actions/research/ecological-index-reports.ts \
+        src/lib/research/ecological-index/__tests__/compute-integration.test.ts
+git commit -m "feat(eco-index): computeAllIndicators integration + DAL + server actions"
 ```
 
 ---
