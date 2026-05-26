@@ -9,7 +9,8 @@ import { ensureHotTopicSystemSource } from "@/lib/collection/seed-system-sources
  */
 export const collectionHotTopicCron = inngest.createFunction(
   { id: "collection-hot-topic-cron", name: "Collection Hub - Hot Topic Cron" },
-  { cron: "0 * * * *" },
+  // 触发时机由 scheduled_jobs.collection-hot-topic-cron 表配置(默认每小时)
+  { event: "scheduled-jobs/collection-hot-topic-cron.run" },
   async ({ step }) => {
     const orgs = await step.run("find-organizations", async () => {
       return db.select({ id: organizations.id }).from(organizations);

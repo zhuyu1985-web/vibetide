@@ -29,7 +29,8 @@ export const accountAnalyticsDailySnapshot = inngest.createFunction(
     concurrency: { limit: 1 }, // 串行，避免重复扫表
     retries: 2,
   },
-  { cron: "0 22 * * *" }, // 22:00 UTC = 06:00 Asia/Shanghai（次日）
+  // 触发时机由 scheduled_jobs.account-analytics-daily-snapshot 表配置(默认 SH 06:00 次日)
+  { event: "scheduled-jobs/account-analytics-daily-snapshot.run" },
   async ({ step }) => {
     // Step 1：算昨日业务日窗口（Asia/Shanghai）
     const { yesterdayDate, windowStart, windowEnd } = await step.run(

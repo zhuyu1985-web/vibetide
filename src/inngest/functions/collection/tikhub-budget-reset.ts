@@ -10,7 +10,8 @@ import { sql } from "drizzle-orm";
  */
 export const tikhubBudgetReset = inngest.createFunction(
   { id: "collection-tikhub-budget-reset" },
-  { cron: "0 0 1 * *" }, // 每月 1 号 00:00 UTC
+  // 触发时机由 scheduled_jobs.collection-tikhub-budget-reset 表配置(默认每月 1 号 SH 08:00)
+  { event: "scheduled-jobs/collection-tikhub-budget-reset.run" },
   async ({ step }) => {
     // 步骤 1：重置月度累计费用
     const resetResult = await step.run("reset-accumulated", async () => {

@@ -63,7 +63,8 @@ export const skillConsistencyCheck = inngest.createFunction(
   // 02:30 Asia/Shanghai daily — between CMS catalog sync (02:00) and morning
   // content workflows (06:30+), so drift alerts land in time for the editor's
   // morning review.
-  { cron: "TZ=Asia/Shanghai 30 2 * * *" },
+  // 触发时机由 scheduled_jobs.skill-consistency-check 表配置(默认 SH 02:30)
+  { event: "scheduled-jobs/skill-consistency-check.run" },
   async ({ step }) => {
     // ── Step 1: scan skills/ directory ──
     const skillDrifts = await step.run("scan-skills", async () => {

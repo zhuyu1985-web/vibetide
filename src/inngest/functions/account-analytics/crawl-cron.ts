@@ -37,8 +37,8 @@ export const accountAnalyticsCrawlCron = inngest.createFunction(
     concurrency: { limit: 1 }, // 串行跑避免 TikHub 额度爆炸
     retries: 0,
   },
-  // UTC 21:00 = Asia/Shanghai 次日 05:00（早于 06:00 snapshot cron）
-  { cron: "0 21 * * *" },
+  // 触发时机由 scheduled_jobs.account-analytics-crawl 表配置(默认 SH 05:00)
+  { event: "scheduled-jobs/account-analytics-crawl.run" },
   async ({ step, logger }) => {
     // Step 1：取所有要自动抓的账号（两表 union）
     const targets = await step.run("load-enabled-accounts", async () => {

@@ -20,8 +20,8 @@ export const dailyHotBriefingCron = inngest.createFunction(
     name: "Daily Hot Briefing - Cron",
     concurrency: { limit: 5 },
   },
-  // 北京时间 8:00 = UTC 0:00
-  { cron: "0 0 * * *" },
+  // 触发时机由 scheduled_jobs.daily-hot-briefing 表配置(默认 SH 08:00)
+  { event: "scheduled-jobs/daily-hot-briefing.run" },
   async ({ step }) => {
     const orgs = await step.run("list-orgs", async () => {
       return db

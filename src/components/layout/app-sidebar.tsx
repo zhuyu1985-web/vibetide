@@ -38,6 +38,7 @@ import {
   Wrench,
   Compass,
   Database,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -164,6 +165,7 @@ const ADMIN_ITEMS: SubItem[] = [
   { label: "用户管理", href: "/admin/users", icon: Users },
   { label: "角色权限", href: "/admin/roles", icon: Shield },
   { label: "组织管理", href: "/admin/organizations", icon: Building2 },
+  { label: "定时任务", href: "/settings/scheduled-jobs", icon: Clock },
 ];
 
 /* ─── Helpers ─── */

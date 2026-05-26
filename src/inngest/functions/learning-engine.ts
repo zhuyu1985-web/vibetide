@@ -19,7 +19,8 @@ export const learningEngine = inngest.createFunction(
   },
   [
     { event: "employee/learn" },
-    { cron: "TZ=Asia/Shanghai 0 2 * * *" },
+    // 触发时机由 scheduled_jobs.learning-engine 表配置(默认 SH 02:00)
+    { event: "scheduled-jobs/learning-engine.run" },
   ],
   async ({ event, step }) => {
     // Determine which employees to process

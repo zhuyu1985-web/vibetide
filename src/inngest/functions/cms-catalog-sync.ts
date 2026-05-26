@@ -16,7 +16,8 @@ export const cmsCatalogSyncDaily = inngest.createFunction(
     name: "[CMS P1] 每日栏目同步",
     concurrency: { limit: 1 },
   },
-  { cron: "TZ=Asia/Shanghai 0 2 * * *" },
+  // 触发时机由 scheduled_jobs.cms-catalog-sync-daily 表配置(默认 SH 02:00)
+  { event: "scheduled-jobs/cms-catalog-sync-daily.run" },
   async ({ step, logger }) => {
     const orgs = await step.run("fetch-orgs", async () =>
       db.query.organizations.findMany(),

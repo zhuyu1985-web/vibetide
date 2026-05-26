@@ -10,7 +10,8 @@ import { db } from "@/db";
  */
 export const weeklyAnalyticsReport = inngest.createFunction(
   { id: "weekly-analytics-report", name: "Weekly Analytics Report" },
-  { cron: "0 9 * * 1" }, // Every Monday at 9:00 AM
+  // 触发时机由 scheduled_jobs.weekly-analytics-report 表配置(默认每周一 09:00)
+  { event: "scheduled-jobs/weekly-analytics-report.run" },
   async ({ step }) => {
     const stats = await step.run("fetch-stats", async () => {
       return getAnalyticsSummary();

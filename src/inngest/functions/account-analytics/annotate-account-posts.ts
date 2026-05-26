@@ -61,7 +61,8 @@ export const annotateAccountPosts = inngest.createFunction(
   },
   [
     { event: "account-analytics/aigc-annotate.requested" },
-    { cron: "TZ=Asia/Shanghai 0 4 * * *" }, // 每天 04:00
+    // 触发时机由 scheduled_jobs.account-analytics-annotate-posts 表配置(默认 SH 04:00)
+    { event: "scheduled-jobs/account-analytics-annotate-posts.run" },
   ],
   async ({ event, step }) => {
     // Inngest 类型上 event.data 是 `event payload | { cron: string }` 的 union；

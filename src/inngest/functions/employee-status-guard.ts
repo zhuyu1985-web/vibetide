@@ -9,7 +9,8 @@ import { eq, and, lt, inArray } from "drizzle-orm";
  */
 export const employeeStatusGuard = inngest.createFunction(
   { id: "employee-status-guard" },
-  { cron: "*/30 * * * *" },
+  // 触发时机由 scheduled_jobs.employee-status-guard 表配置(默认每 30 分钟)
+  { event: "scheduled-jobs/employee-status-guard.run" },
   async ({ step }) => {
     const staleThreshold = new Date(Date.now() - 30 * 60 * 1000);
 

@@ -344,4 +344,35 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Scheduled Jobs Events (2026-05-26) ───
+  // scheduledJobsRunner 每分钟扫 scheduled_jobs 表派发的事件。
+  // 业务函数订阅这些事件而不是 cron,cron 表达式由 DB / UI 管理。
+  // 13 条 event 对应 13 个原 cron 函数 + 1 个新增 monthly-report。
+  "scheduled-jobs/account-analytics-crawl.run": ScheduledJobPayload;
+  "scheduled-jobs/account-analytics-daily-snapshot.run": ScheduledJobPayload;
+  "scheduled-jobs/account-analytics-annotate-posts.run": ScheduledJobPayload;
+  "scheduled-jobs/account-analytics-monthly-report.run": ScheduledJobPayload;
+  "scheduled-jobs/cms-catalog-sync-daily.run": ScheduledJobPayload;
+  "scheduled-jobs/collection-hot-topic-cron.run": ScheduledJobPayload;
+  "scheduled-jobs/collection-tikhub-budget-reset.run": ScheduledJobPayload;
+  "scheduled-jobs/weekly-analytics-report.run": ScheduledJobPayload;
+  "scheduled-jobs/skill-consistency-check.run": ScheduledJobPayload;
+  "scheduled-jobs/daily-hot-briefing.run": ScheduledJobPayload;
+  "scheduled-jobs/learning-engine.run": ScheduledJobPayload;
+  "scheduled-jobs/daily-performance-snapshot.run": ScheduledJobPayload;
+  "scheduled-jobs/employee-status-guard.run": ScheduledJobPayload;
+};
+
+/** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */
+type ScheduledJobPayload = {
+  data: {
+    /** scheduled_jobs.name */
+    jobName: string;
+    /** scheduled_jobs.id */
+    jobId: string;
+    /** 实际派发时间(ISO) */
+    dispatchedAt: string;
+    /** 计划执行时间(可能略早于 dispatchedAt,因为 scheduler 每分钟跑一次) */
+    scheduledAt: string;
+  };
 };

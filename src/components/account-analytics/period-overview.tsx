@@ -40,20 +40,30 @@ export function PeriodOverview({ overview, className }: PeriodOverviewProps) {
       {dailyPosts.length > 0 && (
         <div>
           <div className="text-[12px] text-gray-500 mb-3">每日发布量分布</div>
-          <div className="flex items-end gap-2 h-[150px] overflow-x-auto pb-2">
+          <div className="flex items-end gap-2 h-[180px] overflow-x-auto pb-2">
             {dailyPosts.map((d) => {
-              const heightPct = Math.max(6, (d.count / maxCount) * 100);
+              // 柱子高度 = (count / maxCount) × 柱区高度(扣去顶部数字 18px + 底部日期 22px ≈ 40px)
+              // 用 px 替代 % 避开 flex column 子项无明确高度时 % 失效的兼容性坑
+              const BAR_AREA_PX = 140;
+              const barHeightPx = d.count === 0
+                ? 4
+                : Math.max(6, Math.round((d.count / maxCount) * BAR_AREA_PX));
               return (
                 <div
                   key={d.date}
-                  className="flex flex-col items-center justify-end flex-1 min-w-[44px]"
+                  className="flex flex-col items-center justify-end flex-1 min-w-[44px] h-full"
                 >
-                  <div className="text-[11px] font-semibold text-[#1F3864] dark:text-blue-200 mb-1">
+                  <div className="text-[11px] font-semibold text-[#1F3864] dark:text-blue-200 mb-1 tabular-nums">
                     {d.count}
                   </div>
                   <div
-                    className="w-full rounded-sm bg-gradient-to-b from-[#5BA4D8] via-[#2E75B6] to-[#1F3864]"
-                    style={{ height: `${heightPct}%` }}
+                    className={
+                      "w-full rounded-md transition-all " +
+                      (d.count === 0
+                        ? "bg-gray-200/60 dark:bg-gray-700/40"
+                        : "bg-gradient-to-b from-[#5BA4D8] via-[#2E75B6] to-[#1F3864] shadow-[inset_0_-1px_0_rgba(31,56,100,0.2)]")
+                    }
+                    style={{ height: `${barHeightPx}px` }}
                   />
                   <div className="text-[10px] text-gray-400 mt-1.5 whitespace-nowrap">
                     {d.date.slice(5)}
