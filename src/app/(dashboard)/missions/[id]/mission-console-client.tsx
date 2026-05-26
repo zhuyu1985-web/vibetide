@@ -56,6 +56,7 @@ import {
 import { cancelMission, retryMission, deleteMission, archiveMission } from "@/app/actions/missions";
 import { DraftComparisonPanel } from "@/components/missions/draft-comparison-panel";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
+import { SourceUrlPill } from "@/components/shared/source-url-pill";
 import type {
   MissionWithDetails,
   MissionTask,
@@ -1076,7 +1077,56 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
             </div>
           )}
 
-          {artifactContent && (
+          {task.assignedRole === "archive_to_drafts" && task.outputData != null && (() => {
+            const out = task.outputData as {
+              totalRequested?: number;
+              totalCreated?: number;
+              totalSkipped?: number;
+              created?: { articleId: string; title: string; sourceUrl?: string }[];
+              skipped?: { sourceUrl: string; existingArticleId: string; reason: string }[];
+            };
+            return (
+              <div>
+                <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">入库结果</h3>
+                <div className="space-y-2 rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
+                  <div className="text-xs text-muted-foreground">
+                    本次提交 {out.totalRequested ?? 0} 篇，新建 {out.totalCreated ?? 0} 篇，去重跳过 {out.totalSkipped ?? 0} 篇
+                  </div>
+                  {(out.created ?? []).map((c) => (
+                    <div key={c.articleId} className="flex items-center justify-between p-2 rounded bg-muted/30 gap-2">
+                      <Link
+                        href={`/articles/${c.articleId}`}
+                        className="text-sm font-medium truncate hover:text-blue-600 flex-1 min-w-0"
+                      >
+                        {c.title}
+                      </Link>
+                      <SourceUrlPill url={c.sourceUrl} variant="compact" />
+                    </div>
+                  ))}
+                  {(out.skipped ?? []).length > 0 && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        查看 {out.skipped!.length} 篇去重跳过
+                      </summary>
+                      <div className="space-y-1 pt-1">
+                        {out.skipped!.map((s) => (
+                          <div key={s.sourceUrl} className="flex items-center gap-2 py-1">
+                            <span className="text-muted-foreground">已存在</span>
+                            <Link href={`/articles/${s.existingArticleId}`} className="text-blue-600 hover:text-blue-700">
+                              查看现有稿件
+                            </Link>
+                            <SourceUrlPill url={s.sourceUrl} variant="compact" />
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {task.assignedRole !== "archive_to_drafts" && artifactContent && (
             <div>
               <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
               <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
@@ -1084,7 +1134,7 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
               </div>
             </div>
           )}
-          {!artifactContent && fullSummary && (
+          {task.assignedRole !== "archive_to_drafts" && !artifactContent && fullSummary && (
             <div>
               <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
               <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
@@ -1092,7 +1142,7 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
               </div>
             </div>
           )}
-          {fullOutputText && (
+          {task.assignedRole !== "archive_to_drafts" && fullOutputText && (
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground mb-2">输出数据</h3>
               <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 p-4 rounded-xl overflow-x-auto leading-relaxed">{fullOutputText}</pre>
