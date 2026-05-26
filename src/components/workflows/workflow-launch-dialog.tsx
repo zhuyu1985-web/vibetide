@@ -386,21 +386,24 @@ export function WorkflowLaunchDialog({
               {template.description ?? "点击「启动」立即创建任务。"}
             </p>
           ) : (
-            fields.map((f, idx) => (
-              <FieldRenderer
-                key={idx}
-                field={f}
-                value={values[idx]}
-                error={errors[f.name]}
-                onChange={(v) =>
-                  setValues((prev) => {
-                    const next = prev.slice();
-                    next[idx] = v;
-                    return next;
-                  })
-                }
-              />
-            ))
+            fields
+              .map((f, idx) => ({ field: f, idx }))
+              .filter(({ field }) => !field.hidden)
+              .map(({ field: f, idx }) => (
+                <FieldRenderer
+                  key={idx}
+                  field={f}
+                  value={values[idx]}
+                  error={errors[f.name]}
+                  onChange={(v) =>
+                    setValues((prev) => {
+                      const next = prev.slice();
+                      next[idx] = v;
+                      return next;
+                    })
+                  }
+                />
+              ))
           )}
           {errors._global && (
             <p className="text-sm text-red-600">{errors._global}</p>

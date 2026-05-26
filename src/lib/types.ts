@@ -362,6 +362,7 @@ export interface InputFieldDef {
     min?: number;
     max?: number;
   };
+  hidden?: boolean;
 }
 
 export function normalizeFieldOption(opt: InputFieldOption): { value: string; label: string } {
