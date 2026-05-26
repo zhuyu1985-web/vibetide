@@ -80,8 +80,12 @@ ${(articleContent ?? "").slice(0, 12000)}`;
 
     let fullText = "";
 
+    const modelName = process.env.OPENAI_MODEL;
+    if (!modelName) {
+      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+    }
     const result = streamText({
-      model: deepseek.chat(process.env.OPENAI_MODEL || "deepseek-chat"),
+      model: deepseek.chat(modelName),
       system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
       onFinish: ({ text }) => {

@@ -350,9 +350,12 @@ export async function testSkillExecution(
 
   const systemPrompt = systemPromptParts.join("\n");
 
-  // Resolve model: use DeepSeek via OpenAI-compatible API
+  // Resolve model: use qwen3-max via OpenAI-compatible API
   const resolvedProvider = "openai";
-  const resolvedModel = process.env.OPENAI_MODEL || "deepseek-chat";
+  const resolvedModel = process.env.OPENAI_MODEL;
+  if (!resolvedModel) {
+    throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     return {

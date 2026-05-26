@@ -24,8 +24,11 @@ import { createSkill, updateSkill, registerPluginSkill } from "@/app/actions/ski
 import type { SkillCategory } from "@/lib/types";
 
 const modelOptions = [
+  // audit-allow: skill-form 是 UI 下拉给用户选模型，产品决策保留多模型选项；另起 spec 决定是否简化
   { value: "glm-5", label: "GLM-5 (智谱)", provider: "zhipu" },
+  // audit-allow: skill-form 是 UI 下拉给用户选模型，产品决策保留多模型选项；另起 spec 决定是否简化
   { value: "glm-4-plus", label: "GLM-4 Plus (智谱)", provider: "zhipu" },
+  // audit-allow: skill-form 是 UI 下拉给用户选模型，产品决策保留多模型选项；另起 spec 决定是否简化
   { value: "glm-4-flash", label: "GLM-4 Flash (智谱)", provider: "zhipu" },
   { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", provider: "anthropic" },
   { value: "gpt-4o", label: "GPT-4o", provider: "openai" },

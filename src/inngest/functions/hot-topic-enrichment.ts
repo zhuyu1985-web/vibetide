@@ -44,6 +44,7 @@ export const hotTopicEnrichmentPipeline = inngest.createFunction(
 只返回JSON数组，不要其他文字。`;
 
         const result = await generateText({
+          // audit-allow: hot-topic 富化有意用 GLM-4-Plus（非 fallback），另起 spec 评估是否迁 qwen3-max
           model: zhipu("glm-4-plus"),
           prompt,
           maxOutputTokens: 500,
@@ -95,6 +96,7 @@ export const hotTopicEnrichmentPipeline = inngest.createFunction(
         .join("\n\n");
 
       const { text } = await generateText({
+        // audit-allow: hot-topic 富化有意用 GLM-4-Plus（非 fallback），另起 spec 评估是否迁 qwen3-max
         model: zhipu("glm-4-plus"),
         maxOutputTokens: 4000,
         system: `你是「小雷」，热点监控专家。${buildStepInstruction("monitor")}
@@ -262,6 +264,7 @@ style可选值：deep_report, quick_news, opinion, data_analysis
 
         try {
           const result = await generateText({
+            // audit-allow: hot-topic 富化有意用 GLM-4-Plus（非 fallback），另起 spec 评估是否迁 qwen3-max
             model: zhipu("glm-4-plus"),
             prompt: outlinePrompt,
             maxOutputTokens: 2000,
@@ -304,6 +307,7 @@ style可选值：deep_report, quick_news, opinion, data_analysis
 只返回JSON。`;
 
           const result = await generateText({
+            // audit-allow: hot-topic 富化有意用 GLM-4-Plus（非 fallback），另起 spec 评估是否迁 qwen3-max
             model: zhipu("glm-4-plus"),
             prompt: eventPrompt,
             maxOutputTokens: 500,

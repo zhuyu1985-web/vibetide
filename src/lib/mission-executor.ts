@@ -87,9 +87,13 @@ ${stepLines}
 - 不要用 Markdown 标题，不要用列表符号`;
 
   try {
+    const modelName = process.env.OPENAI_MODEL;
+    if (!modelName) {
+      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+    }
     const model = getLanguageModel({
       provider: "openai",
-      model: process.env.OPENAI_MODEL || "deepseek-chat",
+      model: modelName,
       temperature: 0.7,
       maxTokens: 800,
     });

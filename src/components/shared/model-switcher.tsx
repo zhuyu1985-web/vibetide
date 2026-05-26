@@ -35,7 +35,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     vendor: "huasheng",
   },
   {
-    id: "deepseek-chat",
+    id: "deepseek-chat", // audit-allow: model-switcher 是 UI 下拉给用户选模型，产品决策保留多模型选项；另起 spec 决定是否简化
     label: "DeepSeek",
     description: "通用对话 · 高性价比",
     vendor: "deepseek",
@@ -47,8 +47,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     vendor: "zhipu",
   },
   {
-    id: "glm-4-flash",
-    label: "GLM-4 Flash",
+    id: "glm-4-flash", // audit-allow: model-switcher 是 UI 下拉给用户选模型，产品决策保留多模型选项；另起 spec 决定是否简化
+    label: "GLM-4 Flash", // audit-allow: model-switcher 是 UI 下拉给用户选模型，产品决策保留多模型选项；另起 spec 决定是否简化
     description: "快速响应",
     vendor: "zhipu",
   },

@@ -17,8 +17,12 @@ export async function POST(req: Request) {
       ? `[用户选中的文本：「${selectedText}」]\n\n${lastMessage.content}`
       : lastMessage.content;
 
+    const modelName = process.env.OPENAI_MODEL;
+    if (!modelName) {
+      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+    }
     const result = streamText({
-      model: deepseek.chat(process.env.OPENAI_MODEL || "deepseek-chat"),
+      model: deepseek.chat(modelName),
       system: systemPrompt,
       messages: [
         ...messages.slice(0, -1),

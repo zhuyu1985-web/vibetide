@@ -158,11 +158,15 @@ export async function POST(req: Request) {
           const validSlugs = new Set(allSkills.map((s) => s.slug));
           const systemPrompt = buildSystemPrompt(skillCatalog);
 
+          const modelName = process.env.OPENAI_MODEL;
+          if (!modelName) {
+            throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+          }
           // Call LLM with full conversation history
           const result = await generateText({
             model: getLanguageModel({
               provider: "openai",
-              model: process.env.OPENAI_MODEL || "deepseek-chat",
+              model: modelName,
               temperature: 0.4,
               maxTokens: 2048,
             }),

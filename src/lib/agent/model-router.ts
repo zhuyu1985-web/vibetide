@@ -30,7 +30,11 @@ function getDeepSeekClient() {
 }
 
 function getDefaultModel() {
-  return process.env.OPENAI_MODEL || "deepseek-chat";
+  const model = process.env.OPENAI_MODEL;
+  if (!model) {
+    throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+  }
+  return model;
 }
 
 // Default model per skill category — all use DeepSeek. Temperature tuned per
