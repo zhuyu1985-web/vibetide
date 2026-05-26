@@ -37,7 +37,11 @@ const CATEGORY_TONE_DEFAULTS: Record<string, string> = {
 };
 
 const RewrittenArticleSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1),                              // 唯一稿件 ID 如 t1-v0
+  sourceTopicId: z.string().min(1),                   // ← Phase 4 新：原 topic 的 id
+  variantIndex: z.number().int().min(0).max(2),       // ← Phase 4 新
+  sourceUrl: z.string().optional(),                   // ← Phase 4 新（透传）
+  category: z.string().optional(),                    // ← Phase 4 新（透传）
   title_en: z.string().min(1).max(140),
   body_en: z.string().min(10),
   hashtags: z.array(z.string().min(2).max(40)).min(3).max(7),
@@ -59,12 +63,15 @@ export interface ArticleInput {
   title: string;
   body: string;
   tags?: string[];
+  sourceUrl?: string;   // ← Phase 4 新
+  category?: string;    // ← Phase 4 新（Phase 3 topic_classifier 输出透传）
 }
 
 export interface CrossLanguageRewriteInput {
   articles: ArticleInput[];
   targetLanguage: TargetLanguage;
   categoryHint?: string;       // ← enum 改 string (M3)
+  variantsPerTopic?: 1 | 2 | 3;  // ← Phase 4 新，默认 1
 }
 
 export interface CrossLanguageRewriteOutput {
@@ -75,7 +82,7 @@ export interface CrossLanguageRewriteOutput {
 // Prompt builder
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(categoryHint?: string): string {
+function buildSystemPrompt(categoryHint?: string, variantsPerTopic: number = 1): string {
   const toneText = categoryHint
     ? (CATEGORY_TONE_DEFAULTS[categoryHint] ?? "保持简洁直白，无特定语气倾向")
     : "";
@@ -114,7 +121,20 @@ function buildSystemPrompt(categoryHint?: string): string {
 
 6. **cultural_notes**（可选）：≤ 400 字，简短记录你做过哪些本地化决策（"把'秋天的第一杯奶茶'改成 'pumpkin-spice-latte moment'"），方便编辑复核。
 
-7. 严格按 schema 输出 JSON，不要附加任何解释文字。${toneHint}`;
+7. 严格按 schema 输出 JSON，不要附加任何解释文字。
+
+8. **variantsPerTopic 引导**：
+   - 入参 variants_per_topic = ${variantsPerTopic}。
+   - = 1：每条 input 生成 1 篇英文稿，id = "<input_id>-v0"。
+   - = 2：每条生成 2 篇明显不同的版本（variant 0 = headline-driven 短版；variant 1 = storytelling 中版）。id = "<input_id>-v0" / "<input_id>-v1"。
+   - = 3：再加 variant 2 = analytical 长版，id = "<input_id>-v2"。
+   - 同一 source 的 N 篇必须**明显不同**——不同切入角度、不同钩子、不同长度，不是改几个字。
+
+9. **sourceUrl 透传**：
+   - 输入每条 article 若带 sourceUrl，输出该 input 对应的所有 variant 都必须原样回填 sourceUrl。
+   - **绝对不许编造 / 修改 sourceUrl。** 入参没的也不能填假的。
+
+10. **sourceTopicId / variantIndex**：每条输出必须有这两个字段。sourceTopicId = 原 input.id；variantIndex 从 0 起。${toneHint}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,14 +165,19 @@ export async function crossLanguageRewriteArticles(
     );
   }
 
+  const variantsPerTopic = input.variantsPerTopic ?? 1;
+
   const userPayload = JSON.stringify({
     target_language: input.targetLanguage,
     category_hint: input.categoryHint ?? null,
+    variants_per_topic: variantsPerTopic,
     articles: input.articles.map((a) => ({
       id: a.id,
       title: a.title,
       body: a.body,
       tags: a.tags ?? [],
+      sourceUrl: a.sourceUrl ?? null,
+      category: a.category ?? null,
     })),
   });
 
@@ -164,7 +189,7 @@ export async function crossLanguageRewriteArticles(
 
   const { output } = await generateText({
     model: getLanguageModel(modelConfig),
-    system: buildSystemPrompt(input.categoryHint),
+    system: buildSystemPrompt(input.categoryHint, variantsPerTopic),
     prompt: userPayload,
     output: Output.object({ schema: CrossLanguageRewriteOutputSchema }),
     temperature: modelConfig.temperature,
@@ -172,18 +197,28 @@ export async function crossLanguageRewriteArticles(
   });
 
   // 兜底：缺漏的稿件原样回填（标记需人工处理）
-  const returnedIds = new Set(output.articles.map((a) => a.id));
+  const returnedSourceIds = new Set(output.articles.map((a) => a.sourceTopicId));
   const missing: RewrittenArticle[] = input.articles
-    .filter((a) => !returnedIds.has(a.id))
+    .filter((a) => !returnedSourceIds.has(a.id))
     .map((a) => ({
-      id: a.id,
+      id: `${a.id}-v0`,
+      sourceTopicId: a.id,
+      variantIndex: 0,
+      sourceUrl: a.sourceUrl,
+      category: a.category,
       title_en: `[NEEDS REVIEW] ${a.title}`,
       body_en: `[NEEDS REVIEW] LLM did not return a rewrite for this article. Original Chinese body preserved:\n\n${a.body}`,
       hashtags: ["#NeedsReview", "#FromChina", "#Draft"],
       cultural_notes: "LLM 未返回该条改写，已兜底标记 NEEDS REVIEW。",
     }));
 
+  // sourceUrl 兜底回填 — LLM 漏返时从 input 找 sourceTopicId 对应的原文
+  const filled = output.articles.map((a) => ({
+    ...a,
+    sourceUrl: a.sourceUrl ?? input.articles.find((src) => src.id === a.sourceTopicId)?.sourceUrl,
+  }));
+
   return {
-    articles: [...output.articles, ...missing],
+    articles: [...filled, ...missing],
   };
 }
