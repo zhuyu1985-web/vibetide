@@ -52,7 +52,7 @@ export const missions = pgTable("missions", {
   finalOutput: jsonb("final_output"),
 
   // Cross-module trigger source
-  sourceModule: text("source_module"),      // 'hot_topics' | 'publishing' | 'benchmarking' | 'analytics' | 'creation' | 'inspiration'
+  sourceModule: text("source_module"),      // 'hot_topics' | 'hot_topics_overseas' | 'publishing' | 'benchmarking' | 'analytics' | 'creation' | 'inspiration'
   sourceEntityId: text("source_entity_id"), // ID of triggering entity
   sourceEntityType: text("source_entity_type"), // 'hot_topic' | 'publish_plan' | 'benchmark_alert' | 'anomaly' | 'creation_session'
 

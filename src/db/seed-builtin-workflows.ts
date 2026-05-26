@@ -2279,6 +2279,53 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(5, "通知编辑审核", "compliance_check", "审核通知", "quality_review", "notify"),
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 公共场景 · 海外转发（单条）（M6 / 2026-05-26）
+  // inspiration 卡片 "海外转发" 按钮调用，单条 topic 简化版海外热榜搬运
+  // 跳过 trending_topics（用户已选定）+ topic_classifier（无需过滤）
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    slug: "hot_topic_single_overseas_repost",
+    name: "海外转发（单条）",
+    description: "把单条选定热点翻译改写成英文稿件入库。海外热榜搬运的简化版，不经分类过滤、不通知审核。",
+    icon: "send",
+    category: "social",
+    ownerEmployeeId: null,
+    defaultTeam: ["xiaowen"],
+    inputFields: [
+      { name: "source_topic_id", label: "热点 ID（系统注入）", type: "text", required: true, hidden: true },
+      { name: "source_title", label: "原标题（系统注入）", type: "text", required: true, hidden: true },
+      { name: "source_body", label: "原正文（系统注入）", type: "textarea", required: false, hidden: true },
+      { name: "source_url", label: "原文链接（系统注入）", type: "url", required: false, hidden: true },
+      {
+        name: "variants_per_topic",
+        label: "生成稿件版本数",
+        type: "number",
+        required: false,
+        defaultValue: 1,
+        validation: { min: 1, max: 3 },
+        helpText: "1=单稿；2-3=多版本（短/长/钩子）",
+      },
+    ],
+    systemInstruction:
+      "把这条选定热点改写成 {{variants_per_topic}} 篇适合 X / Instagram 海外读者的英文稿件并入本地稿件库等审核。",
+    promptTemplate:
+      "原标题：{{source_title}}\n原文：{{source_body}}\n原文链接：{{source_url}}\n请翻译改写成英文，生成 {{variants_per_topic}} 个版本。",
+    isFeatured: false,
+    steps: [
+      step(1, "翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate"),
+      step(
+        2,
+        "入英文稿件库（待审）",
+        "archive_to_drafts",
+        "稿件入库",
+        "distribution",
+        "store",
+        { language: "en", initialStatus: "approved" },
+      ),
+    ],
+  },
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────
