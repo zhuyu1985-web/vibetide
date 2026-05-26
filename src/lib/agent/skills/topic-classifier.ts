@@ -46,6 +46,8 @@ function buildClassifierSchema(categoryValues: string[]) {
         confidence: z.number().min(0).max(1),
         reason: z.string().min(2).max(200),
         sourceUrl: z.string().optional(), // ← Phase 4 透传字段（本 task 留口）
+        title: z.string().optional(),     // ← A.1.1: echo input.title
+        summary: z.string().optional(),   // ← A.1.1: echo input.summary
       }),
     ),
   });
@@ -78,6 +80,8 @@ export interface TopicClassifierResult {
   confidence: number;
   reason: string;
   sourceUrl?: string;
+  title?: string;     // ← A.1.1: echo input.title
+  summary?: string;   // ← A.1.1: echo input.summary
 }
 
 export interface TopicClassifierOutput {
@@ -106,7 +110,8 @@ ${lines}
 4. reason 简短中文（≤ 100 字）：说出关键判断词。
 5. 输出顺序与输入顺序一致，每条都要给出（不能省略）。
 6. **若输入条目带 sourceUrl 字段，输出必须原样回填，绝对不改 / 不删**。
-7. 严格按 schema 输出 JSON，不要附加任何解释文字。`;
+7. **title / summary 透传**：输入 topic 的 title 必须原样 echo 到输出；summary 若有也一并 echo（让下游翻译时不用反查）。
+8. 严格按 schema 输出 JSON，不要附加任何解释文字。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,17 +176,29 @@ export async function classifyOverseasTopics(
     .filter((t) => !returnedIds.has(t.id))
     .map((t) => ({
       id: t.id,
-      category: "other",
+      category: "other" as const,
       confidence: 0,
       reason: "LLM 未返回该条分类结果，兜底归为 other",
       sourceUrl: t.sourceUrl,
+      title: t.title,     // ← A.1.1: 兜底回填 title
+      summary: t.summary, // ← A.1.1: 兜底回填 summary
     }));
 
-  // sourceUrl 兜底回填（如果 LLM 漏了某条的 sourceUrl）
-  const filled: TopicClassifierResult[] = output.results.map((r) => ({
-    ...r,
-    sourceUrl: r.sourceUrl ?? input.topics.find((t) => t.id === r.id)?.sourceUrl,
-  }));
+  // sourceUrl / title / summary 兜底回填（如果 LLM 漏了字段）
+  const filled: TopicClassifierResult[] = output.results.map((r) => {
+    const inputTopic = input.topics.find((t) => t.id === r.id);
+    return {
+      ...r,
+      sourceUrl: r.sourceUrl ?? inputTopic?.sourceUrl,
+      title: r.title ?? inputTopic?.title,       // ← A.1.1
+      summary: r.summary ?? inputTopic?.summary, // ← A.1.1
+    };
+  });
 
   return { results: [...filled, ...missing] };
 }
+
+// ---------------------------------------------------------------------------
+// 别名 export：dispatch / renderer 用 ClassifiedItem 更语义化
+// ---------------------------------------------------------------------------
+export type ClassifiedItem = TopicClassifierResult;
