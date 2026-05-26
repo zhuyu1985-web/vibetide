@@ -2264,9 +2264,19 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       "拉取最近 24h 热榜 Top {{topic_limit}}（最低热度 {{min_heat_score}}），筛选 {{categories}}，翻译为英文。",
     isFeatured: true,
     steps: [
-      step(1, "拉取 24h 热榜", "trending_topics", "热榜聚合", "data_collection", "pull"),
-      step(2, "海外分类过滤", "topic_classifier", "海外热榜分类", "content_analysis", "classify"),
-      step(3, "深读+翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate"),
+      step(1, "拉取 24h 热榜", "trending_topics", "热榜聚合", "data_collection", "pull",
+        { mode: "hot", limit: "{{topic_limit}}" }),
+      step(2, "海外分类过滤", "topic_classifier", "海外热榜分类", "content_analysis", "classify",
+        {
+          topics: "{{step1.topics}}",
+          enabledCategories: "{{categories}}",
+        }),
+      step(3, "深读+翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate",
+        {
+          articles: "{{step2.results}}",
+          targetLanguage: "en",
+          variantsPerTopic: "{{variants_per_topic}}",
+        }),
       step(
         4,
         "入英文稿件库（待审）",
