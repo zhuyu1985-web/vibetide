@@ -23,10 +23,18 @@ import { getLanguageModel, resolveModelConfig } from "../model-router";
 // ---------------------------------------------------------------------------
 
 const TARGET_LANGUAGE_ENUM = ["en"] as const;
-const CATEGORY_HINT_ENUM = ["food", "pets", "domestic_tech"] as const;
 
 export type TargetLanguage = (typeof TARGET_LANGUAGE_ENUM)[number];
-export type CategoryHint = (typeof CATEGORY_HINT_ENUM)[number];
+
+// CATEGORY_TONE_DEFAULTS 保留 3 个内置语气模板。新加的分类（用户在工作流
+// 编辑器里加的）会走通用语气 fallback。这 3 个 key 必须跟 seed-builtin-workflows
+// 里 hot_topics_overseas_en 的默认 categories 保持同步。
+const CATEGORY_TONE_DEFAULTS: Record<string, string> = {
+  food: "美食内容用感官化语言（taste / aroma / crispy / fluffy），多用 emoji（🍜🥢🌶️），可以幽默",
+  pets: "萌宠内容用 wholesome / heartwarming 口吻，emoji 偏温馨（🐱🐶🐾✨），鼓励互动（'Drop a 🐾 if you agree'）",
+  domestic_tech:
+    "国内科技内容客观直白，避免过度营销词，可以加规格数字，emoji 克制（🚀💡🔋）",
+};
 
 const RewrittenArticleSchema = z.object({
   id: z.string().min(1),
@@ -56,7 +64,7 @@ export interface ArticleInput {
 export interface CrossLanguageRewriteInput {
   articles: ArticleInput[];
   targetLanguage: TargetLanguage;
-  categoryHint?: CategoryHint;
+  categoryHint?: string;       // ← enum 改 string (M3)
 }
 
 export interface CrossLanguageRewriteOutput {
@@ -67,16 +75,12 @@ export interface CrossLanguageRewriteOutput {
 // Prompt builder
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(categoryHint?: CategoryHint): string {
-  const categoryTone: Record<CategoryHint, string> = {
-    food: "美食内容用感官化语言（taste / aroma / crispy / fluffy），多用 emoji（🍜🥢🌶️），可以幽默",
-    pets: "萌宠内容用 wholesome / heartwarming 口吻，emoji 偏温馨（🐱🐶🐾✨），鼓励互动（'Drop a 🐾 if you agree'）",
-    domestic_tech:
-      "国内科技内容客观直白，避免过度营销词，可以加规格数字，emoji 克制（🚀💡🔋）",
-  };
-
+function buildSystemPrompt(categoryHint?: string): string {
+  const toneText = categoryHint
+    ? (CATEGORY_TONE_DEFAULTS[categoryHint] ?? "保持简洁直白，无特定语气倾向")
+    : "";
   const toneHint = categoryHint
-    ? `\n本批稿件属于 **${categoryHint}** 类别。语气定位：${categoryTone[categoryHint]}。`
+    ? `\n本批稿件属于 **${categoryHint}** 类别。语气定位：${toneText}。`
     : "";
 
   return `你是「跨语言改写员」，负责把中文稿件改写成发布在 X / Instagram / Facebook 等海外社交平台的英文版本。
