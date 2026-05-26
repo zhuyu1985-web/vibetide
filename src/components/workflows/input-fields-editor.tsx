@@ -249,10 +249,36 @@ function FieldRow({
       </div>
 
       {(field.type === "select" || field.type === "multiselect") && (
-        <OptionsEditor
-          options={field.options ?? []}
-          onChange={(opts) => onPatch({ options: opts })}
-        />
+        <>
+          {field.name === "categories" && (
+            <div className="text-[11px] text-muted-foreground mb-2 space-y-1">
+              <p>
+                💡 新增的分类会被 AI 分类器按名字语义自由判断；建议 value 用英文 slug（如 auto / travel），label 用中文。
+              </p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                onClick={() =>
+                  onPatch({
+                    options: [
+                      { value: "food", label: "美食" },
+                      { value: "pets", label: "萌宠" },
+                      { value: "domestic_tech", label: "国内科技" },
+                    ],
+                  })
+                }
+                className="h-auto p-0 text-[11px] justify-start"
+              >
+                恢复默认 3 类
+              </Button>
+            </div>
+          )}
+          <OptionsEditor
+            options={field.options ?? []}
+            onChange={(opts) => onPatch({ options: opts })}
+          />
+        </>
       )}
 
       {field.type === "number" && (
