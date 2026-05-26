@@ -751,13 +751,15 @@ export function SkillDetailClient({ skill, versions = [], usageStats }: SkillDet
                 测试输入
               </label>
               {TEST_INPUT_EXAMPLES[skill.name] && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setTestInput(TEST_INPUT_EXAMPLES[skill.name])}
-                  className="text-[11px] text-blue-500 hover:text-blue-600 mb-1"
+                  className="h-auto p-0 text-[11px] text-blue-500 hover:text-blue-600 mb-1 justify-start"
                 >
                   填入示例参数
-                </button>
+                </Button>
               )}
               <textarea
                 className="w-full min-h-[80px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 resize-none"
