@@ -166,6 +166,8 @@ export interface PeriodOverview {
     favorites: number;
     shares: number;
     score: number;
+    /** 原文 URL,标题列包跳转用;原内容已删除时为 null */
+    sourceUrl: string | null;
   }>;
   /** 公式描述（UI 显示用） */
   formulaLabel: string;
@@ -516,6 +518,7 @@ function buildPeriodOverview(args: {
     viewCount: number;
     favoriteCount: number;
     shareCount: number;
+    canonicalUrl: string | null;
   }>;
   periodStart: string;
   periodEnd: string;
@@ -570,6 +573,7 @@ function buildPeriodOverview(args: {
     favorites: i.favoriteCount,
     shares: i.shareCount,
     score: i.score,
+    sourceUrl: i.canonicalUrl,
   }));
 
   // 均值 footer

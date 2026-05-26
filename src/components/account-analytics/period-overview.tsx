@@ -1,4 +1,13 @@
-import { Trophy } from "lucide-react";
+import { ExternalLink, Trophy } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { cn } from "@/lib/utils";
 import type { PeriodOverview } from "@/lib/dal/account-analytics";
 
@@ -24,7 +33,17 @@ export function PeriodOverview({ overview, className }: PeriodOverviewProps) {
     showViews,
     showFavoritesAndShares,
   } = overview;
-  const maxCount = Math.max(1, ...dailyPosts.map((d) => d.count));
+  // 折线图准备:用 MM-DD 形式作为 x 轴标签,保留原 ISO 给 tooltip
+  const chartData = dailyPosts.map((d) => ({
+    label: d.date.slice(5),
+    fullDate: d.date,
+    count: d.count,
+  }));
+  const peakCount = Math.max(0, ...dailyPosts.map((d) => d.count));
+  const avgCount = dailyPosts.length === 0
+    ? 0
+    : Math.round(dailyPosts.reduce((s, d) => s + d.count, 0) / dailyPosts.length);
+  const activeDays = dailyPosts.filter((d) => d.count > 0).length;
 
   return (
     <div className={cn("space-y-5", className)}>
@@ -36,41 +55,71 @@ export function PeriodOverview({ overview, className }: PeriodOverviewProps) {
         <span className="text-[12px] text-gray-500 dark:text-gray-400">{periodLabel}</span>
       </div>
 
-      {/* 每日发布量柱状图 */}
+      {/* 每日发布量折线图(Recharts AreaChart + 渐变 fill) */}
       {dailyPosts.length > 0 && (
         <div>
-          <div className="text-[12px] text-gray-500 mb-3">每日发布量分布</div>
-          <div className="flex items-end gap-2 h-[180px] overflow-x-auto pb-2">
-            {dailyPosts.map((d) => {
-              // 柱子高度 = (count / maxCount) × 柱区高度(扣去顶部数字 18px + 底部日期 22px ≈ 40px)
-              // 用 px 替代 % 避开 flex column 子项无明确高度时 % 失效的兼容性坑
-              const BAR_AREA_PX = 140;
-              const barHeightPx = d.count === 0
-                ? 4
-                : Math.max(6, Math.round((d.count / maxCount) * BAR_AREA_PX));
-              return (
-                <div
-                  key={d.date}
-                  className="flex flex-col items-center justify-end flex-1 min-w-[44px] h-full"
-                >
-                  <div className="text-[11px] font-semibold text-[#1F3864] dark:text-blue-200 mb-1 tabular-nums">
-                    {d.count}
-                  </div>
-                  <div
-                    className={
-                      "w-full rounded-md transition-all " +
-                      (d.count === 0
-                        ? "bg-gray-200/60 dark:bg-gray-700/40"
-                        : "bg-gradient-to-b from-[#5BA4D8] via-[#2E75B6] to-[#1F3864] shadow-[inset_0_-1px_0_rgba(31,56,100,0.2)]")
-                    }
-                    style={{ height: `${barHeightPx}px` }}
-                  />
-                  <div className="text-[10px] text-gray-400 mt-1.5 whitespace-nowrap">
-                    {d.date.slice(5)}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex items-baseline justify-between mb-3">
+            <div className="text-[12px] text-gray-500">每日发布量趋势</div>
+            <div className="text-[11px] text-gray-400 tabular-nums">
+              峰值 <span className="text-[#1F3864] dark:text-blue-200 font-medium">{peakCount}</span>
+              <span className="mx-2 text-gray-300">·</span>
+              日均 <span className="text-[#1F3864] dark:text-blue-200 font-medium">{avgCount}</span>
+              <span className="mx-2 text-gray-300">·</span>
+              活跃 <span className="text-[#1F3864] dark:text-blue-200 font-medium">{activeDays}</span> / {dailyPosts.length} 天
+            </div>
+          </div>
+          <div className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={chartData}
+                margin={{ top: 18, right: 16, left: -10, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="period-overview-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2E75B6" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#2E75B6" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5eef7" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                  axisLine={{ stroke: "#E5E7EB" }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={36}
+                />
+                <Tooltip
+                  cursor={{ stroke: "#2E75B6", strokeWidth: 1, strokeDasharray: "3 3" }}
+                  formatter={(v) => [`${Number(v ?? 0).toLocaleString("zh-CN")} 条`, "发布量"]}
+                  labelFormatter={(_, payload) => {
+                    const item = payload?.[0]?.payload as { fullDate?: string } | undefined;
+                    return item?.fullDate ?? "";
+                  }}
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #D0E4F5",
+                    fontSize: 12,
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  name="发布量"
+                  stroke="#2E75B6"
+                  strokeWidth={2.5}
+                  fill="url(#period-overview-gradient)"
+                  dot={{ r: 3.5, stroke: "#2E75B6", strokeWidth: 2, fill: "#fff" }}
+                  activeDot={{ r: 5, stroke: "#1F3864", strokeWidth: 2, fill: "#fff" }}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -118,9 +167,24 @@ export function PeriodOverview({ overview, className }: PeriodOverviewProps) {
                     </td>
                     <td
                       className="px-3 py-2 text-[#1F3864] dark:text-blue-200 max-w-0"
-                      title={row.title}
+                      title={row.sourceUrl ? `${row.title} · 点击查看原文` : row.title}
                     >
-                      <div className="truncate">{row.title}</div>
+                      {row.sourceUrl ? (
+                        <a
+                          href={row.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group inline-flex items-center gap-1 w-full min-w-0 hover:text-[#2E75B6] transition-colors"
+                        >
+                          <span className="flex-1 truncate">{row.title}</span>
+                          <ExternalLink
+                            size={12}
+                            className="shrink-0 text-gray-400 group-hover:text-[#2E75B6] transition-colors"
+                          />
+                        </a>
+                      ) : (
+                        <div className="truncate">{row.title}</div>
+                      )}
                     </td>
                     {showViews && (
                       <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300">
