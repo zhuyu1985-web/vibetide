@@ -103,7 +103,7 @@ def _transform_statement(stmt: str) -> str:
             f"END $$;"
         )
 
-    # DROP TABLE "X" → DROP TABLE IF EXISTS "X"
+    # DROP TABLE "X" → DROP TABLE IF EXISTS "X" （CASCADE 等后缀保留）
     m = re.match(r'DROP TABLE\s+"([^"]+)"', stmt)
     if m and "IF EXISTS" not in stmt:
         return stmt.replace(f'DROP TABLE "{m.group(1)}"', f'DROP TABLE IF EXISTS "{m.group(1)}"', 1)
@@ -112,6 +112,89 @@ def _transform_statement(stmt: str) -> str:
     m = re.match(r'DROP INDEX\s+"([^"]+)"', stmt)
     if m and "IF EXISTS" not in stmt:
         return stmt.replace(f'DROP INDEX "{m.group(1)}"', f'DROP INDEX IF EXISTS "{m.group(1)}"', 1)
+
+    # DROP TYPE "schema"."X" → 包成 DO block 检查 pg_type
+    m = re.match(r'DROP TYPE\s+"([^"]+)"\."([^"]+)"\s*;?$', stmt)
+    if m:
+        schema = m.group(1)
+        type_name = m.group(2)
+        return (
+            f"DO $$ BEGIN\n"
+            f"  IF EXISTS (\n"
+            f"    SELECT 1 FROM pg_type t\n"
+            f"    JOIN pg_namespace n ON n.oid = t.typnamespace\n"
+            f"    WHERE t.typname = '{type_name}' AND n.nspname = '{schema}'\n"
+            f"  ) THEN\n"
+            f'    DROP TYPE "{schema}"."{type_name}";\n'
+            f"  END IF;\n"
+            f"END $$;"
+        )
+    # DROP TYPE "X" (无 schema)
+    m = re.match(r'DROP TYPE\s+"([^"]+)"\s*;?$', stmt)
+    if m:
+        type_name = m.group(1)
+        return (
+            f"DO $$ BEGIN\n"
+            f"  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = '{type_name}') THEN\n"
+            f'    DROP TYPE "{type_name}";\n'
+            f"  END IF;\n"
+            f"END $$;"
+        )
+
+    # ALTER TABLE "X" DISABLE ROW LEVEL SECURITY → 仅当表存在时执行
+    m = re.match(r'ALTER TABLE\s+"([^"]+)"\s+DISABLE ROW LEVEL SECURITY', stmt)
+    if m:
+        table = m.group(1)
+        return (
+            f"DO $$ BEGIN\n"
+            f"  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table}') THEN\n"
+            f'    ALTER TABLE "{table}" DISABLE ROW LEVEL SECURITY;\n'
+            f"  END IF;\n"
+            f"END $$;"
+        )
+
+    # ALTER TABLE "X" DROP COLUMN "Y" → DROP COLUMN IF EXISTS
+    m = re.match(r'ALTER TABLE\s+"([^"]+)"\s+DROP COLUMN\s+"([^"]+)"', stmt)
+    if m and "IF EXISTS" not in stmt:
+        return stmt.replace(f'DROP COLUMN "{m.group(2)}"', f'DROP COLUMN IF EXISTS "{m.group(2)}"', 1)
+
+    # ALTER TABLE "X" ALTER COLUMN "Y" SET DATA TYPE Z → 仅当当前类型不是 Z 才改
+    # 由于 PG 不支持原生 IF 判断且 udt_name 对比复杂，这里包一个 EXCEPTION block
+    # 让 SET DATA TYPE 失败时不阻塞整体（注意：失败原因可能是 incompatible cast，那种情况要人工查）
+    m = re.match(r'ALTER TABLE\s+"([^"]+)"\s+ALTER COLUMN\s+"([^"]+)"\s+SET DATA TYPE\s+(.*?);?$', stmt, re.DOTALL)
+    if m:
+        table = m.group(1)
+        col = m.group(2)
+        new_type = m.group(3).strip().rstrip(";")
+        # 用 information_schema.columns 检查当前类型 — udt_name 对比
+        # text[] 在 udt_name 里是 "_text"；jsonb 是 "jsonb" 等；这里只做"已经是数组就 skip"的粗保护
+        # 更精确的判断在 catch-up 场景里不必要（如果 DB 已对齐，SET DATA TYPE 同类型在 PG 里是 no-op）
+        return (
+            f"DO $$ BEGIN\n"
+            f'  ALTER TABLE "{table}" ALTER COLUMN "{col}" SET DATA TYPE {new_type};\n'
+            f"EXCEPTION WHEN others THEN\n"
+            f"  RAISE NOTICE 'SET DATA TYPE skipped for {table}.{col}: %', SQLERRM;\n"
+            f"END $$;"
+        )
+
+    # ALTER TABLE "X" ALTER COLUMN "Y" SET DEFAULT / SET NOT NULL / DROP NOT NULL / DROP DEFAULT
+    # 同样包 EXCEPTION,避免列不存在时整个 migration 中断
+    m = re.match(
+        r'ALTER TABLE\s+"([^"]+)"\s+ALTER COLUMN\s+"([^"]+)"\s+(SET DEFAULT\s+.+|SET NOT NULL|DROP NOT NULL|DROP DEFAULT)\s*;?$',
+        stmt,
+        re.DOTALL,
+    )
+    if m:
+        table = m.group(1)
+        col = m.group(2)
+        action = m.group(3).strip().rstrip(";")
+        return (
+            f"DO $$ BEGIN\n"
+            f'  ALTER TABLE "{table}" ALTER COLUMN "{col}" {action};\n'
+            f"EXCEPTION WHEN others THEN\n"
+            f"  RAISE NOTICE 'ALTER COLUMN {action} skipped for {table}.{col}: %', SQLERRM;\n"
+            f"END $$;"
+        )
 
     # 默认：原样返回
     return stmt

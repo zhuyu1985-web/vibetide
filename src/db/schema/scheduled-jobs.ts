@@ -16,7 +16,7 @@
  *
  * 单租户:这是平台级配置(所有组织共享同一份 cron 节奏),无 organization_id。
  */
-import { boolean, bigint, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, bigint, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const scheduledJobs = pgTable("scheduled_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -72,7 +72,9 @@ export const scheduledJobs = pgTable("scheduled_jobs", {
   /** 创建/更新时间 */
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  enabledNextRunIdx: index("scheduled_jobs_enabled_next_run_idx").on(t.enabled, t.nextRunAt),
+}));
 
 export type ScheduledJob = typeof scheduledJobs.$inferSelect;
 export type NewScheduledJob = typeof scheduledJobs.$inferInsert;
