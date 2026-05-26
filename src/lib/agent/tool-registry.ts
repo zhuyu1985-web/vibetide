@@ -1220,6 +1220,123 @@ function createToolDefinitions(): ToolSet {
         }
       },
     }),
+    archive_to_drafts: tool({
+      description:
+        "把一批稿件批量写入个人稿件库（articles 表）作为指定状态，等待编辑后续处理。" +
+        "**只入本地 DB，不调任何外部 CMS / 发布接口**。" +
+        "适合：海外热榜搬运、跨语言改写等需要把生成内容落库待审的场景。" +
+        "若同 org 下 sourceUrl 已存在则按 dedupBySourceUrl 决定 skip。",
+      inputSchema: z.object({
+        articles: z.array(z.object({
+          title: z.string().min(1).max(200),
+          body: z.string().min(10),
+          summary: z.string().optional(),
+          sourceUrl: z.string().optional(),
+          sourceTopicId: z.string().optional(),
+          variantIndex: z.number().int().min(0).max(2).optional(),
+          language: z.enum(["zh", "en"]).optional().default("en"),
+          category: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          hashtags: z.array(z.string()).optional(),
+          culturalNotes: z.string().optional(),
+        })).min(1).max(20),
+        dedupBySourceUrl: z.boolean().optional().default(true),
+        initialStatus: z.enum(["draft", "approved"]).optional().default("approved"),
+        dryRun: z.boolean().optional(),
+        organizationId: z.string().optional(),
+        operatorId: z.string().optional(),
+      }),
+      execute: async ({
+        articles: items,
+        dedupBySourceUrl,
+        initialStatus,
+        dryRun,
+        organizationId,
+        operatorId,
+      }) => {
+        // dryRun 短路必须在所有 DB 操作之前 —— 跟 cms_publish 一致，
+        // 防止测试入口污染 articles 表。
+        if (dryRun) {
+          return {
+            success: true,
+            dryRun: true,
+            wouldInsert: items.length,
+            wouldDedupBy: dedupBySourceUrl ? "sourceUrl" : "off",
+            note: "dry-run: 实际跑会按 sourceUrl 去重后写入 articles 表",
+          };
+        }
+        if (!organizationId) {
+          return {
+            success: false,
+            error: { code: "missing_context", message: "缺少 organizationId" },
+          };
+        }
+
+        const { db } = await import("@/db");
+        const { articles } = await import("@/db/schema/articles");
+        const { and, eq } = await import("drizzle-orm");
+
+        const created: { articleId: string; title: string; sourceUrl?: string }[] = [];
+        const skipped: { sourceUrl: string; existingArticleId: string; reason: string }[] = [];
+
+        for (const item of items) {
+          if (dedupBySourceUrl && item.sourceUrl) {
+            const exists = await db.query.articles.findFirst({
+              where: and(
+                eq(articles.organizationId, organizationId),
+                eq(articles.sourceUrl, item.sourceUrl),
+              ),
+              columns: { id: true, title: true },
+            });
+            if (exists) {
+              skipped.push({
+                sourceUrl: item.sourceUrl,
+                existingArticleId: exists.id,
+                reason: "duplicate_source_url",
+              });
+              continue;
+            }
+          }
+          // articles 表没有 metadata jsonb 列；把 workflow 元信息塞进已有列：
+          //  - language 直接落库（articles.language 默认 "zh"，这里覆写）
+          //  - sourceTopicId → translatedFromTopicId (uuid FK to hot_topics)
+          //  - variantIndex / category / culturalNotes → advisorNotes 数组
+          //    （advisorNotes 是 jsonb<string[]>，语义上算"编辑/工作流批注"，匹配）
+          const advisorNotes: string[] = [];
+          if (typeof item.variantIndex === "number") {
+            advisorNotes.push(`variantIndex:${item.variantIndex}`);
+          }
+          if (item.category) advisorNotes.push(`category:${item.category}`);
+          if (item.culturalNotes) advisorNotes.push(`culturalNotes:${item.culturalNotes}`);
+
+          const [row] = await db.insert(articles).values({
+            organizationId,
+            title: item.title,
+            body: item.body,
+            summary: item.summary ?? null,
+            sourceUrl: item.sourceUrl ?? null,
+            status: initialStatus,
+            tags: [...(item.tags ?? []), ...(item.hashtags ?? [])],
+            mediaType: "article",
+            publishedAt: null,
+            language: item.language ?? "en",
+            translatedFromTopicId: item.sourceTopicId ?? null,
+            advisorNotes: advisorNotes.length > 0 ? advisorNotes : null,
+          }).returning({ id: articles.id, title: articles.title });
+
+          created.push({ articleId: row.id, title: row.title, sourceUrl: item.sourceUrl });
+        }
+        void operatorId;
+        return {
+          success: true,
+          totalRequested: items.length,
+          totalCreated: created.length,
+          totalSkipped: skipped.length,
+          created,
+          skipped,
+        };
+      },
+    }),
   };
 }
 
@@ -1245,7 +1362,7 @@ export function isToolRegistered(toolName: string): boolean {
  */
 export const WRITE_TOOL_NAMES = new Set<string>([
   "cms_publish",
-  "archive_to_drafts",  // 当前未注册，Task 4.2 加；预留在白名单
+  "archive_to_drafts",  // 海外热榜搬运 / 跨语言改写场景：只入本地 articles 表
   "cms_catalog_sync",   // 当前未注册，预留
   "external_publish",   // 当前未注册，预留
 ]);
