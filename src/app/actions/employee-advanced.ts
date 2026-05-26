@@ -15,8 +15,8 @@ import {
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { invokeToolDirectly, isToolRegistered, isWriteTool } from "@/lib/agent/tool-registry";
 
-// 真工具调用结果序列化后的预览长度上限,超出截断。控制 server action 返回体大小。
-const MAX_TOOL_OUTPUT_PREVIEW_CHARS = 8000;
+// 真工具调用结果展示在 skill 测试 UI 时的最大字符数（防止 LLM 上下文 / DOM 卡顿）
+const MAX_TOOL_RESULT_PREVIEW_CHARS = 8000;
 
 // ---------------------------------------------------------------------------
 // Helper: snapshot current employee config
@@ -236,15 +236,20 @@ export async function testSkillExecution(
     // 2. 写入型工具强制 dryRun
     const writeTool = isWriteTool(skill.name);
     if (writeTool) {
+      // NOTE: 当前依赖每个写入型工具的 execute 入口自己识别 dryRun 并短路。
+      // cms_publish 的 dryRun 支持在 Task 1.2 加；其他写入型工具（archive_to_drafts
+      // 等）在 Task 4.2 / 后续 spec 加。在那之前，写入型 skill 测试会落到工具
+      // 的 missing_context 守卫上拒掉（下方 organizationId 注释里详述）。
       parsedInput.dryRun = true;
     }
 
     // 3. 调用真工具
     const startTime = Date.now();
     const invocation = await invokeToolDirectly(skill.name, parsedInput, {
-      // 测试入口不注入 org 上下文 —— 写入型工具会在 missing_context 守护处早返回，
-      // 配合 Task 1.2 的 dryRun 真正短路提供双层防护。读类工具（trending_topics
-      // 等）不依赖 orgId，能正常执行真实接口。
+      // 测试入口刻意不带 organizationId —— 让 cms_publish 等写入型工具
+      // 命中其内置的 missing_context 守卫（articles INSERT 前 return 失败）。
+      // 这是兜底安全网，主防线是 isWriteTool 自动注入的 dryRun（Task 1.2 让
+      // 工具自己短路）；两层保护之一失效时另一层仍能拦下。
       organizationId: undefined,
       operatorId: user.id,
     });
@@ -253,8 +258,8 @@ export async function testSkillExecution(
     const serialized = invocation.ok
       ? JSON.stringify(invocation.result, null, 2)
       : `Tool 调用失败: ${invocation.error}`;
-    const truncated = serialized.length > MAX_TOOL_OUTPUT_PREVIEW_CHARS
-      ? serialized.slice(0, MAX_TOOL_OUTPUT_PREVIEW_CHARS) + "\n... (结果过长已截断)"
+    const truncated = serialized.length > MAX_TOOL_RESULT_PREVIEW_CHARS
+      ? serialized.slice(0, MAX_TOOL_RESULT_PREVIEW_CHARS) + "\n... (结果过长已截断)"
       : serialized;
 
     return {

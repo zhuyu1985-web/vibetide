@@ -1205,23 +1205,22 @@ export function isToolRegistered(toolName: string): boolean {
 }
 
 /**
- * Write-type tools that mutate DB or call external write APIs.
- * Test entry points (e.g., testSkillExecution) auto-inject `dryRun: true`
- * for these tools to prevent test pollution.
+ * 写入型工具白名单 —— 调用这些工具会产生 DB / 外部 API 副作用。
+ * 用于：skill 测试入口（自动注入 dryRun=true 防污染）、未来 mission 预执行
+ * 阶段的安全检查、UI 警示等。
  *
- * Note: as of Task 1.1 only `cms_publish` is implemented; the others are
- * listed as expected names from the spec (Task 1.2 wires dryRun support
- * into each tool's schema + execute body).
+ * 每个工具都必须在自己的 inputSchema 里支持 `dryRun: z.boolean().optional()`，
+ * 并在 execute 入口先于任何副作用短路 return。
  */
-export const WRITE_TOOL_SLUGS = new Set<string>([
+export const WRITE_TOOL_NAMES = new Set<string>([
   "cms_publish",
-  "archive_to_drafts",
-  "cms_catalog_sync",
-  "external_publish",
+  "archive_to_drafts",  // 当前未注册，Task 4.2 加；预留在白名单
+  "cms_catalog_sync",   // 当前未注册，预留
+  "external_publish",   // 当前未注册，预留
 ]);
 
 export function isWriteTool(toolName: string): boolean {
-  return WRITE_TOOL_SLUGS.has(toolName);
+  return WRITE_TOOL_NAMES.has(toolName);
 }
 
 // ---------------------------------------------------------------------------
