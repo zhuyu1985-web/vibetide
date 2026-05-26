@@ -81,6 +81,7 @@ import {
 import {
   startTopicMission,
   startTopicMissionMulti,
+  startOverseasRepost,
   summarizeTopicKeyPoints,
   refreshInspirationData,
   generateDailyHotBriefing,
@@ -466,6 +467,24 @@ export function InspirationClient({
     [router, startTrackingTransition]
   );
 
+  // 海外转发：把单条 topic 翻译改写成英文稿件入稿件库，启动后跳到 mission 详情页
+  const [isRepostPending, startRepostTransition] = useTransition();
+  const handleStartOverseasRepost = useCallback(
+    (topicId: string) => {
+      startRepostTransition(async () => {
+        try {
+          const res = await startOverseasRepost(topicId);
+          router.push(`/missions/${res.id}`);
+        } catch (err) {
+          console.error("[inspiration] startOverseasRepost failed:", err);
+          const msg = err instanceof Error ? err.message : "海外转发启动失败";
+          toast.error(msg);
+        }
+      });
+    },
+    [router, startRepostTransition]
+  );
+
   // 深度追踪：用户在对话框点确认 → 调 server action → 跳到 mission 详情页
   const handleConfirmDeepTracking = useCallback(
     async (industries: IndustryKey[]) => {
@@ -848,6 +867,8 @@ export function InspirationClient({
                   onMarkRead={handleMarkRead}
                   subscribedCategories={subscribedCategories}
                   onStartDeepTracking={(topic) => setDeepDialogTopic(topic)}
+                  onStartOverseasRepost={handleStartOverseasRepost}
+                  isRepostPending={isRepostPending}
                 />
               </div>
             </ScrollArea>
@@ -1325,6 +1346,8 @@ function TopicList({
   onMarkRead,
   subscribedCategories,
   onStartDeepTracking,
+  onStartOverseasRepost,
+  isRepostPending,
 }: {
   topics: InspirationTopic[];
   readIds: Set<string>;
@@ -1334,6 +1357,8 @@ function TopicList({
   onMarkRead: (id: string) => void;
   subscribedCategories: Set<string>;
   onStartDeepTracking: (topic: InspirationTopic) => void;
+  onStartOverseasRepost: (id: string) => void;
+  isRepostPending: boolean;
 }) {
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -1480,6 +1505,17 @@ function TopicList({
                     {formatTime(topic.discoveredAt)} · {timeAgo(topic.discoveredAt)}
                   </span>
                   <div className="ml-auto flex items-center gap-1">
+                    {!isTracked && (
+                      <button
+                        onClick={() => onStartOverseasRepost(topic.id)}
+                        disabled={isRepostPending}
+                        title="把本条热点翻译改写成英文稿件入稿件库"
+                        className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 transition-colors"
+                      >
+                        <Globe size={10} />
+                        {isRepostPending ? "转发中..." : "海外转发"}
+                      </button>
+                    )}
                     {isTracked ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
                         <Radar size={10} className="animate-pulse" />
@@ -1489,7 +1525,7 @@ function TopicList({
                       <button
                         onClick={() => onStartMission(topic.id)}
                         disabled={isMissionPending}
-                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 transition-colors"
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 ml-2 transition-colors"
                       >
                         <Rocket size={10} />
                         {isMissionPending ? "创建中..." : "快速追踪"}
