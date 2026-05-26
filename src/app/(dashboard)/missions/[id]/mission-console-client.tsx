@@ -56,6 +56,9 @@ import {
 import { cancelMission, retryMission, deleteMission, archiveMission } from "@/app/actions/missions";
 import { DraftComparisonPanel } from "@/components/missions/draft-comparison-panel";
 import { ArchiveToDraftsRenderer } from "@/components/missions/step-renderers/archive-to-drafts-renderer";
+import { TrendingTopicsRenderer } from "@/components/missions/step-renderers/trending-topics-renderer";
+import { TopicClassifierRenderer } from "@/components/missions/step-renderers/topic-classifier-renderer";
+import { CrossLanguageRewriteRenderer } from "@/components/missions/step-renderers/cross-language-rewrite-renderer";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import type {
   MissionWithDetails,
@@ -88,6 +91,16 @@ const SOURCE_LABEL: Record<string, string> = {
   hot_topics: "灵感雷达", publishing: "全渠道发布", benchmarking: "对标监控",
   analytics: "数据分析", creation: "超级创作", inspiration: "热点发现",
 };
+
+// 有 dedicated step renderer 的 assignedRole 集合 —— 这些 role 的 task
+// 通过下方 switch IIFE 渲染专用组件，跳过 generic artifactContent / fullSummary
+// 分支，避免重复渲染。其他 role 由 default null 让 generic 分支兜底。
+const STEP_RENDERER_ROLES = new Set([
+  "trending_topics",
+  "topic_classifier",
+  "cross_language_rewrite",
+  "archive_to_drafts",
+]);
 
 const PHASE_STEPS = [
   { key: "assembling",   label: "组队" },
@@ -1077,11 +1090,22 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
             </div>
           )}
 
-          {task.assignedRole === "archive_to_drafts" && (
-            <ArchiveToDraftsRenderer outputData={task.outputData} />
-          )}
+          {(() => {
+            switch (task.assignedRole) {
+              case "trending_topics":
+                return <TrendingTopicsRenderer outputData={task.outputData} />;
+              case "topic_classifier":
+                return <TopicClassifierRenderer outputData={task.outputData} />;
+              case "cross_language_rewrite":
+                return <CrossLanguageRewriteRenderer outputData={task.outputData} />;
+              case "archive_to_drafts":
+                return <ArchiveToDraftsRenderer outputData={task.outputData} />;
+              default:
+                return null; // 其他 step 走下面的 generic 渲染 (artifactContent / fullSummary)
+            }
+          })()}
 
-          {task.assignedRole !== "archive_to_drafts" && artifactContent && (
+          {!STEP_RENDERER_ROLES.has(task.assignedRole ?? "") && artifactContent && (
             <div>
               <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
               <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
@@ -1089,7 +1113,7 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
               </div>
             </div>
           )}
-          {task.assignedRole !== "archive_to_drafts" && !artifactContent && fullSummary && (
+          {!STEP_RENDERER_ROLES.has(task.assignedRole ?? "") && !artifactContent && fullSummary && (
             <div>
               <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2">执行结果</h3>
               <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10 p-4">
@@ -1097,7 +1121,7 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
               </div>
             </div>
           )}
-          {task.assignedRole !== "archive_to_drafts" && fullOutputText && (
+          {!STEP_RENDERER_ROLES.has(task.assignedRole ?? "") && fullOutputText && (
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground mb-2">输出数据</h3>
               <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 p-4 rounded-xl overflow-x-auto leading-relaxed">{fullOutputText}</pre>
