@@ -1065,6 +1065,10 @@ function createToolDefinitions(): ToolSet {
           .describe("作者，默认 'AI 编辑部'"),
         coverImageUrl: z.string().optional().describe("封面图 URL"),
         tags: z.array(z.string()).optional().describe("标签数组"),
+        dryRun: z
+          .boolean()
+          .optional()
+          .describe("dry-run 模式，不写 DB 不调 CMS，用于 skill 测试入口（M1）"),
         // 下面两个由执行器注入，用户在"参数配置"里不需要填。
         organizationId: z
           .string()
@@ -1082,6 +1086,7 @@ function createToolDefinitions(): ToolSet {
         authorName,
         coverImageUrl,
         tags,
+        dryRun,
         organizationId,
         operatorId,
       }) => {
@@ -1091,6 +1096,32 @@ function createToolDefinitions(): ToolSet {
         // load ctx → 幂等检查 → mapping → cms_publications 审计 → saveArticle →
         // 触发 cms/publication.submitted 轮询事件），跟 SKILL.md Workflow
         // Checklist 对齐。
+
+        // ─── dryRun 短路（M1 验收：测试入口不污染 DB / 不调 CMS） ────────
+        // 必须放在 organizationId 校验之前 + articles insert 之前 —— 否则测试
+        // 仍会污染 articles 表导致验收 SQL 失败。
+        if (dryRun) {
+          return {
+            success: true,
+            dryRun: true,
+            wouldInsert: {
+              title,
+              body,
+              summary,
+              organizationId,
+              tags: tags ?? [],
+            },
+            wouldPublish: {
+              appId: 1768,
+              catalogId: 10210,
+              siteId: 81,
+              authorName: authorName ?? "AI 编辑部",
+            },
+            note: "dry-run: 实际跑会先 insert articles 行（status=approved）再调 publishArticleToCms 9 步流程",
+          };
+        }
+        // ─────────────────────────────────────────────────────────────────
+
         if (!organizationId) {
           return {
             success: false,

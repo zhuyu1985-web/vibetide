@@ -35,7 +35,8 @@ vi.mock("@/lib/agent/tool-registry", async () => {
   );
   return {
     ...actual,
-    isToolRegistered: (name: string) => name === "trending_topics" || name === "archive_to_drafts",
+    isToolRegistered: (name: string) =>
+      name === "trending_topics" || name === "archive_to_drafts" || name === "cms_publish",
     invokeToolDirectly: invokeToolDirectlyMock,
   };
 });
@@ -63,5 +64,39 @@ describe("testSkillExecution real-tool path", () => {
     expect(execResult?.success).toBe(true);
     expect(execResult?.output).toContain("成都串串香");
     expect(res.validationChecks.some(c => c.check === "工具发现" && c.status === "pass")).toBe(true);
+  });
+});
+
+describe("testSkillExecution write-tool dryRun", () => {
+  it("cms_publish 测试入口自动注入 dryRun=true，工具不写 DB", async () => {
+    // mock skill 行为 cms_publish
+    const skillsMock = vi.mocked((await import("@/db")).db.query.skills.findFirst);
+    skillsMock.mockResolvedValueOnce({
+      id: "skill-cms",
+      name: "cms_publish",
+      category: "distribution",
+      version: "1.0",
+      description: "发到 CMS",
+      content: "",
+      inputSchema: {},
+      outputSchema: {},
+      runtimeConfig: null,
+      type: "tool",
+      pluginConfig: null,
+    } as never);
+
+    invokeToolDirectlyMock.mockResolvedValueOnce({
+      ok: true,
+      toolName: "cms_publish",
+      params: { title: "X", body: "Y", dryRun: true },
+      result: { dryRun: true, wouldInsert: { title: "X", body: "Y" }, note: "dry-run, no DB write" },
+    });
+
+    await testSkillExecution("skill-cms", JSON.stringify({ title: "X", body: "Y" }));
+    expect(invokeToolDirectlyMock).toHaveBeenCalledWith(
+      "cms_publish",
+      expect.objectContaining({ dryRun: true }),
+      expect.anything(),
+    );
   });
 });
