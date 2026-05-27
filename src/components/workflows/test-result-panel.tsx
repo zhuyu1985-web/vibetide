@@ -9,7 +9,7 @@ import { formatDuration } from "./step-card";
 // ---------------------------------------------------------------------------
 
 export interface TestResultData {
-  status: "idle" | "pending" | "running" | "completed" | "failed";
+  status: "idle" | "pending" | "running" | "completed" | "warning" | "failed";
   summary?: string;
   fullResult?: string;
   durationMs?: number;

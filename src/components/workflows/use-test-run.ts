@@ -106,7 +106,12 @@ export function useTestRun() {
                     setStepStatuses((prev) => ({
                       ...prev,
                       [data.stepId as string]: {
-                        status: "completed",
+                        // server 端识别"调用成功但产出 0 条"会带 warning=true,
+                        // UI 此时显示黄色警告状态而非纯绿色,让用户能立刻看到
+                        // "数据链路在这里断了"(常见于 topic_classifier 全归 other
+                        // → cross_language_rewrite filter 后 0 条 → archive_to_drafts
+                        // 入库 0 篇)。
+                        status: data.warning ? "warning" : "completed",
                         message:
                           (data.summary as string | undefined) ??
                           (data.result as string),

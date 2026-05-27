@@ -1395,6 +1395,11 @@ function createToolDefinitions(): ToolSet {
         "适合：海外热榜搬运、跨语言改写等需要把生成内容落库待审的场景。" +
         "若同 org 下 sourceUrl 已存在则按 dedupBySourceUrl 决定 skip。",
       inputSchema: z.object({
+        // min(0): 上游 cross_language_rewrite filter 后可能 0 条(全 other / 全
+        // 低置信度)。让本步骤优雅返回"上游 0 条,无可入库稿件"而不是 zod 拒绝,
+        // 这样 UI 上能看到完整的"step 4 → step 5"数据流真相,而不是 step 5
+        // 红色"参数校验失败"误导用户以为 step 5 出错。
+        // max 从 20 提到 50,对齐 trending_topics 50 条上限。
         articles: z.array(z.object({
           title: z.string().min(1).max(200),
           body: z.string().min(10),
@@ -1407,7 +1412,7 @@ function createToolDefinitions(): ToolSet {
           tags: z.array(z.string()).optional(),
           hashtags: z.array(z.string()).optional(),
           culturalNotes: z.string().optional(),
-        })).min(1).max(20),
+        })).min(0).max(50),
         dedupBySourceUrl: z.boolean().optional().default(true),
         initialStatus: z.enum(["draft", "approved"]).optional().default("approved"),
         dryRun: z.boolean().optional(),
@@ -1422,6 +1427,19 @@ function createToolDefinitions(): ToolSet {
         organizationId,
         operatorId,
       }) => {
+        // 上游 0 条:优雅返回,UI 显示"无可入库稿件",而不是失败。
+        if (!items || items.length === 0) {
+          return {
+            success: true,
+            totalRequested: 0,
+            totalCreated: 0,
+            totalSkipped: 0,
+            created: [],
+            skipped: [],
+            note: "上游 cross_language_rewrite 产出 0 条稿件,本步骤无入库动作。常见原因:topic_classifier 把所有热点归为 other 类(用户配置的 categories 跟实际热榜不匹配),或 cross_language_rewrite filter 阶段全过滤掉低置信度条目。",
+          };
+        }
+
         // dryRun 短路必须在所有 DB 操作之前 —— 跟 cms_publish 一致，
         // 防止测试入口污染 articles 表。
         if (dryRun) {

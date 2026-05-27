@@ -10,6 +10,7 @@ import {
   Loader2,
   Check,
   X,
+  AlertTriangle,
   Search,
   Database,
   Lightbulb,
@@ -110,7 +111,7 @@ export interface StepCardProps {
   step: WorkflowStepDef;
   index: number;
   selected: boolean;
-  status?: "idle" | "pending" | "running" | "completed" | "failed";
+  status?: "idle" | "pending" | "running" | "completed" | "warning" | "failed";
   statusMessage?: string;
   durationMs?: number;
   hasResult?: boolean;
@@ -140,6 +141,8 @@ function getStatusIcon(status: StepCardProps["status"]) {
       return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
     case "completed":
       return <Check className="w-4 h-4 text-green-500" />;
+    case "warning":
+      return <AlertTriangle className="w-4 h-4 text-amber-500" />;
     case "failed":
       return <X className="w-4 h-4 text-red-500" />;
     default:
@@ -150,6 +153,7 @@ function getStatusIcon(status: StepCardProps["status"]) {
 function getStatusBorderClass(status: StepCardProps["status"], selected: boolean) {
   if (status === "running") return "border-blue-500";
   if (status === "completed") return "border-green-500";
+  if (status === "warning") return "border-amber-500";
   if (status === "failed") return "border-red-500";
   if (selected) return "border-blue-500";
   return "border-border";
@@ -182,8 +186,12 @@ export function StepCard({
   const statusIcon = getStatusIcon(status);
   const borderClass = getStatusBorderClass(status, selected);
 
-  // Use status icon to replace category icon when running/completed/failed
-  const showStatusIcon = status === "running" || status === "completed" || status === "failed";
+  // Use status icon to replace category icon when running/completed/warning/failed
+  const showStatusIcon =
+    status === "running" ||
+    status === "completed" ||
+    status === "warning" ||
+    status === "failed";
 
   return (
     <div className="flex items-center gap-3 w-full">
@@ -201,7 +209,9 @@ export function StepCard({
                 ? "rgba(59,130,246,0.12)"
                 : status === "completed"
                   ? "rgba(16,185,129,0.12)"
-                  : "rgba(239,68,68,0.12)"
+                  : status === "warning"
+                    ? "rgba(245,158,11,0.12)"
+                    : "rgba(239,68,68,0.12)"
               : catConfig?.bgColor ?? "rgba(107,114,128,0.12)",
           }}
         >
@@ -261,7 +271,10 @@ export function StepCard({
       </button>
 
       {/* Status pill shown to the right of the card (test-run output) */}
-      {(status === "running" || status === "completed" || status === "failed") && (
+      {(status === "running" ||
+        status === "completed" ||
+        status === "warning" ||
+        status === "failed") && (
         <button
           type="button"
           onClick={(e) => {
@@ -284,6 +297,8 @@ export function StepCard({
               <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
             ) : status === "completed" ? (
               <Check className="w-3.5 h-3.5 text-green-500" />
+            ) : status === "warning" ? (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
             ) : (
               <X className="w-3.5 h-3.5 text-red-500" />
             )}
@@ -292,9 +307,11 @@ export function StepCard({
             className={`flex-1 min-w-0 truncate text-xs leading-tight ${
               status === "completed"
                 ? "text-green-700 dark:text-green-400"
-                : status === "failed"
-                  ? "text-red-600 dark:text-red-400"
-                  : "text-blue-600 dark:text-blue-400"
+                : status === "warning"
+                  ? "text-amber-700 dark:text-amber-400"
+                  : status === "failed"
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-blue-600 dark:text-blue-400"
             }`}
             title={statusMessage}
           >

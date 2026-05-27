@@ -133,6 +133,15 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
         if (a.category === "other") return false;
         return (a.confidence ?? 1) >= CLASSIFIER_CONFIDENCE_THRESHOLD;
       });
+      // filter 后 0 条:跳过 LLM 调用,直接返回空 articles + 解释。这样下游
+      // archive_to_drafts 能优雅收到 articles=[] 并显示"无可入库稿件",链路
+      // 完整可追溯,UI 不会出现"step 4 假成功 + step 5 zod 失败"的迷惑现象。
+      if (filtered.length === 0) {
+        return {
+          articles: [],
+          note: `cross_language_rewrite 过滤后 0 条可翻译稿件 (输入 ${rawArticles.length} 条,全部 category=other 或 confidence < ${CLASSIFIER_CONFIDENCE_THRESHOLD})。常见原因:topic_classifier 把所有热点归 other,即用户配置的 categories 跟实际热榜不匹配。建议调整工作流 categories 字段或扩大热榜抓取范围。`,
+        };
+      }
       const articles = filtered.map((a) => {
         const body =
           a.body && a.body.length >= 10

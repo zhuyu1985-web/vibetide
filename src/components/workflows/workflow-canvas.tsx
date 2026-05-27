@@ -10,7 +10,7 @@ import { StepCard } from "./step-card";
 // ---------------------------------------------------------------------------
 
 export interface StepStatus {
-  status: "idle" | "pending" | "running" | "completed" | "failed";
+  status: "idle" | "pending" | "running" | "completed" | "warning" | "failed";
   message?: string;
   fullResult?: string;
   durationMs?: number;

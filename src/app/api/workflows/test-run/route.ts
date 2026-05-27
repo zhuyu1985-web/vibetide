@@ -316,7 +316,13 @@ ${truncated}
 - 可信度：高（真实${dispatchType === "llm-skill" ? "LLM-skill" : "工具"}调用，非模拟）
 - 建议改进：${count === 0 ? "调整参数后重跑" : "无"}`;
 
-                  const summary = extractSummary(deterministicText, skillName);
+                  const baseSummary = extractSummary(deterministicText, skillName);
+                  // 0 条产出 → summary 加 ⚠️,前端 UI 可识别显示黄色警告。
+                  // 链路断裂时(step N 产出 0 → step N+1 拿空数组)用户能立即从
+                  // step 卡片的 summary 字段判断"哪一步真正断了链",而不是看到
+                  // 全绿色完成却空空如也。
+                  const summary =
+                    count === 0 ? `⚠️ ${baseSummary} (产出 0 条)` : baseSummary;
                   const durationMs = Date.now() - stepStartedAt;
                   send("step-complete", {
                     stepId: step.id,
@@ -326,6 +332,8 @@ ${truncated}
                     durationMs,
                     employeeName,
                     success: true,
+                    warning: count === 0,
+                    emptyOutput: count === 0,
                   });
                   previousSteps.push({
                     rawOutput: invocation.result,
