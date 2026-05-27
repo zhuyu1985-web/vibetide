@@ -12,7 +12,12 @@ export interface DeepReadItem {
   sourceUrl?: string;
   body?: string;
   fetchedAt?: string;
-  fetchStatus?: "ok" | "fallback_summary" | "fallback_title" | "failed";
+  fetchStatus?:
+    | "ok"
+    | "fallback_summary"
+    | "fallback_title"
+    | "skipped_other"
+    | "failed";
   fetchError?: string;
 }
 
@@ -20,6 +25,7 @@ interface ExtractedDeepRead {
   items: DeepReadItem[];
   okCount: number;
   fallbackCount: number;
+  skippedCount: number;
   totalRequested: number;
 }
 
@@ -35,6 +41,7 @@ export function extractDeepReadResults(outputData: unknown): ExtractedDeepRead |
     items: obj.items as DeepReadItem[],
     okCount: typeof obj.okCount === "number" ? obj.okCount : 0,
     fallbackCount: typeof obj.fallbackCount === "number" ? obj.fallbackCount : 0,
+    skippedCount: typeof obj.skippedCount === "number" ? obj.skippedCount : 0,
     totalRequested:
       typeof obj.totalRequested === "number" ? obj.totalRequested : (obj.items as unknown[]).length,
   };
@@ -52,6 +59,10 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   fallback_title: {
     label: "仅标题",
     color: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+  },
+  skipped_other: {
+    label: "跳过",
+    color: "bg-gray-100 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400",
   },
   failed: {
     label: "失败",
@@ -77,7 +88,8 @@ export function BatchDeepReadRenderer({ outputData }: { outputData: unknown }) {
     );
   }
 
-  const { items, okCount, fallbackCount, totalRequested } = extracted;
+  const { items, okCount, fallbackCount, skippedCount, totalRequested } =
+    extracted;
   const avgBodyLen =
     items.length > 0
       ? Math.round(items.reduce((acc, it) => acc + (it.body?.length ?? 0), 0) / items.length)
@@ -86,7 +98,7 @@ export function BatchDeepReadRenderer({ outputData }: { outputData: unknown }) {
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground">
-        共 {totalRequested} 条 — 成功抓取 {okCount} 条，兜底 {fallbackCount} 条；平均正文 {avgBodyLen} 字
+        共 {totalRequested} 条 — 抓取 {okCount} 条，兜底 {fallbackCount} 条，跳过 {skippedCount} 条；平均正文 {avgBodyLen} 字
       </div>
       <DataTable
         rows={items}

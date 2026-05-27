@@ -575,29 +575,73 @@ function createToolDefinitions(): ToolSet {
               .passthrough(),
           )
           .min(1)
-          .max(30)
-          .describe("待深读的条目列表（一般来自 topic_classifier 的 results）"),
+          .max(50)
+          .describe("待深读的条目列表（一般来自 topic_classifier 的 results，最多 50 条对齐 trending_topics 上限）"),
         maxLength: z.number().optional().default(5000).describe("单篇正文截断字数，默认 5000"),
         maxConcurrency: z.number().optional().default(3).describe("并发抓取数，默认 3"),
+        confidenceThreshold: z
+          .number()
+          .min(0)
+          .max(1)
+          .optional()
+          .default(0.7)
+          .describe("分类置信度门槛，低于此值或 category=other 的条目直接走 summary 兜底，不浪费 Jina 配额"),
       }),
-      execute: async ({ items, maxLength = 5000, maxConcurrency = 3 }) => {
+      execute: async ({
+        items,
+        maxLength = 5000,
+        maxConcurrency = 3,
+        confidenceThreshold = 0.7,
+      }) => {
         // 简易并发池：分批 Promise.all，限制并发避免 Jina 限流。
         type EnrichedItem = Record<string, unknown> & {
           id: string;
           body: string;
           fetchedAt: string;
-          fetchStatus: "ok" | "fallback_summary" | "fallback_title" | "failed";
+          fetchStatus:
+            | "ok"
+            | "fallback_summary"
+            | "fallback_title"
+            | "skipped_other"
+            | "failed";
           fetchError?: string;
         };
         const enriched: EnrichedItem[] = [];
         let okCount = 0;
         let fallbackCount = 0;
+        let skippedCount = 0;
 
         for (let i = 0; i < items.length; i += maxConcurrency) {
           const batch = items.slice(i, i + maxConcurrency);
           const batchResults = await Promise.all(
             batch.map(async (item): Promise<EnrichedItem> => {
               const base: Record<string, unknown> = { ...item };
+
+              // 短路：category=other 或 confidence < 阈值 → 不抓 URL,直接
+              // summary 兜底。这些条目下游 cross_language_rewrite 也会 filter
+              // 掉,抓详情纯浪费 Jina 配额(50 条里通常 30+ 是 other)。
+              const isOther = item.category === "other";
+              const lowConf =
+                typeof item.confidence === "number" &&
+                item.confidence < confidenceThreshold;
+              if (isOther || lowConf) {
+                skippedCount++;
+                const body =
+                  (item.summary ?? "").trim() ||
+                  (item.title ?? "").trim() ||
+                  (item.id ?? "");
+                return {
+                  ...base,
+                  id: item.id,
+                  body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: "skipped_other",
+                  fetchError: isOther
+                    ? "category=other,跳过抓取"
+                    : `confidence ${item.confidence} < ${confidenceThreshold},跳过抓取`,
+                };
+              }
+
               const url = (item.sourceUrl ?? "").trim();
               if (!url) {
                 fallbackCount++;
@@ -674,6 +718,7 @@ function createToolDefinitions(): ToolSet {
           totalRequested: items.length,
           okCount,
           fallbackCount,
+          skippedCount,
         };
       },
     }),

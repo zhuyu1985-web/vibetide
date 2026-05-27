@@ -354,6 +354,10 @@ ${truncated}
                   continue;
                 }
                 // 调用失败 → 如实报告错误（不 fallback 到 LLM 编造）
+                // send step-failed 而不是 step-complete,前端 useTestRun 按
+                // event type 区分颜色:complete = 绿色✓ / failed = 红色✗。
+                // 之前写成 step-complete 即便 success=false 也照样绿色通过,
+                // 跟后续步骤继续跑(因为没人看 success 字段)。
                 const errText = `【执行摘要】${
                   dispatchType === "llm-skill" ? "LLM-skill" : "工具"
                 } \`${skillSlug}\` 调用失败
@@ -369,14 +373,13 @@ ${truncated}
 - 可信度：不适用
 - 建议改进：排查错误后重试`;
                 const durationMs = Date.now() - stepStartedAt;
-                send("step-complete", {
+                send("step-failed", {
                   stepId: step.id,
                   stepIndex: i,
-                  result: errText,
-                  summary: `${skillSlug} 调用失败`,
+                  error: errText,
+                  summary: `${skillSlug} 调用失败：${invocation.error}`,
                   durationMs,
                   employeeName,
-                  success: true,
                 });
                 previousSteps.push({
                   rawOutput: null,
@@ -391,8 +394,11 @@ ${truncated}
                   },
                   displayText: errText,
                 });
-                completedSteps++;
-                continue;
+                failedSteps++;
+                // 关键步骤失败 → 终止后续步骤,让用户立即看到根因(而不是让
+                // 下游 step 串联到 articles=[] 的空数组继续报"参数校验失败")。
+                // 这跟 mission-executor 的 handle-task-failure 语义一致。
+                break;
               }
 
               // ── 4. 其他 skill：走 agent 路径（与 mission-executor 完全一致） ──
