@@ -53,29 +53,43 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
   cross_language_rewrite: {
     skillName: "cross_language_rewrite",
     execute: async (params) => {
-      // 期望 params: { articles: ClassifiedItem[], targetLanguage, variantsPerTopic }
-      // ClassifiedItem 在 topic-classifier.ts 已加 title/summary echo，无需反查 step1.topics。
-      // Defense-in-depth：?? 只 fallback null/undefined，"" 或对象会原样传过来
-      // 让 .filter throw "not a function"。明确 Array.isArray 兜底。
-      const rawArticles: ClassifiedItem[] = Array.isArray(params.articles)
-        ? (params.articles as ClassifiedItem[])
+      // 期望 params.articles 来自：
+      //   - 海外热榜搬运 step 4：batch_deep_read 输出 items[]（每条带 body=Jina 全文）
+      //   - 单条海外转发：直接传 { id, title, body, sourceUrl, category }
+      //   - 旧链路兼容：topic_classifier 输出 results[]（只有 summary，无 body）
+      //
+      // body 优先级：body(已抓全文) > summary > title.repeat(2) 兜底过 schema 校验
+      // category="other" 且 confidence < 阈值 的条目过滤掉（这些是 topic_classifier
+      // 标的低质量分类，batch_deep_read 透传过来不应翻译）
+      const rawArticles: Array<
+        ClassifiedItem & { body?: string; fetchStatus?: string }
+      > = Array.isArray(params.articles)
+        ? (params.articles as Array<
+            ClassifiedItem & { body?: string; fetchStatus?: string }
+          >)
         : [];
-      const filtered = rawArticles.filter(
-        (a) =>
-          a.category !== "other" &&
-          (a.confidence ?? 0) >= CLASSIFIER_CONFIDENCE_THRESHOLD,
-      );
-      // body fallback: summary 缺失 / 太短时用 title.repeat(2) 保证 length>=10 过 schema 校验
-      const articles = filtered.map((a) => ({
-        id: a.id,
-        title: a.title ?? a.id,
-        body:
-          a.summary && a.summary.length >= 10
-            ? a.summary
-            : (a.title ?? a.id).repeat(2),
-        sourceUrl: a.sourceUrl,
-        category: a.category,
-      }));
+      const filtered = rawArticles.filter((a) => {
+        // 若上游是 batch_deep_read，category 已透传；若没有 category 字段
+        // （单条转发场景）则不过滤
+        if (a.category === undefined) return true;
+        if (a.category === "other") return false;
+        return (a.confidence ?? 1) >= CLASSIFIER_CONFIDENCE_THRESHOLD;
+      });
+      const articles = filtered.map((a) => {
+        const body =
+          a.body && a.body.length >= 10
+            ? a.body
+            : a.summary && a.summary.length >= 10
+              ? a.summary
+              : (a.title ?? a.id).repeat(2);
+        return {
+          id: a.id,
+          title: a.title ?? a.id,
+          body,
+          sourceUrl: a.sourceUrl,
+          category: a.category,
+        };
+      });
       const result = await crossLanguageRewriteArticles({
         articles,
         targetLanguage: (params.targetLanguage as "en") ?? "en",

@@ -554,6 +554,129 @@ function createToolDefinitions(): ToolSet {
         };
       },
     }),
+    batch_deep_read: tool({
+      description:
+        "批量调用 Jina Reader 抓取多条 item 的 sourceUrl 详情页正文，把抓到的全文写入每条 item 的 `body` 字段，原字段（id / title / category / sourceUrl 等）原样透传。" +
+        "用于「海外热榜搬运」step 3：把分类后的中文热点详情页内容抓下来交给翻译改写步骤。" +
+        "失败的条目用 summary 兜底（若无 summary 则保留 title），不会丢条。",
+      inputSchema: z.object({
+        items: z
+          .array(
+            z
+              .object({
+                id: z.string().min(1).describe("条目 id，原样透传"),
+                sourceUrl: z.string().optional().describe("详情页 URL（可选；缺失则 body 用 summary 兜底）"),
+                title: z.string().optional(),
+                summary: z.string().optional(),
+                category: z.string().optional(),
+                confidence: z.number().optional(),
+                reason: z.string().optional(),
+              })
+              .passthrough(),
+          )
+          .min(1)
+          .max(30)
+          .describe("待深读的条目列表（一般来自 topic_classifier 的 results）"),
+        maxLength: z.number().optional().default(5000).describe("单篇正文截断字数，默认 5000"),
+        maxConcurrency: z.number().optional().default(3).describe("并发抓取数，默认 3"),
+      }),
+      execute: async ({ items, maxLength = 5000, maxConcurrency = 3 }) => {
+        // 简易并发池：分批 Promise.all，限制并发避免 Jina 限流。
+        type EnrichedItem = Record<string, unknown> & {
+          id: string;
+          body: string;
+          fetchedAt: string;
+          fetchStatus: "ok" | "fallback_summary" | "fallback_title" | "failed";
+          fetchError?: string;
+        };
+        const enriched: EnrichedItem[] = [];
+        let okCount = 0;
+        let fallbackCount = 0;
+
+        for (let i = 0; i < items.length; i += maxConcurrency) {
+          const batch = items.slice(i, i + maxConcurrency);
+          const batchResults = await Promise.all(
+            batch.map(async (item): Promise<EnrichedItem> => {
+              const base: Record<string, unknown> = { ...item };
+              const url = (item.sourceUrl ?? "").trim();
+              if (!url) {
+                fallbackCount++;
+                const body = (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
+                return {
+                  ...base,
+                  id: item.id,
+                  body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
+                  fetchError: "无 sourceUrl",
+                };
+              }
+              try {
+                new URL(url);
+              } catch {
+                fallbackCount++;
+                const body = (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
+                return {
+                  ...base,
+                  id: item.id,
+                  body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
+                  fetchError: "URL 格式无效",
+                };
+              }
+              try {
+                const result = await fetchViaJinaReader(url);
+                const truncated = truncateContent(result.content, maxLength);
+                if (truncated && truncated.length >= 50) {
+                  okCount++;
+                  return {
+                    ...base,
+                    id: item.id,
+                    title: result.title || (item.title ?? ""),
+                    body: truncated,
+                    fetchedAt: new Date().toISOString(),
+                    fetchStatus: "ok",
+                  };
+                }
+                // Jina 返回成功但内容太短 → 兜底
+                fallbackCount++;
+                const body =
+                  (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
+                return {
+                  ...base,
+                  id: item.id,
+                  body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
+                  fetchError: "Jina 返回内容过短",
+                };
+              } catch (err) {
+                fallbackCount++;
+                const body =
+                  (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
+                return {
+                  ...base,
+                  id: item.id,
+                  body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: "failed",
+                  fetchError: err instanceof Error ? err.message : String(err),
+                };
+              }
+            }),
+          );
+          enriched.push(...batchResults);
+        }
+
+        return {
+          items: enriched,
+          totalRequested: items.length,
+          okCount,
+          fallbackCount,
+        };
+      },
+    }),
     trending_topics: tool({
       description: "聚合多平台实时热榜（微博/知乎/百度/抖音/小红书/36氪等），发现全网热点话题。支持三种模式：hot=全网热点榜中榜、platforms=指定平台热榜、search=全网热榜关键词搜索",
       inputSchema: z.object({

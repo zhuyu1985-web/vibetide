@@ -2259,9 +2259,9 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       },
     ],
     systemInstruction:
-      "把过去 24h 国内热榜里 {{categories}} 三类内容筛出来（最少 {{min_heat_score}} 热度分，最多 {{topic_limit}} 条），翻译改写成适合 X / Instagram 海外读者的英文稿件，入英文稿件库等审核。",
+      "把过去 24h 国内热榜里 {{categories}} 三类内容筛出来（最少 {{min_heat_score}} 热度分，最多 {{topic_limit}} 条），抓详情页全文，翻译改写成适合 X / Instagram 海外读者的英文稿件，入本地英文稿件库（暂不推送 CMS）。",
     promptTemplate:
-      "拉取最近 24h 热榜 Top {{topic_limit}}（最低热度 {{min_heat_score}}），筛选 {{categories}}，翻译为英文。",
+      "拉取最近 24h 热榜 Top {{topic_limit}}（最低热度 {{min_heat_score}}），筛选 {{categories}}，抓详情，翻译为英文。",
     isFeatured: true,
     steps: [
       step(1, "拉取 24h 热榜", "trending_topics", "热榜聚合", "data_collection", "pull",
@@ -2271,27 +2271,33 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
           topics: "{{step1.topics}}",
           enabledCategories: "{{categories}}",
         }),
-      step(3, "深读+翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate",
+      // step 3：把分类后的条目 sourceUrl 走 Jina Reader 抓详情页全文，
+      // 写到每条 item 的 body 字段，原字段（id / title / category / sourceUrl）
+      // 透传给下游翻译。失败的条目用 summary 兜底，不会丢条。
+      step(3, "抓取详情正文", "batch_deep_read", "Jina 深读", "web_search", "fetch",
         {
-          articles: "{{step2.results}}",
+          items: "{{step2.results}}",
+          maxLength: 5000,
+          maxConcurrency: 3,
+        }),
+      step(4, "翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate",
+        {
+          // 接 step 3 抓到的全文 body —— 改写质量比拿 summary 翻译高得多。
+          articles: "{{step3.items}}",
           targetLanguage: "en",
           variantsPerTopic: "{{variants_per_topic}}",
         }),
       step(
-        4,
-        "入英文稿件库（待审）",
+        5,
+        "入英文稿件库（本地）",
         "archive_to_drafts",
         "稿件入库",
         "distribution",
         "store",
         {
-          // articles 从 step 3 cross_language_rewrite 输出获取。
-          // cross_language_rewrite dispatch wrap 后每条 article 含 title/body alias
-          // 满足 archive_to_drafts inputSchema (title.min(1), body.min(10))。
-          // 之前漏写 articles 字段导致 mission-executor 调 invokeToolDirectly 时
-          // zod 校验失败 → fallthrough 到 LLM 路径 → LLM 越权 web_search 编 fake
-          // digest 稿件入库（5/26 早期污染数据来源）。
-          articles: "{{step3.articles}}",
+          // archive_to_drafts 实现只写本地 articles 表（status=approved），
+          // 完全不调华栖云 CMS —— 待审核中心完成后再加 CMS 推送步骤。
+          articles: "{{step4.articles}}",
           language: "en",
           category: "app_overseas_en",
           initialStatus: "approved",

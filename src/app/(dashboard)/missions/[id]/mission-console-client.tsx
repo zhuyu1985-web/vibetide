@@ -58,6 +58,7 @@ import { DraftComparisonPanel } from "@/components/missions/draft-comparison-pan
 import { ArchiveToDraftsRenderer } from "@/components/missions/step-renderers/archive-to-drafts-renderer";
 import { TrendingTopicsRenderer } from "@/components/missions/step-renderers/trending-topics-renderer";
 import { TopicClassifierRenderer } from "@/components/missions/step-renderers/topic-classifier-renderer";
+import { BatchDeepReadRenderer } from "@/components/missions/step-renderers/batch-deep-read-renderer";
 import { CrossLanguageRewriteRenderer } from "@/components/missions/step-renderers/cross-language-rewrite-renderer";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import type {
@@ -98,6 +99,7 @@ const SOURCE_LABEL: Record<string, string> = {
 const STEP_RENDERER_ROLES = new Set([
   "trending_topics",
   "topic_classifier",
+  "batch_deep_read",
   "cross_language_rewrite",
   "archive_to_drafts",
 ]);
@@ -1096,6 +1098,8 @@ function TaskDetailSheet({ task, onClose }: { task: MissionTask | null; onClose:
                 return <TrendingTopicsRenderer outputData={task.outputData} />;
               case "topic_classifier":
                 return <TopicClassifierRenderer outputData={task.outputData} />;
+              case "batch_deep_read":
+                return <BatchDeepReadRenderer outputData={task.outputData} />;
               case "cross_language_rewrite":
                 return <CrossLanguageRewriteRenderer outputData={task.outputData} />;
               case "archive_to_drafts":
