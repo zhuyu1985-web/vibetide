@@ -11,6 +11,7 @@ import { and, count, desc, eq, isNull, notInArray, or, sql, type SQL } from "dri
 import type { Skill, SkillCategory } from "@/lib/types";
 import type { SkillFileRow, SkillVersionRow } from "@/db/types";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { loadSkillContent } from "@/lib/skill-loader";
 
 export interface SkillWithBindCount extends Skill {
   bindCount: number;
@@ -150,6 +151,7 @@ async function findSkillRecord(
         id: skills.id,
         organizationId: skills.organizationId,
         name: skills.name,
+        slug: skills.slug,
         category: skills.category,
         type: skills.type,
         version: skills.version,
@@ -649,6 +651,15 @@ export async function getSkillDetailPageData(
 
   if (!row) return null;
 
+  // db.skills.content 在 seed 时一直写 "" —— 真相在 skills/<slug>/SKILL.md
+  // 文件,工作流执行也只从那里读(见 loadSkillContent)。这里 fallback 一下
+  // 让管理后台 /skills/[id] 详情页能看到完整内容,跟运行时实际用的 prompt
+  // 100% 同源。同时支持 dash↔underscore 文件夹名兜底(loader 已处理)。
+  const fileContent =
+    !row.content || row.content.trim() === ""
+      ? loadSkillContent(row.slug ?? "")
+      : null;
+
   const skill: SkillDetailWithFiles = {
     id: row.id,
     name: row.name,
@@ -656,7 +667,7 @@ export async function getSkillDetailPageData(
     type: row.type as "builtin" | "custom" | "plugin",
     version: row.version,
     description: row.description,
-    content: row.content ?? "",
+    content: fileContent ?? row.content ?? "",
     compatibleRoles: (row.compatibleRoles ?? []) as string[],
     inputSchema: row.inputSchema as Record<string, string> | null,
     outputSchema: row.outputSchema as Record<string, string> | null,
