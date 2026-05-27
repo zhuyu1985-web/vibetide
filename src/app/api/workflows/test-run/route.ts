@@ -7,6 +7,11 @@ import {
   invokeToolDirectly,
   isToolRegistered,
 } from "@/lib/agent/tool-registry";
+import {
+  invokeLLMSkillDirectly,
+  isLLMSkillRegistered,
+} from "@/lib/agent/llm-skill-dispatch";
+import { renderStepParameters } from "@/lib/mission-executor";
 import { loadSkillContent } from "@/lib/skill-loader";
 import {
   loadAvailableEmployees,
@@ -42,7 +47,13 @@ import { renderScenarioTemplate } from "@/lib/scenario-template";
 // 本地累积的"前置步骤输出"，对齐 executeAgent 需要的 StepOutput 结构 ——
 // 让后续步骤的 agent 能看到前面步骤的真实产出，跟实际执行里
 // `loadDependencyOutputs` 的语义一致。
+//
+// rawOutput 是工具/LLM-skill 真实返回的结构化对象（topics / results /
+// articles 等字段在顶层），用来给 renderStepParameters 解析
+// `{{stepN.field}}`。这跟 mission-executor 里 `loadDependencyOutputs` →
+// `previousStepsForRender[priority-1].outputData` 完全同形。
 interface LocalPreviousStep {
+  rawOutput: unknown;
   output: StepOutput;
   /** 用于 UI 展示的完整文本（同时保存以便做 extractSummary 等） */
   displayText: string;
@@ -174,51 +185,64 @@ export async function POST(req: Request) {
                 message: `${employeeName} 正在执行「${skillName}」...`,
               });
 
-              // ── 2. 步骤绑定参数渲染（Mustache） ─────────────────────
+              // ── 2. 步骤绑定参数渲染（与 mission-executor 同源） ─────────
+              // 直接复用 renderStepParameters，支持 `{{key}}`（取 inputParams）
+              // 和 `{{stepN.field}}`（取上 N 步的 outputData.field）。
+              // 关键约定：N = step.order（priority），不是 dependencies 索引 ——
+              // 海外热榜搬运里 step 3 引用 {{step2.results}} 必须能解析到 step 2
+              // 真实输出的结构化字段。
               const rawStepParams = (step.config?.parameters ?? {}) as Record<
                 string,
                 unknown
               >;
-              const renderedParams: Record<string, unknown> = {};
-              for (const [k, rawV] of Object.entries(rawStepParams)) {
-                if (typeof rawV === "string") {
-                  renderedParams[k] = rawV.replace(
-                    /\{\{(\w+)\}\}/g,
-                    (_, name) => {
-                      const v = inputParams[name];
-                      if (v === undefined || v === null) return "";
-                      if (typeof v === "object") return JSON.stringify(v);
-                      return String(v);
-                    },
-                  );
-                } else {
-                  renderedParams[k] = rawV;
+              const previousStepsForRender: Array<{ outputData?: unknown }> =
+                [];
+              sortedSteps.slice(0, i).forEach((upStep, upIdx) => {
+                const order = upStep.order ?? upIdx + 1;
+                const prev = previousSteps[upIdx];
+                if (prev) {
+                  previousStepsForRender[order - 1] = {
+                    outputData: prev.rawOutput,
+                  };
                 }
-              }
-
-              // 只有用户显式绑定参数才进入短路。没绑参数不要猜 ——
-              // 不同工具的必填参数不同（web_search 要 query / content_generate 要
-              // outline / web_deep_read 要 url），盲猜 "query" 会导致 schema 校验
-              // 失败（已发生事故：content_generate 被强塞 query="CCBN" 而报错）。
-              // 无绑定就走 agent 路径，让 LLM 看上下文 + SKILL.md 决定参数。
+              });
+              const renderedParams = renderStepParameters(
+                rawStepParams,
+                { inputParams },
+                previousStepsForRender,
+              );
               const effectiveParams = renderedParams;
+              const hasBindings = Object.keys(effectiveParams).length > 0;
 
-              // ── 3. 数据获取类短路：有真实工具实现 + 用户显式绑定参数 → 真调 + 直出 ────
-              if (
-                skillSlug &&
-                isToolRegistered(skillSlug) &&
-                Object.keys(effectiveParams).length > 0
-              ) {
-                const invocation = await invokeToolDirectly(
-                  skillSlug,
-                  effectiveParams,
-                  // 注入 org / operator 上下文 —— cms_publish 等多租户写入
-                  // 型工具需要这两个字段才能跑（用户无需在 UI 里绑定）。
-                  {
-                    organizationId: orgId,
-                    operatorId: user.id,
-                  },
-                );
+              // ── 3. 短路 dispatch（与 mission-executor 同源） ───────────────
+              // 优先级：
+              //   a. LLM-skill（topic_classifier / cross_language_rewrite）→
+              //      invokeLLMSkillDirectly（内部走真 LLM + zod 校验）
+              //   b. Tool（trending_topics / archive_to_drafts / cms_publish）→
+              //      invokeToolDirectly
+              //   c. 没绑参数或不在两个 registry 里 → 落到下方 agent 路径
+              //
+              // 之前 dispatch 只查 tool-registry，导致 topic_classifier /
+              // cross_language_rewrite 在测试运行里退化成 agent + LLM 编故事，
+              // 跟首页场景启动 mission 真实执行的输出完全对不上 —— 这是用户
+              // 报告"测试运行结果与 /missions 不一致"的根因。
+              const dispatchType: "llm-skill" | "tool" | null =
+                skillSlug && hasBindings
+                  ? isLLMSkillRegistered(skillSlug)
+                    ? "llm-skill"
+                    : isToolRegistered(skillSlug)
+                      ? "tool"
+                      : null
+                  : null;
+
+              if (dispatchType && skillSlug) {
+                const invocation =
+                  dispatchType === "llm-skill"
+                    ? await invokeLLMSkillDirectly(skillSlug, effectiveParams)
+                    : await invokeToolDirectly(skillSlug, effectiveParams, {
+                        organizationId: orgId,
+                        operatorId: user.id,
+                      });
                 const paramsLine = Object.entries(effectiveParams)
                   .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
                   .join(", ");
@@ -230,25 +254,43 @@ export async function POST(req: Request) {
                       ? serialized.slice(0, 6000) +
                         "\n... (结果过长已截断)"
                       : serialized;
+                  // 任一列表字段为空 → 视为 0 条命中（与 mission-executor
+                  // preExecEmpty 同语义）。trending_topics 返回 {topics:[]},
+                  // topic_classifier 返回 {results:[]}, cross_language_rewrite
+                  // 返回 {articles:[]}, archive_to_drafts 返回 {created:[]}.
                   const resultObj = invocation.result as {
                     results?: unknown[];
+                    articles?: unknown[];
+                    topics?: unknown[];
+                    created?: unknown[];
                   } | null;
-                  const count =
-                    resultObj && Array.isArray(resultObj.results)
-                      ? resultObj.results.length
-                      : undefined;
+                  let count: number | undefined;
+                  if (resultObj) {
+                    if (Array.isArray(resultObj.results))
+                      count = resultObj.results.length;
+                    else if (Array.isArray(resultObj.articles))
+                      count = resultObj.articles.length;
+                    else if (Array.isArray(resultObj.topics))
+                      count = resultObj.topics.length;
+                    else if (Array.isArray(resultObj.created))
+                      count = resultObj.created.length;
+                  }
                   const countNote =
                     count === 0
-                      ? "\n\n⚠️ 真实结果 0 条。请调整参数重试（扩大 timeRange / 更换关键词）。"
+                      ? "\n\n⚠️ 真实结果 0 条。请调整参数重试（扩大 timeRange / 更换关键词 / 检查上一步输出）。"
                       : count !== undefined
                         ? `\n\n（真实命中 ${count} 条）`
                         : "";
-                  const deterministicText = `【执行摘要】工具 \`${skillSlug}\` 在 server 端真实调用完成（参数：${paramsLine}）${countNote}
+                  const sourceLabel =
+                    dispatchType === "llm-skill"
+                      ? `LLM-skill \`${skillSlug}\``
+                      : `工具 \`${skillSlug}\``;
+                  const deterministicText = `【执行摘要】${sourceLabel} 在 server 端真实调用完成（参数：${paramsLine}）${countNote}
 
 【执行过程】
-1. 使用步骤绑定的参数直接调用 \`${skillSlug}\`：${paramsLine}
-2. 接收工具原始返回值（真实数据，未经 LLM 修饰）
-3. 本步骤跳过 LLM 模拟以防止按模板编造结果
+1. 使用步骤绑定的参数直接调用 ${sourceLabel}：${paramsLine}
+2. 接收${dispatchType === "llm-skill" ? "结构化 LLM 输出" : "工具原始返回值"}（真实数据，未经二次 LLM 包装）
+3. 本步骤跳过 agent 兜底以防止按模板编造结果
 
 【产出结果】
 \`\`\`json
@@ -256,8 +298,8 @@ ${truncated}
 \`\`\`
 
 【质量评估】
-- 可信度：高（真实工具调用，非模拟）
-- 建议改进：${count === 0 ? "调整 timeRange / 关键词后重跑" : "无"}`;
+- 可信度：高（真实${dispatchType === "llm-skill" ? "LLM-skill" : "工具"}调用，非模拟）
+- 建议改进：${count === 0 ? "调整参数后重跑" : "无"}`;
 
                   const summary = extractSummary(deterministicText, skillName);
                   const durationMs = Date.now() - stepStartedAt;
@@ -271,6 +313,7 @@ ${truncated}
                     success: true,
                   });
                   previousSteps.push({
+                    rawOutput: invocation.result,
                     output: {
                       stepKey: step.id,
                       employeeSlug: (matched?.slug ??
@@ -295,15 +338,17 @@ ${truncated}
                   completedSteps++;
                   continue;
                 }
-                // 工具调用失败 → 如实报告错误（不 fallback 到 LLM 编造）
-                const errText = `【执行摘要】工具 \`${skillSlug}\` 调用失败
+                // 调用失败 → 如实报告错误（不 fallback 到 LLM 编造）
+                const errText = `【执行摘要】${
+                  dispatchType === "llm-skill" ? "LLM-skill" : "工具"
+                } \`${skillSlug}\` 调用失败
 
 【执行过程】
 1. 尝试调用 \`${skillSlug}\`（参数：${paramsLine}）
 2. 错误：${invocation.error}
 
 【产出结果】
-工具调用失败，无法返回真实数据。请检查环境变量（如 TAVILY_API_KEY）/ 网络 / 参数格式。
+调用失败，无法返回真实数据。请检查环境变量 / 网络 / 参数格式 / 上一步输出是否被正确引用。
 
 【质量评估】
 - 可信度：不适用
@@ -319,6 +364,7 @@ ${truncated}
                   success: true,
                 });
                 previousSteps.push({
+                  rawOutput: null,
                   output: {
                     stepKey: step.id,
                     employeeSlug: (matched?.slug ??
@@ -436,6 +482,10 @@ ${truncated}
                 success: true,
               });
               previousSteps.push({
+                // agent 路径没有结构化 raw output，把 StepOutput 当 rawOutput 兜底；
+                // 下游 `{{stepN.field}}` 引用通常失败（fallback 空串），跟
+                // mission-executor 一致。
+                rawOutput: execResult.output,
                 output: execResult.output,
                 displayText: structuredText,
               });
