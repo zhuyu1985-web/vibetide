@@ -205,6 +205,8 @@ export async function createWorkflowFromTemplate(templateId: string) {
         category: virtual.category,
         triggerType: virtual.triggerType,
         triggerConfig: virtual.triggerConfig ?? null,
+        // BuiltinTemplate(旧常量)不带 inputFields/promptTemplate 等字段;
+        // 这是 legacy 路径,新模板都走下面 DB 路径。
         isBuiltin: false,
         isEnabled: false,
         createdBy: user.id,
@@ -235,6 +237,12 @@ export async function createWorkflowFromTemplate(templateId: string) {
       category: template.category,
       triggerType: template.triggerType ?? "manual",
       triggerConfig: template.triggerConfig,
+      // 同上:把 builtin 模板里的启动/编排字段完整搬过来,而不是用 schema default
+      icon: template.icon ?? null,
+      inputFields: (template.inputFields ?? []) as InputFieldDef[],
+      defaultTeam: template.defaultTeam ?? [],
+      systemInstruction: template.systemInstruction ?? null,
+      promptTemplate: template.promptTemplate ?? null,
       isBuiltin: false,
       isEnabled: false,
       createdBy: user.id,
