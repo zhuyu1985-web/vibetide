@@ -574,9 +574,9 @@ function createToolDefinitions(): ToolSet {
               })
               .passthrough(),
           )
-          .min(1)
+          .min(0)
           .max(50)
-          .describe("待深读的条目列表（一般来自 topic_classifier 的 results，最多 50 条对齐 trending_topics 上限）"),
+          .describe("待深读的条目列表（一般来自 topic_classifier 的 results，最多 50 条对齐 trending_topics 上限）。空数组优雅返回 0 条结果,不触发 zod 拒绝。"),
         maxLength: z.number().optional().default(5000).describe("单篇正文截断字数，默认 5000"),
         maxConcurrency: z.number().optional().default(3).describe("并发抓取数，默认 3"),
         confidenceThreshold: z
@@ -593,6 +593,19 @@ function createToolDefinitions(): ToolSet {
         maxConcurrency = 3,
         confidenceThreshold = 0.7,
       }) => {
+        // 上游 0 条 → 优雅返回。之前 schema 是 min(1),空数组被 zod 拒绝 →
+        // mission-executor fallthrough 到 agent LLM 路径 → LLM 凭空编"详情正文
+        // 摘要"假数据塞进 outputData,user 看到绿色"已完成"但实际是欺骗。
+        if (!items || items.length === 0) {
+          return {
+            items: [],
+            totalRequested: 0,
+            okCount: 0,
+            fallbackCount: 0,
+            skippedCount: 0,
+            note: "上游 topic_classifier 产出 0 条,本步骤无可抓取详情。常见原因:topic_classifier 把所有热点归 other(用户配置 categories 跟热榜不匹配)。",
+          };
+        }
         // 简易并发池：分批 Promise.all，限制并发避免 Jina 限流。
         type EnrichedItem = Record<string, unknown> & {
           id: string;

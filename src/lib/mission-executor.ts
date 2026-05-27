@@ -1090,6 +1090,68 @@ async function executeTaskDirect(
       return { status: "completed" as const, taskId };
     }
 
+    // ── 保护:registered tool / LLM-skill 短路失败时,不让 LLM 编故事 ─────────
+    // 事故复盘:step 2 topic_classifier 返回 0 条 → step 3 batch_deep_read
+    // 收到 items=[] → 旧 zod min(1) 拒绝 → preExecUsedTool=false →
+    // fallthrough 到下方 executeAgent → qwen3-max 凭空编"详情正文摘要报告"
+    // 塞进 outputData,UI 显示绿色✓但内容全是假的(用户看到编造的"宁波高血压
+    // 患者""陈克明手擀面"等)。
+    //
+    // 唯一可靠方法 = **registered tool/LLM-skill 短路失败就直接 fail**,
+    // 让 agent 路径只服务"开放性 skill"(无 tool 实现的纯文档型)。
+    if (
+      task.assignedRole &&
+      (isToolRegistered(task.assignedRole) ||
+        isLLMSkillRegistered(task.assignedRole)) &&
+      !preExecUsedTool
+    ) {
+      const failureMsg = `工具/skill \`${task.assignedRole}\` 短路执行失败,拒绝降级到 LLM 编故事路径。可能原因:1) 工具参数被 zod 拒绝(检查上游 step 是否产出空数据 / 字段名不匹配);2) 工具实现内部 throw(检查环境变量 / 网络 / 配额);3) workflowTemplateId 缺失或 step 参数未绑定。详见 server 日志。`;
+      console.error(
+        `[mission-executor] BLOCKED LLM fallthrough for registered tool ${task.assignedRole}`,
+        { taskId, missionId, role: task.assignedRole },
+      );
+      await Promise.all([
+        db
+          .update(missionTasks)
+          .set({
+            status: "failed",
+            errorMessage: failureMsg,
+            outputData: {
+              status: "failed",
+              summary: failureMsg,
+              artifacts: [],
+              metrics: { qualityScore: 0 },
+              stepKey: task.id,
+              employeeSlug: agent.slug,
+              note: "registered tool 短路失败,已阻止 LLM fallthrough 防止编故事",
+            },
+            progress: 100,
+            completedAt: new Date(),
+          })
+          .where(eq(missionTasks.id, taskId)),
+        task.assignedEmployeeId
+          ? db
+              .update(aiEmployees)
+              .set({
+                status: "idle",
+                currentTask: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(aiEmployees.id, task.assignedEmployeeId))
+          : Promise.resolve(),
+        task.assignedEmployeeId
+          ? db.insert(missionMessages).values({
+              missionId,
+              fromEmployeeId: task.assignedEmployeeId,
+              messageType: "result",
+              content: `「${task.title}」失败:${failureMsg}`,
+              relatedTaskId: taskId,
+            })
+          : Promise.resolve(),
+      ]);
+      return { status: "failed" as const, taskId, error: failureMsg };
+    }
+
     const result = await executeAgent(agent, {
       stepKey: task.id,
       stepLabel: task.title,
