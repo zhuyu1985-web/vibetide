@@ -66,6 +66,16 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
       //   - string[]        → 自动包成 [{value, label: value}, ...]
       //   - {value,label}[] → 直接用
       //   - 单个字符串       → 包成单元素数组
+      //
+      // 二级兜底：用户测试时若没勾选任何 categories（启动表单清空），
+      // 渲染后 enabledCategories 是 "" / [] / undefined → normalize 出空数组。
+      // 这时 fallback 到海外热榜搬运 seed 默认的 3 类(food/pets/domestic_tech)，
+      // 避免"调用失败"挡住整个测试流。
+      const DEFAULT_OVERSEAS_CATEGORIES = [
+        { value: "food", label: "美食" },
+        { value: "pets", label: "萌宠" },
+        { value: "domestic_tech", label: "国内科技" },
+      ];
       const rawCategories = params.enabledCategories;
       const normalizedCategories: Array<{ value: string; label: string }> = [];
       if (Array.isArray(rawCategories)) {
@@ -85,11 +95,15 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
           label: rawCategories,
         });
       }
+      const finalCategories =
+        normalizedCategories.length > 0
+          ? normalizedCategories
+          : DEFAULT_OVERSEAS_CATEGORIES;
 
       const input = {
         ...params,
         topics: topicsWithId,
-        enabledCategories: normalizedCategories,
+        enabledCategories: finalCategories,
       } as unknown as Parameters<typeof classifyOverseasTopics>[0];
       return classifyOverseasTopics(input);
     },

@@ -86,7 +86,22 @@ export async function POST(req: Request) {
 
     // inputParams：mission 层的语义与 mission-executor 对齐。用于后面
     // Mustache 渲染、推断 query、构造【工作流输入参数】块。
+    //
+    // defaults 兜底：dialog 可能漏传带 defaultValue 的字段（用户清空 multiselect、
+    // 隐藏字段等场景），这里按 inputFields 补回默认值，避免 step 配置里
+    // {{<field>}} 渲染成空串导致下游 skill zod 校验失败。
     const inputParams: Record<string, unknown> = { ...(userInputs ?? {}) };
+    if (Array.isArray(inputFields)) {
+      for (const field of inputFields) {
+        if (
+          field?.name &&
+          inputParams[field.name] === undefined &&
+          field.defaultValue !== undefined
+        ) {
+          inputParams[field.name] = field.defaultValue;
+        }
+      }
+    }
 
     // stringInputs：字符串化后的版本（供 Mustache 替换、prompt 显示用）。
     const stringInputs: Record<string, string> = {};
