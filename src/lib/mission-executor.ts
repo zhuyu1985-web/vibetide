@@ -20,7 +20,7 @@ import {
   employeeSkills,
 } from "@/db/schema";
 import { workflowTemplates, type WorkflowStepDef } from "@/db/schema/workflows";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, lt } from "drizzle-orm";
 import { verify } from "@/lib/cognitive/verify-learner";
 import { updateSkillStats } from "@/lib/cognitive/skill-manager";
 import { assembleAgent, executeAgent } from "@/lib/agent";
@@ -818,13 +818,53 @@ async function executeTaskDirect(
         // 预执行触发：显式绑定了参数，或 auto-bind 生效
         if (Object.keys(rawParams).length > 0) {
           // 渲染 step.config.parameters 模板（支持 {{key}} 和 {{stepN.field}}）
-          // previousSteps 是 StepOutput[]，包装一层 outputData 以匹配
-          // renderStepParameters 的签名 —— 这样 {{step1.summary}} 等会查找到
-          // StepOutput 自身字段。A.1.3 起 LLM-skill 会在 outputData 中带上
-          // topics / variants 等业务字段，本入口届时自动透出。
-          const previousStepsForRender = previousSteps.map((s) => ({
-            outputData: s,
-          }));
+          //
+          // 关键约定：`{{stepN.X}}` 的 N 是 **step.order**（即 task.priority），
+          // 不是 dependencies 数组的 index。线性 pipeline step 1→2→3→4 里 step 3
+          // 只 dep step 2 (deps array length=1)，但 paramConfig 写 {{step2.X}}
+          // 时，N=2 应该指 step.order=2 不是 deps[1]（undefined）。
+          //
+          // 修复（事故 2026-05-27 重现 + 修）：之前 `previousSteps.map((s,i)=>({outputData:s}))`
+          // 让 N 跟着 deps 顺序，step 3 `{{step2.results}}` → previousSteps[1] = undefined →
+          // renderStepParameters fallback 空字符串 → dispatch.execute 收到 articles="" →
+          // rawArticles.filter throw "not a function" → invocation.ok=false → LLM 兜底 +
+          // 越权 web_search 编 fake digest。
+          //
+          // 改：额外 query 所有 priority < task.priority 且 completed 的 upstream task，
+          // 按 priority 索引 pad previousStepsForRender（如 step 3 时 previousStepsForRender[0]
+          // = step 1 output, [1] = step 2 output），让 {{stepN.X}} 总能按 step order 引用。
+          const allUpstream = task.priority != null
+            ? await db
+                .select({ id: missionTasks.id, priority: missionTasks.priority })
+                .from(missionTasks)
+                .where(
+                  and(
+                    eq(missionTasks.missionId, missionId),
+                    lt(missionTasks.priority, task.priority),
+                    eq(missionTasks.status, "completed"),
+                  ),
+                )
+            : [];
+          const upstreamIds = allUpstream.map((t) => t.id).filter((id): id is string => !!id);
+          const upstreamOutputs = upstreamIds.length > 0
+            ? await loadDependencyOutputs(upstreamIds)
+            : [];
+
+          const previousStepsForRender: Array<{ outputData?: unknown }> = [];
+          allUpstream.forEach((upTask) => {
+            if (upTask.priority == null) return;
+            const out = upstreamOutputs.find((s) => s.stepKey === upTask.id);
+            if (out) {
+              previousStepsForRender[upTask.priority - 1] = { outputData: out };
+            }
+          });
+          // 兜底：若该 query 没拿到（例如本步骤是 step 1 / 无 upstream），保留旧的
+          // deps-based wrapping 跟原始 previousSteps 兼容
+          if (previousStepsForRender.length === 0) {
+            previousSteps.forEach((s, i) => {
+              previousStepsForRender[i] = { outputData: s };
+            });
+          }
           const rendered = renderStepParameters(
             rawParams,
             { inputParams: missionInputParams ?? null },

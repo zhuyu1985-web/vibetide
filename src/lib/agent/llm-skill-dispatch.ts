@@ -30,7 +30,23 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
   topic_classifier: {
     skillName: "topic_classifier",
     execute: async (params) => {
-      const input = params as unknown as Parameters<typeof classifyOverseasTopics>[0];
+      // 上游 trending_topics 返回的 TrendingItem 没有 id 字段（schema 只含 platform/
+      // rank/title/heat/url/category），但 topic_classifier 内部 schema 要求 id。
+      // 之前事故：LLM 看输入没 id 就用 array index "0"~"49" 编 id，下游兜底逻辑
+      // returnedIds 跟 input 都对不上 → missing 兜底 50 条 → results 翻倍到 100 条全 other。
+      // 修：dispatch 层补 fallback id (`${platform}_${rank}` 或 `topic_${idx}`)，
+      // 让 LLM echo 时跟 input id 完全一致。
+      const rawTopics = (params.topics ?? []) as Array<Record<string, unknown>>;
+      const topicsWithId = rawTopics.map((t, idx) => ({
+        ...t,
+        id:
+          (typeof t.id === "string" && t.id) ||
+          (t.platform && t.rank !== undefined ? `${t.platform}_${t.rank}` : `topic_${idx}`),
+      }));
+      const input = {
+        ...params,
+        topics: topicsWithId,
+      } as unknown as Parameters<typeof classifyOverseasTopics>[0];
       return classifyOverseasTopics(input);
     },
   },
@@ -39,7 +55,11 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
     execute: async (params) => {
       // 期望 params: { articles: ClassifiedItem[], targetLanguage, variantsPerTopic }
       // ClassifiedItem 在 topic-classifier.ts 已加 title/summary echo，无需反查 step1.topics。
-      const rawArticles = (params.articles ?? []) as ClassifiedItem[];
+      // Defense-in-depth：?? 只 fallback null/undefined，"" 或对象会原样传过来
+      // 让 .filter throw "not a function"。明确 Array.isArray 兜底。
+      const rawArticles: ClassifiedItem[] = Array.isArray(params.articles)
+        ? (params.articles as ClassifiedItem[])
+        : [];
       const filtered = rawArticles.filter(
         (a) =>
           a.category !== "other" &&
