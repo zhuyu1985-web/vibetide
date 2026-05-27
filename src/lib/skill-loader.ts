@@ -94,29 +94,57 @@ const contentCache = new Map<string, { content: string; mtime: number }>();
 const isProd = process.env.NODE_ENV === "production";
 
 /**
+ * slug → 文件夹名映射,由 getAllBuiltinSkills() 扫描时填充。
+ * 历史遗留:6 个 skill 的目录名用 dash(archive-to-drafts / topic-classifier
+ * / cross-language-rewrite / channel-rewrite 等),但 frontmatter `name`
+ * 是 underscore(archive_to_drafts ...)。tool-registry / 工作流 / db.skills
+ * 全部用 underscore 形式,这里要能反查到 dash 目录。
+ */
+const slugToFolderMap = new Map<string, string>();
+
+/**
  * Load the body content of a single SKILL.md file by slug.
  * In production, cached forever (files are immutable per deployment).
  * In development, checks mtime for hot-reload.
+ *
+ * 路径解析优先级:
+ *   1. slugToFolderMap[slug] (来自 frontmatter.name 反查的精确映射)
+ *   2. slug 当文件夹名直接拼
+ *   3. slug.replace(/_/g, "-") 兜底
  */
 export function loadSkillContent(slug: string): string | null {
-  const filePath = path.join(getSkillsDir(), slug, "SKILL.md");
-
   const cached = contentCache.get(slug);
   if (cached && isProd) return cached.content;
 
-  try {
-    const stat = fs.statSync(filePath);
-    const mtime = stat.mtimeMs;
-
-    if (cached && cached.mtime === mtime) return cached.content;
-
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const { body } = parseFrontmatterYaml(raw);
-    contentCache.set(slug, { content: body, mtime });
-    return body;
-  } catch {
-    return null;
+  // 确保扫描已跑过,slugToFolderMap 已填充
+  if (slugToFolderMap.size === 0) {
+    getAllBuiltinSkills();
   }
+
+  const candidates: string[] = [];
+  const mapped = slugToFolderMap.get(slug);
+  if (mapped) candidates.push(mapped);
+  if (slug !== mapped) candidates.push(slug);
+  const dashed = slug.replace(/_/g, "-");
+  if (dashed !== slug && !candidates.includes(dashed)) candidates.push(dashed);
+
+  for (const folder of candidates) {
+    const filePath = path.join(getSkillsDir(), folder, "SKILL.md");
+    try {
+      const stat = fs.statSync(filePath);
+      const mtime = stat.mtimeMs;
+
+      if (cached && cached.mtime === mtime) return cached.content;
+
+      const raw = fs.readFileSync(filePath, "utf-8");
+      const { body } = parseFrontmatterYaml(raw);
+      contentCache.set(slug, { content: body, mtime });
+      return body;
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,9 +169,10 @@ export function getAllBuiltinSkills(): BuiltinSkillDef[] {
   });
 
   const skills: BuiltinSkillDef[] = [];
+  slugToFolderMap.clear();
 
-  for (const slug of dirs) {
-    const filePath = path.join(skillsDir, slug, "SKILL.md");
+  for (const folder of dirs) {
+    const filePath = path.join(skillsDir, folder, "SKILL.md");
     const stat = fs.statSync(filePath);
     const raw = fs.readFileSync(filePath, "utf-8");
     const { meta, body } = parseFrontmatterYaml(raw);
@@ -154,9 +183,17 @@ export function getAllBuiltinSkills(): BuiltinSkillDef[] {
     // Require category for builtin skills
     if (!meta.category) continue;
 
+    // **权威 slug 取 frontmatter.name** —— 而不是文件夹名。
+    // 历史遗留:6 个 dash 目录(topic-classifier 等),但 frontmatter.name
+    // 是 underscore 形式(topic_classifier),tool-registry / 工作流全用
+    // underscore。之前用文件夹名 → db.skills.slug 错位 → loadSkillContent
+    // 找不到 → 详情页/工作流加载内容空。
+    const slug = meta.name || folder;
+    slugToFolderMap.set(slug, folder);
+
     skills.push({
       slug,
-      name: meta.displayName || meta.name || slug,
+      name: meta.displayName || meta.name || folder,
       category: meta.category,
       description: meta.description || "",
       content: body,
