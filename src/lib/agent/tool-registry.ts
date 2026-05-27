@@ -748,24 +748,32 @@ function createToolDefinitions(): ToolSet {
         const warnings: string[] = [];
         let items: TrendingItem[] = [];
 
+        // env 缺失 → 显式 throw 让 mission-executor 把 step 1 标 failed,
+        // 链路立即止步,而不是静默返回空让 5 步全"completed"但全空跑(已经发生过事故)。
         if (!process.env.TRENDING_API_KEY) {
-          return {
-            fetchedAt: new Date().toISOString(),
-            mode,
-            platforms: [],
-            topics: [],
-            crossPlatformTopics: [],
-            warnings: ["未配置 TRENDING_API_KEY，无法获取实时热榜数据"],
-          };
+          throw new Error(
+            "缺少 TRENDING_API_KEY 环境变量,无法访问 TopHub 热榜 API。" +
+              "请到 https://www.tophubdata.com 注册申请 API key,在 .env.local 添加:\n" +
+              "TRENDING_API_KEY=<your_key>\n" +
+              "TRENDING_API_URL=https://api.tophubdata.com",
+          );
         }
 
         try {
           items = await fetchTrendingFromApi(mode, { platforms, limit, query });
         } catch (err) {
-          warnings.push(`热榜 API 失败: ${err instanceof Error ? err.message : String(err)}`);
+          // API 调用本身失败也直接 throw,而不是软返回空 —— 软失败让 mission-executor
+          // 当成 success,后续 step 跑空数据,用户看到 5 步绿色 + 0 数据,完全没法诊断。
+          throw new Error(
+            `TopHub 热榜 API 调用失败: ${err instanceof Error ? err.message : String(err)}。` +
+              "请检查:1) TRENDING_API_KEY 是否过期 2) 网络是否能访问 api.tophubdata.com 3) API 额度是否用完",
+          );
         }
 
-        if (items.length === 0 && warnings.length > 0) {
+        if (items.length === 0) {
+          // API 调用成功但返回 0 条 —— 通常是 TopHub 临时无数据 / 平台过滤后空。
+          // 返回 0 条 + warnings,test-run / mission console 会显示黄色 warning 让用户看到。
+          warnings.push("TopHub API 调用成功但返回 0 条热榜数据。可能是平台维护中,稍后重试。");
           return {
             fetchedAt: new Date().toISOString(),
             mode,
