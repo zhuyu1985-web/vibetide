@@ -104,14 +104,22 @@ function buildSystemPrompt(categories: { value: string; label: string }[]): stri
 ${lines}
 
 分类规则：
-1. 每条必须给一个 category（n+1 选 1，n 是上面列表条数，+1 是 other），不许多选。
-2. confidence 是 0~1 浮点数，反映你对分类正确性的把握。
-3. 模糊难判 → confidence < 0.7 时归 other。
-4. reason 简短中文（≤ 100 字）：说出关键判断词。
-5. 输出顺序与输入顺序一致，每条都要给出（不能省略）。
-6. **若输入条目带 sourceUrl 字段，输出必须原样回填，绝对不改 / 不删**。
-7. **title / summary 透传**：输入 topic 的 title 必须原样 echo 到输出；summary 若有也一并 echo（让下游翻译时不用反查）。
-8. 严格按 schema 输出 JSON，不要附加任何解释文字。`;
+1. **id 字段必须 1:1 echo 输入的 id 字段值** —— 这是关联回 topic 的唯一键，**绝对不许编造、缩写、替换或归并**（曾出现把 50 条全部输出 id="crypto" 的事故，导致全部归 missing 兜底）。每条输出的 id 必须严格等于输入数组对应位置的 input.id 字符串。
+2. 每条必须给一个 category（n+1 选 1，n 是上面列表条数，+1 是 other），不许多选。
+3. confidence 是 0~1 浮点数，反映你对分类正确性的把握。
+4. 模糊难判 → confidence < 0.7 时归 other。
+5. reason 简短中文（≤ 100 字）：说出关键判断词。
+6. 输出顺序与输入顺序一致，每条都要给出（不能省略）。
+7. **若输入条目带 sourceUrl 字段，输出必须原样回填，绝对不改 / 不删**。
+8. **title / summary 透传**：输入 topic 的 title 必须原样 echo 到输出；summary 若有也一并 echo（让下游翻译时不用反查）。
+9. 严格按 schema 输出 JSON，不要附加任何解释文字。
+
+错误示范（禁止）：
+- 输入 [{"id":"t1",...},{"id":"t2",...}] → 输出 [{"id":"crypto",...},{"id":"crypto",...}] ❌
+- 输入 [{"id":"weibo_1",...}] → 输出 [{"id":"1",...}] ❌（缩写）
+
+正确示范：
+- 输入 [{"id":"weibo_1","title":"X",...}] → 输出 [{"id":"weibo_1","title":"X","category":"food",...}] ✅`;
 }
 
 // ---------------------------------------------------------------------------

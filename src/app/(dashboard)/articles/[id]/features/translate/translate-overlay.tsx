@@ -14,10 +14,25 @@ interface TranslateOverlayProps {
 
 type Direction = "zh2en" | "en2zh";
 
+// 判断稿件主要语言（启发式）：检查 title + body 前 500 字里 ASCII 字母 vs CJK 字符占比。
+// CJK 多 → 中文稿（默认 zh2en），ASCII 多 → 英文稿（默认 en2zh）。
+// 兜底：若文本太短或都没有，默认 zh2en（跟旧版一致）。
+function detectArticleLanguage(article: { title?: string | null; body?: string | null }): Direction {
+  const sample = `${article.title ?? ""} ${(article.body ?? "").slice(0, 500)}`;
+  const asciiLetters = (sample.match(/[A-Za-z]/g) ?? []).length;
+  // CJK Unified Ideographs U+4E00..U+9FFF（含日中韩汉字）
+  const cjk = (sample.match(/[一-鿿]/g) ?? []).length;
+  if (asciiLetters + cjk < 10) return "zh2en"; // 样本太短，保旧 default
+  // 英文稿件：ASCII 字母明显多于 CJK（>= 2 倍）→ 用户多半想看英→中翻译
+  return asciiLetters >= cjk * 2 ? "en2zh" : "zh2en";
+}
+
 // 全屏翻译视图：左右双栏，原文 ↔ 译文。
 // AI 翻译复用 /api/ai/edit（流式输出），支持中英互译切换。
 export function TranslateOverlay({ article, onClose }: TranslateOverlayProps) {
-  const [direction, setDirection] = useState<Direction>("zh2en");
+  // default direction 按稿件主要语言推断（英文稿默认 en→中，跟用户实际需要对齐）。
+  // 用户可点 ArrowLeftRight 按钮手动切换。
+  const [direction, setDirection] = useState<Direction>(() => detectArticleLanguage(article));
   const [translated, setTranslated] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);

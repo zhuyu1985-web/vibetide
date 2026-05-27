@@ -864,22 +864,40 @@ async function executeTaskDirect(
             // （观察过的事故：用户搜 "CCBN"@24h，Tavily 实际返回 0 条，LLM
             // 却给出 2024-03 的假文章）。
             let resultCountHint = "";
-            const resultObj = invocation.result as { results?: unknown[] } | null;
-            if (
-              resultObj &&
-              typeof resultObj === "object" &&
-              Array.isArray(resultObj.results)
-            ) {
-              const count = resultObj.results.length;
-              if (count === 0) {
+            // 检测空结果：工具/skill 可能用 results / articles / topics 等不同字段名，
+            // 任一为空数组都视为"无数据"触发 preExecEmpty。
+            // 历史教训：之前只看 results，导致 cross_language_rewrite 返回 {articles:[]}
+            // 时 preExecEmpty 没设、short-circuit 也没跳过 LLM、LLM 越权调 web_search 补料。
+            const resultObj = invocation.result as
+              | { results?: unknown[]; articles?: unknown[]; topics?: unknown[] }
+              | null;
+            const listFields: Array<["results" | "articles" | "topics"]> = [
+              ["results"],
+              ["articles"],
+              ["topics"],
+            ];
+            let listLen: number | null = null;
+            let listFieldName: string | null = null;
+            if (resultObj && typeof resultObj === "object") {
+              for (const [field] of listFields) {
+                const v = resultObj[field];
+                if (Array.isArray(v)) {
+                  listLen = v.length;
+                  listFieldName = field;
+                  break;
+                }
+              }
+            }
+            if (listLen !== null) {
+              if (listLen === 0) {
                 // 标记为空 —— 后面会跳过 LLM，直接写确定性输出。
                 // 这是经验教训：反复试过加强 LLM 指令都没用，DeepSeek 拿到"空
                 // 结果"还是会按 SKILL.md 模板凭空编内容。唯一可靠方法是根本
                 // 不让它碰这种情况。
                 preExecEmpty = true;
-                resultCountHint = `\n\n⚠️ 真实结果为空（0 条）。你必须如实报告"无命中结果"，并建议用户调整 timeRange（如从 24h 扩大到 7d / 30d）或修改关键词。**严禁从训练数据里补填任何文章、日期、数据、引用** —— 这是伪造。`;
-              } else if (count <= 2) {
-                resultCountHint = `\n\n⚠️ 真实结果仅 ${count} 条。只在这 ${count} 条内做处理；不得从训练数据里补充任何其他条目（包括你"记得"的该话题相关新闻）。日期、标题、来源、数据点必须 1:1 引用结果里的字段，不得改写。`;
+                resultCountHint = `\n\n⚠️ 真实结果 ${listFieldName} 字段为空（0 条）。你必须如实报告"无命中结果"，并建议用户调整 timeRange / 关键词 / 上游 step 参数。**严禁从训练数据里补填任何文章、日期、数据、引用** —— 这是伪造。`;
+              } else if (listLen <= 2) {
+                resultCountHint = `\n\n⚠️ 真实结果 ${listFieldName} 字段仅 ${listLen} 条。只在这 ${listLen} 条内做处理；不得从训练数据里补充任何其他条目（包括你"记得"的该话题相关新闻）。日期、标题、来源、数据点必须 1:1 引用结果里的字段，不得改写。`;
               }
             }
             preExecResultBlock = `【前置工具调用结果（已在 server 端执行，这是真实数据）】\n调用：\`${invocation.toolName}(${JSON.stringify(

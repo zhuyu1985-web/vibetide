@@ -85,25 +85,45 @@ export function TrendingTopicsRenderer({ outputData }: TrendingTopicsRendererPro
           `${t.platform ?? "?"}-${t.rank ?? t.title ?? Math.random().toString(36).slice(2, 8)}`
         }
         columns={[
-          { key: "rank", header: "#", width: "w-12", align: "right", render: (t) => t.rank ?? "—" },
+          // 列宽收紧：mission console TaskDetailSheet 右侧容器只有 ~400-500px，
+          // 之前 rank(w-12)+platform(w-24)+heat(w-24)+url(w-32) = ~368px 让 title
+          // 只剩 ~30-130px，长中文标题一字一行竖排。
+          // 现在 rank(w-10)+platform(w-20)+heat(w-20)+url(w-20) = ~280px，title
+          // 剩 ~120-220px + line-clamp-2 + break-words 让长标题最多 2 行省略。
+          { key: "rank", header: "#", width: "w-10", align: "right", render: (t) => t.rank ?? "—" },
           {
             key: "platform",
             header: "平台",
-            width: "w-24",
+            width: "w-20",
             render: (t) => (t.platform ? <PlatformBadge name={t.platform} /> : "—"),
           },
-          { key: "title", header: "标题", render: (t) => t.title ?? "—" },
+          {
+            key: "title",
+            header: "标题",
+            render: (t) => (
+              <span
+                className="block break-words line-clamp-2 leading-snug"
+                title={t.title ?? ""}
+              >
+                {t.title ?? "—"}
+              </span>
+            ),
+          },
           {
             key: "heat",
             header: "热度",
-            width: "w-24",
+            width: "w-20",
             align: "right",
-            render: (t) => (t.heat !== undefined ? String(t.heat) : "—"),
+            render: (t) => (
+              <span className="whitespace-nowrap text-xs">
+                {t.heat !== undefined ? String(t.heat) : "—"}
+              </span>
+            ),
           },
           {
             key: "url",
             header: "原文",
-            width: "w-32",
+            width: "w-20",
             render: (t) => <SourceUrlPill url={t.url} variant="compact" />,
           },
         ]}
