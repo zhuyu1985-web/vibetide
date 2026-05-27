@@ -37,15 +37,59 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
       // 修：dispatch 层补 fallback id (`${platform}_${rank}` 或 `topic_${idx}`)，
       // 让 LLM echo 时跟 input id 完全一致。
       const rawTopics = (params.topics ?? []) as Array<Record<string, unknown>>;
-      const topicsWithId = rawTopics.map((t, idx) => ({
-        ...t,
-        id:
-          (typeof t.id === "string" && t.id) ||
-          (t.platform && t.rank !== undefined ? `${t.platform}_${t.rank}` : `topic_${idx}`),
-      }));
+      const topicsWithId = rawTopics.map((t, idx) => {
+        // sourceUrl 字段名归一化：trending_topics 输出的 TrendingItem 字段叫 `url`
+        // （不是 sourceUrl）。如果直接透传,下游 topic_classifier echo 不回 URL,
+        // batch_deep_read 再调时 sourceUrl 为空 → Jina 抓不到 → 全部走 summary
+        // 兜底。这里把 `url` 提升为 `sourceUrl`,链路才能闭环。
+        const sourceUrl =
+          (typeof t.sourceUrl === "string" && t.sourceUrl) ||
+          (typeof t.url === "string" && t.url) ||
+          undefined;
+        return {
+          ...t,
+          id:
+            (typeof t.id === "string" && t.id) ||
+            (t.platform && t.rank !== undefined
+              ? `${t.platform}_${t.rank}`
+              : `topic_${idx}`),
+          sourceUrl,
+        };
+      });
+
+      // enabledCategories 归一化：workflow-launch-dialog 的 multiselect 控件
+      // 存的是 string[]（只有 value，没 label），但 classifyOverseasTopics
+      // 要求 { value, label }[]。早期事故：seed 里 `enabledCategories:
+      // "{{categories}}"` 渲染后变成 ["food","pets","domestic_tech"] 字符串
+      // 数组,skill 拿 c.value 拿到 undefined → z.enum 拒绝 → LLM 调用失败。
+      // 修：接受三种形态:
+      //   - string[]        → 自动包成 [{value, label: value}, ...]
+      //   - {value,label}[] → 直接用
+      //   - 单个字符串       → 包成单元素数组
+      const rawCategories = params.enabledCategories;
+      const normalizedCategories: Array<{ value: string; label: string }> = [];
+      if (Array.isArray(rawCategories)) {
+        for (const c of rawCategories) {
+          if (typeof c === "string" && c.trim()) {
+            normalizedCategories.push({ value: c, label: c });
+          } else if (c && typeof c === "object") {
+            const obj = c as { value?: unknown; label?: unknown };
+            const value = typeof obj.value === "string" ? obj.value : "";
+            const label = typeof obj.label === "string" ? obj.label : value;
+            if (value) normalizedCategories.push({ value, label });
+          }
+        }
+      } else if (typeof rawCategories === "string" && rawCategories.trim()) {
+        normalizedCategories.push({
+          value: rawCategories,
+          label: rawCategories,
+        });
+      }
+
       const input = {
         ...params,
         topics: topicsWithId,
+        enabledCategories: normalizedCategories,
       } as unknown as Parameters<typeof classifyOverseasTopics>[0];
       return classifyOverseasTopics(input);
     },
