@@ -2284,9 +2284,19 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
         "稿件入库",
         "distribution",
         "store",
-        { language: "en", category: "app_overseas_en", initialStatus: "approved" },
+        {
+          // articles 从 step 3 cross_language_rewrite 输出获取。
+          // cross_language_rewrite dispatch wrap 后每条 article 含 title/body alias
+          // 满足 archive_to_drafts inputSchema (title.min(1), body.min(10))。
+          // 之前漏写 articles 字段导致 mission-executor 调 invokeToolDirectly 时
+          // zod 校验失败 → fallthrough 到 LLM 路径 → LLM 越权 web_search 编 fake
+          // digest 稿件入库（5/26 早期污染数据来源）。
+          articles: "{{step3.articles}}",
+          language: "en",
+          category: "app_overseas_en",
+          initialStatus: "approved",
+        },
       ),
-      step(5, "通知编辑审核", "compliance_check", "审核通知", "quality_review", "notify"),
     ],
   },
 
@@ -2332,7 +2342,17 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
         "稿件入库",
         "distribution",
         "store",
-        { language: "en", initialStatus: "approved" },
+        {
+          // articles 从 step 1 cross_language_rewrite 输出获取（跟批量工作流一致）。
+          // 注意：单条工作流 step 1 paramConfig 当前为空，依赖 mission-executor LLM
+          // 路径让 LLM 自己调 cross_language_rewrite。若 LLM 输出 outputData.articles
+          // 字段，本 step 能消费；否则 archive_to_drafts 会收到空数组报错。
+          // Follow-up：单条工作流应改造让 step 1 也走 server-side dispatch（直接
+          // 从 mission inputData 的 source_title/source_body 构造 article 数组）。
+          articles: "{{step1.articles}}",
+          language: "en",
+          initialStatus: "approved",
+        },
       ),
     ],
   },

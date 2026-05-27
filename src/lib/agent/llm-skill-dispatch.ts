@@ -56,12 +56,27 @@ export const LLM_SKILL_EXECUTORS: Record<string, LLMSkillExecutor> = {
         sourceUrl: a.sourceUrl,
         category: a.category,
       }));
-      return crossLanguageRewriteArticles({
+      const result = await crossLanguageRewriteArticles({
         articles,
         targetLanguage: (params.targetLanguage as "en") ?? "en",
         variantsPerTopic: params.variantsPerTopic as 1 | 2 | 3 | undefined,
         categoryHint: params.categoryHint as string | undefined,
       });
+      // 为下游 archive_to_drafts 字段名兼容：archive_to_drafts inputSchema 要求
+      // articles[].title / articles[].body，cross_language_rewrite 输出的是
+      // title_en / body_en。在这里 wrap 加 title/body alias，让 step 4 paramConfig
+      // 用 {{step3.articles}} 直接 server-side 调 archive_to_drafts 时 zod 校验过关，
+      // 不再 fallthrough 到 LLM 路径让它越权 web_search 编 fake digest。
+      // hashtags 同步合并进 tags 给 articles.tags 字段（archive_to_drafts 接受 tags+hashtags）。
+      return {
+        ...result,
+        articles: result.articles.map((a) => ({
+          ...a,
+          title: a.title_en,
+          body: a.body_en,
+          culturalNotes: a.cultural_notes,
+        })),
+      };
     },
   },
 };
