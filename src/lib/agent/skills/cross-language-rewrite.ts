@@ -36,16 +36,19 @@ const CATEGORY_TONE_DEFAULTS: Record<string, string> = {
     "国内科技内容客观直白，避免过度营销词，可以加规格数字，emoji 克制（🚀💡🔋）",
 };
 
+// schema 边界放宽:实测 qwen3-max 对严格上限不太敏感(经常输出 title_en
+// 超 140 / cultural_notes 超 400 / hashtags 少于 3),严格 schema 一拒就
+// 整批失败。放宽到合理范围,质量评估交 quality_review 步骤做。
 const RewrittenArticleSchema = z.object({
-  id: z.string().min(1),                              // 唯一稿件 ID 如 t1-v0
-  sourceTopicId: z.string().min(1),                   // ← Phase 4 新：原 topic 的 id
-  variantIndex: z.number().int().min(0).max(2),       // ← Phase 4 新
-  sourceUrl: z.string().optional(),                   // ← Phase 4 新（透传）
-  category: z.string().optional(),                    // ← Phase 4 新（透传）
-  title_en: z.string().min(1).max(140),
+  id: z.string().min(1),
+  sourceTopicId: z.string().min(1),
+  variantIndex: z.number().int().min(0).max(2),
+  sourceUrl: z.string().optional(),
+  category: z.string().optional(),
+  title_en: z.string().min(1).max(280),               // 140 → 280
   body_en: z.string().min(10),
-  hashtags: z.array(z.string().min(2).max(40)).min(3).max(7),
-  cultural_notes: z.string().max(400).optional(),
+  hashtags: z.array(z.string().min(1).max(60)).min(0).max(12),  // 3-7 → 0-12,允许 LLM 给 0 个
+  cultural_notes: z.string().max(1000).optional(),    // 400 → 1000
 });
 
 const CrossLanguageRewriteOutputSchema = z.object({
@@ -152,6 +155,59 @@ function buildSystemPrompt(categoryHint?: string, variantsPerTopic: number = 1):
  * });
  * // out.articles[0] = { id:"a1", title_en:"...", body_en:"...", hashtags:[...] }
  */
+/** 单条 body 截断字数 —— Jina 抓的全文可能 5000+ 字,塞 8 条进一次 prompt
+ *  上下文吃满,qwen3-max 输出 JSON 经常被 maxOutputTokens 截断。2500 字够
+ *  LLM 理解上下文,又不挤爆 token 预算。 */
+const BODY_TRUNCATE_CHARS = 2500;
+
+/** 一批最多塞这么多 article 给 LLM —— 实测 8 条 × 2500 字 body 输出稳定,
+ *  超过会有概率 maxOutputTokens 截断导致 schema 校验失败。 */
+const BATCH_SIZE = 8;
+
+/** 并发上限,避免触发 dashscope 频率限制 */
+const BATCH_CONCURRENCY = 2;
+
+async function rewriteBatch(
+  articles: ArticleInput[],
+  targetLanguage: TargetLanguage,
+  categoryHint: string | undefined,
+  variantsPerTopic: number,
+): Promise<RewrittenArticle[]> {
+  const userPayload = JSON.stringify({
+    target_language: targetLanguage,
+    category_hint: categoryHint ?? null,
+    variants_per_topic: variantsPerTopic,
+    articles: articles.map((a) => ({
+      id: a.id,
+      title: a.title,
+      // body 截断,防止单条全文吃爆 token 预算
+      body:
+        a.body.length > BODY_TRUNCATE_CHARS
+          ? a.body.slice(0, BODY_TRUNCATE_CHARS) + "...(truncated)"
+          : a.body,
+      tags: a.tags ?? [],
+      sourceUrl: a.sourceUrl ?? null,
+      category: a.category ?? null,
+    })),
+  });
+
+  const modelConfig = resolveModelConfig(["content_gen"], {
+    temperature: 0.7,
+    maxTokens: 8192,
+  });
+
+  const { output } = await generateText({
+    model: getLanguageModel(modelConfig),
+    system: buildSystemPrompt(categoryHint, variantsPerTopic),
+    prompt: userPayload,
+    output: Output.object({ schema: CrossLanguageRewriteOutputSchema }),
+    temperature: modelConfig.temperature,
+    maxOutputTokens: modelConfig.maxTokens,
+  });
+
+  return output.articles;
+}
+
 export async function crossLanguageRewriteArticles(
   input: CrossLanguageRewriteInput,
 ): Promise<CrossLanguageRewriteOutput> {
@@ -167,37 +223,38 @@ export async function crossLanguageRewriteArticles(
 
   const variantsPerTopic = input.variantsPerTopic ?? 1;
 
-  const userPayload = JSON.stringify({
-    target_language: input.targetLanguage,
-    category_hint: input.categoryHint ?? null,
-    variants_per_topic: variantsPerTopic,
-    articles: input.articles.map((a) => ({
-      id: a.id,
-      title: a.title,
-      body: a.body,
-      tags: a.tags ?? [],
-      sourceUrl: a.sourceUrl ?? null,
-      category: a.category ?? null,
-    })),
-  });
+  // 分批 + 并发 —— 单批最多 8 条 article × 2500 字 body,实测稳定输出 JSON。
+  // 单批失败不连累其他批(Promise.allSettled 而非 all)。
+  const batches: ArticleInput[][] = [];
+  for (let i = 0; i < input.articles.length; i += BATCH_SIZE) {
+    batches.push(input.articles.slice(i, i + BATCH_SIZE));
+  }
 
-  // content_gen 类别（温度高一点，maxTokens 8192）
-  const modelConfig = resolveModelConfig(["content_gen"], {
-    temperature: 0.7,
-    maxTokens: 8192,
-  });
+  const allResults: RewrittenArticle[] = [];
+  const failedBatchIds = new Set<string>();
+  for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
+    const slice = batches.slice(i, i + BATCH_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      slice.map((batch) =>
+        rewriteBatch(batch, input.targetLanguage, input.categoryHint, variantsPerTopic),
+      ),
+    );
+    settled.forEach((res, idx) => {
+      if (res.status === "fulfilled") {
+        allResults.push(...res.value);
+      } else {
+        console.warn(
+          `[cross_language_rewrite] batch failed, will fallback to NEEDS REVIEW:`,
+          res.reason,
+        );
+        for (const a of slice[idx]) failedBatchIds.add(a.id);
+      }
+    });
+  }
 
-  const { output } = await generateText({
-    model: getLanguageModel(modelConfig),
-    system: buildSystemPrompt(input.categoryHint, variantsPerTopic),
-    prompt: userPayload,
-    output: Output.object({ schema: CrossLanguageRewriteOutputSchema }),
-    temperature: modelConfig.temperature,
-    maxOutputTokens: modelConfig.maxTokens,
-  });
-
-  // 兜底：缺漏的稿件原样回填（标记需人工处理）
-  const returnedSourceIds = new Set(output.articles.map((a) => a.sourceTopicId));
+  // 兜底:缺漏的稿件 + 整批失败的稿件 → 用 [NEEDS REVIEW] 占位入库,
+  // 不让整步失败。编辑可在稿件列表手动改写或删除。
+  const returnedSourceIds = new Set(allResults.map((a) => a.sourceTopicId));
   const missing: RewrittenArticle[] = input.articles
     .filter((a) => !returnedSourceIds.has(a.id))
     .map((a) => ({
@@ -207,13 +264,15 @@ export async function crossLanguageRewriteArticles(
       sourceUrl: a.sourceUrl,
       category: a.category,
       title_en: `[NEEDS REVIEW] ${a.title}`,
-      body_en: `[NEEDS REVIEW] LLM did not return a rewrite for this article. Original Chinese body preserved:\n\n${a.body}`,
+      body_en: `[NEEDS REVIEW] LLM did not return a rewrite for this article. Original Chinese body preserved:\n\n${a.body.slice(0, BODY_TRUNCATE_CHARS)}`,
       hashtags: ["#NeedsReview", "#FromChina", "#Draft"],
-      cultural_notes: "LLM 未返回该条改写，已兜底标记 NEEDS REVIEW。",
+      cultural_notes: failedBatchIds.has(a.id)
+        ? "该批 LLM 调用失败(JSON 解析错 / schema 拒绝),已兜底标记 NEEDS REVIEW。"
+        : "LLM 未返回该条改写,已兜底标记 NEEDS REVIEW。",
     }));
 
   // sourceUrl 兜底回填 — LLM 漏返时从 input 找 sourceTopicId 对应的原文
-  const filled = output.articles.map((a) => ({
+  const filled = allResults.map((a) => ({
     ...a,
     sourceUrl: a.sourceUrl ?? input.articles.find((src) => src.id === a.sourceTopicId)?.sourceUrl,
   }));
