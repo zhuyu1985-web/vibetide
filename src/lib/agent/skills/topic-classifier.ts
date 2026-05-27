@@ -108,18 +108,17 @@ ${lines}
 2. 每条必须给一个 category（n+1 选 1，n 是上面列表条数，+1 是 other），不许多选。
 3. confidence 是 0~1 浮点数，反映你对分类正确性的把握。
 4. 模糊难判 → confidence < 0.7 时归 other。
-5. reason 简短中文（≤ 100 字）：说出关键判断词。
+5. reason 简短中文（≤ 50 字）：说出关键判断词。**reason 只描述分类依据,不要复述标题。**
 6. 输出顺序与输入顺序一致，每条都要给出（不能省略）。
-7. **若输入条目带 sourceUrl 字段，输出必须原样回填，绝对不改 / 不删**。
-8. **title / summary 透传**：输入 topic 的 title 必须原样 echo 到输出；summary 若有也一并 echo（让下游翻译时不用反查）。
-9. 严格按 schema 输出 JSON，不要附加任何解释文字。
+7. **不要输出 sourceUrl / title / summary 字段**（这些由外层从 input 反查回填，省 token 加速）。
+8. 严格按 schema 输出 JSON，不要附加任何解释文字。
 
 错误示范（禁止）：
 - 输入 [{"id":"t1",...},{"id":"t2",...}] → 输出 [{"id":"crypto",...},{"id":"crypto",...}] ❌
 - 输入 [{"id":"weibo_1",...}] → 输出 [{"id":"1",...}] ❌（缩写）
 
 正确示范：
-- 输入 [{"id":"weibo_1","title":"X",...}] → 输出 [{"id":"weibo_1","title":"X","category":"food",...}] ✅`;
+- 输入 [{"id":"weibo_1","title":"X",...}] → 输出 [{"id":"weibo_1","category":"food","confidence":0.9,"reason":"美食饮品话题"}] ✅`;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +141,52 @@ ${lines}
  * });
  * // out.results[0] = { id:"t1", category:"food", confidence:0.95, reason:"..." }
  */
+/**
+ * 一批 topic 走单次 LLM 调用（≤ BATCH_SIZE 条）。
+ * 超过 BATCH_SIZE 由外层 classifyOverseasTopics 自动拆批并发。
+ */
+async function classifyBatch(
+  topics: TopicInput[],
+  enabledCategories: CategoryOption[],
+  schema: ReturnType<typeof buildClassifierSchema>,
+): Promise<TopicClassifierResult[]> {
+  // 精简喂给 LLM 的字段:只保留 id + title(+ 短 summary 当 hint)。
+  // sourceUrl 不传 —— 对分类无意义,但 weibo/baidu 的 URL 含 base64 编码超长。
+  // summary 截断到 100 字符 —— 大多数 trending API 返回的 summary 跟 title 一样。
+  // 输出层 title/summary/sourceUrl 由外层 classifyOverseasTopics 反查回填。
+  const userPayload = JSON.stringify({
+    topics: topics.map((t) => ({
+      id: t.id,
+      title: t.title,
+      ...(t.summary && t.summary !== t.title
+        ? { hint: t.summary.slice(0, 100) }
+        : {}),
+    })),
+  });
+
+  const modelConfig = resolveModelConfig(["content_analysis"], {
+    temperature: 0.2,
+    maxTokens: 4096,
+  });
+
+  const { output } = await generateText({
+    model: getLanguageModel(modelConfig),
+    system: buildSystemPrompt(enabledCategories),
+    prompt: userPayload,
+    output: Output.object({ schema }),
+    temperature: modelConfig.temperature,
+    maxOutputTokens: modelConfig.maxTokens,
+  });
+
+  return output.results;
+}
+
+/** 一批最多塞这么多 topic 给 LLM —— qwen3-max 输出 50 条 JSON 实测会 120s 超时,
+ *  分批 20×3 并发跑实测稳定在 20s 内 */
+const BATCH_SIZE = 20;
+/** 并发上限,避免触发 dashscope 频率限制 */
+const BATCH_CONCURRENCY = 3;
+
 export async function classifyOverseasTopics(
   input: TopicClassifierInput,
 ): Promise<TopicClassifierOutput> {
@@ -155,31 +200,27 @@ export async function classifyOverseasTopics(
   const categoryValues = input.enabledCategories.map((c) => c.value);
   const schema = buildClassifierSchema(categoryValues);
 
-  const userPayload = JSON.stringify({
-    topics: input.topics.map((t) => ({
-      id: t.id,
-      title: t.title,
-      summary: t.summary ?? "",
-      sourceUrl: t.sourceUrl ?? null,
-    })),
-  });
+  // 切批
+  const batches: TopicInput[][] = [];
+  for (let i = 0; i < input.topics.length; i += BATCH_SIZE) {
+    batches.push(input.topics.slice(i, i + BATCH_SIZE));
+  }
 
-  const modelConfig = resolveModelConfig(["content_analysis"], {
-    temperature: 0.2,
-    maxTokens: 4096,
-  });
-
-  const { output } = await generateText({
-    model: getLanguageModel(modelConfig),
-    system: buildSystemPrompt(input.enabledCategories),
-    prompt: userPayload,
-    output: Output.object({ schema }),
-    temperature: modelConfig.temperature,
-    maxOutputTokens: modelConfig.maxTokens,
-  });
+  // 并发执行(BATCH_CONCURRENCY 限速)。单批失败抛错给上层 dispatch 反馈,
+  // 不静默兜底成 other —— 否则用户以为分类完成实际全 other。
+  const allResults: TopicClassifierResult[] = [];
+  for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
+    const slice = batches.slice(i, i + BATCH_CONCURRENCY);
+    const batchOutputs = await Promise.all(
+      slice.map((batch) =>
+        classifyBatch(batch, input.enabledCategories, schema),
+      ),
+    );
+    for (const out of batchOutputs) allResults.push(...out);
+  }
 
   // 兜底：缺失条目归 other
-  const returnedIds = new Set(output.results.map((r) => r.id));
+  const returnedIds = new Set(allResults.map((r) => r.id));
   const missing: TopicClassifierResult[] = input.topics
     .filter((t) => !returnedIds.has(t.id))
     .map((t) => ({
@@ -188,18 +229,18 @@ export async function classifyOverseasTopics(
       confidence: 0,
       reason: "LLM 未返回该条分类结果，兜底归为 other",
       sourceUrl: t.sourceUrl,
-      title: t.title,     // ← A.1.1: 兜底回填 title
-      summary: t.summary, // ← A.1.1: 兜底回填 summary
+      title: t.title,
+      summary: t.summary,
     }));
 
-  // sourceUrl / title / summary 兜底回填（如果 LLM 漏了字段）
-  const filled: TopicClassifierResult[] = output.results.map((r) => {
+  // sourceUrl / title / summary 反查回填(LLM 不再输出这些字段,完全靠外层填)
+  const filled: TopicClassifierResult[] = allResults.map((r) => {
     const inputTopic = input.topics.find((t) => t.id === r.id);
     return {
       ...r,
       sourceUrl: r.sourceUrl ?? inputTopic?.sourceUrl,
-      title: r.title ?? inputTopic?.title,       // ← A.1.1
-      summary: r.summary ?? inputTopic?.summary, // ← A.1.1
+      title: r.title ?? inputTopic?.title,
+      summary: r.summary ?? inputTopic?.summary,
     };
   });
 
