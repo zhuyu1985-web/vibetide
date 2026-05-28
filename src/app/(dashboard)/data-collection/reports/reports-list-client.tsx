@@ -28,6 +28,11 @@ import {
 } from "@/components/ui/tabs";
 import { deleteReportInline } from "@/app/actions/research/reports";
 import { deleteEcologicalIndexReportAction } from "@/app/actions/research/ecological-index-reports";
+import {
+  EcologicalIndexNewDialog,
+  type DatasetOption,
+  type ScopeOption,
+} from "./ecological-index-new-dialog";
 
 export type ReportListRow = {
   id: string;
@@ -78,9 +83,17 @@ interface Props {
   initialTab: SourceTab;
   advRows: ReportListRow[];
   ecoRows: EcoReportListRow[];
+  scopes: ScopeOption[];
+  datasets: DatasetOption[];
 }
 
-export function ReportsListClient({ initialTab, advRows, ecoRows }: Props) {
+export function ReportsListClient({
+  initialTab,
+  advRows,
+  ecoRows,
+  scopes,
+  datasets,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<SourceTab>(initialTab);
@@ -92,6 +105,7 @@ export function ReportsListClient({ initialTab, advRows, ecoRows }: Props) {
   const [deleteEcoTarget, setDeleteEcoTarget] = useState<EcoReportListRow | null>(
     null,
   );
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
 
   const filteredAdv = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -173,8 +187,7 @@ export function ReportsListClient({ initialTab, advRows, ecoRows }: Props) {
     if (tab === "advanced_search") {
       toast.info("检索报告需要在内容池完成检索后点「生成报告」创建");
     } else {
-      // P4.2 才实现 Dialog,本 task 先 toast 占位
-      toast.info("指数体系报告新建入口即将上线 (P4.2)");
+      setNewDialogOpen(true);
     }
   }
 
@@ -593,6 +606,15 @@ export function ReportsListClient({ initialTab, advRows, ecoRows }: Props) {
         confirmText="删除"
         variant="danger"
         onConfirm={handleEcoDelete}
+      />
+      <EcologicalIndexNewDialog
+        open={newDialogOpen}
+        onOpenChange={setNewDialogOpen}
+        scopes={scopes}
+        datasets={datasets}
+        onCreated={(reportId) => {
+          router.push(`/data-collection/reports/${reportId}`);
+        }}
       />
     </div>
   );
