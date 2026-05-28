@@ -586,12 +586,37 @@ function createToolDefinitions(): ToolSet {
           .optional()
           .default(0.7)
           .describe("分类置信度门槛，低于此值或 category=other 的条目直接走 summary 兜底，不浪费 Jina 配额"),
+        // 实测得出的反爬平台黑名单(2026-05-28):
+        //   zhihu / weixin / douyin / xiaohongshu / bilibili 抓回的全是反爬登录页,
+        //   LLM 拿到会"翻译"成 "🔒 Verify to Unlock Expert Insights" 这种假内容入库。
+        //   黑名单内的 host 直接走 summary 兜底,不调 Jina,不让 LLM 看到反爬页。
+        // 用户可在 workflow 编辑器 step 3 paramConfig 里覆盖这个 list。
+        blockedHosts: z
+          .array(z.string())
+          .optional()
+          .default([
+            "zhihu.com",
+            "mp.weixin.qq.com",
+            "douyin.com",
+            "xiaohongshu.com",
+            "bilibili.com",
+            "b23.tv",
+          ])
+          .describe("反爬平台 host 黑名单,命中直接走 summary 兜底不调 Jina"),
       }),
       execute: async ({
         items,
         maxLength = 5000,
         maxConcurrency = 3,
         confidenceThreshold = 0.7,
+        blockedHosts = [
+          "zhihu.com",
+          "mp.weixin.qq.com",
+          "douyin.com",
+          "xiaohongshu.com",
+          "bilibili.com",
+          "b23.tv",
+        ],
       }) => {
         // 上游 0 条 → 优雅返回。之前 schema 是 min(1),空数组被 zod 拒绝 →
         // mission-executor fallthrough 到 agent LLM 路径 → LLM 凭空编"详情正文
@@ -668,8 +693,9 @@ function createToolDefinitions(): ToolSet {
                   fetchError: "无 sourceUrl",
                 };
               }
+              let parsedUrl: URL;
               try {
-                new URL(url);
+                parsedUrl = new URL(url);
               } catch {
                 fallbackCount++;
                 const body = (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
@@ -680,6 +706,33 @@ function createToolDefinitions(): ToolSet {
                   fetchedAt: new Date().toISOString(),
                   fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
                   fetchError: "URL 格式无效",
+                };
+              }
+              // 黑名单 host 短路 —— 命中反爬平台直接走 summary,不调 Jina。
+              // host 匹配规则:把 www. / m. / s. / bbs. / mp. 等子域前缀剥掉
+              // 后再 endsWith 黑名单条目。这样 "m.weixin.qq.com" 能命中黑名单
+              // "mp.weixin.qq.com" 同根域。
+              const rawHost = parsedUrl.host.toLowerCase();
+              const normalizedHost = rawHost
+                .replace(/^www\./, "")
+                .replace(/^m\./, "")
+                .replace(/^s\./, "")
+                .replace(/^bbs\./, "")
+                .replace(/^mp\./, "");
+              const isBlocked = blockedHosts.some((blocked) => {
+                const b = blocked.toLowerCase().replace(/^www\./, "");
+                return normalizedHost === b || normalizedHost.endsWith("." + b);
+              });
+              if (isBlocked) {
+                fallbackCount++;
+                const body = (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
+                return {
+                  ...base,
+                  id: item.id,
+                  body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
+                  fetchError: `${rawHost} 在反爬黑名单内,跳过 Jina 抓取,用 summary 兜底`,
                 };
               }
               try {
