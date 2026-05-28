@@ -104,9 +104,12 @@ function buildSingleSystemPrompt(
 
 **核心原则:本地化改写,不是逐句直译。**
 
+0. **完整翻译,不要概括**:body_en 必须完整覆盖输入 body 的所有事实点,
+   不要自作主张"提炼成要点"或"压缩成 200 字"——除非原文 < 500 字。
+   原文 1000-1500 字应译出 1500-2500 英文单词,信息密度对齐输入。
 1. **文化适配**:谚语/网络梗 → 找英文等价或改直白表达。
 2. **解释专有名词**:中国地名/品牌/名人第一次出现时加 1 句定位,不假设西方读者认识。
-3. **社交语气**:句子短、有钩子,适度 emoji(每段 1-3 个),title_en ≤ 280 字符,body_en 短段落。
+3. **社交语气**:句子短、有钩子,适度 emoji(每段 1-3 个),title_en ≤ 280 字符,body_en 段落短但**段落数足够覆盖原文**。
 4. **保留事实**:不新增原稿没说的事实,数字/时间/地点 1:1 保留。
 5. **hashtags**:0-12 个英文 hashtag,#FoodieLife / #ChinaTech 这种常用形式。
 6. **cultural_notes**:可选,≤ 1000 字简短记录本地化决策。
@@ -136,9 +139,17 @@ ${variantsPerTopic === 3 ? "- 3 篇:v0 短版 / v1 中版 / v2 = analytical 长�
  * });
  * // out.articles[0] = { id:"a1", title_en:"...", body_en:"...", hashtags:[...] }
  */
-/** 单条 body 截断字数 —— Jina 抓的全文可能 5000+ 字。单条 LLM 调用 2500 字
- *  够 LLM 理解上下文,又不挤爆 token 预算。 */
-const BODY_TRUNCATE_CHARS = 2500;
+/** 单条 body 截断字数 —— Jina 抓的全文可能 5000+ 字。
+ *
+ *  调成 1500 是因为:中文 1500 字翻译成英文一般是 2200-3000 单词,加上 title/
+ *  hashtags/cultural_notes,总输出预估 4500-6500 tokens。配 maxTokens=8192
+ *  正好留足空间,不会被截断导致"内容不完整"(用户反馈的核心问题)。
+ *
+ *  如果未来要支持完整翻译长文,改成 chunked translation:把 body 按段落
+ *  分块,每块独立 LLM 翻译,最后拼回。当前 1500 字截断对"海外社交平台短稿"
+ *  场景已经足够(X / IG caption 本身就是短文,5000 字原文一般也只保留
+ *  核心 1500 字精华)。 */
+const BODY_TRUNCATE_CHARS = 1500;
 
 /** 单条 LLM 调用并发上限 —— 海外热榜搬运过滤后通常 3-10 条非 other,
  *  并发 5 个让 N 条任务的总时长接近单条耗时(10-20s),而不是 N×10s。
@@ -179,7 +190,9 @@ async function rewriteOne(
 
   const modelConfig = resolveModelConfig(["content_gen"], {
     temperature: 0.7,
-    maxTokens: 4096, // 单条 4k 输出预算充足
+    // 输出预算 8k —— 单条改写要装下 title_en + body_en (~3000 tokens 英文译文)
+    // + hashtags + cultural_notes,4k 会被截断导致用户看到"内容不完整"。
+    maxTokens: 8192,
   });
 
   // 单条调用加 timeout,防止个别请求长尾拖慢整体
