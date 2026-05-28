@@ -260,6 +260,36 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Ecological Index Report Events (P3.7, 2026-05-28) ───
+
+  /**
+   * 生态文明传播指数报告生成入口 — 由 createEcologicalIndexReportAction 派发,
+   * 由 P3.8 的 7 步 Inngest 流水线消费(matcher → compute → charts → docx → xlsx → content-export → finalize)。
+   */
+  "research/ecological-index.generate": {
+    data: {
+      reportId: string;
+      organizationId: string;
+    };
+  };
+
+  /** 流水线成功完成 — 供 UI/告警订阅(P3.8 末步派发) */
+  "research/ecological-index.completed": {
+    data: {
+      reportId: string;
+      organizationId: string;
+    };
+  };
+
+  /** 流水线失败 — 任意一步 throw 时派发,记录 errorMessage */
+  "research/ecological-index.failed": {
+    data: {
+      reportId: string;
+      organizationId: string;
+      error: string;
+    };
+  };
+
   // ─── External Publish Events (海外英文发布, 2026-05-22) ───
 
   /**
