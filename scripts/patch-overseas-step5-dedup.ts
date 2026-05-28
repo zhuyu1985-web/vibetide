@@ -46,9 +46,11 @@ const client = postgres(url, { prepare: false, max: 1 });
       }
     }
     if (dirty) {
+      // cast: 局部声明的简化 steps 类型(只 narrow 到 config.parameters)与
+      // schema 的 WorkflowStepDef[] 完整类型不同, 在写回时显式 cast
       await db
         .update(schema.workflowTemplates)
-        .set({ steps })
+        .set({ steps: steps as typeof schema.workflowTemplates.$inferInsert.steps })
         .where(eq(schema.workflowTemplates.id, row.id));
       patched++;
       console.log(`patched: ${row.id} "${row.name}"`);

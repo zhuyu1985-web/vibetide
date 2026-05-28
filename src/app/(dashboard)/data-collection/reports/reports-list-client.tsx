@@ -184,11 +184,13 @@ export function ReportsListClient({
   }
 
   function handleNewClick() {
+    // 报告列表页支持新建的报告类型只有「指数体系报告」一种。
+    // 检索报告 (advanced_search) 由内容池高级检索完成后触发生成,不在本页面新建。
+    // 若用户当前在 advanced_search tab,自动切到 ecological_index tab,避免提交后看不到新报告。
     if (tab === "advanced_search") {
-      toast.info("检索报告需要在内容池完成检索后点「生成报告」创建");
-    } else {
-      setNewDialogOpen(true);
+      handleTabChange("ecological_index");
     }
+    setNewDialogOpen(true);
   }
 
   function handleTabChange(value: string) {
