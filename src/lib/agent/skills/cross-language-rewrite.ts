@@ -85,59 +85,40 @@ export interface CrossLanguageRewriteOutput {
 // Prompt builder
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(categoryHint?: string, variantsPerTopic: number = 1): string {
+/**
+ * 单条调用的精简 system prompt —— 单次 LLM 调用只处理 1 条 article 输出
+ * 1~3 个 variant,prompt 不需要"批量协调"的篇幅,聚焦本地化改写规则即可。
+ */
+function buildSingleSystemPrompt(
+  categoryHint?: string,
+  variantsPerTopic: number = 1,
+): string {
   const toneText = categoryHint
     ? (CATEGORY_TONE_DEFAULTS[categoryHint] ?? "保持简洁直白，无特定语气倾向")
     : "";
   const toneHint = categoryHint
-    ? `\n本批稿件属于 **${categoryHint}** 类别。语气定位：${toneText}。`
+    ? `\n稿件类别 **${categoryHint}**：${toneText}。`
     : "";
 
-  return `你是「跨语言改写员」，负责把中文稿件改写成发布在 X / Instagram / Facebook 等海外社交平台的英文版本。
+  return `你是「跨语言改写员」,把单篇中文稿件改写成发布在 X / Instagram / Facebook 的英文版本。
 
-**核心原则：本地化改写，不是逐句直译。**
+**核心原则:本地化改写,不是逐句直译。**
 
-1. **文化适配**：
-   - 中文谚语 / 俗语 → 找英文等价表达（如"打铁还需自身硬" → "You can't pour from an empty cup"），找不到就改成直白说法。
-   - 中文流行梗 / 网络黑话（如"yyds""绝绝子""破防了"）→ 改成英文流行词或直接说意思。
-   - 中文敬语 / 谦辞 → 英文直接平等表达。
+1. **文化适配**:谚语/网络梗 → 找英文等价或改直白表达。
+2. **解释专有名词**:中国地名/品牌/名人第一次出现时加 1 句定位,不假设西方读者认识。
+3. **社交语气**:句子短、有钩子,适度 emoji(每段 1-3 个),title_en ≤ 280 字符,body_en 短段落。
+4. **保留事实**:不新增原稿没说的事实,数字/时间/地点 1:1 保留。
+5. **hashtags**:0-12 个英文 hashtag,#FoodieLife / #ChinaTech 这种常用形式。
+6. **cultural_notes**:可选,≤ 1000 字简短记录本地化决策。
+7. **sourceUrl 透传**:输出 sourceUrl 原样 echo 输入,绝不编造。
+8. **sourceTopicId / variantIndex**:sourceTopicId = 原 input.id;variantIndex 从 0 起。
 
-2. **解释专有名词**：
-   - 中国地名（如"成都""鼓楼""798"）→ 第一次出现时加注（"Chengdu, the spicy-food capital of southwest China"）。
-   - 中国品牌（如"华为""比亚迪""泡泡玛特"）→ 第一次出现时加 1 句定位。
-   - 中国名人 / 网红 → 加身份描述。
-   - 不假设西方读者认识任何中国背景信息。
+**variantsPerTopic = ${variantsPerTopic}**:为输入的单条 article 生成 ${variantsPerTopic} 个 variant:
+${variantsPerTopic === 1 ? "- 1 篇英文稿,id = `<input_id>-v0`" : ""}
+${variantsPerTopic === 2 ? "- 2 篇明显不同:v0 = headline-driven 短版;v1 = storytelling 中版" : ""}
+${variantsPerTopic === 3 ? "- 3 篇:v0 短版 / v1 中版 / v2 = analytical 长版" : ""}
 
-3. **海外社交语气**：
-   - 句子短、直白、有钩子（前 10 词必须抓人）。
-   - 适度 emoji（每段 1-3 个，不堆叠）。
-   - 标题（title_en）≤ 140 字符，适配 X / IG caption 开头。
-   - 正文（body_en）段落短，每段 1-3 句。
-   - 避免中式英语（chinglish）。
-
-4. **保留事实**：
-   - 不许新增中文原稿没说的事实。
-   - 数字 / 时间 / 地点必须保留准确。
-   - 模糊的中文表达（如"很多人"）→ 不要瞎写成"millions"。
-
-5. **hashtags**：3-7 个，全英文，常用形式（#FoodieLife / #ChinaTech / #PetTok），不要中文拼音 hashtag。
-
-6. **cultural_notes**（可选）：≤ 400 字，简短记录你做过哪些本地化决策（"把'秋天的第一杯奶茶'改成 'pumpkin-spice-latte moment'"），方便编辑复核。
-
-7. 严格按 schema 输出 JSON，不要附加任何解释文字。
-
-8. **variantsPerTopic 引导**：
-   - 入参 variants_per_topic = ${variantsPerTopic}。
-   - = 1：每条 input 生成 1 篇英文稿，id = "<input_id>-v0"。
-   - = 2：每条生成 2 篇明显不同的版本（variant 0 = headline-driven 短版；variant 1 = storytelling 中版）。id = "<input_id>-v0" / "<input_id>-v1"。
-   - = 3：再加 variant 2 = analytical 长版，id = "<input_id>-v2"。
-   - 同一 source 的 N 篇必须**明显不同**——不同切入角度、不同钩子、不同长度，不是改几个字。
-
-9. **sourceUrl 透传**：
-   - 输入每条 article 若带 sourceUrl，输出该 input 对应的所有 variant 都必须原样回填 sourceUrl。
-   - **绝对不许编造 / 修改 sourceUrl。** 入参没的也不能填假的。
-
-10. **sourceTopicId / variantIndex**：每条输出必须有这两个字段。sourceTopicId = 原 input.id；variantIndex 从 0 起。${toneHint}`;
+严格按 schema 输出 JSON,articles 字段是 ${variantsPerTopic} 个 RewrittenArticle 的数组。${toneHint}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,20 +136,26 @@ function buildSystemPrompt(categoryHint?: string, variantsPerTopic: number = 1):
  * });
  * // out.articles[0] = { id:"a1", title_en:"...", body_en:"...", hashtags:[...] }
  */
-/** 单条 body 截断字数 —— Jina 抓的全文可能 5000+ 字,塞 8 条进一次 prompt
- *  上下文吃满,qwen3-max 输出 JSON 经常被 maxOutputTokens 截断。2500 字够
- *  LLM 理解上下文,又不挤爆 token 预算。 */
+/** 单条 body 截断字数 —— Jina 抓的全文可能 5000+ 字。单条 LLM 调用 2500 字
+ *  够 LLM 理解上下文,又不挤爆 token 预算。 */
 const BODY_TRUNCATE_CHARS = 2500;
 
-/** 一批最多塞这么多 article 给 LLM —— 实测 8 条 × 2500 字 body 输出稳定,
- *  超过会有概率 maxOutputTokens 截断导致 schema 校验失败。 */
-const BATCH_SIZE = 8;
+/** 单条 LLM 调用并发上限 —— 海外热榜搬运过滤后通常 3-10 条非 other,
+ *  并发 5 个让 N 条任务的总时长接近单条耗时(10-20s),而不是 N×10s。
+ *  5 并发已实测不触发 dashscope 频率限制。 */
+const SINGLE_CONCURRENCY = 5;
 
-/** 并发上限,避免触发 dashscope 频率限制 */
-const BATCH_CONCURRENCY = 2;
+/** 单条 LLM 调用超时 —— 单条输入小输出小,30s 足够。超 30s 直接 abort,
+ *  其他条目继续跑,不连坐。 */
+const SINGLE_TIMEOUT_MS = 30_000;
 
-async function rewriteBatch(
-  articles: ArticleInput[],
+/**
+ * 单条 article 走单次 LLM 调用 —— fan-out/fan-in 模式的"Map"。
+ * 输入小(单条 ≤ 3k tokens),输出小(单条 ≤ 2k tokens × variantsPerTopic),
+ * 单点失败只影响这一条,不连坐整批。
+ */
+async function rewriteOne(
+  article: ArticleInput,
   targetLanguage: TargetLanguage,
   categoryHint: string | undefined,
   variantsPerTopic: number,
@@ -177,35 +164,67 @@ async function rewriteBatch(
     target_language: targetLanguage,
     category_hint: categoryHint ?? null,
     variants_per_topic: variantsPerTopic,
-    articles: articles.map((a) => ({
-      id: a.id,
-      title: a.title,
-      // body 截断,防止单条全文吃爆 token 预算
+    article: {
+      id: article.id,
+      title: article.title,
       body:
-        a.body.length > BODY_TRUNCATE_CHARS
-          ? a.body.slice(0, BODY_TRUNCATE_CHARS) + "...(truncated)"
-          : a.body,
-      tags: a.tags ?? [],
-      sourceUrl: a.sourceUrl ?? null,
-      category: a.category ?? null,
-    })),
+        article.body.length > BODY_TRUNCATE_CHARS
+          ? article.body.slice(0, BODY_TRUNCATE_CHARS) + "...(truncated)"
+          : article.body,
+      tags: article.tags ?? [],
+      sourceUrl: article.sourceUrl ?? null,
+      category: article.category ?? null,
+    },
   });
 
   const modelConfig = resolveModelConfig(["content_gen"], {
     temperature: 0.7,
-    maxTokens: 8192,
+    maxTokens: 4096, // 单条 4k 输出预算充足
   });
 
-  const { output } = await generateText({
-    model: getLanguageModel(modelConfig),
-    system: buildSystemPrompt(categoryHint, variantsPerTopic),
-    prompt: userPayload,
-    output: Output.object({ schema: CrossLanguageRewriteOutputSchema }),
-    temperature: modelConfig.temperature,
-    maxOutputTokens: modelConfig.maxTokens,
-  });
+  // 单条调用加 timeout,防止个别请求长尾拖慢整体
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SINGLE_TIMEOUT_MS);
 
-  return output.articles;
+  try {
+    const { output } = await generateText({
+      model: getLanguageModel(modelConfig),
+      system: buildSingleSystemPrompt(categoryHint, variantsPerTopic),
+      prompt: userPayload,
+      output: Output.object({ schema: CrossLanguageRewriteOutputSchema }),
+      temperature: modelConfig.temperature,
+      maxOutputTokens: modelConfig.maxTokens,
+      abortSignal: controller.signal,
+    });
+    return output.articles;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** 限速并发池 —— 同时跑 SINGLE_CONCURRENCY 个 rewriteOne,完成一个补一个。
+ *  Promise.allSettled 隔离单条失败。 */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+): Promise<Array<PromiseSettledResult<R>>> {
+  const results: Array<PromiseSettledResult<R>> = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const idx = next++;
+      if (idx >= items.length) return;
+      try {
+        const value = await worker(items[idx]);
+        results[idx] = { status: "fulfilled", value };
+      } catch (reason) {
+        results[idx] = { status: "rejected", reason };
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 export async function crossLanguageRewriteArticles(
@@ -223,37 +242,34 @@ export async function crossLanguageRewriteArticles(
 
   const variantsPerTopic = input.variantsPerTopic ?? 1;
 
-  // 分批 + 并发 —— 单批最多 8 条 article × 2500 字 body,实测稳定输出 JSON。
-  // 单批失败不连累其他批(Promise.allSettled 而非 all)。
-  const batches: ArticleInput[][] = [];
-  for (let i = 0; i < input.articles.length; i += BATCH_SIZE) {
-    batches.push(input.articles.slice(i, i + BATCH_SIZE));
-  }
+  // Fan-out:每条 article 单独 LLM 调用,SINGLE_CONCURRENCY=5 并发跑。
+  // 这跟旧版"塞 8 条进单次 LLM"对比:
+  //   - 单点 schema 失败:旧版整批 8 条全 NEEDS REVIEW;新版只影响 1 条
+  //   - maxTokens 截断:旧版 8k 输出预算吃满概率高;新版每条只用 ≤2k
+  //   - 总耗时:旧版串行批次 60-90s;新版并发 5 时 10 条 ≈ 20s
+  const settled = await runWithConcurrency(
+    input.articles,
+    SINGLE_CONCURRENCY,
+    (article) =>
+      rewriteOne(article, input.targetLanguage, input.categoryHint, variantsPerTopic),
+  );
 
   const allResults: RewrittenArticle[] = [];
-  const failedBatchIds = new Set<string>();
-  for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
-    const slice = batches.slice(i, i + BATCH_CONCURRENCY);
-    const settled = await Promise.allSettled(
-      slice.map((batch) =>
-        rewriteBatch(batch, input.targetLanguage, input.categoryHint, variantsPerTopic),
-      ),
-    );
-    settled.forEach((res, idx) => {
-      if (res.status === "fulfilled") {
-        allResults.push(...res.value);
-      } else {
-        console.warn(
-          `[cross_language_rewrite] batch failed, will fallback to NEEDS REVIEW:`,
-          res.reason,
-        );
-        for (const a of slice[idx]) failedBatchIds.add(a.id);
-      }
-    });
-  }
+  const failedArticleIds = new Set<string>();
+  settled.forEach((res, idx) => {
+    if (res.status === "fulfilled") {
+      allResults.push(...res.value);
+    } else {
+      const article = input.articles[idx];
+      console.warn(
+        `[cross_language_rewrite] article ${article.id} failed, fallback to NEEDS REVIEW:`,
+        res.reason,
+      );
+      failedArticleIds.add(article.id);
+    }
+  });
 
-  // 兜底:缺漏的稿件 + 整批失败的稿件 → 用 [NEEDS REVIEW] 占位入库,
-  // 不让整步失败。编辑可在稿件列表手动改写或删除。
+  // 兜底:缺漏 / 单条调用失败 → [NEEDS REVIEW] 占位入库,不让整步失败。
   const returnedSourceIds = new Set(allResults.map((a) => a.sourceTopicId));
   const missing: RewrittenArticle[] = input.articles
     .filter((a) => !returnedSourceIds.has(a.id))
@@ -266,8 +282,8 @@ export async function crossLanguageRewriteArticles(
       title_en: `[NEEDS REVIEW] ${a.title}`,
       body_en: `[NEEDS REVIEW] LLM did not return a rewrite for this article. Original Chinese body preserved:\n\n${a.body.slice(0, BODY_TRUNCATE_CHARS)}`,
       hashtags: ["#NeedsReview", "#FromChina", "#Draft"],
-      cultural_notes: failedBatchIds.has(a.id)
-        ? "该批 LLM 调用失败(JSON 解析错 / schema 拒绝),已兜底标记 NEEDS REVIEW。"
+      cultural_notes: failedArticleIds.has(a.id)
+        ? "该条 LLM 调用失败(timeout / JSON 解析错 / schema 拒绝),已兜底标记 NEEDS REVIEW。"
         : "LLM 未返回该条改写,已兜底标记 NEEDS REVIEW。",
     }));
 
