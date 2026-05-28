@@ -685,7 +685,33 @@ function createToolDefinitions(): ToolSet {
               try {
                 const result = await fetchViaJinaReader(url);
                 const truncated = truncateContent(result.content, maxLength);
-                if (truncated && truncated.length >= 50) {
+
+                // 反爬页面识别 —— 实测知乎/百度/微信对未登录请求返回"安全验证 /
+                // 请登录"占位页,Jina 抓到的就是这个登录提示。如果不识别,LLM 拿到
+                // 这种登录提示页会"翻译"成"🔒 Verify to Unlock Expert Insights on
+                // Zhihu",入库的稿件全是反爬登录页的英文版,不是真内容。
+                const antiCrawlerPatterns = [
+                  "安全验证",
+                  "请登录",
+                  "请先登录",
+                  "登录后查看",
+                  "意见反馈",
+                  "jobs@zhihu.com",
+                  "Verify to access",
+                  "需要登录",
+                  "微信公众平台",
+                  "Weixin Official Accounts Platform",
+                  "登录后继续",
+                ];
+                const looksLikeAntiCrawler =
+                  truncated.length < 500 &&
+                  antiCrawlerPatterns.some((p) => truncated.includes(p));
+
+                if (
+                  truncated &&
+                  truncated.length >= 50 &&
+                  !looksLikeAntiCrawler
+                ) {
                   okCount++;
                   return {
                     ...base,
@@ -696,7 +722,7 @@ function createToolDefinitions(): ToolSet {
                     fetchStatus: "ok",
                   };
                 }
-                // Jina 返回成功但内容太短 → 兜底
+                // Jina 返回成功但内容太短 / 命中反爬模式 → 兜底用 summary
                 fallbackCount++;
                 const body =
                   (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
@@ -706,7 +732,9 @@ function createToolDefinitions(): ToolSet {
                   body,
                   fetchedAt: new Date().toISOString(),
                   fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
-                  fetchError: "Jina 返回内容过短",
+                  fetchError: looksLikeAntiCrawler
+                    ? "命中反爬登录页(知乎/微信常见),用 summary 兜底"
+                    : "Jina 返回内容过短",
                 };
               } catch (err) {
                 fallbackCount++;
