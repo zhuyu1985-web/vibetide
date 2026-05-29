@@ -1318,53 +1318,76 @@ function createToolDefinitions(): ToolSet {
     }),
     cms_publish: tool({
       description:
-        "把一篇稿件真实入库到华栖云 CMS。目标栏目支持运行时参数化：传入 catalogId 即推到指定栏目；" +
-        "不传走 env `CMS_DEFAULT_CATALOG_ID`（默认 10210）。appId/siteId 同理（默认 1768/81）。" +
-        "流程：1) 新建 articles 行（status=approved）；2) 调 publishArticleToCms 9 步主流程；" +
-        "3) 返回 CMS 侧 articleId / publishedUrl / previewUrl。" +
+        "把一篇稿件真实入库到华栖云 CMS。**两种使用模式**：" +
+        "(A) 推送已存在稿件：传 `articleId`（与 archive_to_drafts 串联用），跳过新建直接推送；" +
+        "(B) 一步创建并推送：传 `title + body`，新建 articles 行后推送（旧路径）。" +
+        "目标栏目支持参数化：传入 catalogId 即推到指定栏目；不传走 env `CMS_DEFAULT_CATALOG_ID`。" +
+        "appId/siteId 同理（默认 1768/81）。" +
         "前置：env 里 CMS_HOST / CMS_LOGIN_CMC_ID / CMS_LOGIN_CMC_TID / CMS_TENANT_ID + " +
         "VIBETIDE_CMS_PUBLISH_ENABLED=true。",
-      inputSchema: z.object({
-        title: z.string().describe("稿件标题"),
-        body: z
-          .string()
-          .describe("稿件正文（纯文本/Markdown，mapper 会转成 CMS content blocks）"),
-        summary: z.string().optional().describe("摘要（50-120 字）"),
-        authorName: z
-          .string()
-          .optional()
-          .describe("作者，默认 'AI 编辑部'"),
-        coverImageUrl: z.string().optional().describe("封面图 URL"),
-        tags: z.array(z.string()).optional().describe("标签数组"),
-        catalogId: z
-          .number()
-          .int()
-          .optional()
-          .describe("目标 CMS 栏目 ID。不填走 env CMS_DEFAULT_CATALOG_ID（默认 10210）"),
-        appId: z
-          .number()
-          .int()
-          .optional()
-          .describe("CMS APP 应用 ID。不填走 env CMS_DEFAULT_APP_ID（默认 1768）"),
-        siteId: z
-          .number()
-          .int()
-          .optional()
-          .describe("CMS 站点 ID。不填走 env CMS_DEFAULT_SITE_ID（默认 81）"),
-        dryRun: z
-          .boolean()
-          .optional()
-          .describe("dry-run 模式，不写 DB 不调 CMS，用于 skill 测试入口（M1）"),
-        // 下面两个由执行器注入，用户在"参数配置"里不需要填。
-        organizationId: z
-          .string()
-          .optional()
-          .describe("组织 ID（由 workflow 执行器自动注入）"),
-        operatorId: z
-          .string()
-          .optional()
-          .describe("操作者 ID（由 workflow 执行器自动注入）"),
-      }),
+      inputSchema: z
+        .object({
+          articleId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+              "已存在的 article ID（UUID）。提供时跳过新建直接推送现有稿件到 CMS。" +
+                "与上游 archive_to_drafts 串联：articleId = {{stepN.created.0.articleId}}",
+            ),
+          title: z
+            .string()
+            .optional()
+            .describe("稿件标题（articleId 未提供时必填）"),
+          body: z
+            .string()
+            .optional()
+            .describe(
+              "稿件正文（articleId 未提供时必填；纯文本/Markdown，mapper 会转 CMS content blocks）",
+            ),
+          summary: z.string().optional().describe("摘要（50-120 字）"),
+          authorName: z
+            .string()
+            .optional()
+            .describe("作者，默认 'AI 编辑部'"),
+          coverImageUrl: z.string().optional().describe("封面图 URL"),
+          tags: z.array(z.string()).optional().describe("标签数组"),
+          catalogId: z
+            .number()
+            .int()
+            .optional()
+            .describe("目标 CMS 栏目 ID。不填走 env CMS_DEFAULT_CATALOG_ID（默认 10210）"),
+          appId: z
+            .number()
+            .int()
+            .optional()
+            .describe("CMS APP 应用 ID。不填走 env CMS_DEFAULT_APP_ID（默认 1768）"),
+          siteId: z
+            .number()
+            .int()
+            .optional()
+            .describe("CMS 站点 ID。不填走 env CMS_DEFAULT_SITE_ID（默认 81）"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .describe("dry-run 模式，不写 DB 不调 CMS，用于 skill 测试入口（M1）"),
+          // 下面两个由执行器注入，用户在"参数配置"里不需要填。
+          organizationId: z
+            .string()
+            .optional()
+            .describe("组织 ID（由 workflow 执行器自动注入）"),
+          operatorId: z
+            .string()
+            .optional()
+            .describe("操作者 ID（由 workflow 执行器自动注入）"),
+        })
+        .refine(
+          (data) => Boolean(data.articleId) || Boolean(data.title && data.body),
+          {
+            message:
+              "必须提供 articleId（推送已存在稿件），或同时提供 title 和 body（新建并推送）",
+          },
+        ),
       execute: async ({
         title,
         body,
@@ -1372,6 +1395,7 @@ function createToolDefinitions(): ToolSet {
         authorName,
         coverImageUrl,
         tags,
+        articleId: existingArticleId,
         catalogId,
         appId,
         siteId,
@@ -1403,20 +1427,26 @@ function createToolDefinitions(): ToolSet {
           return {
             success: true,
             dryRun: true,
-            wouldInsert: {
-              title,
-              body,
-              summary,
-              organizationId,
-              tags: tags ?? [],
-            },
+            mode: existingArticleId ? "republish_existing" : "create_and_publish",
+            wouldInsert: existingArticleId
+              ? undefined
+              : {
+                  title,
+                  body,
+                  summary,
+                  organizationId,
+                  tags: tags ?? [],
+                },
+            wouldFetchArticleId: existingArticleId ?? undefined,
             wouldPublish: {
               catalogId: effective.catalogId,
               appId: effective.appId,
               siteId: effective.siteId,
               authorName: authorName ?? "AI 编辑部",
             },
-            note: "dry-run: 实际跑会先 insert articles 行（status=approved）再调 publishArticleToCms 9 步流程",
+            note: existingArticleId
+              ? "dry-run: 实际跑会 SELECT 现有 article 并调 publishArticleToCms 9 步流程"
+              : "dry-run: 实际跑会先 insert articles 行（status=approved）再调 publishArticleToCms 9 步流程",
           };
         }
         // ─────────────────────────────────────────────────────────────────
@@ -1433,46 +1463,77 @@ function createToolDefinitions(): ToolSet {
           };
         }
 
-        // 1. 先建 articles 行（status=approved），过 publishArticleToCms 的状态白名单
-        const { db } = await import("@/db");
-        const { articles } = await import("@/db/schema/articles");
-        // articles 表没有 coverImageUrl / authorName 字段（DAL 层的 Article 接口里才有，
-        // 原因是封面/作者通过 article_assets / content.headline 间接关联）。
-        // 这里只写入 DB 真实列；封面和作者通过 publishArticleToCms 内部映射时走
-        // MapperContext 的 coverImageDefault / author 兜底即可。
-        const [created] = await db
-          .insert(articles)
-          .values({
-            organizationId,
-            title,
-            body,
-            summary: summary ?? null,
-            status: "approved",
-            tags: tags ?? [],
-            mediaType: "article",
-            publishedAt: new Date(),
-          })
-          .returning({ id: articles.id });
-        void coverImageUrl; // 兜底值走 ctx.coverImageDefault（由 loadMapperContext 读 env 得到）
-        void authorName; // 兜底值走 ctx.author（在 loadMapperContext 里默认"智媒编辑部"）
-        if (!created?.id) {
-          return {
-            success: false,
-            error: {
-              code: "article_create_failed",
-              message: "创建 articles 行失败",
-              stage: "config" as const,
-            },
-          };
+        // ─── 决定 articleId 来源：existingArticleId 优先（republish 模式），
+        //     否则 INSERT 新行（create_and_publish 模式） ───────────────
+        let articleId: string;
+
+        if (existingArticleId) {
+          // 模式 A: 推送已存在稿件
+          const { getArticleById } = await import("@/lib/dal/articles");
+          const existing = await getArticleById(existingArticleId);
+          if (!existing) {
+            return {
+              success: false,
+              error: {
+                code: "article_not_found",
+                message: `article ${existingArticleId} 不存在`,
+                stage: "config" as const,
+              },
+            };
+          }
+          if (existing.organizationId !== organizationId) {
+            return {
+              success: false,
+              error: {
+                code: "article_org_mismatch",
+                message: "article 不属于当前组织，不允许跨 org 发布",
+                stage: "config" as const,
+              },
+            };
+          }
+          articleId = existingArticleId;
+        } else {
+          // 模式 B: 旧路径，新建 article（refine 已保证 title + body 非空）
+          const { db } = await import("@/db");
+          const { articles } = await import("@/db/schema/articles");
+          // articles 表没有 coverImageUrl / authorName 字段（DAL 层的 Article 接口里才有，
+          // 原因是封面/作者通过 article_assets / content.headline 间接关联）。
+          // 这里只写入 DB 真实列；封面和作者通过 publishArticleToCms 内部映射时走
+          // MapperContext 的 coverImageDefault / author 兜底即可。
+          const [created] = await db
+            .insert(articles)
+            .values({
+              organizationId,
+              title: title!, // refine 已保证非空
+              body: body!,
+              summary: summary ?? null,
+              status: "approved",
+              tags: tags ?? [],
+              mediaType: "article",
+              publishedAt: new Date(),
+            })
+            .returning({ id: articles.id });
+          void coverImageUrl; // 兜底值走 ctx.coverImageDefault（由 loadMapperContext 读 env 得到）
+          void authorName; // 兜底值走 ctx.author（在 loadMapperContext 里默认"智媒编辑部"）
+          if (!created?.id) {
+            return {
+              success: false,
+              error: {
+                code: "article_create_failed",
+                message: "创建 articles 行失败",
+                stage: "config" as const,
+              },
+            };
+          }
+          articleId = created.id;
         }
 
-        // 2. 调 publishArticleToCms 完整走 9 步（含 cms_publications 审计 +
-        //    Inngest 轮询事件）。feature flag / config 校验都由它内部做，
-        //    siteId/appId/catalogId 由 loadMapperContext 读硬编码常量得到。
+        // ─── 共用路径：调 publishArticleToCms 完整走 9 步（含 cms_publications
+        //     审计 + Inngest 轮询事件）。feature flag / config 校验都由它内部做。 ──
         const { publishArticleToCms } = await import("@/lib/cms");
         try {
           const pubResult = await publishArticleToCms({
-            articleId: created.id,
+            articleId,
             operatorId: operatorId ?? "workflow_system",
             triggerSource: "workflow",
             allowUpdate: true,
@@ -1480,7 +1541,8 @@ function createToolDefinitions(): ToolSet {
           });
           return {
             success: pubResult.success,
-            articleId: created.id,
+            mode: existingArticleId ? "republish_existing" : "create_and_publish",
+            articleId,
             publicationId: pubResult.publicationId,
             cmsArticleId: pubResult.cmsArticleId,
             cmsState: pubResult.cmsState,
@@ -1488,7 +1550,7 @@ function createToolDefinitions(): ToolSet {
             previewUrl: pubResult.previewUrl,
             timings: pubResult.timings,
             meta: {
-              title,
+              title: existingArticleId ? "(从 article 表读取)" : title,
               catalogId: effective.catalogId,
               appId: effective.appId,
               siteId: effective.siteId,
@@ -1508,7 +1570,8 @@ function createToolDefinitions(): ToolSet {
           }
           return {
             success: false,
-            articleId: created.id,
+            mode: existingArticleId ? "republish_existing" : "create_and_publish",
+            articleId,
             error: { code: `cms_${stage}`, message, stage },
             meta: {
               catalogId: effective.catalogId,

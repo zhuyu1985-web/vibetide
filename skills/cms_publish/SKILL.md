@@ -52,8 +52,9 @@ metadata:
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| title | string | ✓ | 稿件标题 |
-| body | string | ✓ | 稿件正文（纯文本/Markdown，mapper 会转 CMS content blocks） |
+| articleId | uuid | ✗* | 已存在的 article ID。提供时跳过新建，直接推送（与 archive_to_drafts 串联用） |
+| title | string | ✗* | 稿件标题（articleId 未提供时必填） |
+| body | string | ✗* | 稿件正文（articleId 未提供时必填；纯文本/Markdown，mapper 会转 CMS content blocks） |
 | summary | string | ✗ | 摘要（50-120 字） |
 | authorName | string | ✗ | 作者，默认 "AI 编辑部" |
 | coverImageUrl | string | ✗ | 封面图 URL |
@@ -64,6 +65,10 @@ metadata:
 | dryRun | boolean | ✗ | dry-run 模式，不写 DB 不调 CMS，用于 skill 测试入口 |
 | organizationId | string | (注入) | 由 workflow 执行器自动注入 |
 | operatorId | string | (注入) | 由 workflow 执行器自动注入 |
+
+**\*** `articleId` 或 (`title` + `body`) 二选一必填。两种使用模式：
+- **A. 推送已存在稿件**：传 `articleId`，跳过新建直接推送。与 `archive_to_drafts` 串联：`articleId = {{stepN.created.0.articleId}}`
+- **B. 一步创建并推送**：传 `title + body`，新建 articles 行后推送（旧路径）
 
 **目标栏目配置方式**：在 workflow_template 的 cms_publish 步骤"参数配置"里加 `catalogId = <CMS 栏目数字 ID>` 即可推到指定栏目。同一组织通常 `appId/siteId` 共用 env 默认（1768/81），跨 app 才填。
 

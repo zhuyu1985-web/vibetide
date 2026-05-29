@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const publishArticleToCmsMock = vi.hoisted(() => vi.fn());
 const insertMock = vi.hoisted(() => vi.fn());
+const getArticleByIdMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/cms", () => ({
   publishArticleToCms: publishArticleToCmsMock,
@@ -30,6 +31,9 @@ vi.mock("@/db", () => ({
   },
 }));
 vi.mock("@/db/schema/articles", () => ({ articles: {} }));
+vi.mock("@/lib/dal/articles", () => ({
+  getArticleById: getArticleByIdMock,
+}));
 
 import { invokeToolDirectly } from "../tool-registry";
 
@@ -150,6 +154,125 @@ describe("cms_publish tool — execute 聚合 target 传给 publishArticleToCms"
         appId: 1768,
         siteId: 81,
       },
+    });
+  });
+});
+
+describe("cms_publish tool — articleId path (republish existing)", () => {
+  beforeEach(() => {
+    getArticleByIdMock.mockReset();
+  });
+
+  it("传 articleId → 跳过 INSERT，SELECT 后调 publishArticleToCms", async () => {
+    getArticleByIdMock.mockResolvedValue({
+      id: "art-existing-1",
+      organizationId: "org-1",
+      title: "已入库稿件",
+      body: "正文",
+    });
+
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { articleId: "550e8400-e29b-41d4-a716-446655440000", catalogId: 10462 },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+
+    expect(insertMock).not.toHaveBeenCalled(); // 关键：不再 INSERT
+    expect(getArticleByIdMock).toHaveBeenCalledWith(
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(publishArticleToCmsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        articleId: "550e8400-e29b-41d4-a716-446655440000",
+        target: { catalogId: 10462, appId: undefined, siteId: undefined },
+      }),
+    );
+    expect(result).toMatchObject({
+      success: true,
+      mode: "republish_existing",
+      articleId: "550e8400-e29b-41d4-a716-446655440000",
+    });
+  });
+
+  it("articleId 不存在 → 报 article_not_found，不调 publishArticleToCms", async () => {
+    getArticleByIdMock.mockResolvedValue(null);
+
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { articleId: "550e8400-e29b-41d4-a716-446655440000" },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "article_not_found" },
+    });
+    expect(publishArticleToCmsMock).not.toHaveBeenCalled();
+  });
+
+  it("articleId 属于其他 org → 报 article_org_mismatch，不发布", async () => {
+    getArticleByIdMock.mockResolvedValue({
+      id: "art-other",
+      organizationId: "org-OTHER",
+      title: "别人的稿件",
+      body: "x",
+    });
+
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { articleId: "550e8400-e29b-41d4-a716-446655440000" },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "article_org_mismatch" },
+    });
+    expect(publishArticleToCmsMock).not.toHaveBeenCalled();
+  });
+
+  it("既不传 articleId 也不传 title+body → zod refine 拒绝", async () => {
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { catalogId: 10462 },
+      { organizationId: "org-1" },
+    );
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toMatch(/articleId|title|body/);
+    }
+  });
+});
+
+describe("cms_publish tool — dryRun mode label", () => {
+  it("传 articleId + dryRun → mode = 'republish_existing'", async () => {
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { articleId: "550e8400-e29b-41d4-a716-446655440000", dryRun: true },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+    expect(result).toMatchObject({
+      dryRun: true,
+      mode: "republish_existing",
+      wouldFetchArticleId: "550e8400-e29b-41d4-a716-446655440000",
+    });
+  });
+
+  it("传 title+body + dryRun → mode = 'create_and_publish'", async () => {
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B", dryRun: true },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+    expect(result).toMatchObject({
+      dryRun: true,
+      mode: "create_and_publish",
     });
   });
 });
