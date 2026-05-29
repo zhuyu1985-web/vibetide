@@ -63,7 +63,51 @@ describe("feature-flags", () => {
         timeoutMs: 15000,
         maxRetries: 3,
         defaultCoverUrl: expect.any(String),
+        defaultSiteId: 81,
+        defaultAppId: 1768,
+        defaultCatalogId: 10210,
       });
     });
+  });
+});
+
+describe("requireCmsConfig — default target (CMS_DEFAULT_*)", () => {
+  const ORIGINAL_ENV = { ...process.env };
+
+  function setRequired() {
+    process.env.CMS_HOST = "https://cms.test";
+    process.env.CMS_LOGIN_CMC_ID = "id";
+    process.env.CMS_LOGIN_CMC_TID = "tid";
+    process.env.CMS_TENANT_ID = "t";
+    process.env.CMS_USERNAME = "u";
+  }
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+    delete process.env.CMS_DEFAULT_SITE_ID;
+    delete process.env.CMS_DEFAULT_APP_ID;
+    delete process.env.CMS_DEFAULT_CATALOG_ID;
+    setRequired();
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("读取 CMS_DEFAULT_* env 并解析为 number", () => {
+    process.env.CMS_DEFAULT_SITE_ID = "100";
+    process.env.CMS_DEFAULT_APP_ID = "2000";
+    process.env.CMS_DEFAULT_CATALOG_ID = "30000";
+    const cfg = requireCmsConfig();
+    expect(cfg.defaultSiteId).toBe(100);
+    expect(cfg.defaultAppId).toBe(2000);
+    expect(cfg.defaultCatalogId).toBe(30000);
+  });
+
+  it("env 缺失时回退到代码内默认 81 / 1768 / 10210", () => {
+    const cfg = requireCmsConfig();
+    expect(cfg.defaultSiteId).toBe(81);
+    expect(cfg.defaultAppId).toBe(1768);
+    expect(cfg.defaultCatalogId).toBe(10210);
   });
 });

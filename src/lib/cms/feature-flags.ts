@@ -12,6 +12,10 @@ export interface CmsConfig {
   timeoutMs: number;
   maxRetries: number;
   defaultCoverUrl: string;
+  // === 默认目标（可被 CMS_DEFAULT_* env 覆盖,缺失回退历史硬编码） ===
+  defaultSiteId: number;
+  defaultAppId: number;
+  defaultCatalogId: number;
 }
 
 const REQUIRED_ENVS = [
@@ -50,5 +54,8 @@ export function requireCmsConfig(): CmsConfig {
     defaultCoverUrl:
       process.env.CMS_DEFAULT_COVER_URL ??
       "https://media.demo.chinamcloud.cn/image/default-cover.jpg",
+    defaultSiteId: parseInt(process.env.CMS_DEFAULT_SITE_ID ?? "81", 10),
+    defaultAppId: parseInt(process.env.CMS_DEFAULT_APP_ID ?? "1768", 10),
+    defaultCatalogId: parseInt(process.env.CMS_DEFAULT_CATALOG_ID ?? "10210", 10),
   };
 }
