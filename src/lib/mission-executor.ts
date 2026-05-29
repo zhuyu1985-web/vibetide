@@ -498,11 +498,42 @@ export async function leaderPlanDirect(
 // 保证下游 mission-console UI 不破。
 // ---------------------------------------------------------------------------
 /**
+ * 解 dotted path 取嵌套字段。支持 array index（纯数字段）+ 嵌套对象 key。
+ *
+ * 例子：
+ *   getNestedField({a: {b: [{c: 1}]}}, "a.b.0.c") → 1
+ *   getNestedField({created: [{articleId: "x"}]}, "created.0.articleId") → "x"
+ *   getNestedField({a: 1}, "a.b") → undefined（解到叶子节点继续访问 → undefined）
+ *   getNestedField({a: 1}, "missing") → undefined
+ *
+ * 返回 undefined 表示路径不可达；调用方负责 fallback。
+ */
+export function getNestedField(obj: unknown, path: string): unknown {
+  const parts = path.split(".");
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    if (typeof current !== "object") return undefined;
+    if (Array.isArray(current)) {
+      // 纯数字字符串 → array index
+      if (/^\d+$/.test(part)) {
+        current = current[parseInt(part, 10)];
+        continue;
+      }
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+/**
  * 渲染 step.config.parameters 里的 `{{key}}` 模板。
  *
  * 支持：
  * - `{{key}}` = mission.inputParams[key] (primitive / array / object)
  * - `{{stepN.field}}` = previousSteps[N-1].outputData[field] (1-indexed)
+ * - `{{stepN.a.b.0.c}}` = dot-path 嵌套寻址 + 数组下标
  * - 未找到的 key → 替换为空字符串
  *
  * 结果尝试 JSON.parse 字符串值（让 array/object 还原），仅在结果是 object/array 时接受 parse 结果，
@@ -517,6 +548,8 @@ export function renderStepParameters(
 ): Record<string, unknown> {
   const src = mission.inputParams ?? {};
   const rendered: Record<string, unknown> = {};
+  // 同一次渲染内对相同未解析路径只打一次 warning，避免循环内 N 个引用刷屏
+  const warnedPaths = new Set<string>();
   for (const [k, rawV] of Object.entries(template)) {
     if (typeof rawV !== "string") {
       rendered[k] = rawV;
@@ -529,17 +562,24 @@ export function renderStepParameters(
         const stepIdx = parseInt(stepMatch[1], 10) - 1;
         const field = stepMatch[2];
         const stepOutput = previousSteps[stepIdx]?.outputData;
-        if (
-          stepOutput &&
-          typeof stepOutput === "object" &&
-          field in (stepOutput as Record<string, unknown>)
-        ) {
-          const v = (stepOutput as Record<string, unknown>)[field];
-          if (v === undefined || v === null) return "";
-          if (typeof v === "object") return JSON.stringify(v);
-          return String(v);
+        const v = getNestedField(stepOutput, field);
+        if (v === undefined || v === null) {
+          // 路径解不通：fallback 空串，同时打 warning 让运营 debug 时能看到
+          const pathKey = `step${stepMatch[1]}.${field}`;
+          if (!warnedPaths.has(pathKey)) {
+            warnedPaths.add(pathKey);
+            console.warn(
+              `[mission-executor] 模板路径未解析：{{${pathKey}}} → 空串。stepOutput keys: ${
+                stepOutput && typeof stepOutput === "object"
+                  ? Object.keys(stepOutput as Record<string, unknown>).join(", ")
+                  : "(non-object or null)"
+              }`,
+            );
+          }
+          return "";
         }
-        return "";
+        if (typeof v === "object") return JSON.stringify(v);
+        return String(v);
       }
       const v = src[trimmedExpr];
       if (v === undefined || v === null) return "";

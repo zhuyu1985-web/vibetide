@@ -1706,6 +1706,9 @@ function createToolDefinitions(): ToolSet {
           totalRequested: items.length,
           totalCreated: created.length,
           totalSkipped: skipped.length,
+          // ─── 顶层便利字段：方便单文章串联场景 {{stepN.firstArticleId}}（dot path 也可，但顶层更直观）─
+          firstArticleId: created[0]?.articleId ?? null,
+          firstTitle: created[0]?.title ?? null,
           created,
           skipped,
         };
