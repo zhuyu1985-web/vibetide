@@ -252,6 +252,7 @@ if (dryRun) {
 - `publishArticleToCms` 在 `createPublication({ requestPayload: dto, ... })` 时把 `target` 一并存到 jsonb：`{ ...dto, _target: target }`（用下划线前缀避免污染 CMS DTO 真实字段名空间）。
 - `cmsPublishRetry` 读 `publication.requestPayload._target` 还原后传给 `publishArticleToCms`。
 - 兼容老数据：`_target` 缺失就走默认（即旧的硬编码 10210，对应旧记录的真实推送目标，行为一致）。
+- **requestHash 行为说明**：`_target` 进入 `hashRequestPayload(dto)` 的计算。所以同一篇 article 改栏目重推时，`requestHash` 会变化、不会命中旧的 `findLatestSuccessByArticle` success 记录，而是产生一条新的 `cms_publications` 行 —— 这正是想要的行为（跨栏目重推就是跨目标，应该作为新记录追踪）。
 
 ## 4. 数据 / Schema 影响
 
@@ -285,6 +286,7 @@ if (dryRun) {
 - `cmsPublishRetry`：从 `_target` 还原后传给 `publishArticleToCms`。
 - `cms_publish` 工具 dryRun：传 `catalogId=10462` → `wouldPublish.catalogId === 10462`。
 - `cms_publish` 工具 execute：transform `{catalogId,appId,siteId}` → `target` 正确（包括全 undefined → target=undefined）。
+- `hashRequestPayload` 稳定性：相同 dto + 相同 `_target` 哈希稳定；`_target.catalogId` 变化 → 哈希变化（防止跨栏目重推命中旧 publication）。
 
 ### 集成测试
 
