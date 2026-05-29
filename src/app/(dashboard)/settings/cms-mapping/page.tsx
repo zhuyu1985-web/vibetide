@@ -33,8 +33,10 @@ export default async function CmsMappingPage() {
       appId: cfg.defaultAppId,
       catalogId: cfg.defaultCatalogId,
     };
-  } catch {
-    // env 未配置时维持代码内默认值
+  } catch (error) {
+    console.warn("[cms-mapping] requireCmsConfig failed, falling back to hardcoded default", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return (
