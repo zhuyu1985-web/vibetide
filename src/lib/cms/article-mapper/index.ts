@@ -63,32 +63,24 @@ export async function mapArticleToCms(
 }
 
 /**
- * 硬编码的 CMS 推送目标（跳过 app_channels ↔ cms_catalogs 绑定）。
+ * 从 env 加载 MapperContext，可选 target 覆盖推送目标。
  *
- * 阶段 1（保障流程跑通）：所有稿件直推到固定站点/应用/栏目。后续接入
- * categories ↔ cms_catalogs 绑定时改这三个常量来源即可。
- */
-const HARDCODED_SITE_ID = 81;
-const HARDCODED_APP_ID = 1768;
-const HARDCODED_CATALOG_ID = 10210;
-
-/**
- * 从 env 加载 MapperContext。
- *
- * 当前不做 app_channels / category 级路由——推送目标写死在
- * HARDCODED_* 常量；mapper 其它字段仍来自 CMS 配置。
+ * - `target.{catalogId,appId,siteId}` 任一字段提供则 override
+ * - 未提供则走 `requireCmsConfig().default*`（来自 env，缺失时代码内 fallback 81/1768/10210）
  *
  * @param org { brandName: string } 组织信息（作为 source 字段兜底）
+ * @param target 可选推送目标 override
  */
 export function loadMapperContext(
   org: { brandName: string },
+  target?: { catalogId?: number; appId?: number; siteId?: number },
 ): MapperContext {
   const config = requireCmsConfig();
 
   return {
-    siteId: HARDCODED_SITE_ID,
-    appId: HARDCODED_APP_ID,
-    catalogId: HARDCODED_CATALOG_ID,
+    siteId: target?.siteId ?? config.defaultSiteId,
+    appId: target?.appId ?? config.defaultAppId,
+    catalogId: target?.catalogId ?? config.defaultCatalogId,
     tenantId: config.tenantId,
     loginId: config.loginCmcId,
     loginTid: config.loginCmcTid,
