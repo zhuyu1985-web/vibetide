@@ -6,6 +6,36 @@ import {
 } from "@/lib/dal/cms-publications";
 
 /**
+ * Republish 单步逻辑（独立 export 便于单测）。
+ * 从 publication.requestPayload._target 还原 target，缺失则走默认。
+ */
+export async function republishWithRestoredTarget(
+  publicationId: string,
+): Promise<{ success: boolean; cmsState?: string; error?: string }> {
+  const pub = await getPublicationById(publicationId);
+  if (!pub) return { success: false, error: "publication not found" };
+
+  const payload = pub.requestPayload as
+    | { _target?: { catalogId?: number; appId?: number; siteId?: number } }
+    | null;
+  const target = payload?._target;
+
+  try {
+    const result = await publishArticleToCms({
+      articleId: pub.articleId,
+      operatorId: pub.operatorId ?? "system",
+      triggerSource: "scheduled",
+      allowUpdate: true,
+      target,
+    });
+    return { success: true, cmsState: result.cmsState };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+/**
  * 最多重试 3 次；加上首次入库共 4 次尝试。
  */
 const MAX_RETRY_COUNT = 3;
@@ -69,24 +99,17 @@ export const cmsPublishRetry = inngest.createFunction(
     });
 
     return await step.run("republish", async () => {
-      try {
-        const result = await publishArticleToCms({
-          articleId: pub.articleId,
-          operatorId: pub.operatorId ?? "system",
-          triggerSource: "scheduled",
-          allowUpdate: true,
-        });
+      const result = await republishWithRestoredTarget(publicationId);
+      if (result.success) {
         logger.info(
           `retry: publication ${publicationId} re-published, cmsState=${result.cmsState}`,
         );
-        return { success: true, cmsState: result.cmsState };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+      } else {
         logger.warn(
-          `retry: publication ${publicationId} failed again: ${message}`,
+          `retry: publication ${publicationId} failed again: ${result.error}`,
         );
-        return { success: false, error: message };
       }
+      return result;
     });
   },
 );
