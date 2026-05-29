@@ -36,3 +36,25 @@ describe("hashRequestPayload", () => {
     expect(h).toMatch(/^[a-f0-9]{64}$/);
   });
 });
+
+describe("hashRequestPayload — _target 字段", () => {
+  const baseDto = { title: "t", body: "b", siteId: 81 } as const;
+
+  it("相同 dto + 相同 _target → 哈希稳定", () => {
+    const h1 = hashRequestPayload({ ...baseDto, _target: { catalogId: 10462 } });
+    const h2 = hashRequestPayload({ ...baseDto, _target: { catalogId: 10462 } });
+    expect(h1).toBe(h2);
+  });
+
+  it("_target.catalogId 变化 → 哈希变化（防止跨栏目重推命中旧 publication）", () => {
+    const h1 = hashRequestPayload({ ...baseDto, _target: { catalogId: 10462 } });
+    const h2 = hashRequestPayload({ ...baseDto, _target: { catalogId: 10127 } });
+    expect(h1).not.toBe(h2);
+  });
+
+  it("有无 _target 字段 → 哈希不同", () => {
+    const h1 = hashRequestPayload(baseDto);
+    const h2 = hashRequestPayload({ ...baseDto, _target: { catalogId: 10462 } });
+    expect(h1).not.toBe(h2);
+  });
+});
