@@ -1318,14 +1318,12 @@ function createToolDefinitions(): ToolSet {
     }),
     cms_publish: tool({
       description:
-        "把一篇稿件真实入库到华栖云 CMS。**appId / catalogId 已硬编码为 " +
-        "1768 / 10210（演示环境指定）**，不依赖 app_channels 映射表。流程：" +
-        "1) 新建 articles 行（status=approved）；" +
-        "2) 直接构造 MapperContext（硬编码 appId/catalogId/siteId）并调 " +
-        "saveArticle 走 /web/article/save 真实接口；" +
+        "把一篇稿件真实入库到华栖云 CMS。目标栏目支持运行时参数化：传入 catalogId 即推到指定栏目；" +
+        "不传走 env `CMS_DEFAULT_CATALOG_ID`（默认 10210）。appId/siteId 同理（默认 1768/81）。" +
+        "流程：1) 新建 articles 行（status=approved）；2) 调 publishArticleToCms 9 步主流程；" +
         "3) 返回 CMS 侧 articleId / publishedUrl / previewUrl。" +
-        "前置要求：env 里 CMS_HOST / CMS_LOGIN_CMC_ID / CMS_LOGIN_CMC_TID / " +
-        "CMS_TENANT_ID + VIBETIDE_CMS_PUBLISH_ENABLED=true。",
+        "前置：env 里 CMS_HOST / CMS_LOGIN_CMC_ID / CMS_LOGIN_CMC_TID / CMS_TENANT_ID + " +
+        "VIBETIDE_CMS_PUBLISH_ENABLED=true。",
       inputSchema: z.object({
         title: z.string().describe("稿件标题"),
         body: z
@@ -1338,6 +1336,21 @@ function createToolDefinitions(): ToolSet {
           .describe("作者，默认 'AI 编辑部'"),
         coverImageUrl: z.string().optional().describe("封面图 URL"),
         tags: z.array(z.string()).optional().describe("标签数组"),
+        catalogId: z
+          .number()
+          .int()
+          .optional()
+          .describe("目标 CMS 栏目 ID。不填走 env CMS_DEFAULT_CATALOG_ID（默认 10210）"),
+        appId: z
+          .number()
+          .int()
+          .optional()
+          .describe("CMS APP 应用 ID。不填走 env CMS_DEFAULT_APP_ID（默认 1768）"),
+        siteId: z
+          .number()
+          .int()
+          .optional()
+          .describe("CMS 站点 ID。不填走 env CMS_DEFAULT_SITE_ID（默认 81）"),
         dryRun: z
           .boolean()
           .optional()
@@ -1359,16 +1372,29 @@ function createToolDefinitions(): ToolSet {
         authorName,
         coverImageUrl,
         tags,
+        catalogId,
+        appId,
+        siteId,
         dryRun,
         organizationId,
         operatorId,
       }) => {
-        // 硬编码的 siteId/appId/catalogId 已经在 article-mapper/index.ts 的
-        // loadMapperContext 里写死（81/1768/10210），publishArticleToCms 会自动读到。
-        // 这里改回走它的完整 9 步流程（feature flag → load article → 状态校验 →
-        // load ctx → 幂等检查 → mapping → cms_publications 审计 → saveArticle →
-        // 触发 cms/publication.submitted 轮询事件），跟 SKILL.md Workflow
-        // Checklist 对齐。
+        // Phase 4: 目标栏目支持运行时参数化。catalogId/appId/siteId 任一非空 →
+        // 走 target override；全 undefined → target=undefined,publishArticleToCms
+        // 内部 loadMapperContext 会回退到 config.default*。
+        const target =
+          catalogId != null || appId != null || siteId != null
+            ? { catalogId, appId, siteId }
+            : undefined;
+
+        // 用于 dryRun / meta 回显真实生效值（不管 target 是否存在都要算 effective）
+        const { requireCmsConfig } = await import("@/lib/cms/feature-flags");
+        const config = requireCmsConfig();
+        const effective = {
+          catalogId: catalogId ?? config.defaultCatalogId,
+          appId: appId ?? config.defaultAppId,
+          siteId: siteId ?? config.defaultSiteId,
+        };
 
         // ─── dryRun 短路（M1 验收：测试入口不污染 DB / 不调 CMS） ────────
         // 必须放在 organizationId 校验之前 + articles insert 之前 —— 否则测试
@@ -1385,9 +1411,9 @@ function createToolDefinitions(): ToolSet {
               tags: tags ?? [],
             },
             wouldPublish: {
-              appId: 1768,
-              catalogId: 10210,
-              siteId: 81,
+              catalogId: effective.catalogId,
+              appId: effective.appId,
+              siteId: effective.siteId,
               authorName: authorName ?? "AI 编辑部",
             },
             note: "dry-run: 实际跑会先 insert articles 行（status=approved）再调 publishArticleToCms 9 步流程",
@@ -1450,6 +1476,7 @@ function createToolDefinitions(): ToolSet {
             operatorId: operatorId ?? "workflow_system",
             triggerSource: "workflow",
             allowUpdate: true,
+            target,
           });
           return {
             success: pubResult.success,
@@ -1462,10 +1489,9 @@ function createToolDefinitions(): ToolSet {
             timings: pubResult.timings,
             meta: {
               title,
-              // 硬编码值来自 article-mapper/index.ts 的 HARDCODED_* 常量
-              appId: 1768,
-              catalogId: 10210,
-              siteId: 81,
+              catalogId: effective.catalogId,
+              appId: effective.appId,
+              siteId: effective.siteId,
               authorName: authorName ?? "AI 编辑部",
             },
           };
@@ -1485,9 +1511,9 @@ function createToolDefinitions(): ToolSet {
             articleId: created.id,
             error: { code: `cms_${stage}`, message, stage },
             meta: {
-              appId: 1768,
-              catalogId: 10210,
-              siteId: 81,
+              catalogId: effective.catalogId,
+              appId: effective.appId,
+              siteId: effective.siteId,
             },
           };
         }
