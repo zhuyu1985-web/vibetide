@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { MetaHeader } from "./meta-header";
 import { TextSelectionMenu } from "./text-selection-menu";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +14,13 @@ interface ArticleReaderProps {
   article: ArticleDetail;
   appearance: AppearanceSettings;
   organizationId?: string;
+}
+
+// 检测 body 是否是 HTML：是 → 走 dangerouslySetInnerHTML（兼容老 HTML 稿件 + 外抓稿件）；
+// 否 → 当 Markdown 用 ReactMarkdown 渲染（content_generate / layout_design 产物）。
+// 启发式：扫常见块级 HTML 标签，命中即认 HTML。空 body 默认 false（走 markdown 路径，渲染空白）。
+function looksLikeHtml(body: string): boolean {
+  return /<(p|div|h[1-6]|br|ul|ol|li|table|article|section|blockquote|pre|code|figure|img|a)\b[^>]*>/i.test(body);
 }
 
 const marginWidths: Record<AppearanceSettings["margins"], number> = {
@@ -59,15 +68,30 @@ export function ArticleReader({ article, appearance, organizationId = "" }: Arti
         <Separator className="my-5" />
 
         <div ref={contentRef}>
-          <article
-            className={cn(
-              "prose dark:prose-invert max-w-none",
-              lineHeightClasses[appearance.lineHeight],
-              fontFamilyClasses[appearance.fontFamily]
-            )}
-            style={{ fontSize: `${appearance.fontSize}px` }}
-            dangerouslySetInnerHTML={{ __html: article.body ?? "" }}
-          />
+          {looksLikeHtml(article.body ?? "") ? (
+            <article
+              className={cn(
+                "prose dark:prose-invert max-w-none",
+                lineHeightClasses[appearance.lineHeight],
+                fontFamilyClasses[appearance.fontFamily]
+              )}
+              style={{ fontSize: `${appearance.fontSize}px` }}
+              dangerouslySetInnerHTML={{ __html: article.body ?? "" }}
+            />
+          ) : (
+            <article
+              className={cn(
+                "prose dark:prose-invert max-w-none",
+                lineHeightClasses[appearance.lineHeight],
+                fontFamilyClasses[appearance.fontFamily]
+              )}
+              style={{ fontSize: `${appearance.fontSize}px` }}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {article.body ?? ""}
+              </ReactMarkdown>
+            </article>
+          )}
         </div>
       </div>
 
