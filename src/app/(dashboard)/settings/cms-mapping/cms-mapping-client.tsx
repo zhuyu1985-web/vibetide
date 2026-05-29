@@ -35,14 +35,12 @@ interface SyncLogVm {
 interface Props {
   cmsCatalogs: CmsCatalogVm[];
   recentLogs: SyncLogVm[];
+  defaultTarget: { siteId: number; appId: number; catalogId: number };
 }
 
 type TabKey = "catalogs" | "logs";
 
-// 当前阶段硬编码的推送目标，见 src/lib/cms/article-mapper/index.ts
-const HARDCODED_TARGET = { siteId: 81, appId: 1768, catalogId: 10210 };
-
-export function CmsMappingClient({ cmsCatalogs, recentLogs }: Props) {
+export function CmsMappingClient({ cmsCatalogs, recentLogs, defaultTarget }: Props) {
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<TabKey>("catalogs");
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -81,13 +79,12 @@ export function CmsMappingClient({ cmsCatalogs, recentLogs }: Props) {
 
       <GlassCard variant="secondary" padding="sm" className="mb-4">
         <div className="text-xs text-muted-foreground">
-          当前阶段：CMS 推送目标在 article-mapper 中硬编码 —
+          当前默认推送目标：
           <span className="font-mono text-foreground">
-            {" "}
-            siteId={HARDCODED_TARGET.siteId} · appId={HARDCODED_TARGET.appId} · catalogId=
-            {HARDCODED_TARGET.catalogId}
+            {" "}siteId={defaultTarget.siteId} · appId={defaultTarget.appId} · catalogId={defaultTarget.catalogId}
           </span>
-          。所有稿件统一推送到此目标，不走 app_channels / categories 绑定。
+          （来自 env <span className="font-mono">CMS_DEFAULT_*</span>，缺失时回退代码默认）。
+          workflow_template 在 cms_publish 步骤参数里覆盖 catalogId/appId/siteId 即可推到指定栏目。
         </div>
       </GlassCard>
 
