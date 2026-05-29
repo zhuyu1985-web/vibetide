@@ -2292,41 +2292,103 @@ export function createXiaoyanChatTools(context: {
   return tools;
 }
 
+/**
+ * LLM agent 路径下，AI SDK 触发 tool_call 时**没有 server-side 调用方**可以把
+ * organizationId / operatorId 注入 args —— 走 `toVercelTools` 的工具需要 context 注入。
+ *
+ * 跟 `invokeToolDirectly` 的 context 字段保持一致；未被对应工具 schema 消费的字段
+ * 会被 zod 自动忽略，所以不会污染不需要 orgId 的工具（web_search 等）。
+ */
+export interface ToolContext {
+  organizationId?: string;
+  operatorId?: string;
+}
+
+/**
+ * 把 tool.execute 包一层，调用时把 context 字段合并进 args。
+ * - context 为空 / 全 undefined → 直接返回原 toolDef（保持向后兼容、不破坏 AI SDK 引用相等检查）
+ * - execute 不是函数 → 原样返回（placeholder tool 已经定义 execute；但 defensive）
+ * - 显式 args.{field} 优先于 context.{field}（与 invokeToolDirectly 行为一致）
+ */
+function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
+  toolDef: T,
+  context?: ToolContext,
+): T {
+  if (!context || (!context.organizationId && !context.operatorId)) {
+    return toolDef;
+  }
+  const orig = toolDef.execute;
+  if (typeof orig !== "function") return toolDef;
+  return {
+    ...toolDef,
+    execute: async (args: Record<string, unknown>, ...rest: unknown[]) => {
+      const merged: Record<string, unknown> = { ...args };
+      if (context.organizationId && merged.organizationId === undefined) {
+        merged.organizationId = context.organizationId;
+      }
+      if (context.operatorId && merged.operatorId === undefined) {
+        merged.operatorId = context.operatorId;
+      }
+      return (orig as (a: Record<string, unknown>, ...r: unknown[]) => unknown)(
+        merged,
+        ...rest,
+      );
+    },
+  } as T;
+}
+
 export function toVercelTools(
   agentTools: AgentTool[],
   pluginConfigs?: Map<string, { description: string; config: PluginConfig }>,
   missionTools?: ToolSet,
-  knowledgeBaseTools?: ToolSet
+  knowledgeBaseTools?: ToolSet,
+  context?: ToolContext,
 ): ToolSet {
   const result: ToolSet = {};
 
   for (const t of agentTools) {
     if (ALL_TOOLS[t.name]) {
-      result[t.name] = ALL_TOOLS[t.name];
+      result[t.name] = wrapToolExecuteWithContext(ALL_TOOLS[t.name], context);
     } else if (pluginConfigs?.has(t.name)) {
       const plugin = pluginConfigs.get(t.name)!;
-      result[t.name] = createPluginTool(t.name, plugin.description, plugin.config);
+      result[t.name] = wrapToolExecuteWithContext(
+        createPluginTool(t.name, plugin.description, plugin.config),
+        context,
+      );
     } else {
-      result[t.name] = tool({
-        description: t.description,
-        inputSchema: z.object({
-          input: z.string().optional().describe("任务输入"),
+      result[t.name] = wrapToolExecuteWithContext(
+        tool({
+          description: t.description,
+          inputSchema: z.object({
+            input: z.string().optional().describe("任务输入"),
+          }),
+          execute: async ({ input }) => ({
+            result: `[${t.name}] 已完成处理${input ? `:${input}` : ""}`,
+          }),
         }),
-        execute: async ({ input }) => ({
-          result: `[${t.name}] 已完成处理${input ? `：${input}` : ""}`,
-        }),
-      });
+        context,
+      );
     }
   }
 
   // Merge mission collaboration tools if provided
   if (missionTools) {
-    Object.assign(result, missionTools);
+    for (const [name, def] of Object.entries(missionTools)) {
+      result[name] = wrapToolExecuteWithContext(
+        def as { execute?: unknown },
+        context,
+      ) as ToolSet[string];
+    }
   }
 
   // Merge knowledge base retrieval tools if provided
   if (knowledgeBaseTools) {
-    Object.assign(result, knowledgeBaseTools);
+    for (const [name, def] of Object.entries(knowledgeBaseTools)) {
+      result[name] = wrapToolExecuteWithContext(
+        def as { execute?: unknown },
+        context,
+      ) as ToolSet[string];
+    }
   }
 
   return result;
