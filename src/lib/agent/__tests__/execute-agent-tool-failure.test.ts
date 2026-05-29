@@ -64,7 +64,7 @@ describe("executeAgent — tool failure detection", () => {
       onStepFinish?.({
         toolCalls: [{ toolName: "web_search", args: {} }],
         toolResults: [
-          { toolName: "web_search", result: { success: true, results: [{ id: 1 }] } },
+          { toolName: "web_search", output: { success: true, results: [{ id: 1 }] } },
         ],
       });
       return {
@@ -85,7 +85,7 @@ describe("executeAgent — tool failure detection", () => {
         toolResults: [
           {
             toolName: "cms_publish",
-            result: {
+            output: {
               success: false,
               error: { code: "missing_context", message: "cms_publish 需要 organizationId" },
             },
@@ -115,11 +115,11 @@ describe("executeAgent — tool failure detection", () => {
         toolResults: [
           {
             toolName: "cms_publish",
-            result: { success: false, error: { code: "a", message: "fail1" } },
+            output: { success: false, error: { code: "a", message: "fail1" } },
           },
           {
             toolName: "archive_to_drafts",
-            result: { success: false, error: { code: "b", message: "fail2" } },
+            output: { success: false, error: { code: "b", message: "fail2" } },
           },
         ],
       });

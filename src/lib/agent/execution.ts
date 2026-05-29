@@ -161,9 +161,12 @@ ${input.skillSpec}
         });
       }
       // Bug B (Phase 2): 扫 toolResults 抓 success=false, 后续覆盖 output.status。
+      // AI SDK v6 的 TypedToolResult 把工具返回值放在 `.output` 字段(见
+      // node_modules/ai/dist/index.d.ts:514-540),不是 `.result`。早期实现误读
+      // `tr.result` 导致整个失败检测分支在真实 SDK 下永远是 undefined → 静默失效。
       if (toolResults) {
-        for (const tr of toolResults as Array<{ toolName?: string; result?: unknown }>) {
-          const r = tr.result;
+        for (const tr of toolResults as Array<{ toolName?: string; output?: unknown }>) {
+          const r = tr.output;
           if (r && typeof r === "object" && (r as { success?: unknown }).success === false) {
             const err = (r as { error?: unknown }).error as
               | { code?: unknown; message?: unknown }

@@ -554,6 +554,148 @@ export function renderStepParameters(
   return rendered;
 }
 
+/**
+ * 2026-05-29 — 第三道防线:LLM agent 跑完后,扫描其输出文本是否含明显失败信号。
+ *
+ * 前置:短路分支 (mission-executor.ts:1018) 和 registered-tool guard
+ * (mission-executor.ts:1144) 理论上应该把所有"工具失败"场景挡在 LLM 之前。
+ * 但运行中观察到:某些 mission(尤其 leader 直接接管的写入步骤)绕过这两道防线
+ * 跑到 executeAgent —— 然后:
+ *   案例 A:LLM 编故事说成功(假 ID / 假 org)—— UI 显示绿色✓但实际没入库
+ *   案例 B:LLM 诚实承认失败 —— 但 task.status 仍被无脑设为 completed
+ *
+ * 本函数兜底处理两类:扫 outputData 的 text/summary 字段,匹配中英常见失败指纹。
+ * 命中即让 caller 把 task.status 设为 failed,不再被 LLM 报喜不报忧误导用户。
+ *
+ * 注:这是宁可错杀的兜底 —— 误判风险存在(LLM 在成功输出里恰好提到"missing_context"
+ * 当作教学例子)。预期场景下 SKILL.md 不应包含这种关键词,所以误判极少。
+ */
+/**
+ * 2026-05-30 — 第四道防线:工具返回 success:true 但 IO 中含上游兜底/失败痕迹时,
+ * 也要把 step 标记为 failed。
+ *
+ * 经典案例:
+ *   - cross_language_rewrite 对部分 article LLM 失败,fallback 用
+ *     `[NEEDS REVIEW] xxx` 标题 + "LLM did not return a rewrite" 正文
+ *   - 下游 archive_to_drafts 收到这些条目,INSERT 成功(success:true),
+ *     但插入的稿件全是 NEEDS REVIEW 垃圾内容
+ *   - 旧逻辑:step 标 completed → 用户看到绿色✓,以为没事
+ *   - 新逻辑:扫 params + result 找上游兜底痕迹 → 标 failed
+ *
+ * 扫描对象:
+ *   - preExecParams(传给工具的入参):捕获"垃圾输入"
+ *   - preExecResult(工具返回值):捕获"垃圾输入透传到输出"
+ *
+ * 用 JSON.stringify 简单序列化扫描 —— 性能足够(单 step 调用一次,
+ * 截到 16 KB 内),pattern 必须精确(避免合法描述误中)。
+ */
+function detectIOContamination(
+  params: Record<string, unknown> | null | undefined,
+  result: unknown,
+): { contaminated: boolean; pattern?: string; sample?: string } {
+  const slices: string[] = [];
+  try {
+    if (params) slices.push(JSON.stringify(params).slice(0, 16000));
+  } catch {
+    /* ignore stringify failure(circular ref 等),跳过该 slice */
+  }
+  try {
+    if (result) slices.push(JSON.stringify(result).slice(0, 16000));
+  } catch {
+    /* ignore */
+  }
+  const haystack = slices.join("\n");
+  if (!haystack) return { contaminated: false };
+
+  // 精确指纹 —— 必须是已知的 fallback 标记或工具内部错误透传,不允许误中
+  // 普通业务文本(如 SKILL.md 描述、新闻标题等)
+  const patterns: Array<{ name: string; re: RegExp }> = [
+    { name: "needs_review_fallback", re: /\[\s*NEEDS\s*REVIEW\s*\]/i },
+    { name: "llm_no_rewrite", re: /LLM\s+did\s+not\s+return\s+a\s+rewrite/i },
+    { name: "fetch_status_failed", re: /"fetchStatus"\s*:\s*"(fail|failed|error|timeout)"/i },
+    { name: "fallback_marker", re: /"fallback"\s*:\s*true/ },
+    { name: "explicit_error_field", re: /"error"\s*:\s*\{[^}]*"code"/ },
+    { name: "translation_failure_zh", re: /该条\s*LLM\s*调用失败/ },
+    { name: "skipped_with_reason", re: /"skipped"\s*:\s*\[[^\]]*"reason"\s*:\s*"(error|failed|timeout)/i },
+  ];
+  for (const p of patterns) {
+    const m = haystack.match(p.re);
+    if (m) {
+      const idx = haystack.indexOf(m[0]);
+      const sample = haystack
+        .slice(Math.max(0, idx - 30), Math.min(haystack.length, idx + 90))
+        .replace(/\s+/g, " ")
+        .trim();
+      return { contaminated: true, pattern: p.name, sample };
+    }
+  }
+  return { contaminated: false };
+}
+
+function detectAgentOutputFailure(output: unknown): {
+  failed: boolean;
+  pattern?: string;
+  excerpt?: string;
+} {
+  if (!output || typeof output !== "object") return { failed: false };
+
+  // ─── Phase 2 fix:优先尊重 executeAgent 显式设置的 status=failed ───────────
+  // executeAgent 在 onStepFinish 里扫到工具 success=false 时,会把 output.status
+  // 覆盖为 "failed" 并填 errorMessage / errorCode。如果不在这里识别,后续的
+  // text/summary regex 兜底有可能漏掉(LLM 没在叙述里复述失败),导致 task 仍
+  // 被标 completed。优先看 executeAgent 给出的明确信号,regex 退化为 fallback。
+  const statusObj = output as {
+    status?: unknown;
+    errorMessage?: unknown;
+    errorCode?: unknown;
+  };
+  if (statusObj.status === "failed") {
+    const msg =
+      typeof statusObj.errorMessage === "string" && statusObj.errorMessage.trim()
+        ? statusObj.errorMessage
+        : typeof statusObj.errorCode === "string" && statusObj.errorCode.trim()
+          ? `errorCode=${statusObj.errorCode}`
+          : "executeAgent 标记 status=failed";
+    return {
+      failed: true,
+      pattern: "agent_status_failed",
+      excerpt: msg.slice(0, 200),
+    };
+  }
+
+  const o = output as { text?: unknown; summary?: unknown };
+  const haystack = [
+    typeof o.text === "string" ? o.text : "",
+    typeof o.summary === "string" ? o.summary : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 8000); // 长输出截断,避免无谓正则扫描
+  if (!haystack) return { failed: false };
+
+  // 工具/系统级失败指纹 —— 必须是"被工具或系统报错"才视为失败,
+  // 不能把 SKILL.md 里描述失败场景的教学语误判。
+  const patterns: Array<{ name: string; re: RegExp }> = [
+    { name: "missing_context", re: /missing[_ ]context/i },
+    { name: "tool_error_code", re: /错误代码["'：:]?\s*['"`]?(missing_context|tool_error|forbidden|unauthorized)/i },
+    { name: "explicit_failed_status", re: /状态["'：:]?\s*['"`]?(失败|failed)["'`]?/i },
+    { name: "structured_success_false", re: /"success"\s*:\s*false/ },
+    { name: "operation_failed_zh", re: /(任务|操作|入库|调用|工具|步骤)\s*(未能完成|失败|无法完成|被拒绝)/ },
+  ];
+  for (const p of patterns) {
+    const m = haystack.match(p.re);
+    if (m) {
+      const idx = haystack.indexOf(m[0]);
+      const excerpt = haystack
+        .slice(Math.max(0, idx - 40), Math.min(haystack.length, idx + 120))
+        .replace(/\s+/g, " ")
+        .trim();
+      return { failed: true, pattern: p.name, excerpt };
+    }
+  }
+  return { failed: false };
+}
+
 function formatPreExecOutputDeterministic(opts: {
   toolName: string;
   params: Record<string, unknown>;
@@ -1035,18 +1177,74 @@ async function executeTaskDirect(
           ? (preExecResult as Record<string, unknown>)
           : {};
 
+      // ─── 检测工具内部"软失败"(invocation.ok=true 但 result.success=false) ───
+      // 历史事故:archive_to_drafts 缺 organizationId 时返回
+      // {success:false, error:{code:"missing_context", message:"..."}},但本短路
+      // 路径之前无脑把 status 写成 "completed"/"success",mission 总状态显示绿色✓,
+      // 用户却根本没入库 —— 这是误导。修复:result.success === false 时
+      // 必须把 task 标为 failed 并把 error.message 写到 errorMessage 列。
+      const explicitToolFailure = (() => {
+        if (!resultFields || typeof resultFields !== "object") return null;
+        const r = resultFields as { success?: unknown; error?: unknown };
+        if (r.success === false) {
+          const e = r.error;
+          if (e && typeof e === "object") {
+            const err = e as { code?: unknown; message?: unknown };
+            const code = typeof err.code === "string" ? err.code : "tool_error";
+            const message =
+              typeof err.message === "string" ? err.message : "工具返回失败";
+            return { code, message };
+          }
+          return { code: "tool_error", message: "工具返回 success=false" };
+        }
+        return null;
+      })();
+
+      // ─── 2026-05-30 — 第四道防线:扫 IO 找上游兜底/失败痕迹 ───
+      // 经典案例:cross_language_rewrite 翻译失败,fallback "[NEEDS REVIEW]" → 下游
+      // archive_to_drafts 收到垃圾入参,INSERT 成功但稿件全是垃圾 → 旧逻辑标 ✓
+      // 误导用户。新逻辑:发现 [NEEDS REVIEW] / LLM did not return 等指纹 → 标 failed
+      const contamination = explicitToolFailure
+        ? null
+        : detectIOContamination(preExecParams, preExecResult);
+
+      // 统一封装两类失败 —— 后续 DB write 不再区分,只看 toolFailure 是否 truthy
+      const toolFailure: { code: string; message: string } | null =
+        explicitToolFailure ??
+        (contamination?.contaminated
+          ? {
+              code: `io_contamination:${contamination.pattern}`,
+              message: `上游兜底/失败痕迹流入本步骤(样本:${contamination.sample ?? ""})`,
+            }
+          : null);
+
+      if (toolFailure && contamination?.contaminated) {
+        console.warn(
+          `[mission-executor] IO contamination detected on task ${taskId}`,
+          {
+            pattern: contamination.pattern,
+            sample: contamination.sample,
+            assignedRole: task.assignedRole,
+          },
+        );
+      }
+
       const deterministicOutput = {
         ...resultFields,
         stepKey: task.id,
         employeeSlug: agent.slug,
-        summary: preExecEmpty
-          ? `${task.assignedRole} 真实返回 0 条 —— 请调整参数`
-          : isLLMSkillRegistered(task.assignedRole)
-            ? `${task.assignedRole} LLM-skill 真实调用完成，结果已直出（未经二次 LLM 包装）`
-            : `${task.assignedRole} 真实调用完成，结果已直出（未经 LLM）`,
+        summary: toolFailure
+          ? `${task.assignedRole} 工具失败:${toolFailure.code} — ${toolFailure.message}`
+          : preExecEmpty
+            ? `${task.assignedRole} 真实返回 0 条 —— 请调整参数`
+            : isLLMSkillRegistered(task.assignedRole)
+              ? `${task.assignedRole} LLM-skill 真实调用完成，结果已直出（未经二次 LLM 包装）`
+              : `${task.assignedRole} 真实调用完成，结果已直出（未经 LLM）`,
         artifacts: [],
-        metrics: { qualityScore: preExecEmpty ? 60 : 85 },
-        status: "success" as const,
+        metrics: {
+          qualityScore: toolFailure ? 30 : preExecEmpty ? 60 : 85,
+        },
+        status: toolFailure ? ("failed" as const) : ("success" as const),
         text: deterministicText,
       };
 
@@ -1054,9 +1252,12 @@ async function executeTaskDirect(
         db
           .update(missionTasks)
           .set({
-            status: "completed",
+            status: toolFailure ? "failed" : "completed",
+            errorMessage: toolFailure
+              ? `[${toolFailure.code}] ${toolFailure.message}`
+              : null,
             outputData: deterministicOutput,
-            progress: 100,
+            progress: toolFailure ? 0 : 100,
             completedAt: new Date(),
           })
           .where(eq(missionTasks.id, taskId)),
@@ -1066,7 +1267,10 @@ async function executeTaskDirect(
               .set({
                 status: "idle",
                 currentTask: null,
-                tasksCompleted: sql`${aiEmployees.tasksCompleted} + 1`,
+                // 失败不计入 tasksCompleted(否则员工绩效虚高)
+                tasksCompleted: toolFailure
+                  ? aiEmployees.tasksCompleted
+                  : sql`${aiEmployees.tasksCompleted} + 1`,
                 avgResponseTime: "0s",
                 updatedAt: new Date(),
               })
@@ -1076,8 +1280,10 @@ async function executeTaskDirect(
           ? db.insert(missionMessages).values({
               missionId,
               fromEmployeeId: task.assignedEmployeeId,
-              messageType: "result",
-              content: `「${task.title}」已完成（工具真实输出直出，未走 LLM）。`,
+              messageType: toolFailure ? "task_failed" : "result",
+              content: toolFailure
+                ? `「${task.title}」失败:${toolFailure.code} — ${toolFailure.message}。请检查工作流上下文(如 organizationId / operatorId 是否已注入),或修复参数后重跑。`
+                : `「${task.title}」已完成（工具真实输出直出，未走 LLM）。`,
               relatedTaskId: taskId,
             })
           : Promise.resolve(),
@@ -1085,9 +1291,16 @@ async function executeTaskDirect(
 
       console.log(
         `[mission-executor] short-circuited data-fetching task ${taskId} (pre-exec direct)`,
-        { isEmpty: preExecEmpty, tool: task.assignedRole },
+        {
+          isEmpty: preExecEmpty,
+          tool: task.assignedRole,
+          toolFailure,
+        },
       );
-      return { status: "completed" as const, taskId };
+      return {
+        status: toolFailure ? ("failed" as const) : ("completed" as const),
+        taskId,
+      };
     }
 
     // ── 保护:registered tool / LLM-skill 短路失败时,不让 LLM 编故事 ─────────
@@ -1162,19 +1375,52 @@ async function executeTaskDirect(
       skillSpec: skillBody ?? undefined,
     }, undefined, missionTools);
 
+    // ── 第三道防线:扫描 LLM 输出文本是否含失败指纹 ──────────────────────
+    // 前两道防线(短路 toolFailure + registered-tool guard)理论上挡所有工具失败,
+    // 但实测有 mission 绕过(leader 接管 / assignedRole 缺失等),跑到这里。
+    // 此处兜底:若 LLM 自己的产出显式提到 missing_context / "失败"等,强制把
+    // task 标 failed,避免 LLM 报喜不报忧或编故事 → UI 显示完成的事故。
+    const agentFailure = detectAgentOutputFailure(result.output);
+    if (agentFailure.failed) {
+      console.warn(
+        `[mission-executor] post-LLM failure detector triggered for task ${taskId}`,
+        {
+          pattern: agentFailure.pattern,
+          excerpt: agentFailure.excerpt,
+          assignedRole: task.assignedRole,
+        },
+      );
+    }
+
     // Batch all post-execution DB writes (queued by max:1 pool, but no await gaps)
     const totalTokens = result.tokensUsed.input + result.tokensUsed.output;
+    const finalStatus: "completed" | "failed" = agentFailure.failed
+      ? "failed"
+      : "completed";
+    const failureErrorMessage = agentFailure.failed
+      ? `[agent_output_failure:${agentFailure.pattern}] ${agentFailure.excerpt ?? "LLM 产出含失败指纹"}`
+      : null;
+
     await Promise.all([
       // Save output
       db.update(missionTasks)
-        .set({ status: "completed", outputData: result.output, progress: 100, completedAt: new Date() })
+        .set({
+          status: finalStatus,
+          errorMessage: failureErrorMessage,
+          outputData: result.output,
+          progress: agentFailure.failed ? 0 : 100,
+          completedAt: new Date(),
+        })
         .where(eq(missionTasks.id, taskId)),
       // Reset employee + post message
       task.assignedEmployeeId
         ? db.update(aiEmployees)
             .set({
               status: "idle", currentTask: null,
-              tasksCompleted: sql`${aiEmployees.tasksCompleted} + 1`,
+              // 失败不计入 tasksCompleted(避免员工绩效虚高)
+              tasksCompleted: agentFailure.failed
+                ? aiEmployees.tasksCompleted
+                : sql`${aiEmployees.tasksCompleted} + 1`,
               avgResponseTime: `${Math.round(result.durationMs / 1000)}s`,
               updatedAt: new Date(),
             })
@@ -1184,8 +1430,10 @@ async function executeTaskDirect(
         ? db.insert(missionMessages).values({
             missionId,
             fromEmployeeId: task.assignedEmployeeId,
-            messageType: "result",
-            content: `「${task.title}」已完成。\n\n${result.output.summary || ""}`,
+            messageType: agentFailure.failed ? "task_failed" : "result",
+            content: agentFailure.failed
+              ? `「${task.title}」检测到失败:${agentFailure.pattern}。LLM 产出显式提到失败指纹(${agentFailure.excerpt ?? ""}),已强制标记为失败。请检查工具调用上下文。`
+              : `「${task.title}」已完成。\n\n${result.output.summary || ""}`,
             relatedTaskId: taskId,
           })
         : Promise.resolve(),
