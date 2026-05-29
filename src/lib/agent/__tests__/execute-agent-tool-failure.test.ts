@@ -29,6 +29,7 @@ vi.mock("ai", () => ({
 }));
 vi.mock("../model-router", () => ({
   getLanguageModel: vi.fn(() => ({ provider: "test" })),
+  applySkillOverride: vi.fn((base: unknown) => base),
 }));
 
 import { executeAgent } from "../execution";

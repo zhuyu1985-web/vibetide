@@ -1,5 +1,5 @@
 import { generateText, stepCountIs } from "ai";
-import { getLanguageModel } from "./model-router";
+import { getLanguageModel, applySkillOverride } from "./model-router";
 import { toVercelTools, createKnowledgeBaseTools, type ToolContext } from "./tool-registry";
 import {
   buildStepInstruction,
@@ -89,7 +89,9 @@ export async function executeAgent(
   // —— parseStepOutput 只看三段式结构, 检测不到失败。
   const toolFailures: Array<{ toolName: string; code: string; message: string }> = [];
 
-  const model = getLanguageModel(agent.modelConfig);
+  // 应用 skill-level override（如 layout_design 降 maxTokens 提速）
+  const effectiveModelConfig = applySkillOverride(agent.modelConfig, input.skillSlug);
+  const model = getLanguageModel(effectiveModelConfig);
 
   // 注入「当前日期」：模型训练截止日可能早于真实时间，不明示的话 LLM 会按训练数据
   // 里的时间判断时效，导致 web_search 设错 timeRange（比如默认 24h 命中旧数据）。
@@ -149,8 +151,8 @@ ${input.skillSpec}
     messages: [{ role: "user", content: userMessage }],
     tools: vercelTools,
     stopWhen: stepCountIs(20),
-    temperature: agent.modelConfig.temperature,
-    maxOutputTokens: agent.modelConfig.maxTokens,
+    temperature: effectiveModelConfig.temperature,
+    maxOutputTokens: effectiveModelConfig.maxTokens,
     abortSignal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
     onStepFinish: ({ toolCalls, toolResults }) => {
       if (toolCalls && toolCalls.length > 0) {

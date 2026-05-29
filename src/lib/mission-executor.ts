@@ -1381,6 +1381,7 @@ async function executeTaskDirect(
         previousSteps,
         userInstructions,
         skillSpec: skillBody ?? undefined,
+        skillSlug: task.assignedRole ?? undefined,
       },
       undefined,
       missionTools,

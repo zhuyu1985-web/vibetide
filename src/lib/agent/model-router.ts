@@ -54,6 +54,33 @@ const CATEGORY_DEFAULTS: Record<SkillCategory, () => ModelConfig> = {
 };
 
 /**
+ * 按 skill slug 的细粒度 maxTokens / temperature override。
+ * 用于让短输出类 skill（layout_design / headline_generate 等）跑得更快，
+ * 不被宽泛的 category default 拖累。
+ *
+ * 新增条目时优先调整 maxTokens；其它字段（model / temperature）按需。
+ */
+export const SKILL_MODEL_OVERRIDES: Record<string, Partial<ModelConfig>> = {
+  // layout_design 只产 layout schema（版式/字号/配图规则），不写正文。
+  // 8192 token 是给正文类用的，layout 用 2048 已足够，能把这步从 60-120s 压到 15-25s。
+  layout_design: { maxTokens: 2048 },
+};
+
+/**
+ * 把 SKILL_MODEL_OVERRIDES 合并到 base config 上。
+ * 没传 skillSlug 或没对应 override → 原样返回 base。
+ */
+export function applySkillOverride(
+  base: ModelConfig,
+  skillSlug?: string,
+): ModelConfig {
+  if (!skillSlug) return base;
+  const override = SKILL_MODEL_OVERRIDES[skillSlug];
+  if (!override) return base;
+  return { ...base, ...override };
+}
+
+/**
  * Resolve model config by priority:
  * 1. Explicit override
  * 2. Primary skill category default

@@ -143,6 +143,8 @@ export interface AgentExecutionInput {
    * rather than an "additional instruction" buried in the user message.
    */
   skillSpec?: string;
+  /** 当前步骤对应的 skill slug（如 "layout_design"），用于触发 SKILL_MODEL_OVERRIDES */
+  skillSlug?: string;
 }
 
 export interface AgentExecutionResult {
