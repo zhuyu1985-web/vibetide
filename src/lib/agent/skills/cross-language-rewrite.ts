@@ -22,9 +22,7 @@ import { getLanguageModel, resolveModelConfig } from "../model-router";
 // Zod schema
 // ---------------------------------------------------------------------------
 
-const TARGET_LANGUAGE_ENUM = ["en"] as const;
-
-export type TargetLanguage = (typeof TARGET_LANGUAGE_ENUM)[number];
+export type TargetLanguage = "en";
 
 // CATEGORY_TONE_DEFAULTS 保留 3 个内置语气模板。新加的分类（用户在工作流
 // 编辑器里加的）会走通用语气 fallback。这 3 个 key 必须跟 seed-builtin-workflows
@@ -77,8 +75,21 @@ export interface CrossLanguageRewriteInput {
   variantsPerTopic?: 1 | 2 | 3;  // ← Phase 4 新，默认 1
 }
 
+export interface RewriteFailedItem {
+  sourceTopicId: string;
+  title: string;
+  sourceUrl?: string;
+  category?: string;
+  reason: "rewrite_unavailable";
+}
+
 export interface CrossLanguageRewriteOutput {
   articles: RewrittenArticle[];
+  failed?: RewriteFailedItem[];
+  warning?: {
+    code: "partial_rewrite_unavailable";
+    message: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -256,11 +267,11 @@ export async function crossLanguageRewriteArticles(
 
   const variantsPerTopic = input.variantsPerTopic ?? 1;
 
-  // Fan-out:每条 article 单独 LLM 调用,SINGLE_CONCURRENCY=5 并发跑。
+  // Fan-out:每条 article 单独 LLM 调用,SINGLE_CONCURRENCY=8 并发跑。
   // 这跟旧版"塞 8 条进单次 LLM"对比:
-  //   - 单点 schema 失败:旧版整批 8 条全 NEEDS REVIEW;新版只影响 1 条
+  //   - 单点 schema 失败:旧版整批 8 条全失败;新版只影响 1 条
   //   - maxTokens 截断:旧版 8k 输出预算吃满概率高;新版每条只用 ≤2k
-  //   - 总耗时:旧版串行批次 60-90s;新版并发 5 时 10 条 ≈ 20s
+  //   - 总耗时:旧版串行批次 60-90s;新版并发 8 时 10 条 ≈ 20s
   const settled = await runWithConcurrency(
     input.articles,
     SINGLE_CONCURRENCY,
@@ -276,30 +287,12 @@ export async function crossLanguageRewriteArticles(
     } else {
       const article = input.articles[idx];
       console.warn(
-        `[cross_language_rewrite] article ${article.id} failed, fallback to NEEDS REVIEW:`,
+        `[cross_language_rewrite] article ${article.id} rewrite unavailable:`,
         res.reason,
       );
       failedArticleIds.add(article.id);
     }
   });
-
-  // 兜底:缺漏 / 单条调用失败 → [NEEDS REVIEW] 占位入库,不让整步失败。
-  const returnedSourceIds = new Set(allResults.map((a) => a.sourceTopicId));
-  const missing: RewrittenArticle[] = input.articles
-    .filter((a) => !returnedSourceIds.has(a.id))
-    .map((a) => ({
-      id: `${a.id}-v0`,
-      sourceTopicId: a.id,
-      variantIndex: 0,
-      sourceUrl: a.sourceUrl,
-      category: a.category,
-      title_en: `[NEEDS REVIEW] ${a.title}`,
-      body_en: `[NEEDS REVIEW] LLM did not return a rewrite for this article. Original Chinese body preserved:\n\n${a.body.slice(0, BODY_TRUNCATE_CHARS)}`,
-      hashtags: ["#NeedsReview", "#FromChina", "#Draft"],
-      cultural_notes: failedArticleIds.has(a.id)
-        ? "该条 LLM 调用失败(timeout / JSON 解析错 / schema 拒绝),已兜底标记 NEEDS REVIEW。"
-        : "LLM 未返回该条改写,已兜底标记 NEEDS REVIEW。",
-    }));
 
   // sourceUrl 兜底回填 — LLM 漏返时从 input 找 sourceTopicId 对应的原文
   const filled = allResults.map((a) => ({
@@ -307,7 +300,27 @@ export async function crossLanguageRewriteArticles(
     sourceUrl: a.sourceUrl ?? input.articles.find((src) => src.id === a.sourceTopicId)?.sourceUrl,
   }));
 
+  const returnedSourceIds = new Set(filled.map((a) => a.sourceTopicId));
+  const failed: RewriteFailedItem[] = input.articles
+    .filter((a) => failedArticleIds.has(a.id) || !returnedSourceIds.has(a.id))
+    .map((a) => ({
+      sourceTopicId: a.id,
+      title: a.title,
+      sourceUrl: a.sourceUrl,
+      category: a.category,
+      reason: "rewrite_unavailable",
+    }));
+
   return {
-    articles: [...filled, ...missing],
+    articles: filled,
+    ...(failed.length > 0
+      ? {
+          failed,
+          warning: {
+            code: "partial_rewrite_unavailable",
+            message: `${failed.length}/${input.articles.length} 篇未生成英文稿，已跳过并保留其余结果。`,
+          },
+        }
+      : {}),
   };
 }

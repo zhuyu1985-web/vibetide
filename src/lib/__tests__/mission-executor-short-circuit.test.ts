@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderStepParameters, getNestedField } from "../mission-executor";
+import {
+  getNestedField,
+  isArchiveDedupOnlyResult,
+  parseCallParamsFromTaskDescription,
+  renderStepParameters,
+  buildImplicitTrendingTopicsParams,
+  formatRegisteredSkillFallbackFailure,
+  shouldBlockRegisteredSkillFallback,
+  shouldForceInjectWorkflowTool,
+  shouldUseStrictToolEnforcement,
+} from "../mission-executor";
 
 describe("renderStepParameters", () => {
   it("从 mission.inputParams 取 primitive string", () => {
@@ -59,6 +69,31 @@ describe("renderStepParameters", () => {
   });
 });
 
+describe("parseCallParamsFromTaskDescription", () => {
+  it("从任务描述的调用参数块恢复 JSON 字符串和布尔值", () => {
+    expect(
+      parseCallParamsFromTaskDescription(`入英文稿件库（待审）（使用技能：稿件入库）
+
+【调用参数（必须严格使用这些值调用工具，禁止自行修改）】
+- articles: "{{step4.articles}}"
+- category: "app_overseas_en"
+- language: "en"
+- initialStatus: "approved"
+- dedupBySourceUrl: true`),
+    ).toEqual({
+      articles: "{{step4.articles}}",
+      category: "app_overseas_en",
+      language: "en",
+      initialStatus: "approved",
+      dedupBySourceUrl: true,
+    });
+  });
+
+  it("没有调用参数块时返回空对象", () => {
+    expect(parseCallParamsFromTaskDescription("普通任务描述")).toEqual({});
+  });
+});
+
 describe("renderStepParameters with real-world StepOutput shape", () => {
   it("从 StepOutput 含 topics 字段能取到 (verify A.1.2.5 fix)", () => {
     // Mock production-like previousSteps shape: StepOutput with extra fields
@@ -81,6 +116,56 @@ describe("renderStepParameters with real-world StepOutput shape", () => {
       previousSteps,
     );
     expect(rendered.topics).toEqual([{ id: "t1", title: "X" }]);
+  });
+
+  it("CMS 发布链路按 step.order 解析 step4.articles 和 step6.firstArticleId", () => {
+    const previousSteps: Array<{ outputData?: unknown }> = [];
+    previousSteps[3] = {
+      outputData: {
+        articles: [
+          {
+            title: "成都早报",
+            body: "正文内容足够长，用于入库测试",
+            summary: "摘要",
+            language: "zh",
+          },
+        ],
+      },
+    };
+    previousSteps[5] = {
+      outputData: {
+        firstArticleId: "11111111-1111-4111-8111-111111111111",
+      },
+    };
+
+    expect(
+      renderStepParameters(
+        { articles: "{{step4.articles}}", initialStatus: "approved" },
+        { inputParams: {} } as never,
+        previousSteps,
+      ),
+    ).toEqual({
+      articles: [
+        {
+          title: "成都早报",
+          body: "正文内容足够长，用于入库测试",
+          summary: "摘要",
+          language: "zh",
+        },
+      ],
+      initialStatus: "approved",
+    });
+
+    expect(
+      renderStepParameters(
+        { articleId: "{{step6.firstArticleId}}", catalogId: "10462" },
+        { inputParams: {} } as never,
+        previousSteps,
+      ),
+    ).toEqual({
+      articleId: "11111111-1111-4111-8111-111111111111",
+      catalogId: "10462",
+    });
   });
 });
 
@@ -173,5 +258,150 @@ describe("getNestedField — 独立单测", () => {
 
   it("解到 primitive 后继续访问 → undefined", () => {
     expect(getNestedField({ a: 1 }, "a.b")).toBeUndefined();
+  });
+});
+
+describe("isArchiveDedupOnlyResult", () => {
+  it("全量 sourceUrl 去重命中且已有 articleId 可用时，不应按写入 0 条失败处理", () => {
+    expect(
+      isArchiveDedupOnlyResult({
+        success: true,
+        totalRequested: 2,
+        totalCreated: 0,
+        totalSkipped: 2,
+        created: [
+          { articleId: "existing-1", status: "existing" },
+          { articleId: "existing-2", status: "existing" },
+        ],
+        skipped: [
+          {
+            sourceUrl: "https://example.com/1",
+            existingArticleId: "existing-1",
+            reason: "duplicate_source_url",
+          },
+          {
+            sourceUrl: "https://example.com/2",
+            existingArticleId: "existing-2",
+            reason: "duplicate_source_url",
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("写入 0 条但不是纯去重命中时，仍然保留失败防线", () => {
+    expect(
+      isArchiveDedupOnlyResult({
+        success: true,
+        totalRequested: 2,
+        totalCreated: 0,
+        totalSkipped: 2,
+        created: [],
+        skipped: [
+          { sourceUrl: "https://example.com/1", reason: "invalid_language" },
+          { sourceUrl: "https://example.com/2", reason: "invalid_language" },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("多个输入命中同一篇已有稿时，只要有可用 articleId 就不是失败", () => {
+    expect(
+      isArchiveDedupOnlyResult({
+        success: true,
+        totalRequested: 2,
+        totalCreated: 0,
+        totalSkipped: 2,
+        created: [{ articleId: "existing-1", status: "existing" }],
+        skipped: [
+          {
+            sourceUrl: "https://example.com/dup",
+            existingArticleId: "existing-1",
+            reason: "duplicate_source_url",
+          },
+          {
+            sourceUrl: "https://example.com/dup",
+            existingArticleId: "existing-1",
+            reason: "duplicate_source_url",
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("shouldBlockRegisteredSkillFallback", () => {
+  it("content_generate 无显式参数时允许走 agent 写稿路径", () => {
+    expect(
+      shouldBlockRegisteredSkillFallback({
+        assignedRole: "content_generate",
+        preExecAttempted: false,
+        preExecUsedTool: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("content_generate 显式短路尝试失败时仍阻止 fallback", () => {
+    expect(
+      shouldBlockRegisteredSkillFallback({
+        assignedRole: "content_generate",
+        preExecAttempted: true,
+        preExecUsedTool: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("写入工具缺少可用短路结果时阻止 fallback", () => {
+    expect(
+      shouldBlockRegisteredSkillFallback({
+        assignedRole: "archive_to_drafts",
+        preExecAttempted: false,
+        preExecUsedTool: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("短路失败文案透出真实 pre-exec 错误", () => {
+    expect(
+      formatRegisteredSkillFallbackFailure(
+        "trending_topics",
+        "TopHub /search returned 401",
+      ),
+    ).toContain("真实错误：TopHub /search returned 401");
+  });
+});
+
+describe("workflow skill tool enforcement guards", () => {
+  it("content_generate 不强制注入/调用同名 helper tool", () => {
+    expect(shouldForceInjectWorkflowTool("content_generate")).toBe(false);
+    expect(shouldUseStrictToolEnforcement("content_generate", false)).toBe(false);
+  });
+
+  it("开放式非工具 skill 不强制走占位工具", () => {
+    expect(shouldForceInjectWorkflowTool("layout_design")).toBe(false);
+    expect(shouldUseStrictToolEnforcement("layout_design", false)).toBe(false);
+  });
+
+  it("写入工具仍强制工具路径", () => {
+    expect(shouldForceInjectWorkflowTool("archive_to_drafts")).toBe(true);
+    expect(shouldUseStrictToolEnforcement("archive_to_drafts", false)).toBe(true);
+  });
+});
+
+describe("buildImplicitTrendingTopicsParams", () => {
+  it("本地场景缺少显式参数时用 city 构造 search 调用", () => {
+    expect(
+      buildImplicitTrendingTopicsParams("AI 早晚报(成都)", {
+        city: "成都",
+        edition: "morning",
+      }),
+    ).toEqual({ mode: "search", query: "成都", limit: 20 });
+  });
+
+  it("没有本地关键词时回退到全网 hot", () => {
+    expect(buildImplicitTrendingTopicsParams("每日热点", {})).toEqual({
+      mode: "hot",
+      limit: 20,
+    });
   });
 });

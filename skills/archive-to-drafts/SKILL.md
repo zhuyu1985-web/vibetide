@@ -43,7 +43,7 @@ metadata:
 - 不要修改 / 重排传入的稿件 —— 保持调用方传过来的内容原样
 - 不要从训练数据补充缺失字段 —— 缺什么就缺什么，让上游解决
 
-`dedupBySourceUrl` 默认开启，遇到重复 sourceUrl 不要插入新行，写到 `skipped[]`。
+`dedupBySourceUrl` 默认开启，遇到重复 sourceUrl 不要插入新行，写到 `skipped[]`，同时把已有稿件的 `articleId` 放入 `created[]` / `articles[]` 兼容字段，供下游 CMS 发布步骤继续消费。
 
 ## 输入
 
@@ -63,12 +63,15 @@ metadata:
 | `articles[].culturalNotes` | string | ✗ | 本地化决策注解 |
 | `dedupBySourceUrl` | boolean | ✗ | 默认 true，sourceUrl 已存在则 skip |
 | `initialStatus` | "draft" \| "approved" | ✗ | 默认 "approved"，入库时的 article.status |
-| `dryRun` | boolean | ✗ | 测试入口自动注入，跳过所有 DB 操作 |
+| `dryRun` | boolean | ✗ | 测试入口自动注入，跳过所有 DB 操作，但返回 shape-compatible 的 `created[]` |
+| `missionId` | string | ✗ | 正式 mission 执行时由执行器注入，落 `articles.mission_id` |
 
 ## 输出
 
-- `totalRequested / totalCreated / totalSkipped`
-- `created[]`: 新建稿件的 `articleId + title + sourceUrl`
+- `totalRequested / totalCreated / totalSkipped / totalAvailable`
+- `created[]`: 下游兼容字段，表示本次确保可用的稿件，包含新建和去重命中的已有稿件
+- `inserted[]`: 本次真实新建稿件的 `articleId + title + sourceUrl`
+- `articles[]`: 与 `created[]` 同义，推荐新工作流绑定这个字段
 - `skipped[]`: 去重跳过的 `sourceUrl + existingArticleId + reason="duplicate_source_url"`
 
 ## 持久化字段
@@ -82,22 +85,21 @@ metadata:
 | `body` | input.body | |
 | `summary` | input.summary ?? null | |
 | `source_url` | input.sourceUrl ?? null | dedupBySourceUrl 的依据 |
+| `mission_id` | 执行器注入 missionId | 用于任务产物归属 |
 | `status` | initialStatus（默认 approved） | |
 | `tags` | [...input.tags, ...input.hashtags] | 中英 tag 合并 |
 | `media_type` | "article" | 硬编码 |
 | `published_at` | null | 始终为 null，跟"未发布"语义对齐 |
 | `language` | input.language ?? "en" | |
+| `metadata` | sourceTopicId / variantIndex / category / culturalNotes / createdByWorkflow | 工作流来源信息 |
 
-**当前 NOT 持久化的字段**（仅在 tool 返回的 `created[]` 里有 sourceUrl 链接，其余完全丢失）：
+**metadata 持久化字段**：
 
 - `sourceTopicId`
 - `variantIndex`
 - `category`
 - `culturalNotes`
-
-> 待办：加 `articles.metadata` jsonb 列后这 4 个字段可以一并落库（CLAUDE.md 标准 Drizzle 流程）。schema drift 已在 commit `8c36095` 追平到 0039 snapshot，下一个 follow-up commit 加 metadata 列后即可启用。**历史 hack 已撤回**（commit `16830be`）：
-> - `sourceTopicId` 是普通 string（如 `"t1"`），不能写进 `translated_from_topic_id`（uuid FK to hot_topics）—— 运行时会 invalid uuid syntax crash
-> - `variantIndex` / `category` / `culturalNotes` 不能拼成字符串塞 `advisor_notes` —— 该列被 `articles/[id]/article-edit-client.tsx:646` 渲染成紫色"顾问"问答卡，会污染用户 UI
+- `createdByWorkflow`
 
 ## 与 cms_publish 的区别
 
@@ -108,6 +110,8 @@ metadata:
 ## 质量把关
 
 - `sourceUrl` 去重防止反复跑同一热点污染稿件库（cross_language_rewrite 输出多个 variant 共用同一 sourceUrl 时，第 1 个 variant 入库、其余 skip——按 source 去重的设计）
+- 纯去重命中不是失败：只要 `skipped[]` 里有 `existingArticleId`，下游仍可继续用已有稿件发布
+- 拒绝 `cross_language_rewrite` 的 `[NEEDS REVIEW]` 兜底稿，且 `language="en"` 时拒绝明显中文内容；这类输入说明上游翻译失败，不能污染英文稿件库
 - `published_at` 始终为 null（不算"已发布"，跟稿件库 status 过滤对齐）
 - `dryRun=true` 必须在所有 DB 操作之前短路返回（跟 cms_publish 一致），防止测试入口污染 articles 表
 - 缺 `organizationId` 直接返回 error code `missing_context`，不允许跨租户写入

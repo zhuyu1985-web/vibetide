@@ -79,6 +79,122 @@ describe("executeAgent — tool failure detection", () => {
     expect(result.output.errorMessage).toBeUndefined();
   });
 
+  it("成功工具结果保留结构化字段，供下游步骤参数引用", async () => {
+    generateTextMock.mockImplementation(async ({ onStepFinish }) => {
+      onStepFinish?.({
+        toolCalls: [{ toolName: "archive_to_drafts", args: {} }],
+        toolResults: [
+          {
+            toolName: "archive_to_drafts",
+            output: {
+              success: true,
+              totalCreated: 1,
+              firstArticleId: "11111111-1111-4111-8111-111111111111",
+              created: [
+                {
+                  articleId: "11111111-1111-4111-8111-111111111111",
+                  title: "早报标题",
+                },
+              ],
+            },
+          },
+        ],
+      });
+      return {
+        text: "【执行摘要】稿件已入库\n\n【执行过程】\n1. 写入 articles\n\n【产出结果】已创建 1 篇稿件\n",
+        usage: { inputTokens: 100, outputTokens: 200 },
+      };
+    });
+
+    const result = await executeAgent(baseAgent, baseInput);
+
+    expect(result.output.status).toBe("success");
+    expect(result.output.firstArticleId).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(result.output.created).toEqual([
+      {
+        articleId: "11111111-1111-4111-8111-111111111111",
+        title: "早报标题",
+      },
+    ]);
+  });
+
+  it("content_generate 文本产出会暴露 articles[] 供 archive_to_drafts 消费", async () => {
+    generateTextMock.mockImplementation(async () => ({
+      text: `【执行摘要】完成成都早报撰写
+
+【产出结果】
+# 成都早报：城市更新与民生服务提速
+
+今日成都聚焦城市更新、交通出行和公共服务优化。多个区县发布便民事项，产业园区也有新进展。
+
+## 民生服务
+社区服务窗口延长办理时间，方便上班族错峰办理。
+
+【质量自评：86/100】`,
+      usage: { inputTokens: 100, outputTokens: 200 },
+    }));
+
+    const result = await executeAgent(baseAgent, {
+      ...baseInput,
+      stepKey: "step-4",
+      stepLabel: "早晚报撰写",
+      skillSlug: "content_generate",
+    });
+
+    expect(result.output.title).toBe("成都早报：城市更新与民生服务提速");
+    expect(result.output.body).toContain("今日成都聚焦城市更新");
+    expect(result.output.articles).toEqual([
+      expect.objectContaining({
+        title: "成都早报：城市更新与民生服务提速",
+        body: expect.stringContaining("今日成都聚焦城市更新"),
+        language: "zh",
+      }),
+    ]);
+  });
+
+  it("content_generate JSON 产出会解包 title/bodyMarkdown 而不是把 JSON 入库", async () => {
+    generateTextMock.mockImplementation(async () => ({
+      text: `【执行摘要】完成成都早报撰写
+
+【产出结果】
+\`\`\`json
+{
+  "meta": { "contentId": "ai-brief-chengdu-20260530" },
+  "title": "成都AI早晚报（2026年5月30日）",
+  "summary": "今日成都AI领域迎来两大关键进展。",
+  "bodyHtml": "<h1>成都AI早晚报（2026年5月30日）</h1><p>今日，成都AI领域迎来两大关键进展。</p>",
+  "bodyMarkdown": "# 成都AI早晚报（2026年5月30日）\\n\\n今日，成都AI领域迎来两大关键进展。"
+}
+\`\`\`
+
+【质量自评：88/100】`,
+      usage: { inputTokens: 100, outputTokens: 200 },
+    }));
+
+    const result = await executeAgent(baseAgent, {
+      ...baseInput,
+      stepKey: "step-4",
+      stepLabel: "早晚报撰写",
+      skillSlug: "content_generate",
+    });
+
+    expect(result.output.title).toBe("成都AI早晚报（2026年5月30日）");
+    expect(result.output.body).toBe(
+      "# 成都AI早晚报（2026年5月30日）\n\n今日，成都AI领域迎来两大关键进展。",
+    );
+    expect(result.output.body).not.toContain('"meta"');
+    expect(result.output.articles).toEqual([
+      expect.objectContaining({
+        title: "成都AI早晚报（2026年5月30日）",
+        body: "# 成都AI早晚报（2026年5月30日）\n\n今日，成都AI领域迎来两大关键进展。",
+        summary: "今日成都AI领域迎来两大关键进展。",
+        language: "zh",
+      }),
+    ]);
+  });
+
   it("工具返回 success=false → output.status=failed + errorMessage 含工具名和 code", async () => {
     generateTextMock.mockImplementation(async ({ onStepFinish }) => {
       onStepFinish?.({

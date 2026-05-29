@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { assembleAgent, executeAgent } from "@/lib/agent";
 import {
   invokeToolDirectly,
+  isWriteTool,
   isToolRegistered,
 } from "@/lib/agent/tool-registry";
 import {
@@ -23,6 +24,10 @@ import type { InputFieldDef } from "@/lib/types";
 import type { StepOutput } from "@/lib/agent/types";
 import type { EmployeeId } from "@/lib/constants";
 import { renderScenarioTemplate } from "@/lib/scenario-template";
+import {
+  detectWorkflowTestRunToolFailure,
+  detectWorkflowTestRunToolWarning,
+} from "@/lib/workflow-test-run-status";
 
 // ---------------------------------------------------------------------------
 // POST /api/workflows/test-run
@@ -39,7 +44,8 @@ import { renderScenarioTemplate } from "@/lib/scenario-template";
 //                                            ← 跟模板 fast-path 同源
 //
 // 差异：
-//   - 不落库（不创建 mission / mission_task / mission_message / artifact）
+//   - 不落库（不创建 mission / mission_task / mission_message / artifact；
+//     写入型工具强制 dryRun，返回 shape-compatible 结果供后续步骤串联）
 //   - 通过 SSE 把每步结果 push 给前端，而不是写 DB
 //   - previousSteps 本地累积，不从 DB 查 dependency 输出
 // ---------------------------------------------------------------------------
@@ -53,6 +59,7 @@ import { renderScenarioTemplate } from "@/lib/scenario-template";
 // `{{stepN.field}}`。这跟 mission-executor 里 `loadDependencyOutputs` →
 // `previousStepsForRender[priority-1].outputData` 完全同形。
 interface LocalPreviousStep {
+  stepId: string;
   rawOutput: unknown;
   output: StepOutput;
   /** 用于 UI 展示的完整文本（同时保存以便做 extractSummary 等） */
@@ -71,6 +78,7 @@ export async function POST(req: Request) {
       userInputs,
       promptTemplate,
       inputFields,
+      clientRunId,
     } = body as {
       steps: WorkflowStepDef[];
       triggerType: "manual" | "scheduled";
@@ -78,7 +86,9 @@ export async function POST(req: Request) {
       userInputs?: Record<string, unknown>;
       promptTemplate?: string;
       inputFields?: InputFieldDef[];
+      clientRunId?: string;
     };
+    const runId = clientRunId || crypto.randomUUID();
 
     if (!steps || !Array.isArray(steps)) {
       return new Response("缺少步骤数据", { status: 400 });
@@ -151,7 +161,7 @@ export async function POST(req: Request) {
           try {
             controller.enqueue(
               encoder.encode(
-                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+                `event: ${event}\ndata: ${JSON.stringify({ ...data, runId })}\n\n`,
               ),
             );
           } catch {
@@ -177,6 +187,13 @@ export async function POST(req: Request) {
           );
 
           for (let i = 0; i < sortedSteps.length; i++) {
+            if (i > 0 && previousSteps.length < i) {
+              failedSteps++;
+              send("error", {
+                message: `工作流在第 ${i + 1} 步前停止：上一步尚未产生可用输出，拒绝继续执行后续步骤。`,
+              });
+              break;
+            }
             const step = sortedSteps[i];
             const skillSlug = step.config?.skillSlug;
             const skillName = step.config?.skillName || step.name;
@@ -226,7 +243,10 @@ export async function POST(req: Request) {
                 { inputParams },
                 previousStepsForRender,
               );
-              const effectiveParams = renderedParams;
+              const effectiveParams =
+                skillSlug && isToolRegistered(skillSlug) && isWriteTool(skillSlug)
+                  ? { ...renderedParams, dryRun: true }
+                  : renderedParams;
               const hasBindings = Object.keys(effectiveParams).length > 0;
 
               // ── 3. 短路 dispatch（与 mission-executor 同源） ───────────────
@@ -290,8 +310,17 @@ export async function POST(req: Request) {
                     else if (Array.isArray(resultObj.created))
                       count = resultObj.created.length;
                   }
-                  const countNote =
-                    count === 0
+                  const toolFailure = detectWorkflowTestRunToolFailure(
+                    invocation.result,
+                  );
+                  const toolWarning = detectWorkflowTestRunToolWarning(
+                    invocation.result,
+                  );
+                  const countNote = toolFailure
+                    ? `\n\n❌ 工具返回失败：${toolFailure.code} — ${toolFailure.message}`
+                    : toolWarning
+                      ? `\n\n⚠️ 工具返回部分成功：${toolWarning.code} — ${toolWarning.message}`
+                    : count === 0
                       ? "\n\n⚠️ 真实结果 0 条。请调整参数重试（扩大 timeRange / 更换关键词 / 检查上一步输出）。"
                       : count !== undefined
                         ? `\n\n（真实命中 ${count} 条）`
@@ -314,15 +343,57 @@ ${truncated}
 
 【质量评估】
 - 可信度：高（真实${dispatchType === "llm-skill" ? "LLM-skill" : "工具"}调用，非模拟）
-- 建议改进：${count === 0 ? "调整参数后重跑" : "无"}`;
+- 建议改进：${toolFailure ? "排查错误后重试" : toolWarning ? "检查 failed/warnings 后继续处理有效结果" : count === 0 ? "调整参数后重跑" : "无"}`;
 
                   const baseSummary = extractSummary(deterministicText, skillName);
+                  if (toolFailure) {
+                    const durationMs = Date.now() - stepStartedAt;
+                    const summary = `${skillSlug} 执行失败：${toolFailure.message}`;
+                    send("step-failed", {
+                      stepId: step.id,
+                      stepIndex: i,
+                      error: deterministicText,
+                      summary,
+                      durationMs,
+                      employeeName,
+                    });
+                    previousSteps.push({
+                      stepId: step.id,
+                      rawOutput: invocation.result,
+                      output: {
+                        stepKey: step.id,
+                        employeeSlug: (matched?.slug ??
+                          leader.slug) as EmployeeId,
+                        summary,
+                        artifacts: [
+                          {
+                            id: `${step.id}-result`,
+                            type: "generic",
+                            title: `${skillSlug} 失败结果`,
+                            content:
+                              typeof invocation.result === "string"
+                                ? invocation.result
+                                : JSON.stringify(invocation.result, null, 2),
+                          },
+                        ],
+                        metrics: { qualityScore: 0 },
+                        status: "partial",
+                      },
+                      displayText: deterministicText,
+                    });
+                    failedSteps++;
+                    break;
+                  }
                   // 0 条产出 → summary 加 ⚠️,前端 UI 可识别显示黄色警告。
                   // 链路断裂时(step N 产出 0 → step N+1 拿空数组)用户能立即从
                   // step 卡片的 summary 字段判断"哪一步真正断了链",而不是看到
                   // 全绿色完成却空空如也。
                   const summary =
-                    count === 0 ? `⚠️ ${baseSummary} (产出 0 条)` : baseSummary;
+                    toolWarning
+                      ? `⚠️ ${baseSummary} (${toolWarning.message})`
+                      : count === 0
+                        ? `⚠️ ${baseSummary} (产出 0 条)`
+                        : baseSummary;
                   const durationMs = Date.now() - stepStartedAt;
                   send("step-complete", {
                     stepId: step.id,
@@ -332,10 +403,11 @@ ${truncated}
                     durationMs,
                     employeeName,
                     success: true,
-                    warning: count === 0,
+                    warning: !!toolWarning || count === 0,
                     emptyOutput: count === 0,
                   });
                   previousSteps.push({
+                    stepId: step.id,
                     rawOutput: invocation.result,
                     output: {
                       stepKey: step.id,
@@ -390,6 +462,7 @@ ${truncated}
                   employeeName,
                 });
                 previousSteps.push({
+                  stepId: step.id,
                   rawOutput: null,
                   output: {
                     stepKey: step.id,
@@ -486,18 +559,18 @@ ${truncated}
                     stringInputs.title ??
                     stringInputs.query ??
                     skillName,
-                  previousSteps: previousSteps.map((p) => p.output),
+                  previousSteps: previousSteps
+                    .filter((p) => (step.dependsOn ?? []).includes(p.stepId))
+                    .map((p) => p.output),
                   userInstructions,
                   skillSpec: skillBody ?? undefined,
+                  skillSlug: skillSlug ?? undefined,
                 },
                 undefined,
                 undefined, // 测试运行无 missionTools（无 mission 上下文可post message）
                 { organizationId: orgId, operatorId: user.id },
               );
 
-              const resultText =
-                execResult.output.summary ||
-                `「${skillName}」执行完成`;
               const structuredText = formatAgentResultForDisplay(execResult);
               const summary = extractSummary(structuredText, skillName);
               const durationMs = Date.now() - stepStartedAt;
@@ -512,9 +585,10 @@ ${truncated}
                 success: true,
               });
               previousSteps.push({
-                // agent 路径没有结构化 raw output，把 StepOutput 当 rawOutput 兜底；
-                // 下游 `{{stepN.field}}` 引用通常失败（fallback 空串），跟
-                // mission-executor 一致。
+                stepId: step.id,
+                // agent 路径把 StepOutput 作为 rawOutput；executeAgent 会把
+                // content_generate.articles、tool result 字段等结构化产出挂到顶层，
+                // 下游 `{{stepN.field}}` 可以继续按 step.order 解析。
                 rawOutput: execResult.output,
                 output: execResult.output,
                 displayText: structuredText,
@@ -533,6 +607,7 @@ ${truncated}
                 durationMs,
               });
               failedSteps++;
+              break;
             }
           }
 

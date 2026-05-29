@@ -102,6 +102,7 @@ export const articles = pgTable("articles", {
     language?: string;
     category?: string;
     culturalNotes?: string;
+    workflowTaskId?: string;
     createdByWorkflow?: boolean;
   }>(),
 

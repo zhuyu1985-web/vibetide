@@ -107,3 +107,74 @@ describe("cross_language_rewrite variants & sourceUrl 透传", () => {
     expect(out.articles[0].sourceUrl).toBe("https://example.com/orig");
   });
 });
+
+describe("cross_language_rewrite partial failures", () => {
+  beforeEach(() => {
+    generateTextMock.mockClear();
+  });
+
+  it("单条改写失败时不把 NEEDS REVIEW 占位稿放进 articles", async () => {
+    generateTextMock.mockImplementation(async ({ prompt }: { prompt: string }) => {
+      const payload = JSON.parse(prompt) as { article: { id: string; title: string } };
+      if (payload.article.id === "bad") {
+        throw new Error("model timeout");
+      }
+      return {
+        output: {
+          articles: [
+            {
+              id: `${payload.article.id}-v0`,
+              sourceTopicId: payload.article.id,
+              variantIndex: 0,
+              sourceUrl: "https://example.com/good",
+              category: "food",
+              title_en: "Young people are spending more on food than fashion",
+              body_en: "A complete English rewrite with enough body text for downstream publishing.",
+              hashtags: ["#FoodCulture", "#YouthSpending"],
+            },
+          ],
+        },
+      };
+    });
+
+    const out = await crossLanguageRewriteArticles({
+      articles: [
+        {
+          id: "good",
+          title: "年轻人更愿意为吃花钱",
+          body: "中文正文内容足够长，用于生成英文稿。",
+          sourceUrl: "https://example.com/good",
+          category: "food",
+        },
+        {
+          id: "bad",
+          title: "为什么年轻人不愿意买衣服",
+          body: "这条会模拟模型超时，不能作为中文占位稿进入下游。",
+          sourceUrl: "https://example.com/bad",
+          category: "food",
+        },
+      ],
+      targetLanguage: "en",
+      categoryHint: "food",
+    });
+
+    expect(out.articles).toHaveLength(1);
+    expect(out.articles[0].sourceTopicId).toBe("good");
+    expect(JSON.stringify(out.articles)).not.toContain("[NEEDS REVIEW]");
+
+    const meta = out as {
+      failed?: Array<{ sourceTopicId: string; reason: string; title: string }>;
+      warning?: { code: string };
+    };
+    expect(meta.failed).toEqual([
+      {
+        sourceTopicId: "bad",
+        title: "为什么年轻人不愿意买衣服",
+        sourceUrl: "https://example.com/bad",
+        category: "food",
+        reason: "rewrite_unavailable",
+      },
+    ]);
+    expect(meta.warning?.code).toBe("partial_rewrite_unavailable");
+  });
+});

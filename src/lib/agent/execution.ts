@@ -17,6 +17,167 @@ import type {
 
 const AGENT_TIMEOUT_MS = 3 * 60 * 1000; // 3 分钟（整个 agent 多步执行上限）
 
+type ArticleDraft = {
+  title: string;
+  body: string;
+  summary: string;
+  language: "zh";
+};
+
+function stripMarkdownTitle(line: string): string {
+  return line
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^[-*]\s*/, "")
+    .replace(/^标题[：:]\s*/, "")
+    .trim();
+}
+
+function stripCodeFence(value: string): string {
+  return value
+    .trim()
+    .replace(/^```[a-zA-Z0-9_-]*\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function extractResultSection(rawText: string): string {
+  const match = rawText.match(/【产出结果】([\s\S]*?)(?:\n\s*【质量自评[：:]|\n\s*【质量评估】|$)/);
+  const section = (match?.[1] ?? rawText).trim();
+  return stripCodeFence(section).replace(/^json\s*(?=\{)/i, "").trim();
+}
+
+function tryParseJsonObject(value: string): Record<string, unknown> | null {
+  const normalized = stripCodeFence(value)
+    .replace(/^json\s*(?=\{)/i, "")
+    .replace(/^json\s*\n(?=\{)/i, "")
+    .trim();
+  const candidates = [normalized];
+  const firstBrace = normalized.indexOf("{");
+  const lastBrace = normalized.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(normalized.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+function decodeBasicHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function htmlToReadableMarkdown(html: string): string {
+  return decodeBasicHtmlEntities(html)
+    .replace(/<h1[^>]*>/gi, "\n# ")
+    .replace(/<h2[^>]*>/gi, "\n## ")
+    .replace(/<h3[^>]*>/gi, "\n### ")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    .replace(/<p[^>]*>/gi, "\n\n")
+    .replace(/<\/p>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n- ")
+    .replace(/<\/li>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function getStringField(obj: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function buildBodyFromSections(sections: unknown): string {
+  if (!Array.isArray(sections)) return "";
+  return sections
+    .map((section) => {
+      if (!section || typeof section !== "object") return "";
+      const obj = section as Record<string, unknown>;
+      const heading = getStringField(obj, ["heading", "title"]);
+      const body = getStringField(obj, ["body", "content", "text"]);
+      return [heading ? `## ${heading}` : "", body].filter(Boolean).join("\n\n");
+    })
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+function buildArticleDraftFromJsonPayload(
+  payload: Record<string, unknown>,
+  fallbackTitle: string,
+): ArticleDraft | null {
+  const title = getStringField(payload, ["title", "headline", "name"]) || fallbackTitle;
+  const summary = getStringField(payload, ["summary", "leadParagraph", "subtitle"]);
+  const body =
+    getStringField(payload, ["bodyMarkdown", "body", "content", "markdown"]) ||
+    buildBodyFromSections(payload.sections) ||
+    htmlToReadableMarkdown(getStringField(payload, ["bodyHtml", "html"]));
+
+  if (body.replace(/\s/g, "").length < 10) return null;
+
+  return {
+    title: stripMarkdownTitle(title).slice(0, 200) || fallbackTitle,
+    body,
+    summary: (summary || body.replace(/[*_`>#-]/g, "").replace(/\s+/g, " ").trim()).slice(0, 180),
+    language: "zh",
+  };
+}
+
+function buildArticleDraftFromGeneratedText(
+  rawText: string,
+  fallbackTitle: string,
+): ArticleDraft | null {
+  const body = extractResultSection(rawText);
+  if (body.replace(/\s/g, "").length < 10) return null;
+
+  const jsonPayload = tryParseJsonObject(body);
+  if (jsonPayload) {
+    const article = buildArticleDraftFromJsonPayload(jsonPayload, fallbackTitle);
+    if (article) return article;
+  }
+
+  const lines = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const heading =
+    lines.find((line) => /^#{1,6}\s+\S/.test(line)) ??
+    lines.find((line) => /^标题[：:]\s*\S/.test(line)) ??
+    lines.find((line) => !line.startsWith("【") && !line.startsWith("```"));
+  const title = stripMarkdownTitle(heading ?? fallbackTitle).slice(0, 200);
+  const plain = body
+    .replace(/^#{1,6}\s+.+$/gm, "")
+    .replace(/【[^】]+】/g, "")
+    .replace(/[*_`>#-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    title: title || fallbackTitle,
+    body,
+    summary: plain.slice(0, 180),
+    language: "zh",
+  };
+}
+
 /**
  * Execute an assembled agent for a specific workflow step.
  *
@@ -88,6 +249,7 @@ export async function executeAgent(
   // 之后用来 override output.status="failed"。LLM 文本叙述 "我失败了" 不可信
   // —— parseStepOutput 只看三段式结构, 检测不到失败。
   const toolFailures: Array<{ toolName: string; code: string; message: string }> = [];
+  const successfulToolOutputs: Array<Record<string, unknown>> = [];
 
   // 应用 skill-level override（如 layout_design 降 maxTokens 提速）
   const effectiveModelConfig = applySkillOverride(agent.modelConfig, input.skillSlug);
@@ -169,7 +331,8 @@ ${input.skillSpec}
       if (toolResults) {
         for (const tr of toolResults as Array<{ toolName?: string; output?: unknown }>) {
           const r = tr.output;
-          if (r && typeof r === "object" && (r as { success?: unknown }).success === false) {
+          if (!r || typeof r !== "object") continue;
+          if ((r as { success?: unknown }).success === false) {
             const err = (r as { error?: unknown }).error as
               | { code?: unknown; message?: unknown }
               | undefined;
@@ -179,6 +342,8 @@ ${input.skillSpec}
               message:
                 typeof err?.message === "string" ? err.message : "工具返回 success=false",
             });
+          } else {
+            successfulToolOutputs.push(r as Record<string, unknown>);
           }
         }
       }
@@ -193,6 +358,41 @@ ${input.skillSpec}
     input.stepKey,
     agent.slug
   );
+
+  // Successful tool calls often return structured fields that downstream
+  // workflow steps need for parameter binding, e.g. archive_to_drafts returns
+  // `firstArticleId` / `created[]` and cms_publish can consume those via
+  // `{{stepN.firstArticleId}}`. parseStepOutput only captures the final text,
+  // so preserve non-reserved tool fields on the StepOutput itself.
+  const reservedOutputKeys = new Set([
+    "stepKey",
+    "employeeSlug",
+    "summary",
+    "artifacts",
+    "metrics",
+    "status",
+    "errorMessage",
+    "errorCode",
+  ]);
+  for (const toolOutput of successfulToolOutputs) {
+    for (const [key, value] of Object.entries(toolOutput)) {
+      if (!reservedOutputKeys.has(key)) {
+        output[key] = value;
+      }
+    }
+  }
+
+  if (input.skillSlug === "content_generate") {
+    const article = buildArticleDraftFromGeneratedText(
+      result.text,
+      input.topicTitle || input.stepLabel || "工作流生成稿件",
+    );
+    if (article) {
+      output.title = article.title;
+      output.body = article.body;
+      output.articles = [article];
+    }
+  }
 
   // Bug B (Phase 2): tool 调用失败时 override 为 "failed"。
   // 必须在 authority-level 检查之前/或保持 guard ——- 如果 observer agent 的 tool 真挂了,

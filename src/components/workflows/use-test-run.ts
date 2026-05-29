@@ -1,7 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { InputFieldDef } from "@/lib/types";
 import type { StepStatus } from "./workflow-canvas";
+import {
+  isCurrentWorkflowTestRunEvent,
+  markPriorRunningStepsCompleted,
+} from "@/lib/workflow-test-run-status";
 
 export interface TestRunExtras {
   userInputs?: Record<string, unknown>;
@@ -15,6 +19,8 @@ export interface TestRunExtras {
 
 export function useTestRun() {
   const [testRunning, setTestRunning] = useState(false);
+  const activeRunIdRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [triggerStatus, setTriggerStatus] = useState<
     "idle" | "running" | "completed"
   >("idle");
@@ -29,7 +35,18 @@ export function useTestRun() {
       triggerConfig: { cron?: string; timezone?: string } | null,
       extras?: TestRunExtras
     ) => {
-      if (testRunning) return;
+      if (activeRunIdRef.current) return;
+      const runId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `test-run-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const orderedStepIds = [...steps]
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((step) => step.id);
+      activeRunIdRef.current = runId;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       setTestRunning(true);
       setTriggerStatus("idle");
       setStepStatuses({});
@@ -45,12 +62,19 @@ export function useTestRun() {
             userInputs: extras?.userInputs,
             promptTemplate: extras?.promptTemplate,
             inputFields: extras?.inputFields,
+            clientRunId: runId,
           }),
+          signal: controller.signal,
         });
+
+        if (!isCurrentWorkflowTestRunEvent(runId, activeRunIdRef.current)) {
+          return;
+        }
 
         if (!res.ok || !res.body) {
           console.error("[test-run] Request failed:", res.status);
           setTestRunning(false);
+          activeRunIdRef.current = null;
           return;
         }
 
@@ -73,6 +97,15 @@ export function useTestRun() {
             } else if (line.startsWith("data: ") && eventType) {
               try {
                 const data = JSON.parse(line.slice(6));
+                if (
+                  !isCurrentWorkflowTestRunEvent(
+                    data.runId,
+                    activeRunIdRef.current,
+                  )
+                ) {
+                  eventType = "";
+                  continue;
+                }
 
                 switch (eventType) {
                   case "trigger-start":
@@ -83,7 +116,13 @@ export function useTestRun() {
                     break;
                   case "step-start":
                     setStepStatuses((prev) => ({
-                      ...prev,
+                      ...markPriorRunningStepsCompleted(
+                        prev,
+                        orderedStepIds,
+                        typeof data.stepIndex === "number"
+                          ? data.stepIndex
+                          : orderedStepIds.indexOf(data.stepId as string),
+                      ),
                       [data.stepId as string]: {
                         status: "running",
                         message: "执行中…",
@@ -138,10 +177,14 @@ export function useTestRun() {
                     break;
                   case "done":
                     setTestRunning(false);
+                    activeRunIdRef.current = null;
+                    abortRef.current = null;
                     break;
                   case "error":
                     console.error("[test-run] Server error:", data.message);
                     setTestRunning(false);
+                    activeRunIdRef.current = null;
+                    abortRef.current = null;
                     break;
                 }
               } catch {
@@ -153,16 +196,28 @@ export function useTestRun() {
         }
 
         // Stream ended — ensure testRunning is reset
-        setTestRunning(false);
+        if (isCurrentWorkflowTestRunEvent(runId, activeRunIdRef.current)) {
+          setTestRunning(false);
+          activeRunIdRef.current = null;
+          abortRef.current = null;
+        }
       } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
         console.error("[test-run] Fetch error:", err);
-        setTestRunning(false);
+        if (isCurrentWorkflowTestRunEvent(runId, activeRunIdRef.current)) {
+          setTestRunning(false);
+          activeRunIdRef.current = null;
+          abortRef.current = null;
+        }
       }
     },
-    [testRunning]
+    []
   );
 
   const resetTestRun = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    activeRunIdRef.current = null;
     setTestRunning(false);
     setTriggerStatus("idle");
     setStepStatuses({});

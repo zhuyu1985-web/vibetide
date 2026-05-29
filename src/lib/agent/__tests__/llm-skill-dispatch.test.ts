@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 
 const classifyMock = vi.hoisted(() => vi.fn());
 const rewriteMock = vi.hoisted(() => vi.fn());
@@ -14,6 +14,10 @@ import {
   invokeLLMSkillDirectly,
   LLM_SKILL_EXECUTORS,
 } from "../llm-skill-dispatch";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("llm-skill-dispatch registration", () => {
   it("topic_classifier + cross_language_rewrite registered", () => {
@@ -77,6 +81,49 @@ describe("invokeLLMSkillDirectly cross_language_rewrite", () => {
     expect(callArgs.articles).toHaveLength(1);  // only food, not other
     expect(callArgs.articles[0].title).toBe("成都串串香排队 3 小时");
     expect(callArgs.articles[0].body.length).toBeGreaterThanOrEqual(10);  // summary used or fallback
+  });
+
+  it("接受 batch_deep_read 的 bocha 补全正文进入翻译", async () => {
+    rewriteMock.mockResolvedValueOnce({
+      articles: [
+        {
+          id: "t1-v0",
+          sourceTopicId: "t1",
+          variantIndex: 0,
+          title_en: "Rocket launch draws attention",
+          body_en: "A Chinese tech story rewritten for overseas readers.",
+          hashtags: ["#ChinaTech"],
+        },
+      ],
+    });
+
+    const res = await invokeLLMSkillDirectly("cross_language_rewrite", {
+      articles: [
+        {
+          id: "t1",
+          category: "domestic_tech",
+          confidence: 0.92,
+          reason: "科技事件",
+          sourceUrl: "https://example.com/tech",
+          title: "新格伦火箭发射台爆炸",
+          body: "Bocha 搜索补全的多源新闻摘要正文，足够支撑海外改写。",
+          fetchStatus: "enriched_via_bocha",
+        },
+      ],
+      targetLanguage: "en",
+      variantsPerTopic: 1,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(rewriteMock).toHaveBeenCalledTimes(1);
+    const callArgs = rewriteMock.mock.calls[0][0] as {
+      articles: Array<{ title: string; body: string; category?: string }>;
+    };
+    expect(callArgs.articles).toHaveLength(1);
+    expect(callArgs.articles[0]).toMatchObject({
+      title: "新格伦火箭发射台爆炸",
+      category: "domestic_tech",
+    });
   });
 
   it("未注册的 skill → ok=false", async () => {

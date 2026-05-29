@@ -91,6 +91,38 @@ function buildTophubHeaders(): Record<string, string> {
   return headers;
 }
 
+const DEFAULT_TOPHUB_TIMEOUT_MS = 20_000;
+const DEFAULT_TOPHUB_SEARCH_RETRY_TIMEOUT_MS = 30_000;
+
+function getPositiveIntegerEnv(name: string): number | null {
+  const raw = process.env[name];
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+}
+
+function getTophubTimeoutMs() {
+  return getPositiveIntegerEnv("TRENDING_API_TIMEOUT_MS") ?? DEFAULT_TOPHUB_TIMEOUT_MS;
+}
+
+function getTophubSearchRetryTimeoutMs() {
+  return (
+    getPositiveIntegerEnv("TRENDING_API_SEARCH_RETRY_TIMEOUT_MS") ??
+    DEFAULT_TOPHUB_SEARCH_RETRY_TIMEOUT_MS
+  );
+}
+
+function isRetryableTophubError(err: unknown) {
+  if (!err) return false;
+  if (err instanceof DOMException && err.name === "AbortError") return true;
+  if (err instanceof Error) {
+    return /abort|timeout|timed?\s*out|fetch failed|network/i.test(
+      `${err.name} ${err.message}`,
+    );
+  }
+  return /abort|timeout|fetch failed|network/i.test(String(err));
+}
+
 // ---------------------------------------------------------------------------
 // TopHub API fetch functions
 // ---------------------------------------------------------------------------
@@ -98,7 +130,7 @@ function buildTophubHeaders(): Record<string, string> {
 /** Fetch /hot — cross-platform trending aggregation (one request, all platforms) */
 async function fetchTrendingHot(): Promise<TrendingItem[]> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), getTophubTimeoutMs());
 
   try {
     const response = await fetch("https://api.tophubdata.com/hot", {
@@ -143,7 +175,7 @@ async function fetchTrendingNode(
   platformName?: string
 ): Promise<TrendingItem[]> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), getTophubTimeoutMs());
 
   try {
     const response = await fetch(`https://api.tophubdata.com/nodes/${nodeId}`, {
@@ -181,9 +213,12 @@ async function fetchTrendingNode(
 }
 
 /** Fetch /search — search across all trending lists */
-async function fetchTrendingSearch(query: string): Promise<TrendingItem[]> {
+async function fetchTrendingSearchOnce(
+  query: string,
+  timeoutMs: number,
+): Promise<TrendingItem[]> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const url = `https://api.tophubdata.com/search?q=${encodeURIComponent(query)}&p=1`;
@@ -215,6 +250,24 @@ async function fetchTrendingSearch(query: string): Promise<TrendingItem[]> {
     }));
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function fetchTrendingSearch(query: string): Promise<TrendingItem[]> {
+  try {
+    return await fetchTrendingSearchOnce(query, getTophubTimeoutMs());
+  } catch (err) {
+    if (!isRetryableTophubError(err)) throw err;
+    try {
+      return await fetchTrendingSearchOnce(query, getTophubSearchRetryTimeoutMs());
+    } catch (retryErr) {
+      const firstMessage = err instanceof Error ? err.message : String(err);
+      const retryMessage =
+        retryErr instanceof Error ? retryErr.message : String(retryErr);
+      throw new Error(
+        `TopHub /search 第一次调用超时或网络失败(${firstMessage}),重试后仍失败(${retryMessage})`,
+      );
+    }
   }
 }
 

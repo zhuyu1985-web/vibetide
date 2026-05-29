@@ -124,4 +124,40 @@ describe("toVercelTools — context 注入", () => {
       expect.objectContaining({ operatorId: "explicit-op" }),
     );
   });
+
+  it("missionTools 路径也会注入 missionId / taskId", async () => {
+    const executeMock = vi.fn().mockResolvedValue({ ok: true });
+    const tools = toVercelTools(
+      [],
+      undefined,
+      {
+        probe: {
+          execute: executeMock,
+        },
+      } as never,
+      undefined,
+      {
+        organizationId: "org-1",
+        operatorId: "op-1",
+        missionId: "mission-1",
+        taskId: "task-1",
+      },
+    );
+
+    await (tools.probe.execute as (args: Record<string, unknown>, opts: unknown) => Promise<unknown>)(
+      { input: "x" },
+      { toolCallId: "x", messages: [] },
+    );
+
+    expect(executeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: "x",
+        organizationId: "org-1",
+        operatorId: "op-1",
+        missionId: "mission-1",
+        taskId: "task-1",
+      }),
+      { toolCallId: "x", messages: [] },
+    );
+  });
 });

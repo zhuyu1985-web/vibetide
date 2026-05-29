@@ -1,7 +1,7 @@
 ---
 name: cross_language_rewrite
 displayName: 中英本地化改写
-description: 把中文稿件批量改写成发布在 X / Instagram / Facebook 等海外社交平台的英文版本。核心是"本地化改写，不是逐句直译"——调整文化引用（中文谚语 → 英文等价表达）、解释中国地名 / 品牌 / 名人（不假设西方读者认识）、语气适配海外受众（短句、emoji、有钩子）、保留事实数字。输出每篇含 id=`<source_id>-v<index>`、sourceTopicId、variantIndex、原样 echo 的 sourceUrl / category、title_en（≤140 字符）、body_en、3~7 个英文 hashtags、可选 cultural_notes。支持 variantsPerTopic（1-3，默认 1）一次为同一条 input 生成多个不同切入角度的英文 variant（0=headline-driven 短版 / 1=storytelling 中版 / 2=analytical 长版）。可选 categoryHint 任意字符串，内置 food/pets/domestic_tech 三种语气模板，其他值 fallback 到通用语气。当 workflow 走「海外热榜搬运」step 3、或编辑想把一篇中文稿快速改成英文发外站时调用。
+description: 把中文稿件批量改写成发布在 X / Instagram / Facebook 等海外社交平台的英文版本。核心是"本地化改写，不是逐句直译"——调整文化引用（中文谚语 → 英文等价表达）、解释中国地名 / 品牌 / 名人（不假设西方读者认识）、语气适配海外受众（短句、emoji、有钩子）、保留事实数字。输出每篇含 id=`<source_id>-v<index>`、sourceTopicId、variantIndex、原样 echo 的 sourceUrl / category、title_en（≤140 字符）、body_en、3~7 个英文 hashtags、可选 cultural_notes。支持 variantsPerTopic（1-3，默认 1）一次为同一条 input 生成多个不同切入角度的英文 variant（0=headline-driven 短版 / 1=storytelling 中版 / 2=analytical 长版）。单条生成失败时跳过该条，在 failed/warning 元数据里记录，不把中文占位稿放入 articles。可选 categoryHint 任意字符串，内置 food/pets/domestic_tech 三种语气模板，其他值 fallback 到通用语气。当 workflow 走「海外热榜搬运」step 3、或编辑想把一篇中文稿快速改成英文发外站时调用。
 version: "1.0"
 category: content_gen
 
@@ -84,6 +84,8 @@ metadata:
 | `articles[].body_en` | string | 英文正文（≥ 10 字符；段落短，每段 1-3 句） |
 | `articles[].hashtags` | string[] | 3~7 个英文 hashtag |
 | `articles[].cultural_notes` | string? | ≤ 400 字，记录本地化决策（编辑复核用） |
+| `failed[]` | `{sourceTopicId,title,sourceUrl?,category?,reason}` | 可选。单条未生成英文稿时记录源稿信息，reason 固定为 `rewrite_unavailable` |
+| `warning` | `{code,message}` | 可选。部分源稿未生成英文稿时返回，code 为 `partial_rewrite_unavailable` |
 
 ## 工作流 Checklist
 
@@ -93,7 +95,7 @@ metadata:
 - [ ] Step 3：调 LLM（qwen3-max，temperature=0.7，maxTokens=8192）—— content_gen 类别允许更高发挥
 - [ ] Step 4：用 `generateText({ output: Output.object({ schema }) })` 拿强 schema 输出
 - [ ] Step 5：对每条 input 按 variantsPerTopic 生成 N 个 variant，id = `<input_id>-v<index>`
-- [ ] Step 6：检查返回数量；缺失条目兜底 `[NEEDS REVIEW]` 占位并保留原中文 body
+- [ ] Step 6：检查返回数量；缺失条目写入 `failed[]` 并跳过，禁止把中文占位稿放进 `articles`
 - [ ] Step 7：sourceUrl 兜底回填 —— LLM 漏返时从 input 找 sourceTopicId 对应原文的 sourceUrl
 - [ ] Step 8：返回 `{ articles: [...] }`
 
@@ -126,7 +128,7 @@ metadata:
 
 | # | 检查点 | 阈值 |
 |---|---|---|
-| 1 | 每篇 input 都有对应 output（按 variantsPerTopic 生成 N 个 variant） | 100% |
+| 1 | 每篇成功生成的 input 都有对应 output；未生成的 input 只进入 `failed[]` | 100% |
 | 2 | id 格式为 `<source_id>-v<index>` | 100%（schema 强校验） |
 | 3 | sourceTopicId 等于 input.id | 100%（schema 强校验） |
 | 4 | variantIndex 为 0 / 1 / 2 | 100%（schema 强校验） |
@@ -165,6 +167,7 @@ metadata:
 | chinglish | "Welcome to taste" / "no zuo no die" | 加反例字典；让 LLM 自检"是否像 native 英文" |
 | 编造数字 | 原文"很多人" → 英文"millions" | prompt 已禁；输出后做数字 diff 校验 |
 | 拼音 hashtag | `#ChuanChuanXiang` | 改成 `#ChineseStreetFood` 或音译+注解 |
+| 失败占位稿流入下游 | `articles[]` 中出现中文标题或占位正文 | 不生成占位稿；失败源稿只进入 `failed[]`，由 UI 显示 warning |
 
 ## 输出示例
 

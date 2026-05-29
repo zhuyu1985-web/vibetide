@@ -600,6 +600,103 @@ export function renderStepParameters(
   return rendered;
 }
 
+export function parseCallParamsFromTaskDescription(
+  description: string | null | undefined,
+): Record<string, unknown> {
+  if (!description) return {};
+  const markerIndex = description.indexOf("【调用参数");
+  if (markerIndex < 0) return {};
+  const lines = description.slice(markerIndex).split(/\r?\n/).slice(1);
+  const params: Record<string, unknown> = {};
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("【")) break;
+    const match = trimmed.match(/^-\s*([A-Za-z_][\w.-]*)\s*:\s*(.*)$/);
+    if (!match) continue;
+    const [, key, rawValue] = match;
+    try {
+      params[key] = JSON.parse(rawValue);
+    } catch {
+      params[key] = rawValue;
+    }
+  }
+  return params;
+}
+
+const AGENT_FALLBACK_COMPATIBLE_REGISTERED_TOOLS = new Set([
+  "content_generate",
+]);
+
+export function shouldBlockRegisteredSkillFallback(input: {
+  assignedRole: string | null | undefined;
+  preExecAttempted: boolean;
+  preExecUsedTool: boolean;
+}): boolean {
+  const role = input.assignedRole;
+  if (!role || input.preExecUsedTool) return false;
+  if (!isToolRegistered(role) && !isLLMSkillRegistered(role)) return false;
+  if (input.preExecAttempted) return true;
+  return !AGENT_FALLBACK_COMPATIBLE_REGISTERED_TOOLS.has(role);
+}
+
+export function formatRegisteredSkillFallbackFailure(
+  assignedRole: string | null | undefined,
+  preExecError?: string | null,
+): string {
+  const role = assignedRole ?? "unknown";
+  const detail = preExecError?.trim()
+    ? `真实错误：${preExecError.trim()}`
+    : "可能原因:1) 工具参数被 zod 拒绝(检查上游 step 是否产出空数据 / 字段名不匹配);2) 工具实现内部 throw(检查环境变量 / 网络 / 配额);3) workflowTemplateId 缺失或 step 参数未绑定。详见 server 日志。";
+  return `工具/skill \`${role}\` 短路执行失败,拒绝降级到 LLM 编故事路径。${detail}`;
+}
+
+export function shouldForceInjectWorkflowTool(
+  assignedRole: string | null | undefined,
+): boolean {
+  if (!assignedRole) return false;
+  if (AGENT_FALLBACK_COMPATIBLE_REGISTERED_TOOLS.has(assignedRole)) {
+    return false;
+  }
+  return isToolRegistered(assignedRole);
+}
+
+export function shouldUseStrictToolEnforcement(
+  assignedRole: string | null | undefined,
+  preExecUsedTool: boolean,
+): boolean {
+  if (!assignedRole || preExecUsedTool) return false;
+  if (AGENT_FALLBACK_COMPATIBLE_REGISTERED_TOOLS.has(assignedRole)) {
+    return false;
+  }
+  return isToolRegistered(assignedRole) || isLLMSkillRegistered(assignedRole);
+}
+
+export function buildImplicitTrendingTopicsParams(
+  missionTitle: string,
+  missionInputParams: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const city =
+    typeof missionInputParams?.city === "string"
+      ? missionInputParams.city.trim()
+      : "";
+  const explicitQuery =
+    city ||
+    (typeof missionInputParams?.topic === "string"
+      ? missionInputParams.topic.trim()
+      : "") ||
+    (typeof missionInputParams?.query === "string"
+      ? missionInputParams.query.trim()
+      : "");
+  const titleCity = missionTitle.match(/[（(]([\u3400-\u9fff]{2,12})[）)]/)?.[1] ?? "";
+  const query = explicitQuery || titleCity;
+
+  if (query) {
+    return { mode: "search", query, limit: 20 };
+  }
+  return { mode: "hot", limit: 20 };
+}
+
 /**
  * 2026-05-29 — 第三道防线:LLM agent 跑完后,扫描其输出文本是否含明显失败信号。
  *
@@ -635,9 +732,69 @@ export function renderStepParameters(
  * 用 JSON.stringify 简单序列化扫描 —— 性能足够(单 step 调用一次,
  * 截到 16 KB 内),pattern 必须精确(避免合法描述误中)。
  */
+/**
+ * 写入型工具白名单 —— 这类工具的成功语义 = "至少写了 1 条业务行"。
+ * 如果 totalCreated === 0(无论 totalRequested 是 0 还是 N),通常视为本步骤
+ * 实际没干活,标 failed。archive_to_drafts 的纯 sourceUrl 去重命中例外:
+ * 这表示稿件库里已有可复用稿件,应继续把 existingArticleId 交给下游发布。
+ *
+ * 例如 archive_to_drafts 在 items=[] 时返回 {success:true, totalCreated:0,
+ * note:"上游 cross_language_rewrite 产出 0 条..."} —— 旧逻辑认为成功,
+ * 但用户的预期是"这步要入库 N 条稿件",0 条 = 任务没完成。
+ */
+const WRITE_TYPE_TOOLS = new Set([
+  "archive_to_drafts",
+  "cms_publish",
+  "cms_batch_publish",
+]);
+
+export function isArchiveDedupOnlyResult(result: unknown): boolean {
+  if (!result || typeof result !== "object") return false;
+  const r = result as {
+    success?: unknown;
+    totalRequested?: unknown;
+    totalCreated?: unknown;
+    totalSkipped?: unknown;
+    skipped?: unknown;
+    created?: unknown;
+    articles?: unknown;
+  };
+  if (r.success === false) return false;
+  if (
+    typeof r.totalRequested !== "number" ||
+    typeof r.totalCreated !== "number" ||
+    typeof r.totalSkipped !== "number"
+  ) {
+    return false;
+  }
+  if (r.totalRequested <= 0 || r.totalCreated !== 0) return false;
+  if (r.totalSkipped !== r.totalRequested) return false;
+  if (!Array.isArray(r.skipped) || r.skipped.length !== r.totalRequested) {
+    return false;
+  }
+  const allDuplicateWithExistingId = r.skipped.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const skipped = item as { reason?: unknown; existingArticleId?: unknown };
+    return (
+      skipped.reason === "duplicate_source_url" &&
+      typeof skipped.existingArticleId === "string" &&
+      skipped.existingArticleId.length > 0
+    );
+  });
+  if (!allDuplicateWithExistingId) return false;
+
+  const available = Array.isArray(r.created)
+    ? r.created
+    : Array.isArray(r.articles)
+      ? r.articles
+      : [];
+  return available.length > 0;
+}
+
 function detectIOContamination(
   params: Record<string, unknown> | null | undefined,
   result: unknown,
+  toolName?: string | null,
 ): { contaminated: boolean; pattern?: string; sample?: string } {
   const slices: string[] = [];
   try {
@@ -675,6 +832,46 @@ function detectIOContamination(
       return { contaminated: true, pattern: p.name, sample };
     }
   }
+
+  // ─── 写入型工具的"实际没写"检测 ───
+  // archive_to_drafts / cms_publish 等:若 result.totalCreated === 0,
+  // 通常表示"本步骤实际没产生任何业务行" → 失败。纯去重命中且已有
+  // articleId 可用时例外,否则重跑同一批热榜会被误杀。
+  if (toolName && WRITE_TYPE_TOOLS.has(toolName) && result && typeof result === "object") {
+    if (toolName === "archive_to_drafts" && isArchiveDedupOnlyResult(result)) {
+      return { contaminated: false };
+    }
+    // 兼容两种写入工具的计数字段命名:
+    // - archive_to_drafts / cms_publish:返回 totalCreated
+    // - cms_batch_publish:返回 totalPublished
+    const r = result as {
+      totalCreated?: unknown;
+      totalPublished?: unknown;
+      totalRequested?: unknown;
+      note?: unknown;
+    };
+    const writeCount =
+      typeof r.totalCreated === "number"
+        ? r.totalCreated
+        : typeof r.totalPublished === "number"
+          ? r.totalPublished
+          : null;
+    if (writeCount === 0) {
+      const totalReq =
+        typeof r.totalRequested === "number" ? r.totalRequested : undefined;
+      const note = typeof r.note === "string" ? r.note : "";
+      const reason =
+        totalReq === 0
+          ? "上游产出 0 条入参,实际没写任何数据"
+          : `请求 ${totalReq ?? "未知"} 条但实际写入 0 条(全被跳过或失败)`;
+      return {
+        contaminated: true,
+        pattern: `write_tool_zero_created:${toolName}`,
+        sample: note ? `${reason}。工具 note:${note.slice(0, 150)}` : reason,
+      };
+    }
+  }
+
   return { contaminated: false };
 }
 
@@ -709,24 +906,46 @@ function detectAgentOutputFailure(output: unknown): {
     };
   }
 
-  const o = output as { text?: unknown; summary?: unknown };
-  const haystack = [
-    typeof o.text === "string" ? o.text : "",
-    typeof o.summary === "string" ? o.summary : "",
-  ]
+  // 2026-05-30:扩到扫 artifacts[*].content。
+  // 背景:parseStepOutput 把 LLM 全文塞 artifacts[0].content,summary 只取第一行
+  // (通常是【执行摘要】标题,没具体失败词)。之前只扫 text/summary 经常漏 ——
+  // 例如 cms_publish 的 "❌ CMS入库失败 / 错误代码 cms_network / fetch failed"
+  // 全在 artifacts[0].content 里,task 被错标 completed。
+  const o = output as {
+    text?: unknown;
+    summary?: unknown;
+    artifacts?: unknown;
+  };
+  const parts: string[] = [];
+  if (typeof o.text === "string") parts.push(o.text);
+  if (typeof o.summary === "string") parts.push(o.summary);
+  if (Array.isArray(o.artifacts)) {
+    for (const a of o.artifacts) {
+      if (a && typeof a === "object") {
+        const c = (a as { content?: unknown }).content;
+        if (typeof c === "string") parts.push(c);
+      }
+    }
+  }
+  const haystack = parts
     .filter(Boolean)
     .join("\n")
-    .slice(0, 8000); // 长输出截断,避免无谓正则扫描
+    .slice(0, 16000); // 加倍上限,artifacts 可能很长
   if (!haystack) return { failed: false };
 
   // 工具/系统级失败指纹 —— 必须是"被工具或系统报错"才视为失败,
   // 不能把 SKILL.md 里描述失败场景的教学语误判。
   const patterns: Array<{ name: string; re: RegExp }> = [
     { name: "missing_context", re: /missing[_ ]context/i },
-    { name: "tool_error_code", re: /错误代码["'：:]?\s*['"`]?(missing_context|tool_error|forbidden|unauthorized)/i },
+    { name: "tool_error_code", re: /错误代码["'：:]?\s*['"`]?(missing_context|tool_error|forbidden|unauthorized|cms_network|cms_business|cms_schema|cms_auth)/i },
     { name: "explicit_failed_status", re: /状态["'：:]?\s*['"`]?(失败|failed)["'`]?/i },
     { name: "structured_success_false", re: /"success"\s*:\s*false/ },
-    { name: "operation_failed_zh", re: /(任务|操作|入库|调用|工具|步骤)\s*(未能完成|失败|无法完成|被拒绝)/ },
+    { name: "operation_failed_zh", re: /(任务|操作|入库|调用|工具|步骤|CMS)\s*(未能完成|失败|无法完成|被拒绝|网络错误)/ },
+    // 2026-05-30 — 用户截图实测漏掉的 pattern:
+    // cms_publish 失败时输出 "❌ CMS入库失败！" + "错误阶段 network" + "fetch failed"
+    { name: "error_stage_field", re: /错误阶段\s*(network|business|schema|auth|fetch|timeout)/i },
+    { name: "fetch_failed", re: /fetch\s+failed/i },
+    { name: "explicit_failure_emoji", re: /❌\s*[\u4e00-\u9fa5A-Za-z][\u4e00-\u9fa5A-Za-z\s]{0,30}(失败|错误|出错|fail|error)/i },
   ];
   for (const p of patterns) {
     const m = haystack.match(p.re);
@@ -873,13 +1092,18 @@ async function executeTaskDirect(
     // `agent.tools` 里就不会包含对应工具，LLM 拿不到工具调用权限，只能按
     // 输出格式"幻觉"出一段看似真实的结果（已出现过 web_search 没被调用、
     // LLM 编造 OpenAI/苹果假新闻的事故）。
-    // 这里将 task 所需的技能主动注入 agent.tools，确保工具始终可用 ——
-    // 工作流合同 > 员工画像。
-    if (task.assignedRole && !agent.tools.some((t) => t.name === task.assignedRole)) {
+    // 这里仅将真实工具主动注入 agent.tools，确保工具型步骤始终可用 ——
+    // 生成型 skill（如 content_generate）依赖 SKILL.md 合同，不注入同名 helper tool。
+    const workflowToolSlug = task.assignedRole;
+    if (
+      workflowToolSlug &&
+      shouldForceInjectWorkflowTool(workflowToolSlug) &&
+      !agent.tools.some((t) => t.name === workflowToolSlug)
+    ) {
       agent.tools = [
         ...agent.tools,
         {
-          name: task.assignedRole,
+          name: workflowToolSlug,
           description: `工作流指定的执行技能：${task.title}`,
           parameters: {},
         },
@@ -920,17 +1144,21 @@ async function executeTaskDirect(
     // task.assignedRole 对应 ALL_TOOLS 里已注册的工具。
     let preExecResultBlock = "";
     let preExecUsedTool = false;
+    let preExecAttempted = false;
     let preExecEmpty = false; // 预执行跑完且结果为 0 条 —— 触发 LLM 跳过路径
     let preExecParams: Record<string, unknown> = {};
+    let preExecError: string | null = null;
     // 保留 invocation.result 到外层 scope —— deterministicOutput 在 short-circuit
     // 分支需要把它 spread 进 outputData，让 {{stepN.field}} 模板能引用工具/skill
     // 真实返回的结构化字段（topics / results / articles 等）。
     let preExecResult: unknown = null;
-    if (mission.workflowTemplateId && task.assignedRole) {
+    if (task.assignedRole) {
       try {
-        const tpl = await db.query.workflowTemplates.findFirst({
-          where: eq(workflowTemplates.id, mission.workflowTemplateId),
-        });
+        const tpl = mission.workflowTemplateId
+          ? await db.query.workflowTemplates.findFirst({
+              where: eq(workflowTemplates.id, mission.workflowTemplateId),
+            })
+          : null;
         const tplSteps = (tpl?.steps ?? []) as WorkflowStepDef[];
         // 用 priority (===step.order) + skillSlug 双重匹配，避免重名步骤误匹配
         const matchedStep = tplSteps.find(
@@ -942,6 +1170,9 @@ async function executeTaskDirect(
           string,
           unknown
         >;
+        if (Object.keys(rawParams).length === 0) {
+          rawParams = parseCallParamsFromTaskDescription(task.description);
+        }
 
         // ── Auto-bind fallback for retrieval-intent steps ──────────────
         // 观察到的事故：seed 里所有 step.config.parameters={}，导致下方
@@ -1003,8 +1234,21 @@ async function executeTaskDirect(
           }
         }
 
+        if (Object.keys(rawParams).length === 0 && task.assignedRole === "trending_topics") {
+          rawParams = buildImplicitTrendingTopicsParams(
+            mission.title,
+            missionInputParams,
+          );
+          autoBound = true;
+          console.log(
+            "[mission-executor] auto-bound trending_topics",
+            { params: rawParams, missionId, taskId },
+          );
+        }
+
         // 预执行触发：显式绑定了参数，或 auto-bind 生效
         if (Object.keys(rawParams).length > 0) {
+          preExecAttempted = true;
           // 渲染 step.config.parameters 模板（支持 {{key}} 和 {{stepN.field}}）
           //
           // 关键约定：`{{stepN.X}}` 的 N 是 **step.order**（即 task.priority），
@@ -1071,6 +1315,8 @@ async function executeTaskDirect(
               {
                 organizationId: mission.organizationId ?? undefined,
                 operatorId: task.assignedEmployeeId ?? undefined,
+                missionId,
+                taskId,
               },
             );
           }
@@ -1143,6 +1389,7 @@ async function executeTaskDirect(
               },
             );
           } else {
+            preExecError = invocation.error;
             preExecResultBlock = `【前置工具调用失败（已在 server 端尝试）】\n调用：\`${invocation.toolName}(${JSON.stringify(
               invocation.params,
             )})\`\n\n错误：${invocation.error}\n\n请基于空结果按 SKILL.md 建议：要么如实报告无数据，要么用更宽的 timeRange/关键词重试。不要凭空编造结果。`;
@@ -1153,15 +1400,22 @@ async function executeTaskDirect(
           }
         }
       } catch (err) {
+        preExecError = err instanceof Error ? err.message : String(err);
         console.error("[mission-executor] pre-exec threw:", err);
       }
     }
 
     // 工具强制块：有预执行结果时，改成"请基于真实结果做排序/摘要，不要重复调用"。
+    const useStrictToolEnforcement = shouldUseStrictToolEnforcement(
+      task.assignedRole,
+      preExecUsedTool,
+    );
     const toolEnforcementBlock = task.assignedRole
       ? preExecUsedTool
         ? `【工具调用说明】\nserver 端已用绑定参数调用了 \`${task.assignedRole}\`，真实结果在上面的【前置工具调用结果】块里。你的任务是**基于这些真实数据**按 SKILL.md 的要求做排序、筛选、摘要、分组等后续处理，直接产出最终输出。\n\n禁止：\n- 不要再调用 ${task.assignedRole}（参数相同，浪费 token）\n- 不要忽略或替换真实结果中的条目\n- 不要凭空增加未出现在结果中的条目（伪造来源、时间、数据点）\n- 若真实结果为空，如实报告"无命中"并给出下一步建议，不得用训练数据里的话题填充`
-        : `【工具调用强制要求】\n本步骤必须首先调用 \`${task.assignedRole}\` 工具。参数取值按以下优先级：\n1. 优先使用【调用参数】块里的值（若已提供）—— 这些是步骤作者显式绑定的真实参数，必须逐字使用，禁止自行改写；\n2. 若未提供【调用参数】，再从【工作流输入参数】里挑选合适字段（通常 query / topic / keyword 对应 topic_title 之类的文本字段）；\n3. 绝不能使用步骤名、技能描述里的关键词、或训练数据里的热门话题替代用户的真实输入。\n\n严禁跳过工具直接编写结果；严禁伪造来源、时间、数据。若工具返回空结果，如实报告空结果，不得替换为其他话题。`
+        : useStrictToolEnforcement
+          ? `【工具调用强制要求】\n本步骤必须首先调用 \`${task.assignedRole}\` 工具。参数取值按以下优先级：\n1. 优先使用【调用参数】块里的值（若已提供）—— 这些是步骤作者显式绑定的真实参数，必须逐字使用，禁止自行改写；\n2. 若未提供【调用参数】，再从【工作流输入参数】里挑选合适字段（通常 query / topic / keyword 对应 topic_title 之类的文本字段）；\n3. 绝不能使用步骤名、技能描述里的关键词、或训练数据里的热门话题替代用户的真实输入。\n\n严禁跳过工具直接编写结果；严禁伪造来源、时间、数据。若工具返回空结果，如实报告空结果，不得替换为其他话题。`
+          : `【技能执行要求】\n本步骤对应技能 \`${task.assignedRole}\`。请按 SKILL.md、本次工作流任务、工作流输入参数与上游步骤输出完成本步骤；不要为了套格式伪造来源、时间、数据或不存在的上游事实。`
       : "";
 
     const userInstructions = [
@@ -1189,9 +1443,11 @@ async function executeTaskDirect(
     //
     // 诊断日志：若 pre-exec 没触发，多半是这几个原因里的一个。
     if (
-      task.assignedRole &&
-      isToolRegistered(task.assignedRole) &&
-      !preExecUsedTool
+      shouldBlockRegisteredSkillFallback({
+        assignedRole: task.assignedRole,
+        preExecAttempted,
+        preExecUsedTool,
+      })
     ) {
       console.warn(
         `[mission-executor] WARN: task ${taskId} (${task.assignedRole}) has real tool but fell through to LLM path. Possible causes:`,
@@ -1252,7 +1508,7 @@ async function executeTaskDirect(
       // 误导用户。新逻辑:发现 [NEEDS REVIEW] / LLM did not return 等指纹 → 标 failed
       const contamination = explicitToolFailure
         ? null
-        : detectIOContamination(preExecParams, preExecResult);
+        : detectIOContamination(preExecParams, preExecResult, task.assignedRole);
 
       // 统一封装两类失败 —— 后续 DB write 不再区分,只看 toolFailure 是否 truthy
       const toolFailure: { code: string; message: string } | null =
@@ -1356,15 +1612,20 @@ async function executeTaskDirect(
     // 塞进 outputData,UI 显示绿色✓但内容全是假的(用户看到编造的"宁波高血压
     // 患者""陈克明手擀面"等)。
     //
-    // 唯一可靠方法 = **registered tool/LLM-skill 短路失败就直接 fail**,
-    // 让 agent 路径只服务"开放性 skill"(无 tool 实现的纯文档型)。
+    // 唯一可靠方法 = **必须短路的 registered tool/LLM-skill 短路失败就直接 fail**。
+    // 少数生成型 skill（如 content_generate）虽然有同名 helper tool，但无显式
+    // 参数时本来就应走 agent + SKILL.md 写稿路径，不能被这个 guard 误杀。
     if (
-      task.assignedRole &&
-      (isToolRegistered(task.assignedRole) ||
-        isLLMSkillRegistered(task.assignedRole)) &&
-      !preExecUsedTool
+      shouldBlockRegisteredSkillFallback({
+        assignedRole: task.assignedRole,
+        preExecAttempted,
+        preExecUsedTool,
+      })
     ) {
-      const failureMsg = `工具/skill \`${task.assignedRole}\` 短路执行失败,拒绝降级到 LLM 编故事路径。可能原因:1) 工具参数被 zod 拒绝(检查上游 step 是否产出空数据 / 字段名不匹配);2) 工具实现内部 throw(检查环境变量 / 网络 / 配额);3) workflowTemplateId 缺失或 step 参数未绑定。详见 server 日志。`;
+      const failureMsg = formatRegisteredSkillFallbackFailure(
+        task.assignedRole,
+        preExecError,
+      );
       console.error(
         `[mission-executor] BLOCKED LLM fallthrough for registered tool ${task.assignedRole}`,
         { taskId, missionId, role: task.assignedRole },
@@ -1428,6 +1689,8 @@ async function executeTaskDirect(
       {
         organizationId: mission.organizationId,
         operatorId: task.assignedEmployeeId ?? mission.leaderEmployeeId ?? undefined,
+        missionId,
+        taskId,
       },
     );
 

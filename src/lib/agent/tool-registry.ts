@@ -78,6 +78,51 @@ function inferSource(title: string, source: string, url: string) {
   return normalizeWhitespace(candidate);
 }
 
+type ArchiveDraftArticleInput = {
+  title: string;
+  body: string;
+  language?: "zh" | "en";
+  sourceUrl?: string;
+  culturalNotes?: string;
+};
+
+function countCjkChars(value: string) {
+  return [...value].filter((ch) => /[\u3400-\u9fff]/u.test(ch)).length;
+}
+
+function detectArchiveInputFailure(
+  item: ArchiveDraftArticleInput,
+): string | null {
+  const haystack = [item.title, item.body, item.culturalNotes ?? ""].join("\n");
+  if (/\[\s*NEEDS\s*REVIEW\s*\]/i.test(haystack)) {
+    return "needs_review_fallback";
+  }
+  if (
+    /LLM\s+did\s+not\s+return\s+a\s+rewrite/i.test(haystack) ||
+    /Original\s+Chinese\s+body\s+preserved/i.test(haystack) ||
+    /已兜底标记\s*NEEDS\s*REVIEW/i.test(haystack) ||
+    /该条\s*LLM\s*调用失败/.test(haystack)
+  ) {
+    return "rewrite_failure_fallback";
+  }
+
+  if ((item.language ?? "en") === "en") {
+    const titleChars = [...item.title].length;
+    const bodyChars = [...item.body].length;
+    const titleCjk = countCjkChars(item.title);
+    const bodyCjk = countCjkChars(item.body);
+    const titleLooksChinese =
+      titleCjk >= 4 && titleCjk / Math.max(titleChars, 1) > 0.15;
+    const bodyLooksChinese =
+      bodyCjk >= 20 && bodyCjk / Math.max(bodyChars, 1) > 0.1;
+    if (titleLooksChinese || bodyLooksChinese) {
+      return "non_english_content_for_en";
+    }
+  }
+
+  return null;
+}
+
 function buildSearchVariants(query: string) {
   return Array.from(
     new Set([
@@ -616,6 +661,11 @@ function createToolDefinitions(): ToolSet {
           "xiaohongshu.com",
           "bilibili.com",
           "b23.tv",
+          // 2026-05-30 — Weibo 热点 sourceUrl 本质是搜索页(s.weibo.com/weibo?q=...,
+          // m.weibo.cn/search?containerid=...),Jina 抓回登录页或搜索结果列表 markdown,
+          // 不是单篇文章。下游翻译爆 token + JSON 拒绝 → 全部 [NEEDS REVIEW] 入库垃圾稿。
+          "weibo.com",
+          "weibo.cn",
         ],
       }) => {
         // 上游 0 条 → 优雅返回。之前 schema 是 min(1),空数组被 zod 拒绝 →
@@ -641,6 +691,8 @@ function createToolDefinitions(): ToolSet {
             | "fallback_summary"
             | "fallback_title"
             | "skipped_other"
+            | "enriched_via_bocha"
+            | "enriched_via_bocha_failed"
             | "failed";
           fetchError?: string;
         };
@@ -648,6 +700,32 @@ function createToolDefinitions(): ToolSet {
         let okCount = 0;
         let fallbackCount = 0;
         let skippedCount = 0;
+        let enrichedCount = 0;
+
+        // 2026-05-30 — bocha fallback enrichment helper。
+        // Jina 不可用(反爬黑名单 / 搜索页 URL / 短内容 / throw)时,用 item.title 调 bocha
+        // 拿 top 3 snippet 拼成 markdown 给下游翻译 LLM 上下文 —— 不再只丢一行 title 进 step 4。
+        async function tryBochaEnrich(
+          item: Record<string, unknown> & { id: string; title?: string; summary?: string },
+        ): Promise<{ body: string; status: "enriched_via_bocha" | "fallback" }> {
+          const fallbackBody = (item.summary ?? "").trim() || (item.title ?? "").trim() || item.id;
+          const query = (item.title ?? "").trim();
+          if (!query) return { body: fallbackBody, status: "fallback" };
+          try {
+            const { searchWeb } = await import("@/lib/search");
+            const res = await searchWeb(query, { forceProvider: "bocha", maxResults: 3, topic: "news" });
+            if (!res.items || res.items.length === 0) return { body: fallbackBody, status: "fallback" };
+            const sections = res.items.slice(0, 3).map((it) => {
+              const parts = [it.title ? `# ${it.title}` : "", it.source ? `_来源:${it.source}_` : "", it.snippet ?? ""].filter(Boolean);
+              return parts.join("\n");
+            });
+            const body = sections.join("\n\n---\n\n").trim();
+            if (body.length < 50) return { body: fallbackBody, status: "fallback" };
+            return { body, status: "enriched_via_bocha" };
+          } catch {
+            return { body: fallbackBody, status: "fallback" };
+          }
+        }
 
         for (let i = 0; i < items.length; i += maxConcurrency) {
           const batch = items.slice(i, i + maxConcurrency);
@@ -724,15 +802,60 @@ function createToolDefinitions(): ToolSet {
                 return normalizedHost === b || normalizedHost.endsWith("." + b);
               });
               if (isBlocked) {
+                const enr = await tryBochaEnrich(item);
+                if (enr.status === "enriched_via_bocha") {
+                  enrichedCount++;
+                  return {
+                    ...base,
+                    id: item.id,
+                    body: enr.body,
+                    fetchedAt: new Date().toISOString(),
+                    fetchStatus: "enriched_via_bocha",
+                    fetchError: `${rawHost} 反爬,改走 bocha 搜索 title`,
+                  };
+                }
                 fallbackCount++;
-                const body = (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
                 return {
                   ...base,
                   id: item.id,
-                  body,
+                  body: enr.body,
                   fetchedAt: new Date().toISOString(),
                   fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
-                  fetchError: `${rawHost} 在反爬黑名单内,跳过 Jina 抓取,用 summary 兜底`,
+                  fetchError: `${rawHost} 反爬 + bocha 未命中,用 summary 兜底`,
+                };
+              }
+              // 2026-05-30 URL-shape filter:搜索/列表页 URL(s.weibo / m.weibo / baidu/s / toutiao/search etc.)
+              // 不调 Jina,直接 bocha,因为 Jina 抓搜索页只返回列表 markdown,不是文章正文。
+              const pathname = parsedUrl.pathname.toLowerCase();
+              const search = parsedUrl.search.toLowerCase();
+              const looksLikeSearchPage =
+                pathname.includes("/search") ||
+                pathname.includes("/s.html") ||
+                /[?&]q=/i.test(search) ||
+                /[?&]wd=/i.test(search) ||
+                /[?&]keyword=/i.test(search) ||
+                /[?&]containerid=100103/i.test(search);
+              if (looksLikeSearchPage) {
+                const enr = await tryBochaEnrich(item);
+                if (enr.status === "enriched_via_bocha") {
+                  enrichedCount++;
+                  return {
+                    ...base,
+                    id: item.id,
+                    body: enr.body,
+                    fetchedAt: new Date().toISOString(),
+                    fetchStatus: "enriched_via_bocha",
+                    fetchError: "URL 是搜索/列表页,改走 bocha 搜索 title",
+                  };
+                }
+                fallbackCount++;
+                return {
+                  ...base,
+                  id: item.id,
+                  body: enr.body,
+                  fetchedAt: new Date().toISOString(),
+                  fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
+                  fetchError: "URL 是搜索/列表页 + bocha 未命中,用 summary 兜底",
                 };
               }
               try {
@@ -775,31 +898,54 @@ function createToolDefinitions(): ToolSet {
                     fetchStatus: "ok",
                   };
                 }
-                // Jina 返回成功但内容太短 / 命中反爬模式 → 兜底用 summary
+                // Jina 返回成功但内容太短 / 命中反爬模式 → bocha → summary 兜底
+                const enr = await tryBochaEnrich(item);
+                if (enr.status === "enriched_via_bocha") {
+                  enrichedCount++;
+                  return {
+                    ...base,
+                    id: item.id,
+                    body: enr.body,
+                    fetchedAt: new Date().toISOString(),
+                    fetchStatus: "enriched_via_bocha",
+                    fetchError: looksLikeAntiCrawler
+                      ? "Jina 抓到反爬登录页,改走 bocha"
+                      : "Jina 返回内容过短,改走 bocha",
+                  };
+                }
                 fallbackCount++;
-                const body =
-                  (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
                 return {
                   ...base,
                   id: item.id,
-                  body,
+                  body: enr.body,
                   fetchedAt: new Date().toISOString(),
                   fetchStatus: item.summary ? "fallback_summary" : "fallback_title",
                   fetchError: looksLikeAntiCrawler
-                    ? "命中反爬登录页(知乎/微信常见),用 summary 兜底"
-                    : "Jina 返回内容过短",
+                    ? "反爬登录页 + bocha 未命中,用 summary 兜底"
+                    : "Jina 返回过短 + bocha 未命中,用 summary 兜底",
                 };
               } catch (err) {
+                const errMsg = err instanceof Error ? err.message : String(err);
+                const enr = await tryBochaEnrich(item);
+                if (enr.status === "enriched_via_bocha") {
+                  enrichedCount++;
+                  return {
+                    ...base,
+                    id: item.id,
+                    body: enr.body,
+                    fetchedAt: new Date().toISOString(),
+                    fetchStatus: "enriched_via_bocha",
+                    fetchError: `Jina 抛错(${errMsg.slice(0, 80)}),改走 bocha`,
+                  };
+                }
                 fallbackCount++;
-                const body =
-                  (item.summary ?? "").trim() || (item.title ?? "").trim() || (item.id ?? "");
                 return {
                   ...base,
                   id: item.id,
-                  body,
+                  body: enr.body,
                   fetchedAt: new Date().toISOString(),
-                  fetchStatus: "failed",
-                  fetchError: err instanceof Error ? err.message : String(err),
+                  fetchStatus: "enriched_via_bocha_failed",
+                  fetchError: `Jina + bocha 都失败: ${errMsg.slice(0, 150)}`,
                 };
               }
             }),
@@ -811,6 +957,7 @@ function createToolDefinitions(): ToolSet {
           items: enriched,
           totalRequested: items.length,
           okCount,
+          enrichedCount,
           fallbackCount,
           skippedCount,
         };
@@ -1582,6 +1729,111 @@ function createToolDefinitions(): ToolSet {
         }
       },
     }),
+    // 2026-05-30 批量版 cms_publish。接受 archive_to_drafts 输出的 articles[]
+    // (每条带 articleId),循环调 publishArticleToCms 把每篇已入库稿件推到 CMS。
+    // 跟单篇 cms_publish 的关键区别:这里假定上游已经入 articles 表,只发布不再 INSERT。
+    cms_batch_publish: tool({
+      description:
+        "批量把一组已入库稿件(articleId 数组,通常来自 archive_to_drafts 输出)发布到华栖云 CMS。" +
+        "循环调 publishArticleToCms,单条失败不影响其他。返回 published / failed 两个数组。" +
+        "前置:env 里 CMS_HOST/CMS_LOGIN_CMC_ID/CMS_LOGIN_CMC_TID/CMS_TENANT_ID + VIBETIDE_CMS_PUBLISH_ENABLED=true。",
+      inputSchema: z.object({
+        articles: z
+          .array(
+            z.object({
+              articleId: z.string().min(1),
+              title: z.string().optional(),
+              sourceUrl: z.string().optional(),
+            }).passthrough(),
+          )
+          .min(0).max(50)
+          .describe("待发布稿件,通常绑 {{stepN.created}}"),
+        catalogId: z.number().int().optional(),
+        appId: z.number().int().optional(),
+        siteId: z.number().int().optional(),
+        allowUpdate: z.boolean().optional().default(true),
+        dryRun: z.boolean().optional(),
+        organizationId: z.string().optional(),
+        operatorId: z.string().optional(),
+        missionId: z.string().optional(),
+        taskId: z.string().optional(),
+      }),
+      execute: async ({ articles, catalogId, appId, siteId, allowUpdate = true, dryRun, organizationId, operatorId }) => {
+        if (!articles || articles.length === 0) {
+          return {
+            success: true, totalRequested: 0, totalPublished: 0, totalFailed: 0,
+            published: [], failed: [],
+            note: "上游 archive_to_drafts 产出 0 条稿件,本步骤无可发布内容。",
+          };
+        }
+        if (dryRun) {
+          return {
+            success: true,
+            dryRun: true,
+            totalRequested: articles.length,
+            totalPublished: articles.length,
+            totalFailed: 0,
+            wouldPublish: articles.length,
+            published: articles.map((item, index) => ({
+              articleId: item.articleId,
+              publicationId: `dry-run-publication-${index + 1}`,
+              cmsState: "dry_run",
+            })),
+            failed: [],
+          };
+        }
+        if (!organizationId) {
+          return { success: false, error: { code: "missing_context", message: "缺少 organizationId" } };
+        }
+        if (!operatorId) {
+          return { success: false, error: { code: "missing_context", message: "缺少 operatorId" } };
+        }
+        const target = (catalogId !== undefined || appId !== undefined || siteId !== undefined)
+          ? { catalogId, appId, siteId } : undefined;
+        const { publishArticleToCms } = await import("@/lib/cms/publish");
+        const published: Array<{ articleId: string; publicationId: string; cmsArticleId?: string; cmsState: string; publishedUrl?: string }> = [];
+        const failed: Array<{ articleId: string; stage?: string; code?: string; message: string; retriable?: boolean }> = [];
+        // 串行循环避免并发打爆 CMS
+        for (const item of articles) {
+          try {
+            const r = await publishArticleToCms({
+              articleId: item.articleId, operatorId, triggerSource: "workflow", allowUpdate, target,
+            });
+            if (r.success) {
+              published.push({
+                articleId: item.articleId, publicationId: r.publicationId,
+                cmsArticleId: r.cmsArticleId, cmsState: r.cmsState, publishedUrl: r.publishedUrl,
+              });
+            } else {
+              failed.push({
+                articleId: item.articleId, stage: r.error?.stage, code: r.error?.code,
+                message: r.error?.message ?? "CMS 返回 success=false", retriable: r.error?.retriable,
+              });
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            const name = err instanceof Error ? err.name : "";
+            const stage = name.includes("Auth") ? "auth"
+              : name.includes("Business") ? "cms_business"
+              : name.includes("Network") ? "network"
+              : name.includes("Schema") ? "cms_schema"
+              : name.includes("Config") ? "config" : undefined;
+            failed.push({ articleId: item.articleId, stage, message: msg, retriable: name.includes("Network") || name.includes("Auth") });
+          }
+        }
+        // 任一失败 → success=false,defense #1 标 step failed
+        return {
+          success: failed.length === 0,
+          totalRequested: articles.length,
+          totalPublished: published.length,
+          totalFailed: failed.length,
+          published, failed,
+          ...(failed.length > 0 ? {
+            error: { code: "partial_or_total_failure", message: `${failed.length}/${articles.length} 条发布失败,详见 failed 数组` },
+          } : {}),
+        };
+      },
+    }),
     archive_to_drafts: tool({
       description:
         "把一批稿件批量写入个人稿件库（articles 表）作为指定状态，等待编辑后续处理。" +
@@ -1612,6 +1864,8 @@ function createToolDefinitions(): ToolSet {
         dryRun: z.boolean().optional(),
         organizationId: z.string().optional(),
         operatorId: z.string().optional(),
+        missionId: z.string().optional(),
+        taskId: z.string().optional(),
       }),
       execute: async ({
         articles: items,
@@ -1620,6 +1874,8 @@ function createToolDefinitions(): ToolSet {
         dryRun,
         organizationId,
         operatorId,
+        missionId,
+        taskId,
       }) => {
         // 上游 0 条:优雅返回,UI 显示"无可入库稿件",而不是失败。
         if (!items || items.length === 0) {
@@ -1634,14 +1890,85 @@ function createToolDefinitions(): ToolSet {
           };
         }
 
+        const failedInput = items
+          .map((item, index) => {
+            const reason = detectArchiveInputFailure(item);
+            return reason
+              ? { index, title: item.title, sourceUrl: item.sourceUrl, reason }
+              : null;
+          })
+          .filter((item): item is {
+            index: number;
+            title: string;
+            sourceUrl: string | undefined;
+            reason: string;
+          } =>
+            item !== null,
+          );
+        const failedIndexes = new Set(failedInput.map((item) => item.index));
+        const validItems = items.filter((_, index) => !failedIndexes.has(index));
+        if (validItems.length === 0 && failedInput.length > 0) {
+          return {
+            success: false,
+            totalRequested: items.length,
+            totalCreated: 0,
+            totalSkipped: 0,
+            totalFailed: failedInput.length,
+            created: [],
+            skipped: [],
+            failed: failedInput.map((item) => ({
+              title: item.title,
+              sourceUrl: item.sourceUrl,
+              reason: item.reason,
+            })),
+            error: {
+              code: "invalid_archive_input",
+              message: `${failedInput.length}/${items.length} 条稿件未通过入库校验,未执行任何入库动作`,
+            },
+          };
+        }
+
         // dryRun 短路必须在所有 DB 操作之前 —— 跟 cms_publish 一致，
         // 防止测试入口污染 articles 表。
         if (dryRun) {
+          const dryRunCreated = validItems.map((item, index) => {
+            const articleId = `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
+            return {
+              articleId,
+              title: item.title,
+              sourceUrl: item.sourceUrl,
+              status: "created" as const,
+            };
+          });
           return {
             success: true,
             dryRun: true,
-            wouldInsert: items.length,
+            totalRequested: items.length,
+            totalCreated: dryRunCreated.length,
+            totalSkipped: 0,
+            totalFailed: failedInput.length,
+            totalAvailable: dryRunCreated.length,
+            wouldInsert: dryRunCreated.length,
             wouldDedupBy: dedupBySourceUrl ? "sourceUrl" : "off",
+            firstArticleId: dryRunCreated[0]?.articleId ?? null,
+            firstTitle: dryRunCreated[0]?.title ?? null,
+            created: dryRunCreated,
+            inserted: dryRunCreated,
+            articles: dryRunCreated,
+            skipped: [],
+            failed: failedInput.map((item) => ({
+              title: item.title,
+              sourceUrl: item.sourceUrl,
+              reason: item.reason,
+            })),
+            ...(failedInput.length > 0
+              ? {
+                  warning: {
+                    code: "partial_invalid_archive_input",
+                    message: `${failedInput.length}/${items.length} 条稿件未通过入库校验,dry-run 已跳过坏稿并模拟其余有效稿件`,
+                  },
+                }
+              : {}),
             note: "dry-run: 实际跑会按 sourceUrl 去重后写入 articles 表",
           };
         }
@@ -1656,23 +1983,58 @@ function createToolDefinitions(): ToolSet {
         const { articles } = await import("@/db/schema/articles");
         const { and, eq } = await import("drizzle-orm");
 
-        const created: { articleId: string; title: string; sourceUrl?: string }[] = [];
-        const skipped: { sourceUrl: string; existingArticleId: string; reason: string }[] = [];
+        const inserted: {
+          articleId: string;
+          title: string;
+          sourceUrl?: string;
+          status: "created";
+        }[] = [];
+        const available: {
+          articleId: string;
+          title: string;
+          sourceUrl?: string;
+          status: "created" | "existing";
+        }[] = [];
+        const availableArticleIds = new Set<string>();
+        const pushAvailable = (item: (typeof available)[number]) => {
+          if (availableArticleIds.has(item.articleId)) return;
+          availableArticleIds.add(item.articleId);
+          available.push(item);
+        };
+        const skipped: {
+          sourceUrl: string;
+          existingArticleId: string;
+          title: string;
+          reason: string;
+        }[] = [];
 
-        for (const item of items) {
+        for (const item of validItems) {
           if (dedupBySourceUrl && item.sourceUrl) {
             const exists = await db.query.articles.findFirst({
               where: and(
                 eq(articles.organizationId, organizationId),
                 eq(articles.sourceUrl, item.sourceUrl),
               ),
-              columns: { id: true, title: true },
+              columns: { id: true, title: true, missionId: true },
             });
             if (exists) {
+              if (missionId && !exists.missionId) {
+                await db
+                  .update(articles)
+                  .set({ missionId })
+                  .where(eq(articles.id, exists.id));
+              }
               skipped.push({
                 sourceUrl: item.sourceUrl,
                 existingArticleId: exists.id,
+                title: exists.title,
                 reason: "duplicate_source_url",
+              });
+              pushAvailable({
+                articleId: exists.id,
+                title: exists.title,
+                sourceUrl: item.sourceUrl,
+                status: "existing",
               });
               continue;
             }
@@ -1683,6 +2045,7 @@ function createToolDefinitions(): ToolSet {
             body: item.body,
             summary: item.summary ?? null,
             sourceUrl: item.sourceUrl ?? null,
+            missionId: missionId ?? null,
             status: initialStatus,
             tags: [...(item.tags ?? []), ...(item.hashtags ?? [])],
             mediaType: "article",
@@ -1694,23 +2057,51 @@ function createToolDefinitions(): ToolSet {
               language: item.language ?? "en",
               category: item.category,
               culturalNotes: item.culturalNotes,
+              workflowTaskId: taskId,
               createdByWorkflow: true,
             },
           }).returning({ id: articles.id, title: articles.title });
 
-          created.push({ articleId: row.id, title: row.title, sourceUrl: item.sourceUrl });
+          const ref = {
+            articleId: row.id,
+            title: row.title,
+            sourceUrl: item.sourceUrl,
+            status: "created" as const,
+          };
+          inserted.push(ref);
+          pushAvailable(ref);
         }
         void operatorId;
         return {
           success: true,
           totalRequested: items.length,
-          totalCreated: created.length,
+          totalCreated: inserted.length,
           totalSkipped: skipped.length,
+          totalFailed: failedInput.length,
+          totalAvailable: available.length,
           // ─── 顶层便利字段：方便单文章串联场景 {{stepN.firstArticleId}}（dot path 也可，但顶层更直观）─
-          firstArticleId: created[0]?.articleId ?? null,
-          firstTitle: created[0]?.title ?? null,
-          created,
+          firstArticleId: available[0]?.articleId ?? null,
+          firstTitle: available[0]?.title ?? null,
+          // created 保持为下游兼容字段：CMS 批量发布步骤常绑定 {{stepN.created}}。
+          // 这里返回“本次确保已在稿件库可用”的稿件，包含新建和按 sourceUrl 命中的已有稿件；
+          // 精确的新建行数看 totalCreated，精确的新建列表看 inserted。
+          created: available,
+          inserted,
+          articles: available,
           skipped,
+          failed: failedInput.map((item) => ({
+            title: item.title,
+            sourceUrl: item.sourceUrl,
+            reason: item.reason,
+          })),
+          ...(failedInput.length > 0
+            ? {
+                warning: {
+                  code: "partial_invalid_archive_input",
+                  message: `${failedInput.length}/${items.length} 条稿件未通过入库校验,已跳过坏稿并入库其余有效稿件`,
+                },
+              }
+            : {}),
         };
       },
     }),
@@ -1739,6 +2130,7 @@ export function isToolRegistered(toolName: string): boolean {
  */
 export const WRITE_TOOL_NAMES = new Set<string>([
   "cms_publish",
+  "cms_batch_publish",
   "archive_to_drafts",  // 海外热榜搬运 / 跨语言改写场景：只入本地 articles 表
   "cms_catalog_sync",   // 当前未注册，预留
   "external_publish",   // 当前未注册，预留
@@ -1856,6 +2248,8 @@ export async function invokeToolDirectly(
   context?: {
     organizationId?: string;
     operatorId?: string;
+    missionId?: string;
+    taskId?: string;
   },
 ): Promise<
   | { ok: true; toolName: string; params: Record<string, unknown>; result: unknown }
@@ -1888,6 +2282,12 @@ export async function invokeToolDirectly(
   }
   if (context?.operatorId && rawWithContext.operatorId === undefined) {
     rawWithContext.operatorId = context.operatorId;
+  }
+  if (context?.missionId && rawWithContext.missionId === undefined) {
+    rawWithContext.missionId = context.missionId;
+  }
+  if (context?.taskId && rawWithContext.taskId === undefined) {
+    rawWithContext.taskId = context.taskId;
   }
   const coerced: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rawWithContext)) {
@@ -2139,7 +2539,7 @@ export function createMissionTools(context: {
       execute: async ({ title, description, expectedOutput, assignedEmployeeSlug, dependencyTitles, priority }) => {
         const { db: _db } = await import("@/db");
         const { missionTasks: _mt, aiEmployees: _emp } = await import("@/db/schema");
-        const { eq: _eq, and: _and } = await import("drizzle-orm");
+        const { eq: _eq } = await import("drizzle-orm");
 
         // Find employee by slug
         const emp = await _db.query.aiEmployees.findFirst({
@@ -2250,7 +2650,7 @@ export function createKnowledgeBaseTools(context: {
       const { searchKnowledgeBases } = await import("@/lib/knowledge/retrieval");
       const { db: _db } = await import("@/db");
       const { knowledgeBases: _kb } = await import("@/db/schema");
-      const { inArray: _inArray, eq: _eq, and: _and } = await import("drizzle-orm");
+      const { inArray: _inArray } = await import("drizzle-orm");
 
       // Filter kb_ids: must be in employee's bound list
       const allowedSet = new Set(context.employeeKnowledgeBaseIds);
@@ -2368,6 +2768,8 @@ export function createXiaoyanChatTools(context: {
 export interface ToolContext {
   organizationId?: string;
   operatorId?: string;
+  missionId?: string;
+  taskId?: string;
 }
 
 /**
@@ -2380,7 +2782,10 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
   toolDef: T,
   context?: ToolContext,
 ): T {
-  if (!context || (!context.organizationId && !context.operatorId)) {
+  if (
+    !context ||
+    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId)
+  ) {
     return toolDef;
   }
   const orig = toolDef.execute;
@@ -2394,6 +2799,12 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
       }
       if (context.operatorId && merged.operatorId === undefined) {
         merged.operatorId = context.operatorId;
+      }
+      if (context.missionId && merged.missionId === undefined) {
+        merged.missionId = context.missionId;
+      }
+      if (context.taskId && merged.taskId === undefined) {
+        merged.taskId = context.taskId;
       }
       return (orig as (a: Record<string, unknown>, ...r: unknown[]) => unknown)(
         merged,
