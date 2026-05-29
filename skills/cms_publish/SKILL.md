@@ -20,8 +20,7 @@ metadata:
       - CMS_LOGIN_CMC_ID
       - CMS_LOGIN_CMC_TID
       - VIBETIDE_CMS_PUBLISH_ENABLED
-    dependencies:
-      - cms_catalog_sync  # 栏目映射必须先同步过至少一次
+    dependencies: []
   implementation:
     scriptPath: src/lib/cms/publish/publish-article.ts
     testPath: src/lib/cms/__tests__/publish/
@@ -44,9 +43,8 @@ metadata:
 - 稿件未通过审核（应先走 `quality_review` / `compliance_check`）
 - 稿件目标是发社交媒体（应走 `publish_strategy` + 对应社媒 adapter）
 - 视频稿件且视频尚未入 VMS（videoId 缺失时）
-- `app_channels` 映射表未同步（首次使用前必须先跑 `cms_catalog_sync`）
 
-**前置依赖**：`CMS_HOST` / `CMS_LOGIN_CMC_ID` / `CMS_LOGIN_CMC_TID` env 必填；feature flag `VIBETIDE_CMS_PUBLISH_ENABLED=true`（按 org 灰度）；`cms_catalogs` + `app_channels` 有数据。
+**前置依赖**：`CMS_HOST` / `CMS_LOGIN_CMC_ID` / `CMS_LOGIN_CMC_TID` env 必填；feature flag `VIBETIDE_CMS_PUBLISH_ENABLED=true`（按 org 灰度）。可选：`CMS_DEFAULT_SITE_ID/APP_ID/CATALOG_ID`（不配走代码 fallback 81/1768/10210）。
 
 ## 输入 / 输出
 
@@ -54,14 +52,20 @@ metadata:
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| articleId | uuid | ✓ | VibeTide `articles.id` |
-| appChannelSlug | enum | ✓ | 9 个 APP 栏目之一（见 `ALL_APP_CHANNEL_SLUGS`） |
-| operatorId | string | ✓ | 操作者（AI 员工 slug 或 user id） |
-| triggerSource | enum | ✗ | `manual` / `scheduled` / `workflow` / `daily_plan`，默认 `workflow` |
-| allowUpdate | boolean | ✗ | 允许覆盖 CMS 已有稿件，默认 `true` |
-| overrideCatalogId | string | ✗ | 覆盖栏目默认 catalogId（多栏目场景） |
+| title | string | ✓ | 稿件标题 |
+| body | string | ✓ | 稿件正文（纯文本/Markdown，mapper 会转 CMS content blocks） |
+| summary | string | ✗ | 摘要（50-120 字） |
+| authorName | string | ✗ | 作者，默认 "AI 编辑部" |
+| coverImageUrl | string | ✗ | 封面图 URL |
+| tags | string[] | ✗ | 标签数组 |
+| catalogId | number | ✗ | 目标 CMS 栏目 ID。不填走 env `CMS_DEFAULT_CATALOG_ID`（默认 10210） |
+| appId | number | ✗ | CMS APP 应用 ID。不填走 env `CMS_DEFAULT_APP_ID`（默认 1768） |
+| siteId | number | ✗ | CMS 站点 ID。不填走 env `CMS_DEFAULT_SITE_ID`（默认 81） |
+| dryRun | boolean | ✗ | dry-run 模式，不写 DB 不调 CMS，用于 skill 测试入口 |
+| organizationId | string | (注入) | 由 workflow 执行器自动注入 |
+| operatorId | string | (注入) | 由 workflow 执行器自动注入 |
 
-**9 个 APP 栏目 slug**：`app_home` / `app_news` / `app_politics` / `app_sports` / `app_variety` / `app_livelihood_zhongcao` / `app_livelihood_tandian` / `app_livelihood_podcast` / `app_drama`。
+**目标栏目配置方式**：在 workflow_template 的 cms_publish 步骤"参数配置"里加 `catalogId = <CMS 栏目数字 ID>` 即可推到指定栏目。同一组织通常 `appId/siteId` 共用 env 默认（1768/81），跨 app 才填。
 
 **输出简要表：**
 
@@ -84,7 +88,7 @@ metadata:
 - [ ] Step 1: Feature flag `isCmsPublishEnabled()` + `requireCmsConfig()`（env 全）
 - [ ] Step 2: `getArticleById(articleId)` 加载稿件；不存在抛 `CmsConfigError`
 - [ ] Step 3: 状态合法性检查（`publishStatus ∈ {approved, publishing, published}`）
-- [ ] Step 4: `loadMapperContext(orgId, appChannelSlug, org)` 取 siteId/appId/catalogId/listStyle/默认封面
+- [ ] Step 4: `loadMapperContext(org, target?)` 取 siteId/appId/catalogId（target 来自工具入参聚合的 `{catalogId,appId,siteId}`，未传走 env 默认）
 - [ ] Step 5: 幂等检查 — 查 `cmsPublications` 最近记录；`synced` 且 `!allowUpdate` → 直接返回；`allowUpdate` → DTO 附 `articleId` 走 MODIFY
 - [ ] Step 6: `mapArticleToCms(article, ctx)` → 按 type=1/2/4/5/11 分发 mapper → 生成 `CmsArticleSaveDTO`
 - [ ] Step 7: `createPublication({state:"submitting", requestHash, requestPayload, attempts})`
@@ -97,13 +101,13 @@ metadata:
 
 mapper 路由在 `Step 6` 内部执行，判定优先级从上到下：
 
-| 判定条件 | CMS type | 名称 | 必填字段（除 title/author/username/logo） | 典型栏目 |
+| 判定条件 | CMS type | 名称 | 必填字段（除 title/author/username/logo） | 示例栏目（catalogId） |
 |---------|---------|------|-----------------------------------------|---------|
-| `article.audioId` 存在 | `11` | 音频 | `articleContentDto.audioDtoList[]`（含 audioId） | `app_livelihood_podcast` |
-| `article.videoId` 存在 | `5` | 视频 | `articleContentDto.videoDtoList[]`（含 videoId） | `app_news` / `app_sports` / `app_variety` |
-| `article.externalUrl` && `!body` | `4` | 外链 | `redirectUrl` | `app_home` / `app_news` |
-| `mediaType=gallery` && `images.length≥3` | `2` | 图集 | `images[]`（≥3 张，含 image+note）+ `articleContentDto.imageDtoList` + `appCustomParams.customStyle.imgPath`（前 3 图 URL） | `app_news` / `app_livelihood_*` |
-| 其他（默认） | `1` | 图文 | `content` + `articleContentDto.htmlContent`（自动包 `<div id="editWrap">`） | 全部 |
+| `article.audioId` 存在 | `11` | 音频 | `articleContentDto.audioDtoList[]`（含 audioId） | `10462`（AI 日报，音频可用）/ 音频专属栏目 |
+| `article.videoId` 存在 | `5` | 视频 | `articleContentDto.videoDtoList[]`（含 videoId） | `10127`（置顶热点新闻）/ `10230`（时政要闻）等视频允收栏目 |
+| `article.externalUrl` && `!body` | `4` | 外链 | `redirectUrl` | `10127`（置顶热点新闻）/ `10462`（AI 日报）等图文/外链栏目 |
+| `mediaType=gallery` && `images.length≥3` | `2` | 图集 | `images[]`（≥3 张，含 image+note）+ `articleContentDto.imageDtoList` + `appCustomParams.customStyle.imgPath`（前 3 图 URL） | `10127`（置顶热点新闻）/ `10463`（本地新闻）等支持图集的栏目 |
+| 其他（默认） | `1` | 图文 | `content` + `articleContentDto.htmlContent`（自动包 `<div id="editWrap">`） | 所有栏目 |
 
 **公共字段映射**（所有 type）：`title`/`listTitle` ≤ 80 字 · `shortTitle` fallback 取前 20 字 · `author` fallback "智媒编辑部" · `username` 取 env `CMS_USERNAME` · `keyword/tags` 取前 10 · `logo` 必填（`coverImageUrl` fallback `CMS_DEFAULT_COVER_URL`）· `status` 由 VibeTide `publishStatus` 映射（draft=0/pending=20/published=30/rejected=60）· `referType=9`（AI 自产）· `version="cms2"` 固定 · `tenantId` 取 env。
 
@@ -125,7 +129,7 @@ mapper 路由在 `Step 6` 内部执行，判定优先级从上到下：
 | 场景 | 条件 | 动作 |
 |------|------|------|
 | 凭证失效 | `state=401` / message 含 "未登录" | 抛 `CmsAuthError`；告警；暂停队列避免封号 |
-| 栏目不存在 | CMS 返回栏目无效 | 抛 `CmsConfigError`；提示跑 `cms_catalog_sync` |
+| 栏目不存在 | CMS 返回栏目无效 | 抛 `CmsBusinessError`；运营修正 workflow_template 步骤的 `catalogId` 参数（或检查 env `CMS_DEFAULT_CATALOG_ID`） |
 | 图片 URL 无效 | logo HEAD 失败 | `CMS_DEFAULT_COVER_URL` 兜底，继续 |
 | 已入过（有 cmsArticleId） | `existing.cmsState==="synced"` | `allowUpdate=true` 走 MODIFY；`false` 直接返回 |
 | 网络超时 / 5xx | `AbortError` / `state≥500` | `retrying`，退避 1s/2s/4s，3 次后 `failed` |
@@ -144,9 +148,8 @@ CMS 入库完成！
    • 封面：{coverSource} [使用/兜底]
 
 📍 目标栏目
-   • APP 栏目：{input.appChannelSlug}
-   • CMS 栏目：{catalog.name} (id={catalog.cmsCatalogId})
-   • 所属应用：{app.name} (siteId={app.siteId})
+   • CMS 栏目 ID：{ctx.catalogId}（来源：步骤参数 / env 默认）
+   • APP 应用：{ctx.appId} · 站点：{ctx.siteId}
 
 📊 入库结果
    ✓ CMS 文稿 ID：{cmsArticleId}
@@ -181,20 +184,20 @@ polling_enabled: true
 polling_max_attempts: 5
 polling_intervals_sec: [5, 10, 20, 40, 60]
 
-# 分栏目策略覆盖
-channel_overrides:
-  app_politics:
-    default_author: "深圳时政编辑部"
-    polling_max_attempts: 8            # 时政稿需更久确认
-  app_sports:
-    default_author: "川超报道团"
+# 按目标栏目 ID 策略覆盖
+catalog_overrides:
+  10230:                  # 时政要闻
+    default_author: "时政编辑部"
+    polling_max_attempts: 8         # 时政稿需更久确认
+  10127:                  # 置顶热点新闻
+    default_author: "热点报道团"
 ```
 
-**值优先级**：函数参数 → 稿件 `article.metadata.*` → EXTEND `channel_overrides.<slug>` → EXTEND 全局 → Skill 代码默认。
+**值优先级**：函数参数 → 稿件 `article.metadata.*` → EXTEND `catalog_overrides.<catalogId>` → EXTEND 全局 → Skill 代码默认。
 
 ## 上下游协作
 
-- **上游触发**：`quality_review` / `compliance_check` 产出 approved 稿件 → 稿件详情页「发布到 APP」按钮 / 每日定时 / workflow step；`cms_catalog_sync` 必须先跑过一次保证 `app_channels` + `cms_catalogs` 有数据
+- **上游触发**：`quality_review` / `compliance_check` 产出 approved 稿件 → 稿件详情页「发布到 APP」按钮 / 每日定时 / workflow step。目标栏目由 workflow_template 的 cms_publish 步骤参数 `catalogId` 指定（不指定走 env `CMS_DEFAULT_CATALOG_ID`）；不依赖 `cms_catalog_sync`。
 - **下游消费**：
   - Inngest `cmsStatusPoll`（event `cms/publication.submitted`）— 5 次指数退避查 `getMyArticleDetail` 确认 `synced`
   - Inngest `cmsPublishRetry`（event `cms/publication.retry`）— 失败重试 3 次
@@ -209,7 +212,7 @@ channel_overrides:
 | 问题 | 原因 | 解决 |
 |------|------|------|
 | `CmsAuthError: 未登录` | `login_cmc_id` / `login_cmc_tid` 过期 | 更新 env；Phase 2 接 MMS/CMC 自动鉴权；暂停队列 |
-| `CmsBusinessError: 栏目不存在` | catalogId 失效 | 跑 `cms_catalog_sync`；检查 `app_channels.defaultCatalogId` |
+| `CmsBusinessError: 栏目不存在` | catalogId 失效 / 不在该 app 下 | 在华栖云 CMS 后台核对 catalogId 数字；更新 workflow_template 步骤参数 `catalogId` 或 env `CMS_DEFAULT_CATALOG_ID` |
 | `CmsSchemaError: missing content` | type=1 但 article.body 空 | 检查上游 `content_generate` 是否失败 |
 | 入稿成功但轮询一直 "20" | CMS 侧需人工发布 | 正常现象；如需自动上线，传 `targetCmsStatus=published` |
 | 封面图破图 | URL 不可访问或被 CDN 拒 | 上传到 CMS 媒资库；或用 `CMS_DEFAULT_COVER_URL` 兜底 |
@@ -229,7 +232,7 @@ channel_overrides:
 - Server Action：`src/app/actions/cms.ts#publishArticleToCms`
 - 测试：[src/lib/cms/__tests__/publish/](../../src/lib/cms/__tests__/publish/)（`publish-article.test.ts` / `request-hash.test.ts`）
 - 参考 Spec：[docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md](../../docs/superpowers/specs/2026-04-18-newsclaw-cms-aigc-scenario-design.md)
-- 关联 skill：[cms_catalog_sync](../cms_catalog_sync/SKILL.md)（栏目映射前置）
+- 参考 Spec（栏目参数化）：[docs/superpowers/specs/2026-05-29-cms-publish-catalog-selector-design.md](../../docs/superpowers/specs/2026-05-29-cms-publish-catalog-selector-design.md)
 
 - **媒体行业专业标准（共享）**：[../../docs/skills/media-industry-standards.md](../../docs/skills/media-industry-standards.md)
 
