@@ -295,3 +295,94 @@ describe("publishArticleToCms", () => {
     ).rejects.toThrow(/app_channel_not_mapped/);
   });
 });
+
+describe("publishArticleToCms — target override", () => {
+  // 复用外层 beforeEach 设置的所有 mock（DAL/mapper/env）。
+  // 每个 case 自行 mockCmsFetch 让 publishArticleToCms 走完完整流程，
+  // 这样断言才能稳定看到 loadMapperContext / createPublication 调用参数。
+
+  it("传 target → 透传给 loadMapperContext 第二个参数", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse({
+        article: { id: 1, status: 0, title: "t" },
+        url: "1/x/1.shtml",
+        preViewPath: "https://cms/preview",
+        method: "ADD",
+      }),
+    ]);
+    await publishArticleToCms({
+      articleId: "art-1",
+      operatorId: "op-1",
+      triggerSource: "workflow",
+      target: { catalogId: 10462, appId: 1768, siteId: 81 },
+    });
+
+    expect(loadMapperContext as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({ brandName: expect.any(String) }),
+      { catalogId: 10462, appId: 1768, siteId: 81 },
+    );
+  });
+
+  it("不传 target → loadMapperContext 第二个参数为 undefined", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse({
+        article: { id: 1, status: 0, title: "t" },
+        url: "1/x/1.shtml",
+        preViewPath: "https://cms/preview",
+        method: "ADD",
+      }),
+    ]);
+    await publishArticleToCms({
+      articleId: "art-1",
+      operatorId: "op-1",
+      triggerSource: "workflow",
+    });
+    expect(loadMapperContext as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({ brandName: expect.any(String) }),
+      undefined,
+    );
+  });
+
+  it("传 target → createPublication 的 requestPayload._target 含正确 catalogId", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse({
+        article: { id: 1, status: 0, title: "t" },
+        url: "1/x/1.shtml",
+        preViewPath: "https://cms/preview",
+        method: "ADD",
+      }),
+    ]);
+    await publishArticleToCms({
+      articleId: "art-1",
+      operatorId: "op-1",
+      triggerSource: "workflow",
+      target: { catalogId: 10462 },
+    });
+
+    expect(createPublication as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestPayload: expect.objectContaining({
+          _target: { catalogId: 10462 },
+        }),
+      }),
+    );
+  });
+
+  it("不传 target → requestPayload 没有 _target 字段", async () => {
+    mockCmsFetch([
+      cmsSuccessResponse({
+        article: { id: 1, status: 0, title: "t" },
+        url: "1/x/1.shtml",
+        preViewPath: "https://cms/preview",
+        method: "ADD",
+      }),
+    ]);
+    await publishArticleToCms({
+      articleId: "art-1",
+      operatorId: "op-1",
+      triggerSource: "workflow",
+    });
+    const call = (createPublication as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(call?.requestPayload).not.toHaveProperty("_target");
+  });
+});

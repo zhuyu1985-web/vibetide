@@ -98,6 +98,12 @@ export interface PublishInput {
   triggerSource: "manual" | "workflow" | "scheduled" | "daily_plan";
   /** 是否允许覆盖 CMS 已有稿件（默认 true，走 CMS MODIFY） */
   allowUpdate?: boolean;
+  /** 推送目标 override（catalogId/appId/siteId 任一字段未传走 env 默认） */
+  target?: {
+    catalogId?: number;
+    appId?: number;
+    siteId?: number;
+  };
 }
 
 export interface PublishResult {
@@ -182,10 +188,11 @@ export async function publishArticleToCms(
     };
   }
 
-  // 4. MapperContext（硬编码推送目标：siteId/appId/catalogId，见 article-mapper/index.ts）
-  const ctx: MapperContext = loadMapperContext({
-    brandName: org.brandName ?? "智媒编辑部",
-  });
+  // 4. MapperContext（target 可覆盖默认推送目标；缺省走 env defaults）
+  const ctx: MapperContext = loadMapperContext(
+    { brandName: org.brandName ?? "智媒编辑部" },
+    input.target,
+  );
 
   // 6. 映射
   const mappingStart = performance.now();
@@ -220,13 +227,21 @@ export async function publishArticleToCms(
   const mappingMs = performance.now() - mappingStart;
 
   // 7. 落库（requestHash 忽略易变字段，便于重试幂等）
-  const requestHash = hashRequestPayload(dto);
+  //
+  // `_target` 同时进 requestHash 和 requestPayload —— 这样跨栏目重推（同一篇 article 改
+  // catalogId 再发）会得到新 hash → 新 publication 记录，不会命中老 success 记录；
+  // retry 时也能从 requestPayload._target 还原 target，避免悄悄漂回默认目标。
+  // (spec §3.7)
+  const payloadWithTarget = input.target
+    ? { ...dto, _target: input.target }
+    : dto;
+  const requestHash = hashRequestPayload(payloadWithTarget);
   const publicationId = await createPublication({
     organizationId: article.organizationId,
     articleId: input.articleId,
     cmsType,
     requestHash,
-    requestPayload: dto,
+    requestPayload: payloadWithTarget,
     operatorId: input.operatorId,
     triggerSource: input.triggerSource,
   });
