@@ -1821,21 +1821,19 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
         validation: { min: 3, max: 20 },
       },
       {
-        name: "publish_channel_slug",
-        label: "发布栏目",
-        type: "select",
+        name: "publish_catalog_id",
+        label: "CMS 目标栏目 ID",
+        type: "number",
         required: false,
-        defaultValue: "app_news",
-        options: [
-          { value: "app_news", label: "APP - 新闻（每日 AI 资讯）" },
-          { value: "app_home", label: "APP - 首页" },
-        ],
+        defaultValue: 10462,
+        placeholder: "如 10462 (AI 日报) / 10127 (置顶热点新闻)",
+        validation: { min: 1 },
       },
     ],
     systemInstruction:
-      "聚焦今日 AI（{{focus_subdomain}}）资讯：① 从热点发现线索模块匹配 AI 相关线索；② 筛选/去重得 Top {{item_count}} 条代表性新闻；③ 每条产出 80-120 字概要（事实 + 影响）；④ 合并为一篇《每日 AI 资讯》稿件（导语 / 分条目列表 / 收尾观察）；⑤ 审核通过后定时发布到 CMS APP 的 {{publish_channel_slug}} 栏目。",
+      "聚焦今日 AI（{{focus_subdomain}}）资讯：① 从热点发现线索模块匹配 AI 相关线索；② 筛选/去重得 Top {{item_count}} 条代表性新闻；③ 每条产出 80-120 字概要（事实 + 影响）；④ 合并为一篇《每日 AI 资讯》稿件（导语 / 分条目列表 / 收尾观察）；⑤ 审核通过后定时发布到 CMS 栏目 ID {{publish_catalog_id}}。",
     promptTemplate:
-      "从热点线索匹配今日 AI 资讯（聚焦 {{focus_subdomain}}），Top {{item_count}} 条逐条摘要后合并成稿，并定时发布到 {{publish_channel_slug}}。",
+      "从热点线索匹配今日 AI 资讯（聚焦 {{focus_subdomain}}），Top {{item_count}} 条逐条摘要后合并成稿，并定时发布到 CMS 栏目 ID {{publish_catalog_id}}。",
     steps: [
       step(1, "AI 热点线索匹配", "trending_topics", "热榜聚合", "data_collection", "match"),
       step(2, "AI 话题筛选去重", "topic_extraction", "选题提取", "data_analysis", "filter"),
@@ -1843,7 +1841,7 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       step(4, "逐条摘要生成", "summary_generate", "摘要生成", "content_gen", "summary"),
       step(5, "合并成稿", "content_generate", "内容生成", "content_gen", "write"),
       step(6, "定时发布到 APP", "cms_publish", "CMS 文稿入库发布", "distribution", "publish", {
-        appChannelSlug: "{{publish_channel_slug}}",
+        catalogId: "{{publish_catalog_id}}",
         triggerSource: "scheduled",
       }),
     ],
