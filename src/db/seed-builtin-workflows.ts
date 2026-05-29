@@ -2301,12 +2301,11 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
           language: "en",
           category: "app_overseas_en",
           initialStatus: "approved",
-          // dedupBySourceUrl=false:每次跑都把所有筛选条目入库,不按 sourceUrl
-          // 跟历史稿件去重。事故复盘:用户跑了多次 mission,第二次起所有
-          // sourceUrl 都已存在于 articles 表 → dedup 全 skip → step 5 created=0
-          // → 用户感知"只有 1 条入库"(实际是首次跑入了几条,后续重跑全跳过)。
-          // 改成 false 后每次都入库,编辑可在稿件列表手动管理重复(或加 cleanup 脚本)。
-          dedupBySourceUrl: false,
+          // dedupBySourceUrl=true:按用户明确需求,之前已抓过的稿件
+          // (按 sourceUrl 判定)不重复入库。重跑相同热榜时只新增之前没入库的
+          // 条目,避免稿件库膨胀。step 5 outputData 会带 totalSkipped 计数
+          // 让用户看到"创建 N 条,跳过 M 条已存在"。
+          dedupBySourceUrl: true,
         },
       ),
     ],

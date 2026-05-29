@@ -38,8 +38,11 @@ const client = postgres(url, { prepare: false, max: 1 });
     for (const s of steps) {
       if (s.config?.skillSlug === "archive_to_drafts") {
         const params = s.config.parameters ?? {};
-        if (params.dedupBySourceUrl !== false) {
-          params.dedupBySourceUrl = false;
+        // 2026-05-29 修正:之前 patch 把 dedup 改 false 是误诊
+        //("只有 1 条入库"其实是 dedup 正常工作,重跑相同热榜全 skip)。
+        // 用户明确要求"之前抓过的稿件不要再入库",恢复 dedupBySourceUrl=true。
+        if (params.dedupBySourceUrl !== true) {
+          params.dedupBySourceUrl = true;
           s.config.parameters = params;
           dirty = true;
         }
