@@ -234,14 +234,23 @@ export const executeMissionTask = inngest.createFunction(
           .filter(Boolean)
           .join("\n");
 
-        const result = await executeAgent(agent, {
-          stepKey: task.id,
-          stepLabel: task.title,
-          scenario: scenarioLabel,
-          topicTitle: mission.title,
-          previousSteps,
-          userInstructions,
-        }, undefined, mTools);
+        const result = await executeAgent(
+          agent,
+          {
+            stepKey: task.id,
+            stepLabel: task.title,
+            scenario: scenarioLabel,
+            topicTitle: mission.title,
+            previousSteps,
+            userInstructions,
+          },
+          undefined,
+          mTools,
+          {
+            organizationId: organizationId || undefined,
+            operatorId: task.assignedEmployeeId ?? mission.leaderEmployeeId ?? undefined,
+          },
+        );
 
         return result;
       });

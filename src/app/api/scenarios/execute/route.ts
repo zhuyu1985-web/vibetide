@@ -158,7 +158,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
+    const vercelTools = toVercelTools(
+      agent.tools,
+      agent.pluginConfigs,
+      undefined, // missionTools
+      undefined, // knowledgeBaseTools
+      { organizationId, operatorId: user.id },
+    );
 
     const result = streamText({
       model,

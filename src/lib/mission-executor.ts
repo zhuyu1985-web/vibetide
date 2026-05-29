@@ -385,14 +385,20 @@ export async function leaderPlanDirect(
 
   const prompt = buildLeaderDecomposePrompt(mission, employeesWithSkills);
 
-  const planResult = await executeAgent(agent, {
-    stepKey: "leader-plan",
-    stepLabel: "任务分解与分配",
-    scenario: await loadScenarioLabel(mission),
-    topicTitle: mission.title,
-    previousSteps: [],
-    userInstructions: prompt,
-  });
+  const planResult = await executeAgent(
+    agent,
+    {
+      stepKey: "leader-plan",
+      stepLabel: "任务分解与分配",
+      scenario: await loadScenarioLabel(mission),
+      topicTitle: mission.title,
+      previousSteps: [],
+      userInstructions: prompt,
+    },
+    undefined, // onProgress
+    undefined, // missionTools
+    { organizationId, operatorId: mission.leaderEmployeeId ?? undefined },
+  );
 
   // Parse tasks from output — use full artifact content (not summary which truncates to first line)
   const outputText = planResult.output.artifacts?.[0]?.content || planResult.output.summary || "";
@@ -1365,15 +1371,24 @@ async function executeTaskDirect(
       return { status: "failed" as const, taskId, error: failureMsg };
     }
 
-    const result = await executeAgent(agent, {
-      stepKey: task.id,
-      stepLabel: task.title,
-      scenario: await loadScenarioLabel(mission),
-      topicTitle: mission.title,
-      previousSteps,
-      userInstructions,
-      skillSpec: skillBody ?? undefined,
-    }, undefined, missionTools);
+    const result = await executeAgent(
+      agent,
+      {
+        stepKey: task.id,
+        stepLabel: task.title,
+        scenario: await loadScenarioLabel(mission),
+        topicTitle: mission.title,
+        previousSteps,
+        userInstructions,
+        skillSpec: skillBody ?? undefined,
+      },
+      undefined,
+      missionTools,
+      {
+        organizationId: mission.organizationId,
+        operatorId: task.assignedEmployeeId ?? mission.leaderEmployeeId ?? undefined,
+      },
+    );
 
     // ── 第三道防线:扫描 LLM 输出文本是否含失败指纹 ──────────────────────
     // 前两道防线(短路 toolFailure + registered-tool guard)理论上挡所有工具失败,
@@ -1749,14 +1764,20 @@ export async function leaderConsolidateDirect(
 
   const previousSteps = mapTaskOutputsToStepOutputs(completedTasks);
 
-  const result = await executeAgent(agent, {
-    stepKey: "leader-consolidate",
-    stepLabel: "成果汇总与交付",
-    scenario: await loadScenarioLabel(mission),
-    topicTitle: mission.title,
-    previousSteps,
-    userInstructions: prompt,
-  });
+  const result = await executeAgent(
+    agent,
+    {
+      stepKey: "leader-consolidate",
+      stepLabel: "成果汇总与交付",
+      scenario: await loadScenarioLabel(mission),
+      topicTitle: mission.title,
+      previousSteps,
+      userInstructions: prompt,
+    },
+    undefined, // onProgress
+    undefined, // missionTools
+    { organizationId, operatorId: mission.leaderEmployeeId ?? undefined },
+  );
 
   // Save final output
   await db

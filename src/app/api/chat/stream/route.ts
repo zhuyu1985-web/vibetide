@@ -157,7 +157,13 @@ export async function POST(req: Request) {
     }
 
     // Free chat: use agent's own tools (no scenario-specific toolsHint)
-    const baseTools = toVercelTools(agent.tools, agent.pluginConfigs);
+    const baseTools = toVercelTools(
+      agent.tools,
+      agent.pluginConfigs,
+      undefined, // missionTools
+      undefined, // knowledgeBaseTools
+      { organizationId, operatorId: user.id },
+    );
     // xiaoyan / xiaolei / xiaoshu chat tools — research_query_builder + data_pivoter（A6 Phase 3+4）
     // 仅当 employee 已通过 employee_skills 绑了对应 skill 时才合并真实 execute。
     const xiaoyanTools = createXiaoyanChatTools({

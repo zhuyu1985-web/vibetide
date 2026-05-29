@@ -211,7 +211,13 @@ export async function POST(req: Request) {
             });
 
             const model = getLanguageModel(agent.modelConfig);
-            const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs);
+            const vercelTools = toVercelTools(
+              agent.tools,
+              agent.pluginConfigs,
+              undefined, // missionTools
+              undefined, // knowledgeBaseTools
+              { organizationId: orgId, operatorId: user.id },
+            );
 
             // ── Server-side tool pre-execution (anti-hallucination) ─────────
             // 背景：对 "CCBN" 这类 LLM "自认为熟悉"的话题，它会绕过工具按

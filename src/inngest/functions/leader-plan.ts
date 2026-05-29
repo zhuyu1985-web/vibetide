@@ -195,14 +195,20 @@ export const leaderPlan = inngest.createFunction(
 
       const prompt = buildLeaderDecomposePrompt(mission, availableEmployees);
 
-      const result = await executeAgent(agent, {
-        stepKey: "leader-plan",
-        stepLabel: "任务分解与分配",
-        scenario: scenarioLabel,
-        topicTitle: mission.title,
-        previousSteps: [],
-        userInstructions: prompt,
-      });
+      const result = await executeAgent(
+        agent,
+        {
+          stepKey: "leader-plan",
+          stepLabel: "任务分解与分配",
+          scenario: scenarioLabel,
+          topicTitle: mission.title,
+          previousSteps: [],
+          userInstructions: prompt,
+        },
+        undefined, // onProgress
+        undefined, // missionTools
+        { organizationId, operatorId: mission.leaderEmployeeId ?? undefined },
+      );
 
       return result;
     });

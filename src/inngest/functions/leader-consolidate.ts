@@ -130,14 +130,20 @@ export const leaderConsolidate = inngest.createFunction(
 
         const previousSteps = mapTaskOutputsToStepOutputs(completedTasks);
 
-        const result = await executeAgent(agent, {
-          stepKey: "leader-consolidate",
-          stepLabel: "成果汇总与交付",
-          scenario: scenarioLabel,
-          topicTitle: mission.title,
-          previousSteps,
-          userInstructions: prompt,
-        });
+        const result = await executeAgent(
+          agent,
+          {
+            stepKey: "leader-consolidate",
+            stepLabel: "成果汇总与交付",
+            scenario: scenarioLabel,
+            topicTitle: mission.title,
+            previousSteps,
+            userInstructions: prompt,
+          },
+          undefined, // onProgress
+          undefined, // missionTools
+          { organizationId, operatorId: mission.leaderEmployeeId ?? undefined },
+        );
 
         return result;
       }

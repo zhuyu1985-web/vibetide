@@ -429,7 +429,18 @@ export async function testSkillExecution(
             ],
           ])
         : undefined;
-    const vercelTools = toVercelTools(agentTools, pluginConfigs);
+    const vercelTools = toVercelTools(
+      agentTools,
+      pluginConfigs,
+      undefined, // missionTools
+      undefined, // knowledgeBaseTools
+      {
+        // 与上方 invokeToolDirectly 测试路径保持一致：刻意不带 organizationId，
+        // 让写入型工具命中 missing_context 守卫，避免测试入口污染生产数据。
+        organizationId: undefined,
+        operatorId: user.id,
+      },
+    );
 
     const startTime = Date.now();
     const result = await generateText({

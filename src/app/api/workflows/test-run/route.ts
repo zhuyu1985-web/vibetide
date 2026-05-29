@@ -492,6 +492,7 @@ ${truncated}
                 },
                 undefined,
                 undefined, // 测试运行无 missionTools（无 mission 上下文可post message）
+                { organizationId: orgId, operatorId: user.id },
               );
 
               const resultText =
