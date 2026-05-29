@@ -151,10 +151,11 @@ ${variantsPerTopic === 3 ? "- 3 篇:v0 短版 / v1 中版 / v2 = analytical 长�
  *  核心 1500 字精华)。 */
 const BODY_TRUNCATE_CHARS = 1500;
 
-/** 单条 LLM 调用并发上限 —— 海外热榜搬运过滤后通常 3-10 条非 other,
- *  并发 5 个让 N 条任务的总时长接近单条耗时(10-20s),而不是 N×10s。
- *  5 并发已实测不触发 dashscope 频率限制。 */
-const SINGLE_CONCURRENCY = 5;
+/** 单条 LLM 调用并发上限 —— 海外热榜搬运过滤后通常 5-15 条非 other,
+ *  并发 8 让 15 条任务 2 波并发跑完,总时长 ≈ 单条耗时 × 2(30-60s)。
+ *  qwen3-max 单条 30s+ 是常态,所以并发上限决定了 step 4 总耗时。
+ *  之前 5 并发对 13 条要 3 波 ≈ 90s+,提到 8 后 2 波 ≈ 60s。 */
+const SINGLE_CONCURRENCY = 8;
 
 /** 单条 LLM 调用超时 —— 单条输入小输出小,30s 足够。超 30s 直接 abort,
  *  其他条目继续跑,不连坐。 */

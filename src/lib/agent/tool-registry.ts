@@ -889,7 +889,10 @@ function createToolDefinitions(): ToolSet {
           mode,
           platforms: activePlatforms,
           totalCount: items.length,
-          topics: items.slice(0, mode === "hot" ? 50 : limit * Math.max(activePlatforms.length, 1)),
+          // 之前 mode=hot 硬切 50 条 —— 但用户传入 limit=30 时期望就是 30 条,
+          // 强制 50 让下游 step 2-4 处理量翻 1.7 倍,翻译步骤直接慢 1 分钟+。
+          // 现在 hot 模式也遵守 limit,默认 limit=20 时只返 20 条。
+          topics: items.slice(0, mode === "hot" ? limit : limit * Math.max(activePlatforms.length, 1)),
           crossPlatformTopics,
           warnings,
         };

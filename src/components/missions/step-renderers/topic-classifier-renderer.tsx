@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { DataTable } from "@/components/shared/data-table";
 import { SourceUrlPill } from "@/components/shared/source-url-pill";
 import { FallbackRenderer } from "./fallback-renderer";
 
@@ -77,33 +76,54 @@ export function TopicClassifierRenderer({ outputData }: TopicClassifierRendererP
           <> ({Object.entries(groupCounts).map(([cat, n]) => `${cat}: ${n}`).join(", ")})</>
         )}
       </div>
+      {/* 单行列表 —— 跟 step 4 风格一致,标题/理由 truncate 防止换行竖排。 */}
       {passed.length > 0 && (
-        <DataTable
-          rows={passed}
-          rowKey={(r) => r.id}
-          columns={[
-            { key: "id", header: "ID", width: "w-20", render: (r) => <code className="text-xs">{r.id}</code> },
-            { key: "category", header: "分类", width: "w-32", render: (r) => <CategoryBadge value={r.category} /> },
-            { key: "confidence", header: "置信度", width: "w-20", align: "right", render: (r) => r.confidence.toFixed(2) },
-            { key: "reason", header: "理由", render: (r) => r.reason },
-            { key: "sourceUrl", header: "原文", width: "w-20", render: (r) => <SourceUrlPill url={r.sourceUrl} variant="compact" /> },
-          ]}
-        />
+        <div className="space-y-1">
+          {passed.map((r) => (
+            <div
+              key={r.id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/30"
+            >
+              <code className="shrink-0 text-xs text-muted-foreground">{r.id}</code>
+              <CategoryBadge value={r.category} />
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {r.confidence.toFixed(2)}
+              </span>
+              <span
+                className="text-sm flex-1 min-w-0 truncate"
+                title={`${r.title ?? ""}\n${r.reason}`}
+              >
+                {r.title ?? r.reason}
+              </span>
+              <SourceUrlPill url={r.sourceUrl} variant="compact" />
+            </div>
+          ))}
+        </div>
       )}
       {other.length > 0 && (
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer text-muted-foreground">被过滤为 other 的 {other.length} 条</summary>
-          <div className="mt-2">
-            <DataTable
-              rows={other}
-              rowKey={(r) => r.id}
-              columns={[
-                { key: "id", header: "ID", width: "w-20", render: (r) => <code className="text-xs">{r.id}</code> },
-                { key: "confidence", header: "置信度", width: "w-20", align: "right", render: (r) => r.confidence.toFixed(2) },
-                { key: "reason", header: "理由", render: (r) => r.reason },
-                { key: "sourceUrl", header: "原文", width: "w-20", render: (r) => <SourceUrlPill url={r.sourceUrl} variant="compact" /> },
-              ]}
-            />
+          <summary className="cursor-pointer text-muted-foreground">
+            被过滤为 other 的 {other.length} 条
+          </summary>
+          <div className="mt-2 space-y-1">
+            {other.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/30"
+              >
+                <code className="shrink-0 text-xs text-muted-foreground">{r.id}</code>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {r.confidence.toFixed(2)}
+                </span>
+                <span
+                  className="text-xs flex-1 min-w-0 truncate"
+                  title={`${r.title ?? ""}\n${r.reason}`}
+                >
+                  {r.title ?? r.reason}
+                </span>
+                <SourceUrlPill url={r.sourceUrl} variant="compact" />
+              </div>
+            ))}
           </div>
         </details>
       )}

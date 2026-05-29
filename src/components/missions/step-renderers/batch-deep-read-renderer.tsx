@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { DataTable } from "@/components/shared/data-table";
 import { SourceUrlPill } from "@/components/shared/source-url-pill";
 import { FallbackRenderer } from "./fallback-renderer";
 
@@ -100,55 +99,37 @@ export function BatchDeepReadRenderer({ outputData }: { outputData: unknown }) {
       <div className="text-xs text-muted-foreground">
         共 {totalRequested} 条 — 抓取 {okCount} 条，兜底 {fallbackCount} 条，跳过 {skippedCount} 条；平均正文 {avgBodyLen} 字
       </div>
-      <DataTable
-        rows={items}
-        rowKey={(r) => r.id}
-        columns={[
-          {
-            key: "id",
-            header: "ID",
-            width: "w-20",
-            render: (r) => <code className="text-xs">{r.id}</code>,
-          },
-          {
-            key: "status",
-            header: "状态",
-            width: "w-20",
-            render: (r) => <StatusBadge status={r.fetchStatus} />,
-          },
-          {
-            key: "title",
-            header: "标题",
-            render: (r) => <span className="text-xs">{r.title ?? "（无标题）"}</span>,
-          },
-          {
-            key: "bodyLen",
-            header: "正文字数",
-            width: "w-24",
-            align: "right",
-            render: (r) => (r.body ? r.body.length : 0),
-          },
-          {
-            key: "sourceUrl",
-            header: "原文",
-            width: "w-20",
-            render: (r) => <SourceUrlPill url={r.sourceUrl} variant="compact" />,
-          },
-        ]}
-        expandedKeys={new Set()}
-        renderExpanded={(row) => (
-          <div className="space-y-2 px-3 py-2 text-xs">
-            {row.fetchError && (
-              <div className="rounded bg-rose-50 dark:bg-rose-900/10 p-2 text-rose-700 dark:text-rose-300">
-                抓取错误：{row.fetchError}
+      {/* 单行列表 —— 跟 step 4 风格一致。details 包住每行让用户能点开看正文。 */}
+      <div className="space-y-1">
+        {items.map((r) => (
+          <details key={r.id} className="group">
+            <summary className="cursor-pointer flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/30 list-none">
+              <code className="shrink-0 text-xs text-muted-foreground">{r.id}</code>
+              <StatusBadge status={r.fetchStatus} />
+              <span
+                className="text-sm flex-1 min-w-0 truncate"
+                title={r.title ?? ""}
+              >
+                {r.title ?? "（无标题）"}
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                {r.body ? r.body.length : 0} 字
+              </span>
+              <SourceUrlPill url={r.sourceUrl} variant="compact" />
+            </summary>
+            <div className="mt-2 ml-2 space-y-2 text-xs">
+              {r.fetchError && (
+                <div className="rounded bg-rose-50 dark:bg-rose-900/10 p-2 text-rose-700 dark:text-rose-300">
+                  抓取错误：{r.fetchError}
+                </div>
+              )}
+              <div className="whitespace-pre-wrap text-muted-foreground line-clamp-12">
+                {r.body || "（无正文）"}
               </div>
-            )}
-            <div className="whitespace-pre-wrap text-muted-foreground line-clamp-12">
-              {row.body || "（无正文）"}
             </div>
-          </div>
-        )}
-      />
+          </details>
+        ))}
+      </div>
     </div>
   );
 }

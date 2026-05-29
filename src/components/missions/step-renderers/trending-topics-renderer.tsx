@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { DataTable } from "@/components/shared/data-table";
 import { SourceUrlPill } from "@/components/shared/source-url-pill";
 import { FallbackRenderer } from "./fallback-renderer";
 
@@ -79,55 +78,35 @@ export function TrendingTopicsRenderer({ outputData }: TrendingTopicsRendererPro
       <div className="text-xs text-muted-foreground">
         拉取 {topics.length} 条热榜 · 涉及 {uniquePlatforms.size} 个平台
       </div>
-      <DataTable
-        rows={topics}
-        rowKey={(t) =>
-          `${t.platform ?? "?"}-${t.rank ?? t.title ?? Math.random().toString(36).slice(2, 8)}`
-        }
-        columns={[
-          // 列宽收紧：mission console TaskDetailSheet 右侧容器只有 ~400-500px，
-          // 之前 rank(w-12)+platform(w-24)+heat(w-24)+url(w-32) = ~368px 让 title
-          // 只剩 ~30-130px，长中文标题一字一行竖排。
-          // 现在 rank(w-10)+platform(w-20)+heat(w-20)+url(w-20) = ~280px，title
-          // 剩 ~120-220px + line-clamp-2 + break-words 让长标题最多 2 行省略。
-          { key: "rank", header: "#", width: "w-10", align: "right", render: (t) => t.rank ?? "—" },
-          {
-            key: "platform",
-            header: "平台",
-            width: "w-20",
-            render: (t) => (t.platform ? <PlatformBadge name={t.platform} /> : "—"),
-          },
-          {
-            key: "title",
-            header: "标题",
-            render: (t) => (
-              <span
-                className="block break-words line-clamp-2 leading-snug"
-                title={t.title ?? ""}
-              >
-                {t.title ?? "—"}
+      {/* 单行列表 —— 跟 step 4 cross_language_rewrite 风格一致:
+          mission console TaskDetailSheet 右侧容器只有 ~400-500px,DataTable
+          会让长中文标题挤成"一字一行"竖排。改成 flex 单行 + truncate 后
+          长标题省略号截断,鼠标 hover 看 tooltip。 */}
+      <div className="space-y-1">
+        {topics.map((t, i) => (
+          <div
+            key={`${t.platform ?? "?"}-${t.rank ?? i}`}
+            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/30"
+          >
+            <span className="shrink-0 text-xs text-muted-foreground w-6 text-right tabular-nums">
+              {t.rank ?? i + 1}
+            </span>
+            {t.platform && <PlatformBadge name={t.platform} />}
+            <span
+              className="text-sm flex-1 min-w-0 truncate"
+              title={t.title ?? ""}
+            >
+              {t.title ?? "—"}
+            </span>
+            {t.heat !== undefined && (
+              <span className="shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                {String(t.heat)}
               </span>
-            ),
-          },
-          {
-            key: "heat",
-            header: "热度",
-            width: "w-20",
-            align: "right",
-            render: (t) => (
-              <span className="whitespace-nowrap text-xs">
-                {t.heat !== undefined ? String(t.heat) : "—"}
-              </span>
-            ),
-          },
-          {
-            key: "url",
-            header: "原文",
-            width: "w-20",
-            render: (t) => <SourceUrlPill url={t.url} variant="compact" />,
-          },
-        ]}
-      />
+            )}
+            <SourceUrlPill url={t.url} variant="compact" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
