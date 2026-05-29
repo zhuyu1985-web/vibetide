@@ -1,6 +1,6 @@
 import { generateText, stepCountIs } from "ai";
 import { getLanguageModel } from "./model-router";
-import { toVercelTools, createKnowledgeBaseTools } from "./tool-registry";
+import { toVercelTools, createKnowledgeBaseTools, type ToolContext } from "./tool-registry";
 import {
   buildStepInstruction,
   formatPreviousStepContext,
@@ -30,7 +30,13 @@ export async function executeAgent(
   agent: AssembledAgent,
   input: AgentExecutionInput,
   onProgress?: ProgressCallback,
-  missionTools?: ToolSet
+  missionTools?: ToolSet,
+  /**
+   * Phase 2 (2026-05-30-tool-context-injection-fix-plan): organizationId /
+   * operatorId 等 context 透传给 toVercelTools, 让 LLM 触发的 tool 调用能拿到
+   * 多租户上下文（cms_publish / archive_to_drafts 等需要）。
+   */
+  context?: ToolContext,
 ): Promise<AgentExecutionResult> {
   const startTime = Date.now();
 
@@ -69,9 +75,19 @@ export async function executeAgent(
     agent.knowledgeBaseIds && agent.knowledgeBaseIds.length > 0
       ? createKnowledgeBaseTools({ employeeKnowledgeBaseIds: agent.knowledgeBaseIds })
       : undefined;
-  const vercelTools = toVercelTools(agent.tools, agent.pluginConfigs, missionTools, kbTools);
+  const vercelTools = toVercelTools(
+    agent.tools,
+    agent.pluginConfigs,
+    missionTools,
+    kbTools,
+    context,
+  );
 
   let toolCallCount = 0;
+  // Bug B (Phase 2): 累积所有 success=false 的 tool 结果, parseStepOutput
+  // 之后用来 override output.status="failed"。LLM 文本叙述 "我失败了" 不可信
+  // —— parseStepOutput 只看三段式结构, 检测不到失败。
+  const toolFailures: Array<{ toolName: string; code: string; message: string }> = [];
 
   const model = getLanguageModel(agent.modelConfig);
 
@@ -136,13 +152,30 @@ ${input.skillSpec}
     temperature: agent.modelConfig.temperature,
     maxOutputTokens: agent.modelConfig.maxTokens,
     abortSignal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
-    onStepFinish: ({ toolCalls }) => {
+    onStepFinish: ({ toolCalls, toolResults }) => {
       if (toolCalls && toolCalls.length > 0) {
         toolCallCount += toolCalls.length;
         onProgress?.({
           percent: Math.min(30 + toolCallCount * 10, 80),
           message: `已执行 ${toolCallCount} 个工具调用...`,
         });
+      }
+      // Bug B (Phase 2): 扫 toolResults 抓 success=false, 后续覆盖 output.status。
+      if (toolResults) {
+        for (const tr of toolResults as Array<{ toolName?: string; result?: unknown }>) {
+          const r = tr.result;
+          if (r && typeof r === "object" && (r as { success?: unknown }).success === false) {
+            const err = (r as { error?: unknown }).error as
+              | { code?: unknown; message?: unknown }
+              | undefined;
+            toolFailures.push({
+              toolName: tr.toolName ?? "unknown",
+              code: typeof err?.code === "string" ? err.code : "tool_error",
+              message:
+                typeof err?.message === "string" ? err.message : "工具返回 success=false",
+            });
+          }
+        }
       }
     },
   });
@@ -156,8 +189,24 @@ ${input.skillSpec}
     agent.slug
   );
 
-  // Check if approval is needed based on authority level
-  if (agent.authorityLevel === "observer" || agent.authorityLevel === "advisor") {
+  // Bug B (Phase 2): tool 调用失败时 override 为 "failed"。
+  // 必须在 authority-level 检查之前/或保持 guard ——- 如果 observer agent 的 tool 真挂了,
+  // status 应该是 failed, 不能被 "needs_approval" 覆盖（工具没成功跑, 没东西可审批）。
+  if (toolFailures.length > 0) {
+    output.status = "failed";
+    const first = toolFailures[0];
+    const more =
+      toolFailures.length > 1 ? `（共 ${toolFailures.length} 个工具失败）` : "";
+    output.errorMessage = `工具 ${first.toolName} 失败：${first.code} — ${first.message}${more}`;
+    output.errorCode = first.code;
+  }
+
+  // Check if approval is needed based on authority level.
+  // Guard: 不要覆盖上面已经标记为 "failed" 的状态 —— 工具没跑成, 没东西审批。
+  if (
+    (agent.authorityLevel === "observer" || agent.authorityLevel === "advisor") &&
+    output.status !== "failed"
+  ) {
     output.status = "needs_approval";
   }
 

@@ -108,7 +108,16 @@ export interface StepOutput {
     qualityScore?: number;
     wordCount?: number;
   };
-  status: "success" | "partial" | "needs_approval";
+  status: "success" | "partial" | "needs_approval" | "failed";
+  /**
+   * Filled by executeAgent when any tool call returned `{ success: false }`.
+   * Mission-executor reads this to set the task to "failed" instead of
+   * trusting the LLM's text narrative (which may either lie about success
+   * or honestly admit failure but still get parsed as "success" by
+   * parseStepOutput). Phase 2 of 2026-05-30-tool-context-injection-fix-plan.
+   */
+  errorMessage?: string;
+  errorCode?: string;
   // 工具/LLM-skill 真实结果直出场景（mission-executor 短路分支）会把
   // invocation.result 的结构化字段（topics / results / articles 等）spread 进
   // outputData，让下游步骤的 {{stepN.field}} 模板能引用。Index signature 让
