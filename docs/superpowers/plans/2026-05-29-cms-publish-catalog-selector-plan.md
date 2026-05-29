@@ -113,7 +113,31 @@ npx vitest run src/lib/cms/__tests__/feature-flags.test.ts -t "default target"
 ```
 Expected: 2 个 case 都失败（`cfg.defaultSiteId` undefined）。
 
-- [ ] **Step 3: 实现 CmsConfig 扩展**
+- [ ] **Step 3a: 先同步更新现有 toEqual 断言（防 break 老 case）**
+
+`src/lib/cms/__tests__/feature-flags.test.ts` 第 57-66 行原有 `it("returns config object when all env present", ...)` 用了**严格**的 `toEqual({...})` 整体相等比对。给 `CmsConfig` 加 3 个新字段会让这个老 case 立刻 FAIL（多余 key）。改两选一：
+
+**方案 A（推荐）**：在 `toEqual` 对象里追加 3 个字段：
+
+```ts
+expect(config).toEqual({
+  host: "https://example.com",
+  loginCmcId: "id123",
+  loginCmcTid: "tid123",
+  tenantId: "tenant123",
+  username: "admin",
+  timeoutMs: 15000,
+  maxRetries: 3,
+  defaultCoverUrl: expect.any(String),
+  defaultSiteId: 81,        // ← 新增
+  defaultAppId: 1768,       // ← 新增
+  defaultCatalogId: 10210,  // ← 新增
+});
+```
+
+**方案 B**：改 `toEqual` 为 `expect.objectContaining`，未来增减字段都不破坏。本计划用方案 A，更明确。
+
+- [ ] **Step 3b: 实现 CmsConfig 扩展**
 
 修改 `src/lib/cms/feature-flags.ts`：
 
@@ -327,37 +351,16 @@ git commit -m "feat(cms): loadMapperContext 接受 target override，删除硬�
 
 - [ ] **Step 1: 在测试文件末尾追加 target 透传 describe 块**
 
-参考已有 mock 设置（`loadMapperContext` 已被 vi.mock）。在 `publish-article.test.ts` 末尾追加：
+**重要：不要写自己的 `beforeEach`/`afterEach`。** 该文件的**外层** `beforeEach`（约第 92-115 行）已经统一 mock 了 `getArticleById / getOrganizationById / loadMapperContext / createPublication / findLatestSuccessByArticle` 和 env，并配置了 `mockCmsFetch`。新 describe 块只需直接在 `it` 内 trigger CMS 响应 + 检查 mock 调用参数。重复写 mock 容易因执行顺序漏 `createPublication` 等关键 mock 导致 publishArticleToCms 内部解构失败（reviewer 标记的真实陷阱）。
+
+在 `publish-article.test.ts` 末尾追加：
 
 ```ts
 describe("publishArticleToCms — target override", () => {
-  beforeEach(() => {
-    vi.mocked(getArticleById).mockResolvedValue({
-      ...baseArticle,
-      publishStatus: "approved",
-    } as unknown as ReturnType<typeof getArticleById> extends Promise<infer T> ? T : never);
-    vi.mocked(getOrganizationById).mockResolvedValue({
-      id: "org-1",
-      brandName: "Demo",
-    } as never);
-    vi.mocked(loadMapperContext).mockReturnValue(baseMapperCtx as never);
-    vi.mocked(findLatestSuccessByArticle).mockResolvedValue(null);
-    process.env.VIBETIDE_CMS_PUBLISH_ENABLED = "true";
-    mockCmsFetch(() =>
-      cmsSuccessResponse({
-        article: { id: 999 },
-        url: "/article/999",
-        preViewPath: "https://preview/999",
-      }),
-    );
-  });
+  // 复用外层 beforeEach 设置的所有 mock（DAL/mapper/env/CMS fetch）。
+  // 内部 it 只关心调用参数，外层 mock 返回值不影响断言。
 
-  afterEach(() => {
-    restoreCmsFetch();
-    vi.clearAllMocks();
-  });
-
-  it("传 target → 透传给 loadMapperContext", async () => {
+  it("传 target → 透传给 loadMapperContext 第二个参数", async () => {
     await publishArticleToCms({
       articleId: "art-1",
       operatorId: "op-1",
@@ -365,20 +368,20 @@ describe("publishArticleToCms — target override", () => {
       target: { catalogId: 10462, appId: 1768, siteId: 81 },
     });
 
-    expect(vi.mocked(loadMapperContext)).toHaveBeenCalledWith(
-      expect.objectContaining({ brandName: "Demo" }),
+    expect(loadMapperContext as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({ brandName: expect.any(String) }),
       { catalogId: 10462, appId: 1768, siteId: 81 },
     );
   });
 
-  it("不传 target → loadMapperContext 收到 undefined", async () => {
+  it("不传 target → loadMapperContext 第二个参数为 undefined", async () => {
     await publishArticleToCms({
       articleId: "art-1",
       operatorId: "op-1",
       triggerSource: "workflow",
     });
-    expect(vi.mocked(loadMapperContext)).toHaveBeenCalledWith(
-      expect.objectContaining({ brandName: "Demo" }),
+    expect(loadMapperContext as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({ brandName: expect.any(String) }),
       undefined,
     );
   });
@@ -391,7 +394,7 @@ describe("publishArticleToCms — target override", () => {
       target: { catalogId: 10462 },
     });
 
-    expect(vi.mocked(createPublication)).toHaveBeenCalledWith(
+    expect(createPublication as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
       expect.objectContaining({
         requestPayload: expect.objectContaining({
           _target: { catalogId: 10462 },
@@ -406,7 +409,7 @@ describe("publishArticleToCms — target override", () => {
       operatorId: "op-1",
       triggerSource: "workflow",
     });
-    const call = vi.mocked(createPublication).mock.calls[0]?.[0];
+    const call = (createPublication as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(call?.requestPayload).not.toHaveProperty("_target");
   });
 });
@@ -718,7 +721,7 @@ git commit -m "feat(cms): retry 时从 publication.requestPayload._target 还原
 
 - [ ] **Step 1: 写测试文件**
 
-参考 `archive-to-drafts.test.ts` 的 mock 套路。完整内容：
+参考 `archive-to-drafts.test.ts` 的 mock 套路。**重要**：`invokeToolDirectly` 返回 wrapper `{ ok: true, toolName, params, result }`（参考 `tool-registry.ts:1768-1771` 和 `archive-to-drafts.test.ts:49-53` 的解包方式）。**断言时必须先解开 wrapper 拿 `res.result`，不要直接 assert `res`**。完整内容：
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -765,13 +768,24 @@ beforeEach(() => {
   });
 });
 
+/**
+ * Helper：解开 invokeToolDirectly 的 wrapper { ok, result } 拿到工具自身的返回值。
+ */
+type ToolResult = Record<string, unknown>;
+function unwrap(res: Awaited<ReturnType<typeof invokeToolDirectly>>): ToolResult {
+  if (!res.ok) throw new Error(`invokeToolDirectly failed: ${res.error}`);
+  return res.result as ToolResult;
+}
+
 describe("cms_publish tool — dryRun 回显真实 target", () => {
   it("不传栏目 → wouldPublish.{catalogId,appId,siteId} 走 env 默认 81/1768/10210", async () => {
-    const res = await invokeToolDirectly("cms_publish", {
-      title: "T", body: "B", dryRun: true,
-      organizationId: "org-1",
-    });
-    expect(res).toMatchObject({
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B", dryRun: true },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+    expect(result).toMatchObject({
       success: true,
       dryRun: true,
       wouldPublish: { catalogId: 10210, appId: 1768, siteId: 81 },
@@ -779,12 +793,13 @@ describe("cms_publish tool — dryRun 回显真实 target", () => {
   });
 
   it("传 catalogId=10462 → wouldPublish.catalogId === 10462", async () => {
-    const res = await invokeToolDirectly("cms_publish", {
-      title: "T", body: "B", dryRun: true,
-      catalogId: 10462,
-      organizationId: "org-1",
-    });
-    expect(res).toMatchObject({
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B", dryRun: true, catalogId: 10462 },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+    expect(result).toMatchObject({
       dryRun: true,
       wouldPublish: { catalogId: 10462, appId: 1768, siteId: 81 },
     });
@@ -792,11 +807,13 @@ describe("cms_publish tool — dryRun 回显真实 target", () => {
 
   it("env 设了 CMS_DEFAULT_CATALOG_ID=55555 → 不传时走 55555", async () => {
     process.env.CMS_DEFAULT_CATALOG_ID = "55555";
-    const res = await invokeToolDirectly("cms_publish", {
-      title: "T", body: "B", dryRun: true,
-      organizationId: "org-1",
-    });
-    expect(res).toMatchObject({
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B", dryRun: true },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+    expect(result).toMatchObject({
       dryRun: true,
       wouldPublish: { catalogId: 55555 },
     });
@@ -805,11 +822,11 @@ describe("cms_publish tool — dryRun 回显真实 target", () => {
 
 describe("cms_publish tool — execute 聚合 target 传给 publishArticleToCms", () => {
   it("传 {catalogId,appId,siteId} → target 完整传下去", async () => {
-    await invokeToolDirectly("cms_publish", {
-      title: "T", body: "B",
-      catalogId: 10462, appId: 1768, siteId: 81,
-      organizationId: "org-1",
-    });
+    await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B", catalogId: 10462, appId: 1768, siteId: 81 },
+      { organizationId: "org-1" },
+    );
 
     expect(publishArticleToCmsMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -820,22 +837,24 @@ describe("cms_publish tool — execute 聚合 target 传给 publishArticleToCms"
   });
 
   it("全 undefined → target=undefined 不污染参数", async () => {
-    await invokeToolDirectly("cms_publish", {
-      title: "T", body: "B",
-      organizationId: "org-1",
-    });
+    await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B" },
+      { organizationId: "org-1" },
+    );
     expect(publishArticleToCmsMock).toHaveBeenCalledWith(
       expect.objectContaining({ target: undefined }),
     );
   });
 
   it("meta 回显真实使用的 target/默认值", async () => {
-    const res = await invokeToolDirectly("cms_publish", {
-      title: "T", body: "B",
-      catalogId: 10462,
-      organizationId: "org-1",
-    });
-    expect(res).toMatchObject({
+    const res = await invokeToolDirectly(
+      "cms_publish",
+      { title: "T", body: "B", catalogId: 10462 },
+      { organizationId: "org-1" },
+    );
+    const result = unwrap(res);
+    expect(result).toMatchObject({
       meta: {
         catalogId: 10462,
         appId: 1768,
