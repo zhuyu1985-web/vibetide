@@ -203,7 +203,7 @@ scripts/
 | **idle**(默认) | 进入 dashboard 后 | 眨眼(`avatar-eye`,每 4 秒一次)+ 嘴角呼吸(SMIL 已有)+ 问号灯泡上下浮动(`avatar-anim-float`,2.4s)+ 帽角星星闪烁(`avatar-anim-shimmer`) |
 | **hover** | 鼠标悬停 | `scale(1.08)` + 旋转 `+8deg` 再回正(framer-motion `spring`)+ 问号灯泡放大跳动 + 右侧弹气泡"需要帮助吗? 按 ? 打开" |
 | **active** | 鼠标点击瞬间 | `scale(0.92)` + 旋转 `0deg` + 问号灯泡爆炸式星光发散 200ms |
-| **wave**(招手) | idle 30 秒鼠标无活动 + 5 分钟内未播放过 + 本 session 总次数 < 3 | 右手抬起 + 左右摆动 2 次(1.2s)+ 气泡"在这里呢 ✋",2.5 秒后自动收起 |
+| **wave**(招手) | idle 30 秒鼠标无活动 + 相邻两次间隔 ≥ 5 分钟 + 同 session 累计 ≤ 3 次 | 右手抬起 + 左右摆动 2 次(1.2s)+ 气泡"在这里呢 ✋",2.5 秒后自动收起 |
 | **first-tip** | 用户首次访问 dashboard(`localStorage.help-launcher-first-tip-shown` 未设) | 5 秒后自动弹"第一次来?这里有使用指南 →" 气泡,3 秒后自动收起,写 localStorage 防重 |
 | **unread-badge** | `localStorage.help-changelog-last-seen < LATEST_CHANGELOG_AT` | 右上角 8px 红点(`bg-red-500 ring-2 ring-page`),hover 气泡改成"有新公告 →" |
 
@@ -243,7 +243,7 @@ scripts/
 
 | 行为 | 限制 |
 |---|---|
-| wave 招手 | 同 session 最多 3 次,5 分钟冷却(`sessionStorage.help-wave-count`) |
+| wave 招手 | 同 session 累计 ≤ 3 次,相邻两次间隔 ≥ 5 分钟(`sessionStorage.help-wave-count` 计数 + `sessionStorage.help-wave-last-at` 时间戳) |
 | first-tip | 终身一次(`localStorage.help-launcher-first-tip-shown`) |
 | 红点 badge | 进 changelog 页面后清零,新 changelog 上线再次出现 |
 
@@ -304,10 +304,12 @@ Server Component,四块从上到下:
   横向滚动 4-6 张文档预览卡(frontmatter popular: true 的)
   每卡: 文档标题 + 阅读时长 + 所属分类 tag
 
-⑤ ContactSection (max-w-4xl, py-12, 居中)
+④ ContactSection (max-w-4xl, py-12, 居中)
   H3: 没找到答案?
   [按钮: 打开 AI 员工对话中心 →]  [按钮: 提交文档反馈]
 ```
+
+> 注:首页四块编号 ①②③④ 对应 HeroSearch / CategoryGrid / PopularDocs / ContactSection。澄清阶段曾使用 ① ② ③ ⑤,本 spec 已统一连续编号。
 
 数据获取:
 
@@ -534,7 +536,37 @@ export function remarkExtractToc() {
 }
 ```
 
-`getDocBySlug()` 把 `toc` 一并返回给页面,右栏组件直接渲染。
+**关键:TOC 抽取与 `<MDXRemote>` 正文渲染解耦**。
+
+`next-mdx-remote-client/rsc` 的 `<MDXRemote>` 内部 compile 出来的 `vfile.data` 不会透传给调用方,所以**不能**指望同一条 pipeline 同时拿到 toc 和渲染结果。实际做法:**在 `getDocBySlug()` 内单独跑一次纯 remark parse 抽 toc**,再把 body 字符串原样传给 `<MDXRemote source={doc.body}>`:
+
+```ts
+// src/lib/help/content.ts
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import { remarkExtractToc } from "./toc";
+
+export const getDocBySlug = cache(async (cat: string, slug: string) => {
+  const raw = await fs.readFile(filePath, "utf-8");
+  const { data, content } = matter(raw);
+  const frontmatter = HelpFrontmatterSchema.parse(data);
+
+  // 单独跑一次 remark pipeline 抽 toc(不渲染)
+  const file = await unified().use(remarkParse).use(remarkExtractToc).run(
+    unified().use(remarkParse).parse(content)
+  );
+  const toc = (file.data.toc as TocEntry[]) ?? [];
+
+  return {
+    frontmatter,
+    body: content,                                  // 给 <MDXRemote source={body}>
+    toc,                                            // 独立返回,供右栏 DocToc 使用
+    readingTime: readingTime(content).text,
+  };
+});
+```
+
+这条 pipeline 比正文 compile 轻很多(只 parse、不 transform),性能开销忽略不计。详情页拿到 `doc.toc` 后直接传给 `<DocToc entries={doc.toc} />`。
 
 ### 7.5 阅读时长
 
@@ -695,7 +727,7 @@ pagefind `forceLanguage: "zh-cn"` 启用字符级 n-gram 分词。实测中文 d
 ### 9.2 渲染(`src/app/help/faq/page.tsx`)
 
 - 顶部分类 Tab(`variant="line"`):全部 / 工作流 / AI 员工 / ...
-- 手风琴列表(`@/components/ui/accordion`),问题点开显示 answer + relatedDocs 链接
+- 手风琴列表(`@/components/ui/accordion`,**项目当前未安装**,需用 `npx shadcn@latest add accordion` 添加),问题点开显示 answer + relatedDocs 链接
 - 顶部小搜索框走客户端 `Fuse.js` 模糊匹配(独立于全局 pagefind,因为 FAQ 体量小、即时反馈更好)
 - `popular: true` 项打"热门"小 badge
 - URL hash 锚点:`/help/faq#wf-001` 自动展开对应项
@@ -848,19 +880,36 @@ MVP 不做读接口、不做后台 UI(Drizzle Studio 看)。
 
 ## 12. Proxy 变更
 
-`src/proxy.ts`:
+`src/proxy.ts` 当前 `isPublic()` 写法是 `startsWith` 链式 OR:
 
 ```ts
-// 在 PUBLIC_PATHS 中加入 "/help"
-const PUBLIC_PATHS = ["/", "/auth", "/login", "/register", "/help"];
+function isPublic(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/auth")
+  );
+}
+```
 
-function isPublicPath(pathname: string) {
-  if (pathname === "/") return true;
-  return PUBLIC_PATHS.some((p) => p !== "/" && pathname.startsWith(p));
+**最小改动**:加一行 `|| pathname.startsWith("/help")`:
+
+```ts
+function isPublic(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/help")     // 新增
+  );
 }
 ```
 
 未登录用户访问 `/help/*` 直接放行,**不**触发重定向。已登录用户访问也不重定向(与 `/login` 行为不同,`/login` 已登录跳 `/home`)。
+
+(若未来公共路径继续增加,可顺手把 `isPublic` 重构成数组遍历;本期保持原风格只加一行,避免无关 diff。)
 
 ## 13. 错误处理与边界
 
@@ -933,7 +982,8 @@ function isPublicPath(pathname: string) {
 
 ## 17. 实施次序建议(供后续 plan 参考)
 
-1. **基础设施**:`content/help/` 目录骨架、frontmatter schema、`src/lib/help/content.ts`、proxy 改动
+0. **依赖落地**:`npm i` 新增的 11 个 MDX/搜索相关包 + `npx shadcn@latest add accordion`,跑 `npx tsc --noEmit` 确认无类型冲突
+1. **基础设施**:`content/help/` 目录骨架、frontmatter schema、`src/lib/help/content.ts`(含独立 remark pipeline 抽 toc)、proxy 改动
 2. **Layout + 首页骨架**:`src/app/help/layout.tsx`、`page.tsx`、`HelpHeader/HelpFooter`
 3. **小帮入口**:`XiaobangAvatar` SVG + `HelpLauncher` + dashboard-shell 集成 + 5 态动画
 4. **分类页 + 详情页骨架**:`[category]/page.tsx`、`[slug]/page.tsx`、左目录树 + 右 TOC + 面包屑
@@ -968,6 +1018,12 @@ function isPublicPath(pathname: string) {
 "fast-glob": "^3.x",
 "tsx": "^4.x"  // 如未安装
 ```
+
+shadcn/ui 组件(`npx shadcn@latest add ...`):
+
+- `accordion` —— FAQ 与 changelog 折叠展开,项目当前未安装,必须新增
+
+dialog / tabs / select / input / button 等已在 `src/components/ui/` 下,直接复用。
 
 ## 19. 风险与缓解
 
