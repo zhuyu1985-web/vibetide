@@ -69,5 +69,6 @@ supabase/.temp/
 # 大体积数据/演示文档(476MB json + 51MB presentations 等,不入仓)
 docs/data.xlsx
 docs/test-site.xlsx
+docs/scope-content-2025.xlsx
 docs/json/
 docs/presentations/
