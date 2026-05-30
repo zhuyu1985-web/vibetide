@@ -73,6 +73,26 @@ describe("CmsClient.post (basic, no retry)", () => {
     await expect(client.post("/x", {})).rejects.toThrow(CmsAuthError);
   });
 
+  it("throws CmsAuthError on state=700004 (CMS 自定义登录失效码)", async () => {
+    mockCmsFetch([cmsErrorResponse(700004, "登录过期，请重新登录")]);
+    const client = new CmsClient(baseConfig);
+    await expect(client.post("/x", {})).rejects.toThrow(CmsAuthError);
+  });
+
+  it("throws CmsAuthError on Chinese '登录过期' message with non-standard state", async () => {
+    mockCmsFetch([cmsErrorResponse(500, "登录失效，请重新登录")]);
+    const client = new CmsClient(baseConfig);
+    await expect(client.post("/x", {})).rejects.toThrow(CmsAuthError);
+  });
+
+  it("CmsAuthError message contains operational hint for ops", async () => {
+    mockCmsFetch([cmsErrorResponse(700004, "登录过期，请重新登录")]);
+    const client = new CmsClient(baseConfig);
+    await expect(client.post("/x", {})).rejects.toThrow(
+      /CMS_LOGIN_CMC_ID.*CMS_LOGIN_CMC_TID/,
+    );
+  });
+
   it("throws CmsNetworkError on HTTP 5xx", async () => {
     mockCmsFetch([cmsHttpErrorResponse(503, "gateway")]);
     const client = new CmsClient(baseConfig);

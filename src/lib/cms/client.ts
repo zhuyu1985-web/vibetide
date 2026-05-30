@@ -195,13 +195,20 @@ export class CmsClient {
     const envelope = parsed.data as CmsResponseEnvelope<TRes>;
 
     // 鉴权错误（优先级高于其他业务错误）
+    // 700004 是 CMS/MMS 自定义的"登录态失效"业务码,与 401/403 同语义。
+    // 中文 message 兼容："未登录" / "登录过期" / "登录失效" / "登录超时" 等变体。
     if (
       envelope.state === 401 ||
       envelope.state === 403 ||
-      /未登录|token.*(失效|过期)|login.*(failed|expired)/i.test(envelope.message)
+      envelope.state === 700004 ||
+      /未登录|登录.{0,4}(过期|失效|超时)|token.*(失效|过期)|login.*(failed|expired)/i.test(
+        envelope.message,
+      )
     ) {
       throw new CmsAuthError(
-        `CMS 鉴权失败：state=${envelope.state} message="${envelope.message}"`,
+        `CMS token 已失效 (state=${envelope.state} message="${envelope.message}" at ${path})。` +
+          `请在 MMS/CMC 后台用 superAdmin 重新登录,把新的 login_cmc_id / login_cmc_tid ` +
+          `更新到生产环境 CMS_LOGIN_CMC_ID / CMS_LOGIN_CMC_TID 后重启服务。`,
       );
     }
 
