@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // 生产 Docker 镜像使用多阶段构建 + node .next/standalone/server.js
   output: "standalone",
+  // canvas / chartjs-node-canvas 含 native .node，禁止打进 server bundle
+  serverExternalPackages: ["canvas", "chartjs-node-canvas"],
   experimental: {
     serverActions: {
       // Excel 导入会把前端解析后的批量行数据提交给 Server Action；默认 1MB 不够。

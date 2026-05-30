@@ -119,5 +119,12 @@
     "typescript": "^5",
     "vitest": "^4.1.4",
     "xlsx": "^0.18.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "canvas",
+      "esbuild",
+      "sharp"
+    ]
   }
 }

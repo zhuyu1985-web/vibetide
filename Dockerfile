@@ -35,6 +35,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # ─── 依赖 ─────────────────────────────────────────────────
 FROM base AS deps
+# canvas / chartjs-node-canvas 需要 Cairo/Pango 等 native 库才能在 Linux 编译 .node
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+  && rm -rf /var/lib/apt/lists/*
 # pnpm 与依赖安装默认走 npmmirror（国内直连 registry.npmjs.org 常超时）
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
@@ -65,6 +76,15 @@ RUN pnpm run build
 
 # ─── 运行 ─────────────────────────────────────────────────
 FROM base AS runner
+# canvas 运行时动态库（不含 -dev 头文件，镜像更小）
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    libcairo2 \
+    libpango-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
