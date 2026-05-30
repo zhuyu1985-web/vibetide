@@ -32,7 +32,7 @@ export const cmsPublications = pgTable(
       .references(() => organizations.id)
       .notNull(),
     articleId: uuid("article_id")
-      .references(() => articles.id)
+      .references(() => articles.id, { onDelete: "cascade" })
       .notNull(),
 
     cmsArticleId: text("cms_article_id"),

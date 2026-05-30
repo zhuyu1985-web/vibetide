@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { isSuperAdmin } from "@/lib/rbac";
 import { startMission } from "@/app/actions/missions";
+import { isToolRegistered } from "@/lib/agent/tool-registry";
 import {
   BUILTIN_TEMPLATES,
   type BuiltinTemplate,
@@ -65,15 +66,26 @@ async function normalizeSkillSteps(
     : [];
 
   const bySlug = new Map(rows.map((r) => [r.slug!, r]));
+
+  // 2026-05-30:容忍 tool-registry 里有但 skills 表里没有的 slug。
+  // 背景:`batch_deep_read` 等工具是真实可执行的 tool(tool-registry.ts 注册),
+  // 但历史上没补到 skills 表里。"海外热榜搬运"种子直接把 batch_deep_read 作为
+  // step 3 入库,跳过了校验。现在用户编辑该模板时,normalizeSkillSteps 校验所有
+  // step,老的不一致会冒出来 → 用户根本没动 batch_deep_read 这步,却被告知它不存在,
+  // 体验极差。
+  //
+  // 规则:slug 必须 ① 在 skills 表里(canonical 数据) OR ② 是已注册的 tool。
+  // 两者都不是才视为"真不存在",拒绝保存。
   const missing = skillSteps
     .filter((s) => {
       const slug = s.config?.skillSlug;
-      return !slug || !bySlug.has(slug);
+      if (!slug) return true; // 空 slug 一律拒
+      return !bySlug.has(slug) && !isToolRegistered(slug);
     })
     .map((s) => s.config?.skillSlug || "(空)");
   if (missing.length > 0) {
     throw new Error(
-      `工作流步骤技能不存在于技能库：${[...new Set(missing)].join("、")}`,
+      `工作流步骤技能不存在于技能库或工具注册表：${[...new Set(missing)].join("、")}`,
     );
   }
 
@@ -81,6 +93,8 @@ async function normalizeSkillSteps(
     if (step.type !== "skill") return step;
     const slug = step.config?.skillSlug;
     const canonical = slug ? bySlug.get(slug) : undefined;
+    // Tool-only slug(无 DB row)→ 保留 step.config 里现有的 skillName/skillCategory
+    // (来自原始种子或前端编辑器),不强制改写。
     if (!canonical) return step;
     return {
       ...step,
@@ -299,7 +313,30 @@ export async function saveWorkflow(data: {
 }
 
 /**
- * Update an existing non-builtin workflow.
+ * Result of `updateWorkflow`.
+ * - `forked: false` —— 用户有权直接改 existing,原地写入,id 不变
+ * - `forked: true` —— builtin + 非 super admin,系统自动 clone 一份到用户 org 下,
+ *   返回新 id,前端应 router.replace 到新 url
+ */
+export interface UpdateWorkflowResult {
+  id: string;
+  forked: boolean;
+  /** forked 时附上源 builtin 模板 id,UI 可显示"复制自 xxx" */
+  forkedFrom?: string;
+}
+
+/**
+ * Update an existing workflow.
+ *
+ * 2026-05-30 行为变更:
+ *   - 旧版:builtin + 非 super admin → throw "内置工作流仅管理员可修改"。
+ *     体验差 —— 用户在编辑器里已经改了字段、点保存才报错,改动全丢。
+ *   - 新版:builtin + 非 super admin → **自动 fork** 成用户 org 下的一份新副本
+ *     (`is_builtin=false`、`legacy_scenario_key=null`、`createdBy=user.id`、
+ *     `name='<原名>（副本）'`),把待保存的 `data` 应用到副本,返回新 id。
+ *     前端可 router.replace 到新 id 的 edit url,改动不丢、原 builtin 完好。
+ *
+ * Super admin 仍可直接改 builtin —— 走原地更新分支。
  */
 export async function updateWorkflow(
   id: string,
@@ -313,25 +350,68 @@ export async function updateWorkflow(
     inputFields?: InputFieldDef[];
     promptTemplate?: string;
   }
-) {
+): Promise<UpdateWorkflowResult> {
   const user = await requireAuth();
 
-  // Verify the workflow exists. Builtin templates are normally read-only, but
-  // super admins can still edit them so product operators can hotfix shipped
-  // templates without a code release.
   const existing = await db.query.workflowTemplates.findFirst({
     where: eq(workflowTemplates.id, id),
   });
   if (!existing) throw new Error("工作流不存在");
-  if (existing.isBuiltin && !(await isSuperAdmin(user.id))) {
-    throw new Error("内置工作流仅管理员可修改");
-  }
 
   const patch = { ...data };
   if (data.steps) {
     patch.steps = await normalizeSkillSteps(data.steps);
   }
 
+  // ─── Auto-fork: builtin + 非 super admin ───
+  if (existing.isBuiltin && !(await isSuperAdmin(user.id))) {
+    const orgId = await getCurrentUserOrg();
+    if (!orgId) {
+      throw new Error("当前用户未关联组织,无法复制工作流");
+    }
+
+    // 名称冲突最小化:加"(副本)"后缀;重复 fork 同一 builtin 会产出 N 个副本,
+    // 这是有意的(用户可自行重命名),不去查表去重以避免复杂度。
+    const forkName = patch.name?.trim() || `${existing.name}（副本）`;
+
+    // 复制完整字段 → 应用 patch → 强制清掉 builtin 标记 / 改 owner / 改 org
+    const [forked] = await db
+      .insert(workflowTemplates)
+      .values({
+        organizationId: orgId,
+        name: forkName,
+        description: patch.description ?? existing.description,
+        steps: (patch.steps ?? existing.steps) as WorkflowStepDef[],
+        category: patch.category ?? existing.category ?? "custom",
+        triggerType: patch.triggerType ?? existing.triggerType ?? "manual",
+        triggerConfig: patch.triggerConfig ?? existing.triggerConfig,
+        isBuiltin: false,
+        // legacyScenarioKey 必须置空 —— 它的 partial unique index 是
+        // (org, legacy_scenario_key) WHERE legacy_scenario_key IS NOT NULL,
+        // 复制时若沿用源模板 key 会撞 unique 约束。
+        legacyScenarioKey: null,
+        // B.1 扩展字段
+        icon: existing.icon,
+        inputFields: (patch.inputFields ?? existing.inputFields) as InputFieldDef[],
+        defaultTeam: existing.defaultTeam,
+        systemInstruction: existing.systemInstruction,
+        content: existing.content,
+        ownerEmployeeId: existing.ownerEmployeeId,
+        promptTemplate: patch.promptTemplate ?? existing.promptTemplate,
+        isPublic: true,
+        isFeatured: false,
+        createdBy: user.id,
+      })
+      .returning({ id: workflowTemplates.id });
+
+    revalidatePath("/workflows");
+    revalidatePath(`/workflows/${id}`); // 源 builtin
+    revalidatePath(`/workflows/${forked.id}`); // 新副本
+
+    return { id: forked.id, forked: true, forkedFrom: id };
+  }
+
+  // ─── 普通路径:有权直接改,原地写入 ───
   await db
     .update(workflowTemplates)
     .set({ ...patch, updatedAt: new Date() })
@@ -339,6 +419,8 @@ export async function updateWorkflow(
 
   revalidatePath("/workflows");
   revalidatePath(`/workflows/${id}`);
+
+  return { id, forked: false };
 }
 
 /**

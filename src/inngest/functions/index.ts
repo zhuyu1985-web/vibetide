@@ -1,5 +1,6 @@
 import { leaderPlan } from "./leader-plan";
 import { scheduledJobsRunner } from "./scheduler/scheduled-jobs-runner";
+import { workflowTemplateScheduledLaunch } from "./workflow-template-scheduled-launch";
 import { executeMissionTask, executeMissionTaskFailureHandler } from "./execute-mission-task";
 import { checkTaskDependencies } from "./check-task-dependencies";
 import { handleTaskFailure } from "./handle-task-failure";
@@ -114,4 +115,7 @@ export const functions = [
   // accountAnalyticsAnnotateAccountPosts,
   // Scheduler 调度中枢 (2026-05-26) — 替代各函数硬编码 cron,从 scheduled_jobs 表读配置派发事件
   scheduledJobsRunner,
+  // Workflow Template scheduled launch (2026-05-29) — 订阅 scheduledJobsRunner 派的统一
+  // event,把 schedule 触发翻译为 mission(走 startMissionFromTemplateScheduled service 入口)
+  workflowTemplateScheduledLaunch,
 ];

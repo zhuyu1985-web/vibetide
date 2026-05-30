@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { Clock, Loader2, Pause, Play, RefreshCw, Settings2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
@@ -16,17 +17,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   toggleScheduledJob,
   triggerScheduledJobNow,
   updateScheduledJobCron,
 } from "@/app/actions/scheduled-jobs";
-import type { ScheduledJob } from "@/db/schema";
+import type { ScheduledJobWithRelations } from "@/lib/dal/scheduled-jobs";
 
 interface Props {
-  jobs: ScheduledJob[];
+  jobs: ScheduledJobWithRelations[];
 }
+
+type KindFilter = "all" | "platform" | "workflow_template";
 
 const CATEGORY_LABELS: Record<string, string> = {
   "account-analytics": "账号分析",
@@ -75,16 +85,24 @@ function relativeTime(iso: Date | string | null): string {
 }
 
 export function ScheduledJobsClient({ jobs: initialJobs }: Props) {
-  const [jobs, setJobs] = useState<ScheduledJob[]>(initialJobs);
-  const [editingJob, setEditingJob] = useState<ScheduledJob | null>(null);
+  const [jobs, setJobs] = useState<ScheduledJobWithRelations[]>(initialJobs);
+  const [editingJob, setEditingJob] = useState<ScheduledJobWithRelations | null>(null);
   const [editCron, setEditCron] = useState("");
   const [editTimezone, setEditTimezone] = useState("Asia/Shanghai");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 
-  const enabledCount = useMemo(() => jobs.filter((j) => j.enabled).length, [jobs]);
+  const filteredJobs = useMemo(
+    () => (kindFilter === "all" ? jobs : jobs.filter((j) => j.kind === kindFilter)),
+    [jobs, kindFilter],
+  );
+  const enabledCount = useMemo(
+    () => filteredJobs.filter((j) => j.enabled).length,
+    [filteredJobs],
+  );
 
-  function openEdit(job: ScheduledJob) {
+  function openEdit(job: ScheduledJobWithRelations) {
     setEditingJob(job);
     setEditCron(job.cronExpression);
     setEditTimezone(job.timezone);
@@ -121,7 +139,7 @@ export function ScheduledJobsClient({ jobs: initialJobs }: Props) {
     });
   }
 
-  function handleToggle(job: ScheduledJob) {
+  function handleToggle(job: ScheduledJobWithRelations) {
     setPendingId(job.id);
     startTransition(async () => {
       const res = await toggleScheduledJob({ id: job.id, enabled: !job.enabled });
@@ -137,7 +155,7 @@ export function ScheduledJobsClient({ jobs: initialJobs }: Props) {
     });
   }
 
-  function handleRunNow(job: ScheduledJob) {
+  function handleRunNow(job: ScheduledJobWithRelations) {
     setPendingId(job.id);
     startTransition(async () => {
       const res = await triggerScheduledJobNow({ id: job.id });
@@ -176,9 +194,32 @@ export function ScheduledJobsClient({ jobs: initialJobs }: Props) {
         </div>
       </GlassCard>
 
+      {/* Kind 筛选 */}
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-gray-600">按类型筛选:</span>
+        <Select
+          value={kindFilter}
+          onValueChange={(v) => setKindFilter(v as KindFilter)}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部 ({jobs.length})</SelectItem>
+            <SelectItem value="platform">
+              平台级 ({jobs.filter((j) => j.kind === "platform").length})
+            </SelectItem>
+            <SelectItem value="workflow_template">
+              工作流模板 (
+              {jobs.filter((j) => j.kind === "workflow_template").length})
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <GlassCard padding="lg">
         <DataTable
-          rows={jobs}
+          rows={filteredJobs}
           rowKey={(j) => j.id}
           columns={[
             {
@@ -209,6 +250,37 @@ export function ScheduledJobsClient({ jobs: initialJobs }: Props) {
                   )}
                 </div>
               ),
+            },
+            {
+              key: "kind",
+              header: "类型 / 关联",
+              width: "180px",
+              render: (j) =>
+                j.kind === "workflow_template" ? (
+                  <div className="text-[11px]">
+                    <div className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-violet-700">
+                      工作流模板
+                    </div>
+                    <div className="mt-1 text-gray-500">
+                      {j.organizationName ?? "—"}
+                    </div>
+                    {j.workflowTemplateId ? (
+                      <Link
+                        href={`/workflows/${j.workflowTemplateId}`}
+                        className="mt-0.5 inline-block max-w-full truncate text-sky-600 hover:text-sky-700"
+                        title={j.workflowTemplateName ?? "查看模板"}
+                      >
+                        {j.workflowTemplateName ?? "查看模板"}
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-gray-500">
+                    <div className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                      平台级
+                    </div>
+                  </div>
+                ),
             },
             {
               key: "cronExpression",

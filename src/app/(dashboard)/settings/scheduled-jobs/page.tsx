@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { listScheduledJobs } from "@/lib/dal/scheduled-jobs";
+import { listScheduledJobsWithRelations } from "@/lib/dal/scheduled-jobs";
 import { ScheduledJobsClient } from "./scheduled-jobs-client";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function ScheduledJobsPage() {
     redirect("/home");
   }
 
-  const jobs = await listScheduledJobs();
+  const jobs = await listScheduledJobsWithRelations();
 
   return <ScheduledJobsClient jobs={jobs} />;
 }

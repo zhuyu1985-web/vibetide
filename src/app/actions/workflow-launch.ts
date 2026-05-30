@@ -85,37 +85,24 @@ export interface StartMissionOptions {
 }
 
 /**
- * Task 2.1 — Start a mission from a `workflow_templates` row.
+ * 内部 helper —— 两条入口(手动 `startMissionFromTemplate` / 定时
+ * `startMissionFromTemplateScheduled`)共享的"按模板装配 mission row +
+ * 插入 + 容错去重 + 触发执行 + revalidate"主链路。
  *
- * Flow:
- *   1. Auth + org resolution (bail with _global error if no org).
- *   2. Load template (scoped to current org).
- *   3. Validate user inputs against `template.inputFields` via shared `validateInputs`.
- *   4. Resolve leader employee: `owner_employee_id` → `default_team[0]` → fallback `xiaolei`.
- *   5. Build `user_instruction` by rendering `prompt_template` (or fallback param dump).
- *   6. Insert mission row with denormalized `scenario` = template.name (spec §3.3),
- *      `workflowTemplateId` = template.id, and `inputParams` = cleaned values.
- *      When `options.source` is set, write it atomically here so the partial
- *      unique index prevents race-duplicates and we never leave rows with
- *      `sourceModule=null` from a failed backfill.
- *   7. Fire-and-forget execution via `executeMissionDirect`.
- *
- * Returns either `{ok:true, missionId}` or `{ok:false, errors}` — errors can
- * be per-field (from validateInputs) or `{_global: "..."}` for higher-level
- * failures. The caller (WorkflowLaunchDialog in Task 2.2) surfaces these.
+ * 拆出 helper 的原因:
+ *   - 手动入口必须 requireAuth() + 从 session 拿 orgId
+ *   - 定时入口没有 user session,必须显式接 orgId 并跳过 requireAuth
+ *   - 但 leader 解析、defaultTeam → employee ids、prompt rendering、source
+ *     去重、`missions_source_dedup_uidx` race 处理、run stats 更新、
+ *     executeMissionDirect fire-and-forget 这些核心逻辑两条入口完全一致 ——
+ *     不拆 helper 必然行为分叉。
  */
-export async function startMissionFromTemplate(
+async function _buildAndInsertMission(
+  orgId: string,
   templateId: string,
   inputs: Record<string, unknown>,
   options?: StartMissionOptions,
 ): Promise<StartMissionResult> {
-  await requireAuth();
-
-  const orgId = await getCurrentUserOrg();
-  if (!orgId) {
-    return { ok: false, errors: { _global: "用户未关联组织" } };
-  }
-
   const template = await db.query.workflowTemplates.findFirst({
     where: and(
       eq(workflowTemplates.id, templateId),
@@ -133,6 +120,67 @@ export async function startMissionFromTemplate(
   if (!ok) {
     return { ok: false, errors };
   }
+
+  return _insertMissionRow(orgId, template, cleaned, options);
+}
+
+/**
+ * Task 2.1 — Start a mission from a `workflow_templates` row.
+ *
+ * Flow:
+ *   1. Auth + org resolution (bail with _global error if no org).
+ *   2. Delegate to shared `_buildAndInsertMission` helper.
+ *
+ * Returns either `{ok:true, missionId}` or `{ok:false, errors}` — errors can
+ * be per-field (from validateInputs) or `{_global: "..."}` for higher-level
+ * failures. The caller (WorkflowLaunchDialog in Task 2.2) surfaces these.
+ */
+export async function startMissionFromTemplate(
+  templateId: string,
+  inputs: Record<string, unknown>,
+  options?: StartMissionOptions,
+): Promise<StartMissionResult> {
+  await requireAuth();
+
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) {
+    return { ok: false, errors: { _global: "用户未关联组织" } };
+  }
+
+  return _buildAndInsertMission(orgId, templateId, inputs, options);
+}
+
+/**
+ * 2026-05-29 新增 —— 定时任务路径专用 service 入口。
+ *
+ * 与 `startMissionFromTemplate` 的唯一差别:
+ *   - 不 requireAuth():调用方是 Inngest 函数,没有 user session
+ *   - 显式接 orgId:由 `scheduled_jobs.organization_id` 提供
+ *   - 强烈建议传 options.source = { module: "schedule", entityId: scheduledJobId,
+ *     entityType: "scheduled_job" },让 `missions_source_dedup_uidx` 自动
+ *     防止"同一 schedule 在重试场景下重复插入 mission"
+ *
+ * 不导出为 server action(无 "use server" 副作用),仅供 inngest 函数与 server
+ * 端调用。注意:本文件顶部已有 "use server" 指令,这意味着所有导出都被视为
+ * server action;但 Inngest 函数作为 server-side 调用方,直接 `await` 调用仍然
+ * 工作,且我们已经在该文件里有同类先例。
+ */
+export async function startMissionFromTemplateScheduled(
+  templateId: string,
+  orgId: string,
+  inputs: Record<string, unknown>,
+  options?: StartMissionOptions,
+): Promise<StartMissionResult> {
+  return _buildAndInsertMission(orgId, templateId, inputs, options);
+}
+
+/** 真正干活的"装配 + INSERT + 容错去重 + 执行 + revalidate"核心 */
+async function _insertMissionRow(
+  orgId: string,
+  template: NonNullable<Awaited<ReturnType<typeof db.query.workflowTemplates.findFirst>>>,
+  cleaned: Record<string, unknown>,
+  options: StartMissionOptions | undefined,
+): Promise<StartMissionResult> {
 
   // Leader is ALWAYS the dedicated "任务总监" employee (slug="leader"),
   // auto-provisioned per-org. Previously this function picked the template's

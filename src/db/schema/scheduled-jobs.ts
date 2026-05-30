@@ -14,9 +14,27 @@
  *   - 业务 Inngest 函数从订阅 cron 改为订阅 event(`scheduled-jobs/<name>.run`),
  *     这样 cron 表达式可在 DB / UI 上动态修改,无需重启
  *
- * 单租户:这是平台级配置(所有组织共享同一份 cron 节奏),无 organization_id。
+ * 2026-05-29 扩展 — 新增 kind 字段区分两类 job:
+ *   - kind='platform':原有 13 条平台级 cron(无 organization_id,eventName 写死)
+ *   - kind='workflow_template':运营在 /workflows/[id] 定时任务 tab 上配置的
+ *     "按场景定时启动 mission",organization_id + workflow_template_id 必填,
+ *     payload 承载 inputParams,runner 派发统一的 typed event
+ *     `scheduled-jobs/workflow-template.run`。
  */
-import { boolean, bigint, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  bigint,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  jsonb,
+} from "drizzle-orm/pg-core";
+import { organizations } from "./users";
+import { workflowTemplates } from "./workflows";
+import { scheduledJobKindEnum } from "./enums";
 
 export const scheduledJobs = pgTable("scheduled_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -32,7 +50,9 @@ export const scheduledJobs = pgTable("scheduled_jobs", {
 
   /**
    * 派发的 Inngest 事件名 —— 业务函数订阅这个事件而不是 cron。
-   * 约定:`scheduled-jobs/<name>.run`,如 `scheduled-jobs/account-analytics-crawl.run`
+   * - kind='platform':约定 `scheduled-jobs/<name>.run`
+   * - kind='workflow_template':runner 忽略此列,统一派 `scheduled-jobs/workflow-template.run`
+   *   (允许写任意值占位,推荐写 `scheduled-jobs/workflow-template.run` 保持一致)
    */
   eventName: text("event_name").notNull(),
 
@@ -47,6 +67,32 @@ export const scheduledJobs = pgTable("scheduled_jobs", {
 
   /** 分类标签,用于 UI 分组,如 "account-analytics" / "cms" / "collection" */
   category: text("category").notNull().default("misc"),
+
+  // ─── 2026-05-29 新增:支持 per-workflow-template per-org schedule ───
+
+  /**
+   * Job 类型:platform = 平台级 cron(向后兼容);workflow_template = 按场景模板的 schedule
+   * 默认 platform 保留 13 条旧行的行为完全不变
+   */
+  kind: scheduledJobKindEnum("kind").notNull().default("platform"),
+
+  /**
+   * 所属组织(多租户隔离)。kind='platform' 时必须为 NULL;
+   * kind='workflow_template' 时必须非 NULL。
+   */
+  organizationId: uuid("organization_id").references(() => organizations.id),
+
+  /**
+   * 关联的 workflow_template。kind='platform' 时为 NULL;
+   * kind='workflow_template' 时必须非 NULL,指向 workflow_templates.id。
+   */
+  workflowTemplateId: uuid("workflow_template_id").references(() => workflowTemplates.id),
+
+  /**
+   * 触发 mission 时传给 startMissionFromTemplateScheduled 的 inputParams。
+   * kind='platform' 不读;kind='workflow_template' 应符合该模板的 inputFields 形状。
+   */
+  payload: jsonb("payload").$type<Record<string, unknown>>(),
 
   /** 上次实际派发时间(scheduler 写入) */
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
@@ -74,6 +120,13 @@ export const scheduledJobs = pgTable("scheduled_jobs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   enabledNextRunIdx: index("scheduled_jobs_enabled_next_run_idx").on(t.enabled, t.nextRunAt),
+  // 2026-05-29:按租户 + kind + 模板查 schedule 的热路径(workflow-template-schedules DAL)
+  orgKindTemplateIdx: index("scheduled_jobs_org_kind_template_idx").on(
+    t.organizationId,
+    t.kind,
+    t.workflowTemplateId,
+    t.enabled,
+  ),
 }));
 
 export type ScheduledJob = typeof scheduledJobs.$inferSelect;

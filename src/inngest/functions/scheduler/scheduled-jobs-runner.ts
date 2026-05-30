@@ -3,8 +3,15 @@
  *
  * 每分钟跑一次,扫描 scheduled_jobs 表,对每条 enabled = true 的记录:
  *   1. 用 cron-parser 算 next_run_at(基于 cron_expression + timezone)
- *   2. 如果 next_run_at <= NOW(),派发对应 eventName 事件(业务函数订阅这个事件)
+ *   2. 如果 next_run_at <= NOW(),按 kind 分叉派发事件:
+ *      - kind='platform':派发 row.eventName(写死的 typed event)
+ *      - kind='workflow_template':派发统一的 `scheduled-jobs/workflow-template.run`
+ *        event,data 里塞 workflowTemplateId / organizationId / inputParams
  *   3. 更新 last_run_at / last_run_status / total_runs / next_run_at(算下一次)
+ *
+ * 2026-05-29 — 新增 workflow_template kind 分叉(per-job jitter 用 sendEvent 的
+ * `ts` 字段做 durable 延迟交付,而非 step.sleep —— 后者会序列化整个 for 循环,
+ * 在 30+ jobs 场景下会超过 60s tick 窗口)
  *
  * 设计要点:
  *   - 这是项目里唯一保留的硬编码 cron 函数(必须有 ≥1 个 cron 才能驱动整个体系)
@@ -21,9 +28,32 @@ import type { InngestEvents } from "@/inngest/events";
 import { db } from "@/db";
 import { scheduledJobs } from "@/db/schema";
 
-type ScheduledEventName = keyof {
-  [K in keyof InngestEvents as K extends `scheduled-jobs/${string}` ? K : never]: true;
+/**
+ * Platform-kind 派发的 typed event 集合 —— 不含 workflow-template.run
+ * (后者的 payload 形状不同,kind='workflow_template' 分支单独处理)
+ */
+type PlatformScheduledEventName = keyof {
+  [K in keyof InngestEvents as K extends `scheduled-jobs/${string}`
+    ? K extends "scheduled-jobs/workflow-template.run"
+      ? never
+      : K
+    : never]: true;
 };
+
+/** workflow_template kind 全部派同一个 event,payload 区分模板 */
+const WORKFLOW_TEMPLATE_RUN_EVENT = "scheduled-jobs/workflow-template.run" as const;
+
+/** workflow_template kind 的 per-job 派发时间打散区间 ±15 秒,避免同分启动风暴 */
+const WORKFLOW_TEMPLATE_JITTER_MAX_MS = 15_000;
+
+/** 用 jobId 当种子算 deterministic jitter,同一个 job 每次 jitter 一致,便于排查 */
+function computeJitterMs(jobId: string): number {
+  let h = 0;
+  for (let i = 0; i < jobId.length; i++) {
+    h = (h * 31 + jobId.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % WORKFLOW_TEMPLATE_JITTER_MAX_MS;
+}
 
 export const scheduledJobsRunner = inngest.createFunction(
   {
@@ -67,20 +97,45 @@ export const scheduledJobsRunner = inngest.createFunction(
         const isFirstRun = job.nextRunAt === null;
 
         if (!isFirstRun) {
-          // 真正到点 → 派发事件,业务函数会收到
-          // 事件名在 DB 配置 → runtime string,需 cast 到 typed event name union
           const scheduledAt = job.nextRunAt
             ? new Date(job.nextRunAt).toISOString()
             : now.toISOString();
-          await step.sendEvent(`dispatch-${job.name}`, {
-            name: job.eventName as ScheduledEventName,
-            data: {
-              jobName: job.name,
-              jobId: job.id,
-              dispatchedAt: now.toISOString(),
-              scheduledAt,
-            },
-          });
+
+          // ─── 按 kind 分叉派发 ───
+          if (job.kind === "workflow_template") {
+            // workflow-template kind 必须有 organizationId + workflowTemplateId
+            if (!job.organizationId || !job.workflowTemplateId) {
+              throw new Error(
+                `workflow_template kind job 缺少 organizationId/workflowTemplateId(jobId=${job.id})`,
+              );
+            }
+            const jitterMs = computeJitterMs(job.id);
+            await step.sendEvent(`dispatch-${job.name}`, {
+              name: WORKFLOW_TEMPLATE_RUN_EVENT,
+              // ts 让 Inngest 在 jittered 时间点投递事件 —— durable & 不阻塞 for 循环
+              ts: now.getTime() + jitterMs,
+              data: {
+                jobName: job.name,
+                jobId: job.id,
+                dispatchedAt: now.toISOString(),
+                scheduledAt,
+                workflowTemplateId: job.workflowTemplateId,
+                organizationId: job.organizationId,
+                inputParams: (job.payload ?? {}) as Record<string, unknown>,
+              },
+            });
+          } else {
+            // kind='platform' —— 老路径,事件名在 DB 配置 → runtime string,cast 到 typed
+            await step.sendEvent(`dispatch-${job.name}`, {
+              name: job.eventName as PlatformScheduledEventName,
+              data: {
+                jobName: job.name,
+                jobId: job.id,
+                dispatchedAt: now.toISOString(),
+                scheduledAt,
+              },
+            });
+          }
           dispatched++;
         }
 

@@ -18,8 +18,11 @@ export interface StepStatus {
 }
 
 interface WorkflowCanvasProps {
-  triggerType: "manual" | "scheduled";
-  triggerConfig?: { cron?: string; timezone?: string } | null;
+  /** 2026-05-29: 替代旧的 triggerType/triggerConfig prop —— 现在卡片直接读 schedule 数 */
+  scheduleCount: number;
+  enabledScheduleCount: number;
+  /** 最近一条 schedule 的简短摘要(可空) */
+  nextScheduleSummary?: string | null;
   steps: WorkflowStepDef[];
   selectedStepId: string | null;
   testResultStepId?: string | null;
@@ -41,8 +44,9 @@ interface WorkflowCanvasProps {
 // ---------------------------------------------------------------------------
 
 export function WorkflowCanvas({
-  triggerType,
-  triggerConfig,
+  scheduleCount,
+  enabledScheduleCount,
+  nextScheduleSummary,
   steps,
   selectedStepId,
   testResultStepId = null,
@@ -75,8 +79,9 @@ export function WorkflowCanvas({
       {/* ── 入门 section ── */}
       <p className="text-sm text-muted-foreground mb-3 self-start">入门</p>
       <TriggerCard
-        triggerType={triggerType}
-        triggerConfig={triggerConfig}
+        scheduleCount={scheduleCount}
+        enabledCount={enabledScheduleCount}
+        nextSummary={nextScheduleSummary}
         onClick={onTriggerClick}
         status={triggerStatus}
       />

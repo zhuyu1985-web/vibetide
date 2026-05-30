@@ -79,7 +79,12 @@ vi.mock("@/db", () => ({
   },
 }));
 
-import { startMissionFromTemplate } from "../workflow-launch";
+import {
+  startMissionFromTemplate,
+  startMissionFromTemplateScheduled,
+} from "../workflow-launch";
+import { requireAuth } from "@/lib/auth/current-user";
+import { getCurrentUserOrg } from "@/lib/dal/auth";
 
 beforeEach(() => {
   insertCalls.length = 0;
@@ -266,5 +271,94 @@ describe("startMissionFromTemplate — source link & race handling", () => {
     expect(a).toEqual({ ok: true, missionId: "winner-id" });
     expect(b).toEqual({ ok: true, missionId: "winner-id" });
     expect(insertCalls.length).toBe(2); // both tried to INSERT; one was rejected
+  });
+});
+
+describe("startMissionFromTemplateScheduled — scheduled launch path", () => {
+  it("does NOT call requireAuth or getCurrentUserOrg (service entry, no session)", async () => {
+    insertReturningQueue.push(() => Promise.resolve([{ id: "sched-m1" }]));
+
+    vi.mocked(requireAuth).mockClear();
+    vi.mocked(getCurrentUserOrg).mockClear();
+
+    const res = await startMissionFromTemplateScheduled(
+      "tpl1",
+      "org-explicit",
+      { foo: "bar" },
+      {
+        source: {
+          module: "schedule",
+          entityId: "scheduled-job-1",
+          entityType: "scheduled_job",
+        },
+      },
+    );
+
+    expect(res).toEqual({ ok: true, missionId: "sched-m1" });
+    expect(requireAuth).not.toHaveBeenCalled();
+    expect(getCurrentUserOrg).not.toHaveBeenCalled();
+  });
+
+  it("uses the explicit orgId argument and writes schedule-kind source link", async () => {
+    insertReturningQueue.push(() => Promise.resolve([{ id: "sched-m2" }]));
+
+    await startMissionFromTemplateScheduled(
+      "tpl1",
+      "org-A",
+      { foo: "bar" },
+      {
+        source: {
+          module: "schedule",
+          entityId: "job-xyz",
+          entityType: "scheduled_job",
+        },
+      },
+    );
+
+    const inserted = insertCalls[0].values;
+    expect(inserted.organizationId).toBe("org-A");
+    expect(inserted.sourceModule).toBe("schedule");
+    expect(inserted.sourceEntityId).toBe("job-xyz");
+    expect(inserted.sourceEntityType).toBe("scheduled_job");
+  });
+
+  it("reuses race winner when the same scheduled-job tries to insert twice", async () => {
+    insertReturningQueue.push(() => Promise.reject(uniqueViolation()));
+    findFirstMissionMock.mockResolvedValueOnce({
+      id: "winner-sched-mission",
+      status: "queued",
+    });
+
+    const res = await startMissionFromTemplateScheduled(
+      "tpl1",
+      "org-A",
+      { foo: "bar" },
+      {
+        source: {
+          module: "schedule",
+          entityId: "job-xyz",
+          entityType: "scheduled_job",
+        },
+      },
+    );
+
+    expect(res).toEqual({ ok: true, missionId: "winner-sched-mission" });
+    expect(insertCalls.length).toBe(1);
+  });
+
+  it("returns _global error when template is not in the given org", async () => {
+    findFirstTemplateMock.mockResolvedValueOnce(null);
+
+    const res = await startMissionFromTemplateScheduled(
+      "tpl-foreign",
+      "org-A",
+      { foo: "bar" },
+    );
+
+    expect(res).toEqual({
+      ok: false,
+      errors: { _global: "模板不存在或无权访问" },
+    });
+    expect(insertCalls.length).toBe(0);
   });
 });

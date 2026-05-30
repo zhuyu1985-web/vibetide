@@ -115,7 +115,9 @@
   --glass-input-border: rgba(148, 163, 184, 0.3);
   --glass-badge-bg: rgba(255, 255, 255, 0.55);
   --glass-sidebar-bg: rgba(248, 251, 255, 0.78);
-  --glass-elevated-bg: rgba(255, 255, 255, 0.72);
+  /* 2026-05-30: 0.72 → 0.94 — popover/dialog/sheet 内容透出底层文字过严重,
+     用户反馈"看不清"。提到 0.94 仍保留 backdrop-blur 的液态玻璃感,但内容可读 */
+  --glass-elevated-bg: rgba(255, 255, 255, 0.94);
   --glass-elevated-border: rgba(255, 255, 255, 0.8);
   --glass-elevated-inset: rgba(255, 255, 255, 1);
   --glass-blue-bg: rgba(219, 234, 254, 0.45);
@@ -207,7 +209,8 @@
   --glass-input-border: rgba(148, 163, 184, 0.2);
   --glass-badge-bg: rgba(15, 23, 42, 0.5);
   --glass-sidebar-bg: rgba(11, 18, 32, 0.88);
-  --glass-elevated-bg: rgba(15, 23, 42, 0.72);
+  /* 2026-05-30: 同 light theme,0.72 → 0.92,dark mode 内容更可读 */
+  --glass-elevated-bg: rgba(15, 23, 42, 0.92);
   --glass-elevated-border: rgba(148, 163, 184, 0.2);
   --glass-elevated-inset: rgba(255, 255, 255, 0.1);
   --glass-blue-bg: rgba(59, 130, 246, 0.12);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, Clock, Loader2, Save } from "lucide-react";
+import { Play, Loader2, Save } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -8,10 +8,7 @@ import { Play, Clock, Loader2, Save } from "lucide-react";
 
 interface BottomActionBarProps {
   onTestRun: () => void;
-  onToggleEnabled: () => void;
   onSave: () => void;
-  isEnabled: boolean;
-  triggerType: "manual" | "scheduled";
   saving: boolean;
   testRunning: boolean;
   hasChanges: boolean;
@@ -19,14 +16,17 @@ interface BottomActionBarProps {
 
 // ---------------------------------------------------------------------------
 // Component
+//
+// 2026-05-29 重构(ADR-0002):
+//   - 移除"开启/已开启"按钮 —— 旧版只翻 React 内存 state,根本不写 DB,
+//     真正的定时控制在每条 schedule 行的 enabled toggle 上(TriggerCard
+//     打开的 Sheet 里)
+//   - 移除 triggerType / isEnabled / onToggleEnabled 三个 prop
 // ---------------------------------------------------------------------------
 
 export function BottomActionBar({
   onTestRun,
-  onToggleEnabled,
   onSave,
-  isEnabled,
-  triggerType,
   saving,
   testRunning,
   hasChanges,
@@ -46,21 +46,6 @@ export function BottomActionBar({
         )}
         {testRunning ? "运行中..." : "测试运行"}
       </button>
-
-      {/* 开启/关闭 — only for scheduled */}
-      {triggerType === "scheduled" && (
-        <button
-          onClick={onToggleEnabled}
-          className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
-            isEnabled
-              ? "bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20"
-              : "bg-black/[0.05] dark:bg-white/[0.08] text-muted-foreground hover:bg-black/[0.08] dark:hover:bg-white/[0.12]"
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          {isEnabled ? "已开启" : "开启"}
-        </button>
-      )}
 
       {/* 保存更改 */}
       <button
