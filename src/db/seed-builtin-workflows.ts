@@ -2365,6 +2365,335 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       ),
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 本地化场景包（2026-05-29 追加 · 默认成都,可切换城市）
+  // 4 条:早晚报 / 政策解读 / 本地热点 / 数据新闻 —— 全部默认 isFeatured
+  // 让首页"主流场景" tab 直接展示;triggerType 保持 manual,运营在
+  // /workflows/[id]/edit 的"定时任务"Sheet 里挂 cron 即可
+  // ════════════════════════════════════════════════════════════════════════
+
+  {
+    slug: "local_briefing_chengdu",
+    name: "AI 早晚报(成都)",
+    description: "每日定时聚合本地热点、政务公告、民生信息,产出「早报」或「晚报」快讯。默认成都,可切换。",
+    icon: "sun",
+    category: "daily_brief",
+    ownerEmployeeId: "xiaolei",
+    defaultTeam: ["xiaolei", "xiaoce", "xiaowen"],
+    isFeatured: true,
+    inputFields: [
+      {
+        name: "city",
+        label: "城市",
+        type: "select",
+        required: true,
+        defaultValue: "成都",
+        options: ["成都", "重庆", "深圳", "广州", "上海", "北京", "杭州", "武汉"],
+      },
+      {
+        name: "edition",
+        label: "时段",
+        type: "select",
+        required: true,
+        defaultValue: "morning",
+        options: [
+          { value: "morning", label: "早报" },
+          { value: "evening", label: "晚报" },
+        ],
+      },
+      {
+        name: "brief_date",
+        label: "汇编日期",
+        type: "date",
+        required: false,
+      },
+      {
+        name: "section_scope",
+        label: "板块范围",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "policy", label: "政务要闻" },
+          { value: "livelihood", label: "民生服务" },
+          { value: "economy", label: "经济产业" },
+          { value: "culture", label: "文化体育" },
+          { value: "weather", label: "天气交通" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "汇编 {{city}} {{brief_date}} 的{{edition}}快讯,覆盖板块 {{section_scope}}。结构:1) 一句话头条 2) 今日 Top 8 要闻(含来源 + 1 行点评) 3) 民生贴士(早:出行 / 天气;晚:夜经济 / 文娱) 4) 明日预告。语气简洁有信息量,适合移动端推送。",
+    promptTemplate:
+      "为 {{city}} 汇编 {{brief_date}} 的{{edition}},聚焦 {{section_scope}}。",
+    steps: [
+      step(1, "本地信源聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
+      step(2, "本地热榜抓取", "trending_topics", "热榜聚合", "data_collection", "hot", {
+        mode: "search",
+        query: "{{city}}",
+        limit: 20,
+      }),
+      step(3, "要闻筛选去重", "topic_extraction", "选题提取", "content_analysis", "filter"),
+      step(4, "早晚报撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "推送排版设计", "layout_design", "排版设计", "content_gen", "layout"),
+      step(6, "稿件入库（不发布）", "archive_to_drafts", "稿件入库（不发布）", "distribution", "store", {
+        articles: "{{step4.articles}}",
+        initialStatus: "approved",
+      }),
+      step(7, "CMS 文稿入库发布", "cms_publish", "CMS 文稿入库发布", "distribution", "publish", {
+        articleId: "{{step6.firstArticleId}}",
+        catalogId: 10462,
+      }),
+    ],
+  },
+
+  {
+    slug: "local_policy_interpretation_chengdu",
+    name: "AI 政策解读",
+    description: "汇集本地热点政策(低空经济、民营经济 25 条、人才落户、住房公积金等),输出政策要点 + 影响解读。",
+    icon: "scroll-text",
+    category: "livelihood",
+    ownerEmployeeId: "xiaoce",
+    defaultTeam: ["xiaoce", "xiaowen", "xiaoshu"],
+    isFeatured: true,
+    inputFields: [
+      {
+        name: "city",
+        label: "城市",
+        type: "select",
+        required: true,
+        defaultValue: "成都",
+        options: ["成都", "重庆", "深圳", "广州", "上海", "北京", "杭州", "武汉"],
+      },
+      {
+        name: "policy_topic",
+        label: "政策主题",
+        type: "select",
+        required: true,
+        placeholder: "选择政策 / 或选自定义后填写",
+        options: [
+          { value: "low_altitude_economy", label: "低空经济三年行动" },
+          { value: "private_economy_25", label: "促进民营经济 25 条" },
+          { value: "talent_settlement", label: "人才落户新政" },
+          { value: "housing_fund", label: "住房公积金调整" },
+          { value: "custom", label: "自定义(在下方填写)" },
+        ],
+      },
+      {
+        name: "custom_policy",
+        label: "自定义政策名 / 关键词",
+        type: "text",
+        required: false,
+        placeholder: "选择上方「自定义」时填写,如:成都国际消费中心城市建设方案",
+      },
+      {
+        name: "angle",
+        label: "解读角度",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "summary", label: "核心要点" },
+          { value: "impact_business", label: "对企业影响" },
+          { value: "impact_citizen", label: "对市民影响" },
+          { value: "compare", label: "与既有政策对比" },
+          { value: "qna", label: "常见疑问 Q&A" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "围绕 {{city}} 的「{{policy_topic}}」({{custom_policy}}) 输出政策解读,角度覆盖 {{angle}}。结构:1) 政策原文要点摘要(分条) 2) 关键变化对比(新 vs 旧) 3) 受益群体 / 受限对象 4) 落地时间表与执行机构 5) 常见误读澄清 6) 建议行动清单。引用官方原文链接。",
+    promptTemplate:
+      "解读 {{city}} 政策「{{policy_topic}}」({{custom_policy}}),角度 {{angle}}。",
+    steps: [
+      step(1, "政策原文检索", "web_search", "全网搜索", "web_search", "search", {
+        query: "{{city}} {{policy_topic}} {{custom_policy}} 官方 政策 原文 解读",
+        timeRange: "30d",
+        maxResults: 8,
+        topic: "news",
+      }),
+      step(2, "政策深读分析", "web_deep_read", "网页深读", "web_search", "deepread", {
+        url: "{{step1.results.0.url}}",
+        maxLength: 5000,
+      }),
+      step(3, "选题角度提炼", "topic_extraction", "选题提取", "content_analysis", "extract"),
+      step(4, "解读稿件撰写", "content_generate", "内容生成", "content_gen", "write"),
+      step(5, "事实核查", "fact_check", "事实核查", "review", "factcheck", {
+        text: "{{step4.artifacts.0.content}}",
+      }),
+      step(6, "解读稿件入库（不发布）", "archive_to_drafts", "稿件入库（不发布）", "distribution", "store", {
+        articles: "{{step4.articles}}",
+        initialStatus: "approved",
+      }),
+    ],
+  },
+
+  {
+    slug: "local_hotspot_chengdu",
+    name: "AI 本地热点(成都)",
+    description: "聚焦本地舆论场,扫描微博 / 抖音 / 头条 / 本地论坛的成都话题,输出 Top N 热点雷达。",
+    icon: "flame",
+    category: "news",
+    ownerEmployeeId: "xiaolei",
+    defaultTeam: ["xiaolei", "xiaoce"],
+    isFeatured: true,
+    inputFields: [
+      {
+        name: "city",
+        label: "城市",
+        type: "select",
+        required: true,
+        defaultValue: "成都",
+        options: ["成都", "重庆", "深圳", "广州", "上海", "北京", "杭州", "武汉"],
+      },
+      {
+        name: "platforms",
+        label: "监测平台",
+        type: "multiselect",
+        required: true,
+        defaultValue: ["weibo", "douyin", "toutiao"],
+        options: [
+          { value: "weibo", label: "微博" },
+          { value: "douyin", label: "抖音" },
+          { value: "toutiao", label: "头条" },
+          { value: "xiaohongshu", label: "小红书" },
+          { value: "bilibili", label: "B 站" },
+          { value: "local_forum", label: "本地论坛" },
+        ],
+      },
+      {
+        name: "domain",
+        label: "话题领域",
+        type: "select",
+        required: false,
+        defaultValue: "全部",
+        options: ["全部", "政务", "民生", "经济", "科技", "文体", "突发事件"],
+      },
+      {
+        name: "top_n",
+        label: "Top N",
+        type: "number",
+        required: false,
+        defaultValue: 10,
+        validation: { min: 3, max: 30 },
+      },
+    ],
+    systemInstruction:
+      "扫描 {{platforms}} 上 {{city}} 的 {{domain}} 热点,输出 Top {{top_n}} 本地热点雷达。每条含:标题 / 热度值 / 主平台 / 上升趋势 / 1 行建议切入角。末尾:整体态势 + 3 个推荐跟进选题 + 1 个需谨慎处理的舆情提示。",
+    promptTemplate:
+      "扫描 {{city}} 在 {{platforms}} 的 {{domain}} 热点,Top {{top_n}}。",
+    steps: [
+      step(1, "多平台热榜抓取", "trending_topics", "热榜聚合", "data_collection", "fetch", {
+        mode: "platforms",
+        platforms: "{{platforms}}",
+        limit: "{{top_n}}",
+      }),
+      step(2, "本地话题筛选", "social_listening", "社交舆情", "data_collection", "listen", {
+        query: "{{city}} {{domain}} 本地热点",
+        platforms: "{{platforms}}",
+        limit: "{{top_n}}",
+      }),
+      step(3, "热度趋势分析", "trend_monitor", "趋势监控", "data_collection", "trend", {
+        query: "{{city}} {{domain}} 本地热点",
+        timeRange: "24h",
+      }),
+      step(4, "热点价值评分", "heat_scoring", "热度评分", "data_analysis", "score", {
+        query: "{{city}} {{domain}} 本地热点",
+        timeRange: "24h",
+      }),
+      {
+        ...step(5, "热点雷达报告", "content_generate", "内容生成", "content_gen", "report"),
+        dependsOn: ["step-1", "step-2", "step-3", "step-4"],
+      },
+      step(6, "热点稿件入库（不发布）", "archive_to_drafts", "稿件入库（不发布）", "distribution", "store", {
+        articles: "{{step5.articles}}",
+        initialStatus: "approved",
+      }),
+    ],
+  },
+
+  {
+    slug: "local_data_news_chengdu",
+    name: "AI 数据新闻(本地)",
+    description: "聚合本地天气、房价、物价、交通、空气质量等数据,产出数据驱动的本地新闻简报。",
+    icon: "bar-chart-3",
+    category: "daily_brief",
+    ownerEmployeeId: "xiaoshu",
+    defaultTeam: ["xiaoshu", "xiaowen", "xiaoce"],
+    isFeatured: true,
+    inputFields: [
+      {
+        name: "city",
+        label: "城市",
+        type: "select",
+        required: true,
+        defaultValue: "成都",
+        options: ["成都", "重庆", "深圳", "广州", "上海", "北京", "杭州", "武汉"],
+      },
+      {
+        name: "data_types",
+        label: "数据类型",
+        type: "multiselect",
+        required: true,
+        defaultValue: ["weather", "housing", "transport"],
+        options: [
+          { value: "weather", label: "天气 / 空气质量" },
+          { value: "housing", label: "房价 / 楼市成交" },
+          { value: "consumer", label: "消费物价" },
+          { value: "transport", label: "交通 / 拥堵指数" },
+          { value: "tourism", label: "文旅客流" },
+          { value: "economy", label: "经济运行指标" },
+        ],
+      },
+      {
+        name: "period",
+        label: "数据周期",
+        type: "daterange",
+        required: false,
+      },
+      {
+        name: "compare_to",
+        label: "对比基线",
+        type: "select",
+        required: false,
+        defaultValue: "wow",
+        options: [
+          { value: "wow", label: "环比上周" },
+          { value: "mom", label: "环比上月" },
+          { value: "yoy", label: "同比去年" },
+          { value: "none", label: "不做对比" },
+        ],
+      },
+    ],
+    systemInstruction:
+      "为 {{city}} 在 {{period}} 期间产出数据新闻,覆盖 {{data_types}},对比基线 {{compare_to}}。结构:1) 核心结论(一句话) 2) 关键数据卡片(每类 2-3 个指标 + 同环比箭头) 3) 图表建议(注明图种 + 字段映射) 4) 数据解读(异常 + 趋势) 5) 数据局限性说明。",
+    promptTemplate:
+      "为 {{city}} 在 {{period}} 产出数据新闻,覆盖 {{data_types}},对比 {{compare_to}}。",
+    steps: [
+      step(1, "本地数据源检索", "web_search", "全网搜索", "web_search", "search", {
+        query: "{{city}} {{data_types}} {{period}} 数据 统计 官方 发布",
+        timeRange: "30d",
+        maxResults: 8,
+        topic: "news",
+      }),
+      step(2, "数据指标拉取", "data_report", "数据报告", "data_analysis", "data", {
+        reportType: "weekly",
+        metrics: "{{data_types}}",
+      }),
+      step(3, "趋势对比分析", "trend_monitor", "趋势监控", "data_collection", "trend", {
+        query: "{{city}} {{data_types}} 数据 趋势 {{compare_to}}",
+        timeRange: "30d",
+      }),
+      {
+        ...step(4, "数据新闻撰写", "content_generate", "内容生成", "content_gen", "write"),
+        dependsOn: ["step-1", "step-2", "step-3"],
+      },
+      step(5, "排版与图表建议", "layout_design", "排版设计", "content_gen", "layout"),
+      step(6, "数据新闻入库（不发布）", "archive_to_drafts", "稿件入库（不发布）", "distribution", "store", {
+        articles: "{{step4.articles}}",
+        initialStatus: "approved",
+      }),
+    ],
+  },
 ];
 
 // ─── Seed input 映射 ──────────────────────────────────────────────────────

@@ -3,6 +3,8 @@ import { listSkillsForWorkflowPicker } from "@/lib/dal/skills";
 import { getAllToolParamSpecs } from "@/lib/agent/tool-registry";
 import { WorkflowEditor } from "@/components/workflows/workflow-editor";
 import { notFound } from "next/navigation";
+import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { listSchedulesByTemplate } from "@/lib/dal/workflow-template-schedules";
 
 export default async function EditWorkflowPage({
   params,
@@ -21,6 +23,14 @@ export default async function EditWorkflowPage({
   // 不能 import。
   const toolParamSpecs = getAllToolParamSpecs();
 
+  // 2026-05-29 — 编辑器 Trigger Sheet 需要 per-template schedule 列表(用作初始
+  // 状态 + 卡片摘要)。仅当模板属于当前 org 才有意义,跨 org 浏览时返回空数组。
+  const orgId = await getCurrentUserOrg();
+  const initialSchedules =
+    orgId && workflow.organizationId === orgId
+      ? await listSchedulesByTemplate(orgId, id)
+      : [];
+
   return (
     <div className="-m-6 h-[calc(100%+48px)] overflow-hidden">
       <WorkflowEditor
@@ -37,6 +47,12 @@ export default async function EditWorkflowPage({
           steps: workflow.steps,
           inputFields: workflow.inputFields ?? [],
           promptTemplate: workflow.promptTemplate ?? "",
+        }}
+        initialSchedules={initialSchedules}
+        workflowMeta={{
+          id: workflow.id,
+          name: workflow.name,
+          inputFields: workflow.inputFields ?? [],
         }}
       />
     </div>

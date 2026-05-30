@@ -26,7 +26,7 @@ export const externalPublications = pgTable(
       .references(() => organizations.id)
       .notNull(),
     articleId: uuid("article_id")
-      .references(() => articles.id)
+      .references(() => articles.id, { onDelete: "cascade" })
       .notNull(),
 
     // Ayrshare 聚合 id（一次 POST /api/post 可能跨多平台，返回统一 id）

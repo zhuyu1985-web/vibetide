@@ -20,6 +20,7 @@ import {
   Clock,
   Rocket,
   Loader2,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateWorkflowTemplate } from "@/app/actions/workflow-engine";
@@ -27,9 +28,12 @@ import { startMission } from "@/app/actions/missions";
 import { templateToScenarioSlug } from "@/lib/workflow-template-slug";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
+import type { ScheduledJob } from "@/db/schema/scheduled-jobs";
+import { ScheduleListClient } from "./schedule-list-client";
 
 interface WorkflowDetailClientProps {
   workflow: WorkflowTemplateRow;
+  schedules?: ScheduledJob[];
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -47,7 +51,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   custom: "通用场景",
 };
 
-export function WorkflowDetailClient({ workflow }: WorkflowDetailClientProps) {
+export function WorkflowDetailClient({
+  workflow,
+  schedules = [],
+}: WorkflowDetailClientProps) {
   const router = useRouter();
   const [mdEditing, setMdEditing] = useState(false);
   const [mdDraft, setMdDraft] = useState(workflow.content ?? "");
@@ -175,6 +182,10 @@ export function WorkflowDetailClient({ workflow }: WorkflowDetailClientProps) {
           <TabsTrigger value="meta" className="gap-1.5">
             <Clock size={14} />
             元数据
+          </TabsTrigger>
+          <TabsTrigger value="schedules" className="gap-1.5">
+            <Calendar size={14} />
+            定时任务 ({schedules.length})
           </TabsTrigger>
         </TabsList>
 
@@ -357,6 +368,11 @@ export function WorkflowDetailClient({ workflow }: WorkflowDetailClientProps) {
               </div>
             </dl>
           </GlassCard>
+        </TabsContent>
+
+        {/* Schedules Tab — per-template cron 配置 (2026-05-29) */}
+        <TabsContent value="schedules" className="mt-0">
+          <ScheduleListClient workflow={workflow} schedules={schedules} />
         </TabsContent>
       </Tabs>
     </div>

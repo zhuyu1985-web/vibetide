@@ -692,3 +692,13 @@ export const accountReportStatusEnum = pgEnum("account_report_status", [
   "ready",
   "failed",
 ]);
+
+// =====================================================================
+// Scheduled Job Kind (2026-05-29)
+// platform — 13 条遗留的平台级 cron（无 organization_id，eventName 写死）
+// workflow_template — 运营在 /workflows/[id] 上配置的"按场景定时启动 mission"
+// =====================================================================
+export const scheduledJobKindEnum = pgEnum("scheduled_job_kind", [
+  "platform",
+  "workflow_template",
+]);

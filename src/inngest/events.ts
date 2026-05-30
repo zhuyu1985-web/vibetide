@@ -391,6 +391,12 @@ export type InngestEvents = {
   "scheduled-jobs/learning-engine.run": ScheduledJobPayload;
   "scheduled-jobs/daily-performance-snapshot.run": ScheduledJobPayload;
   "scheduled-jobs/employee-status-guard.run": ScheduledJobPayload;
+
+  // ─── Workflow Template Scheduled Launch (2026-05-29) ───
+  // 所有 kind='workflow_template' 的 scheduled_jobs 共用同一个 event,
+  // payload 里带 workflowTemplateId / organizationId / inputParams 区分。
+  // 订阅方:src/inngest/functions/workflow-template-scheduled-launch.ts
+  "scheduled-jobs/workflow-template.run": WorkflowTemplateScheduledRunPayload;
 };
 
 /** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */
@@ -404,5 +410,24 @@ type ScheduledJobPayload = {
     dispatchedAt: string;
     /** 计划执行时间(可能略早于 dispatchedAt,因为 scheduler 每分钟跑一次) */
     scheduledAt: string;
+  };
+};
+
+/**
+ * workflow-template kind job 派发的 event payload。
+ * 与 ScheduledJobPayload 同结构,额外多 3 个字段让订阅方直接拿到模板 + org + 参数。
+ */
+type WorkflowTemplateScheduledRunPayload = {
+  data: {
+    jobName: string;
+    jobId: string;
+    dispatchedAt: string;
+    scheduledAt: string;
+    /** 关联的 workflow_template id —— 订阅方 startMissionFromTemplateScheduled 必用 */
+    workflowTemplateId: string;
+    /** 关联的 org id —— 订阅方显式接 org,不依赖 session */
+    organizationId: string;
+    /** scheduled_jobs.payload —— 当作 mission inputParams 传给 startMissionFromTemplateScheduled */
+    inputParams: Record<string, unknown>;
   };
 };

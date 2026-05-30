@@ -295,6 +295,20 @@
       "when": 1779817259274,
       "tag": "0041_nasty_queen_noir",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780035668157,
+      "tag": "0042_funny_gorilla_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1780081291426,
+      "tag": "0043_equal_frank_castle",
+      "breakpoints": true
     }
   ]
 }

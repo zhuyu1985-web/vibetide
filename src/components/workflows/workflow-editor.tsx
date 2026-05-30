@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -21,11 +21,26 @@ import { InputFieldsEditor } from "./input-fields-editor";
 import { useWorkflowSteps } from "./use-workflow-steps";
 import { useTestRun } from "./use-test-run";
 import { TestRunInputsDialog } from "./test-run-inputs-dialog";
+import { ScheduleSheet } from "./schedule-sheet";
 import { saveWorkflow, updateWorkflow } from "@/app/actions/workflow-engine";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { InputFieldDef } from "@/lib/types";
 import type { WorkflowPickerSkill } from "@/lib/dal/skills";
 import type { ToolParamSpec } from "./step-detail-panel";
+import type { ScheduledJob } from "@/db/schema/scheduled-jobs";
+import type { WorkflowTemplateRow } from "@/db/types";
+
+/** 把 cron 翻成简短的中文摘要,如 "每天 09:00";解析失败 fallback 显示原始 cron */
+function summarizeCron(cron: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length < 5) return cron;
+  const [minute, hour] = parts;
+  // 仅支持最常见的 "分 时 * * *" / "分 时 * * X" 模式,其他直接 fallback
+  if (/^\d+$/.test(minute) && /^\d+$/.test(hour)) {
+    return `每天 ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  }
+  return cron;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,7 +52,9 @@ interface WorkflowEditorProps {
     name: string;
     description: string;
     category: string;
+    /** @deprecated 2026-05-29 — schedule 已迁到 scheduled_jobs;保留 prop 仅为不破坏旧调用方 */
     triggerType: string;
+    /** @deprecated 2026-05-29 — 同上 */
     triggerConfig?: { cron?: string; timezone?: string } | null;
     steps: WorkflowStepDef[];
     inputFields?: InputFieldDef[];
@@ -53,6 +70,20 @@ interface WorkflowEditorProps {
    * drizzle) that can't reach the client bundle.
    */
   toolParamSpecs?: Record<string, ToolParamSpec[]>;
+  /**
+   * 2026-05-29 — 该模板已挂载的 schedule 列表(只在 edit mode 有值)。
+   * 用于 TriggerCard 显示当前调度数 + Sheet 打开时作为初始 state。
+   */
+  initialSchedules?: ScheduledJob[];
+  /**
+   * 2026-05-29 — schedule Sheet 嵌入 ScheduleListClient 需要的"模板元数据"。
+   * 在 create mode 下未保存前为 undefined,Sheet 入口将禁用提示先保存。
+   */
+  workflowMeta?: {
+    id: string;
+    name: string;
+    inputFields: InputFieldDef[];
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +109,8 @@ export function WorkflowEditor({
   mode,
   skills,
   toolParamSpecs,
+  initialSchedules = [],
+  workflowMeta,
 }: WorkflowEditorProps) {
   const router = useRouter();
 
@@ -89,13 +122,22 @@ export function WorkflowEditor({
   const [category, setCategory] = useState<Category>(
     (initialData?.category as Category) ?? "custom"
   );
-  const [triggerType, setTriggerType] = useState<"manual" | "scheduled">(
-    (initialData?.triggerType as "manual" | "scheduled") ?? "manual"
+
+  // 2026-05-29 移除 triggerType / triggerConfig / isEnabled 三个 state ——
+  // 现在 schedule 由独立的 scheduled_jobs 系统管理,编辑器只编辑模板定义本身。
+
+  // ── Schedule state (lifted from Sheet so TriggerCard 可以显示实时数量) ──
+  const [schedules, setSchedules] = useState<ScheduledJob[]>(initialSchedules);
+  const [scheduleSheetOpen, setScheduleSheetOpen] = useState(false);
+
+  const enabledScheduleCount = useMemo(
+    () => schedules.filter((s) => s.enabled).length,
+    [schedules],
   );
-  const [triggerConfig, setTriggerConfig] = useState(
-    initialData?.triggerConfig ?? null
-  );
-  const [isEnabled, setIsEnabled] = useState(false);
+  const nextScheduleSummary = useMemo(() => {
+    const firstEnabled = schedules.find((s) => s.enabled) ?? schedules[0];
+    return firstEnabled ? summarizeCron(firstEnabled.cronExpression) : null;
+  }, [schedules]);
 
   // ── Input fields / prompt template ──
   const [inputFields, setInputFields] = useState<InputFieldDef[]>(
@@ -164,11 +206,14 @@ export function WorkflowEditor({
   );
 
   const handleTriggerClick = useCallback(() => {
-    setTriggerType((prev) =>
-      prev === "manual" ? "scheduled" : "manual"
-    );
-    stepsHook.setHasChanges(true);
-  }, [stepsHook]);
+    // 2026-05-29 — TriggerCard 现在是 schedule Sheet 入口,不再切换 triggerType。
+    // 在 create mode 下模板尚未持久化,先提示保存。
+    if (!workflowMeta) {
+      toast.info("请先保存工作流,然后再配置定时任务");
+      return;
+    }
+    setScheduleSheetOpen(true);
+  }, [workflowMeta]);
 
   // ── Workflow actions ──
 
@@ -180,26 +225,37 @@ export function WorkflowEditor({
     setSaving(true);
     try {
       if (mode === "edit" && initialData?.id) {
-        await updateWorkflow(initialData.id, {
+        const result = await updateWorkflow(initialData.id, {
           name: name.trim(),
           description: description.trim() || undefined,
           category,
-          triggerType,
-          triggerConfig,
+          // triggerType / triggerConfig 已 deprecated(ADR-0002),传固定 default
+          // 保持 server action 签名兼容。真正的调度在 scheduled_jobs 表上,
+          // 由 /workflows/[id] 详情页或本编辑器 TriggerCard 打开的 Sheet 管理。
+          triggerType: "manual",
+          triggerConfig: null,
           steps: stepsHook.steps,
           inputFields,
           promptTemplate: promptTemplate.trim() || undefined,
         });
-        // 保存后停留在当前页 —— 清掉"未保存改动"标记，给一个 toast 反馈。
-        stepsHook.setHasChanges(false);
-        toast.success("保存成功");
+        // 2026-05-30:builtin + 非 super admin 的编辑会被 server action 自动
+        // fork 成新副本(避免改动丢失)。此时 result.forked=true,跳到新副本 url。
+        if (result.forked) {
+          stepsHook.setHasChanges(false);
+          toast.success("已自动复制为我的工作流（原内置模板不可修改）");
+          router.push(`/workflows/${result.id}/edit`);
+        } else {
+          // 保存后停留在当前页 —— 清掉"未保存改动"标记，给一个 toast 反馈。
+          stepsHook.setHasChanges(false);
+          toast.success("保存成功");
+        }
       } else {
         const created = await saveWorkflow({
           name: name.trim(),
           description: description.trim() || undefined,
           category,
-          triggerType,
-          triggerConfig,
+          triggerType: "manual",
+          triggerConfig: null,
           steps: stepsHook.steps,
           inputFields,
           promptTemplate: promptTemplate.trim() || undefined,
@@ -225,9 +281,7 @@ export function WorkflowEditor({
     name,
     description,
     category,
-    triggerType,
-    triggerConfig,
-    stepsHook.steps,
+    stepsHook,
     inputFields,
     promptTemplate,
     router,
@@ -243,8 +297,9 @@ export function WorkflowEditor({
       }
       await testRun.startTestRun(
         stepsHook.steps,
-        triggerType,
-        triggerConfig,
+        // 测试运行始终以 "手动触发" 模拟;定时触发不需要测试模拟
+        "manual",
+        null,
         {
           userInputs,
           promptTemplate,
@@ -255,8 +310,6 @@ export function WorkflowEditor({
     [
       testRun,
       stepsHook.steps,
-      triggerType,
-      triggerConfig,
       rightPanelMode,
       promptTemplate,
       inputFields,
@@ -273,11 +326,6 @@ export function WorkflowEditor({
     await runTestWithInputs({});
   }, [inputFields, runTestWithInputs]);
 
-  const handleToggleEnabled = useCallback(() => {
-    setIsEnabled((prev) => !prev);
-    stepsHook.setHasChanges(true);
-  }, [stepsHook]);
-
   // ── AI chat callback ──
 
   const handleWorkflowGenerated = useCallback(
@@ -285,15 +333,17 @@ export function WorkflowEditor({
       name: string;
       description: string;
       category: Category;
-      triggerType: "manual" | "scheduled";
-      triggerConfig: { cron?: string; timezone?: string } | null;
+      /** @deprecated 仍在 payload 里以兼容旧 AI 输出,但本编辑器不再消费 */
+      triggerType?: "manual" | "scheduled";
+      /** @deprecated 同上 */
+      triggerConfig?: { cron?: string; timezone?: string } | null;
       steps: WorkflowStepDef[];
     }) => {
       setName(data.name);
       setDescription(data.description);
       setCategory(data.category);
-      setTriggerType(data.triggerType);
-      if (data.triggerConfig) setTriggerConfig(data.triggerConfig);
+      // 2026-05-29 — AI 生成 payload 里的 triggerType/triggerConfig 直接丢弃,
+      // 用户应在保存后通过 TriggerCard 进 Sheet 自助配置 schedule
       stepsHook.replaceSteps(data.steps);
     },
     [stepsHook]
@@ -396,8 +446,9 @@ export function WorkflowEditor({
               </div>
             </div>
             <WorkflowCanvas
-              triggerType={triggerType}
-              triggerConfig={triggerConfig}
+              scheduleCount={schedules.length}
+              enabledScheduleCount={enabledScheduleCount}
+              nextScheduleSummary={nextScheduleSummary}
               steps={stepsHook.steps}
               selectedStepId={stepsHook.selectedStepId}
               testResultStepId={testResultStepId}
@@ -416,10 +467,7 @@ export function WorkflowEditor({
           </div>
           <BottomActionBar
             onTestRun={handleTestRun}
-            onToggleEnabled={handleToggleEnabled}
             onSave={handleSave}
-            isEnabled={isEnabled}
-            triggerType={triggerType}
             saving={saving}
             testRunning={testRun.testRunning}
             hasChanges={stepsHook.hasChanges}
@@ -455,6 +503,23 @@ export function WorkflowEditor({
           void runTestWithInputs(values);
         }}
       />
+
+      {/* 2026-05-29 — schedule 管理 Sheet,由 TriggerCard 触发 */}
+      {workflowMeta ? (
+        <ScheduleSheet
+          open={scheduleSheetOpen}
+          onOpenChange={setScheduleSheetOpen}
+          workflow={
+            {
+              id: workflowMeta.id,
+              name: workflowMeta.name,
+              inputFields: workflowMeta.inputFields,
+            } as unknown as WorkflowTemplateRow
+          }
+          schedules={schedules}
+          onSchedulesChange={setSchedules}
+        />
+      ) : null}
     </div>
   );
 }

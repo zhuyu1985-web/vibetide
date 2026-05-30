@@ -58,6 +58,11 @@ export const workflowTemplates = pgTable("workflow_templates", {
 
   category: workflowCategoryEnum("category").default("custom"),
   triggerType: workflowTriggerTypeEnum("trigger_type").default("manual"),
+  /**
+   * @deprecated 2026-05-29 — scheduled trigger 已迁到 scheduled_jobs 表
+   * (kind='workflow_template', 一个模板可挂 0..N 条独立 schedule)。
+   * 新代码不要读写此字段;UI 也不暴露编辑。列保留仅为向后兼容,后续单独 change 清理。
+   */
   triggerConfig: jsonb("trigger_config").$type<{
     cron?: string;
     timezone?: string;

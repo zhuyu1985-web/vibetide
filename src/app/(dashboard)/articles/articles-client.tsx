@@ -907,17 +907,19 @@ function BatchActionBar({
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.floor((startOfToday - startOfDate) / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return "今天";
-  if (diffDays === 1) return "昨天";
-  if (diffDays < 7) return `${diffDays}天前`;
+  if (diffDays === 0) return `今天 ${hm}`;
+  if (diffDays === 1) return `昨天 ${hm}`;
+  if (diffDays > 1 && diffDays < 7) return `${diffDays}天前 ${hm}`;
 
   const month = d.getMonth() + 1;
   const day = d.getDate();
   if (d.getFullYear() === now.getFullYear()) {
-    return `${month}月${day}日`;
+    return `${month}月${day}日 ${hm}`;
   }
-  return `${d.getFullYear()}/${month}/${day}`;
+  return `${d.getFullYear()}/${month}/${day} ${hm}`;
 }

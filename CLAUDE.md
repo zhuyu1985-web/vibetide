@@ -76,6 +76,7 @@ npm run db:cleanup-skill-dupes       # Dedupe legacy skill rows
 当前生效：
 
 - [`2026-05-01-platform-supabase-strategy.md`](docs/adr/2026-05-01-platform-supabase-strategy.md) — 留 self-hosted Supabase；统一栈不分 SKU；不引入 supabase-js / 不替换 Inngest / 不做极简版客户化部署。该 ADR §5 Non-Goals 列出明确禁止的方向。
+- [`2026-05-29-workflow-template-schedule-on-scheduled-jobs.md`](docs/adr/2026-05-29-workflow-template-schedule-on-scheduled-jobs.md) — workflow_template 定时任务嫁接 `scheduled_jobs` 表（加 `kind` 字段区分 platform vs workflow_template），不新建独立调度系统。`workflow_templates.triggerConfig` 标 `@deprecated`，由 `scheduled_jobs(kind='workflow_template')` 取代。
 
 ADR 是 immutable 决策快照——情况变了写新 ADR 引用并 supersede 老的，不要修改老 ADR 内容。
 
@@ -420,7 +421,21 @@ Phase 1 交付的 `src/lib/cms/` 模块是 VibeTide → 华栖云 CMS 的唯一�
 - **AI operations:** `leader-plan`, `leader-consolidate`, `learning-engine`, `benchmarking-analysis`, `benchmarking-crawl`
 - **Monitoring:** `analytics-report`, `daily-performance-snapshot`, `employee-status-guard`
 - **Knowledge base:** `knowledge-base-vectorize` (Jina embeddings pipeline for KB documents)
+- **Scheduler:** `scheduled-jobs-runner`（每分钟扫 `scheduled_jobs` 表派发对应 event；2026-05-29 起按 `kind` 分叉：platform 派 row.eventName，workflow_template 派统一 `scheduled-jobs/workflow-template.run`），`workflow-template-scheduled-launch`（订阅后者，调 `startMissionFromTemplateScheduled` 启动 mission，runtime source 标记 `module='schedule'`）
 - Dev server auto-configures; production requires `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`
+
+#### Workflow Template Schedules (2026-05-29)
+
+任意 `workflow_template` 可挂 0..N 条 cron schedule（运营在 `/workflows/[id]` "定时任务" tab 上配置）；不影响手动启动入口——两者并存。
+
+- **DAL:** `src/lib/dal/workflow-template-schedules.ts`（per-org per-template CRUD，强制 `kind='workflow_template'` + org 隔离）
+- **Server actions:** `src/app/actions/workflow-template-schedules.ts`（auth + 模板 ownership 校验 + cron `cron-parser` 校验 + 周期下限 60 秒）
+- **Cron 校验:** `src/lib/cron.ts`（`validateCronExpression(expr, tz)` 返回 `{ok, nextRuns[3]}` 或 `{ok:false, error}`）
+- **Service 入口:** `startMissionFromTemplateScheduled(templateId, orgId, inputs, options)`（与 `startMissionFromTemplate` 共享 `_buildAndInsertMission` helper；跳过 `requireAuth`，显式接 orgId）
+- **触发链路:** runner 每分钟扫表 → 派 typed event（带 `workflowTemplateId` / `organizationId` / `inputParams`）→ `workflowTemplateScheduledLaunch` handler → `startMissionFromTemplateScheduled`，`source.module='schedule'` + `sourceEntityId=jobId` 让 `missions_source_dedup_uidx` 自动去重
+- **关闭:** UI 上 toggle enabled=false，下个分钟 tick 起停止派发
+- **UI 入口（两处统一）:** ① 详情页 `/workflows/[id]` "定时任务" tab；② 编辑器 `/workflows/[id]/edit` 画布"入门" section 的 TriggerCard 卡片，点击在 Sheet 中嵌入同一个 `ScheduleListClient` 做完整 CRUD（`src/components/workflows/schedule-sheet.tsx`）。两入口共享 `ScheduleListClient` 的 `onSchedulesChange` 回调把 schedule 数同步给 TriggerCard 显示
+- **已废弃（ADR-0002）:** `workflow_templates.triggerType` enum + `triggerConfig` jsonb 字段；编辑器 `BottomActionBar` 的"开启/已开启"按钮；TriggerCard 旧版"手动 ↔ 定时"切换。新代码不要恢复这些 stub —— 所有"是否定时 / cron 表达式 / 启用状态"都从 `scheduled_jobs(kind='workflow_template')` 派生
 
 ### Knowledge Base Module
 
