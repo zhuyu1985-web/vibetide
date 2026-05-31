@@ -766,7 +766,8 @@ export default function HelpNotFound() {
       <p className="mt-3 text-muted-foreground">这份资料可能被移动了,或者还在编写中。</p>
       <div className="mt-6 flex gap-3 justify-center">
         <Button asChild><Link href="/help">回到帮助首页</Link></Button>
-        <Button asChild variant="outline"><Link href="/help/search">搜索文档</Link></Button>
+        {/* CLAUDE.md "按钮不要带边框" — 用 secondary 而非 outline */}
+        <Button asChild variant="secondary"><Link href="/help/search">搜索文档</Link></Button>
       </div>
     </div>
   );
@@ -1489,9 +1490,10 @@ export function SearchDialog({ open, onOpenChange, children }: any) {
               <span>试试搜:</span>
               <div className="flex gap-2 flex-wrap justify-center">
                 {HOT_TERMS.map((t) => (
-                  <button key={t} onClick={() => setQuery(t)} className="px-3 py-1 rounded-full bg-muted hover:bg-muted/70 text-xs">
+                  // 用 Button 而非裸 button(CLAUDE.md 设计系统纪律 + eslint no-restricted-syntax)
+                  <Button key={t} variant="secondary" size="sm" onClick={() => setQuery(t)} className="h-7 px-3 rounded-full text-xs">
                     {t}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -2007,7 +2009,7 @@ describe("submitDocFeedback", () => {
 ```tsx
 "use client";
 import { useState, useTransition } from "react";
-import { submitDocFeedback } from "@/lib/help/feedback";
+import { submitDocFeedback } from "@/app/actions/help-feedback";   // 与 Task 8.2 Step 1 的 server action 路径保持一致
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
