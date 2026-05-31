@@ -2,6 +2,8 @@
   "categories": [
     { "id": "workflow", "name": "工作流" },
     { "id": "employee", "name": "AI 员工" },
+    { "id": "creation", "name": "创作生产" },
+    { "id": "data-collection", "name": "数据采集" },
     { "id": "billing", "name": "账户与权限" }
   ],
   "items": [
@@ -23,10 +25,29 @@
       "updatedAt": "2026-05-31"
     },
     {
+      "id": "wf-003",
+      "category": "workflow",
+      "question": "工作流执行很慢怎么排查?",
+      "answer": "先在 mission 详情页打开 **执行时间线**,定位耗时最长的 step。常见原因包括:\n\n1. **LLM 节点**遇到长正文,可尝试拆分 prompt 或降低 `maxOutputTokens`\n2. **采集节点**等待外部接口,看是否命中限流\n3. **依赖关系**串行过深,可在编辑器里把无依赖的 step 改成并行\n\n若整体卡住 > 5 分钟,系统会自动判定为 stuck 并触发清理。",
+      "relatedDocs": ["/help/workflows/mission-monitoring", "/help/workflows/common-failures"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "wf-004",
+      "category": "workflow",
+      "question": "定时任务最短可以多久跑一次?",
+      "answer": "为了避免误配置导致的高频空跑,系统**强制最短周期 60 秒**。\n\n推荐写法:每天定点用 `0 8 * * *`(每天 08:00),每小时跑一次用 `0 * * * *`。可在编辑器里实时看 cron 解析后的 **下次执行时间**,确认无误再保存。",
+      "relatedDocs": ["/help/workflows/scheduling"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
       "id": "emp-001",
       "category": "employee",
       "question": "AI 员工的技能是怎么管理的?",
-      "answer": "每个 AI 员工可以绑定多个技能(skill),通过 `/skills` 页面管理。技能本质是封装的 prompt + 工具调用模板,员工通过技能完成具体任务。",
+      "answer": "每个 AI 员工可以绑定多个技能(skill),通过 `/skills` 页面管理。技能本质是封装的 prompt + 工具调用模板,员工通过技能完成具体任务。\n\n员工执行任务时,系统会按 **熟练度(proficiency)** 排序备选技能,完成后还会自动回写经验值。",
+      "relatedDocs": ["/help/ai-employees/skills", "/help/ai-employees/proficiency-and-stats"],
       "popular": true,
       "updatedAt": "2026-05-31"
     },
@@ -34,15 +55,127 @@
       "id": "emp-002",
       "category": "employee",
       "question": "员工记忆机制如何工作?",
-      "answer": "员工在对话/任务执行中会自动生成\"记忆\"条目(类似经验总结),后续相似任务会自动调用 top-10 最相关记忆作为上下文,实现\"越用越聪明\"。",
+      "answer": "员工在对话 / 任务执行中会自动生成 **记忆** 条目(类似经验总结),后续相似任务会自动调用 top-10 最相关记忆作为上下文,实现 \"越用越聪明\"。\n\n你也可以在员工详情页手动添加 / 编辑 / 删除记忆,让员工快速对齐新规范。",
+      "relatedDocs": ["/help/ai-employees/memories"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "emp-003",
+      "category": "employee",
+      "question": "8 个 AI 员工分别擅长什么?",
+      "answer": "默认 8 位 AI 员工各自有清晰职责:\n\n- **小雷**:统筹 / 任务派单 (Leader)\n- **小策**:策划 / 选题\n- **小子**:文字创作\n- **小文**:文案润色\n- **小剪**:视频剪辑 / 短视频生产\n- **小审**:质量审核 / 合规\n- **小发**:全渠道发布\n- **小数**:数据分析 / 报告\n\n详细职责与擅长场景见员工花名册。",
+      "relatedDocs": ["/help/ai-employees/employee-roster"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "emp-004",
+      "category": "employee",
+      "question": "怎么把知识库绑定给某个员工?",
+      "answer": "进入 `/knowledge-bases` 选择一个知识库 → **绑定员工** tab → 勾选要使用的 AI 员工 → 保存。\n\n绑定后,员工在执行任务时会自动注入 `kb_search` 工具,优先从你的知识库检索答案。注意:知识库需先完成向量化(状态 `done`)才能被检索。",
+      "relatedDocs": ["/help/ai-employees/knowledge-bindings", "/help/media-assets/knowledge-base"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "cre-001",
+      "category": "creation",
+      "question": "热点发现的数据从哪里来?",
+      "answer": "热点发现聚合多个来源:\n\n- **热榜接口**:接入了微博 / 知乎 / 抖音 / 头条等主流热榜\n- **联网搜索**:博查 (国内主通道) / Tavily (海外通道)\n- **自定义源**:可在 `/data-collection` 里加站点 RSS / 爬虫脚本\n\n每个 topic 会带来源标签,方便你溯源。",
+      "relatedDocs": ["/help/creation/inspiration", "/help/data-collection/source-config"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "cre-002",
+      "category": "creation",
+      "question": "漏题筛查怎么用?",
+      "answer": "漏题筛查会把你的稿件库与对标媒体(同题对比里设置的友媒)做交叉比对,标出 **同行报了但你没报** 的话题。\n\n打开 `/creation/missing-topic`,选时间窗口(默认近 7 天)与对标媒体,系统会列出漏题清单,每条可一键发起 \"补稿\" 工作流。",
+      "relatedDocs": ["/help/creation/missing-topic", "/help/creation/topic-compare"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "cre-003",
+      "category": "creation",
+      "question": "超级创作和普通写稿有什么区别?",
+      "answer": "**普通写稿**:单一员工跑一次 prompt,生成一篇稿子。\n\n**超级创作**:多员工协作的工作流——小策出选题大纲 → 小子写正文 → 小文润色 → 小审做合规 → 小数加数据要点。整个过程透明可追溯,中间稿件可被你随时介入修改。",
+      "relatedDocs": ["/help/creation/super-creation"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "cre-004",
+      "category": "creation",
+      "question": "短视频工厂支持哪些格式输出?",
+      "answer": "短视频工厂当前支持:\n\n- **横屏 16:9**:适配视频号 / B 站 / 抖音横版\n- **竖屏 9:16**:适配抖音 / 快手 / 视频号竖版\n- **方屏 1:1**:适配微博 / 小红书 feed\n\n所有视频默认 1080p、MP4 容器、H.264 编码。导出时可批量生成多比例版本。",
+      "relatedDocs": ["/help/creation/video-factory"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "dc-001",
+      "category": "data-collection",
+      "question": "采集失败的常见原因有哪些?",
+      "answer": "TOP 5 失败原因:\n\n1. **源站反爬升级**:UA / Cookie 失效,需在 `/data-collection/source-config` 更新\n2. **限流**:相同 IP 触发频控,可在采集源配置里加 `延迟 / 并发` 限制\n3. **接口下线**:第三方接口路径变更,系统会标红\n4. **环境变量缺失**:`BOCHA_API_KEY` / `JINA_API_KEY` 未配置\n5. **正文解析失败**:页面结构异常,可手动切换到 Jina Reader 二次抓取",
+      "relatedDocs": ["/help/data-collection/source-config", "/help/data-collection/monitoring-panel"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "dc-002",
+      "category": "data-collection",
+      "question": "主题监测和热点发现有什么区别?",
+      "answer": "**热点发现**:被动聚合全网热榜,看 \"现在大家在聊什么\"。\n\n**主题监测**:主动盯一个或多个关键词 / 实体,7×24h 跑爬虫,一有新内容就入库并打标签。适合舆情跟踪、长期选题积累。\n\n两者数据可串联——热点发现命中的话题可直接 \"加入主题监测\" 长期追踪。",
+      "relatedDocs": ["/help/data-collection/topic-monitoring", "/help/creation/inspiration"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "dc-003",
+      "category": "data-collection",
+      "question": "研究报告是自动生成的吗?",
+      "answer": "对。在 `/data-collection/research-report` 选时间窗口 + 主题 + 输出模板,系统会调用 LLM 把这段时间的采集数据汇总成结构化报告(摘要、数据趋势、典型样本、结论建议),支持导出 Word / PDF。\n\n一次生成约耗 30-90 秒,期间页面会显示进度条。",
+      "relatedDocs": ["/help/data-collection/research-report"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "dc-004",
+      "category": "data-collection",
+      "question": "内容池里数据保存多久?",
+      "answer": "默认保留 **180 天**,过期自动归档。如需更长保留期(如做长期研究),可在 `/data-collection/content-pool` 把单条 \"加星标\",星标内容**永不过期**。\n\n也可以批量导出 CSV / Excel,落本地存档。",
+      "relatedDocs": ["/help/data-collection/content-pool"],
+      "popular": true,
       "updatedAt": "2026-05-31"
     },
     {
       "id": "bill-001",
       "category": "billing",
       "question": "我可以邀请其他成员到组织吗?",
-      "answer": "可以。前提是你的角色有\"用户管理\"权限。前往\"系统管理 → 用户管理\"页面,点击\"邀请成员\"即可。",
+      "answer": "可以。前提是你的角色有 **用户管理** 权限。前往 **系统管理 → 用户管理** 页面,点击 **邀请成员** 即可。",
       "relatedDocs": ["/help/admin/users-roles"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "bill-002",
+      "category": "billing",
+      "question": "删除用户后,他名下的任务怎么办?",
+      "answer": "删除用户**不会**自动删除他名下的稿件 / mission / 采集源。这些数据会保留,创建者字段标记为 \"已删除用户\"。\n\n如果你需要转移给其他人,推荐先在用户列表里点 **转移资产**,选择接收人后再删除账号。",
+      "relatedDocs": ["/help/admin/users-roles"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "bill-003",
+      "category": "billing",
+      "question": "怎么导出操作审计日志?",
+      "answer": "进入 **系统管理 → 组织设置 → 审计日志** tab,选择时间窗口与操作类型(登录 / 任务启动 / 数据变更等),点 **导出 CSV** 即可。\n\n日志保留 90 天,如需更长保留期可在组织高级设置里调整(需超级管理员权限)。",
+      "relatedDocs": ["/help/admin/organizations"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "bill-004",
+      "category": "billing",
+      "question": "忘记密码了怎么办?",
+      "answer": "目前 Vibe Media 未开放自助找回密码 / 邮件验证流程,需联系组织管理员重置:\n\n1. 管理员进入 **系统管理 → 用户管理**\n2. 找到你的账号,点击 **重置密码**\n3. 设置新密码并下发给你\n\n首次登录后建议立即在 **个人设置** 里改成自己的密码。",
+      "relatedDocs": ["/help/getting-started/login-register", "/help/admin/users-roles"],
+      "popular": true,
       "updatedAt": "2026-05-31"
     }
   ]

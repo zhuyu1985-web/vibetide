@@ -1,0 +1,19 @@
+{
+  "title": "工作流与任务",
+  "description": "用模板编排多步任务、启动 mission、配置定时调度,并监控失败重试。",
+  "icon": "Workflow",
+  "groups": [
+    {
+      "title": "入门",
+      "docs": ["start-first-workflow", "concepts"]
+    },
+    {
+      "title": "编排与运行",
+      "docs": ["template-editor", "node-config", "scheduling"]
+    },
+    {
+      "title": "监控与排错",
+      "docs": ["mission-monitoring", "retry-state-machine", "common-failures"]
+    }
+  ]
+}

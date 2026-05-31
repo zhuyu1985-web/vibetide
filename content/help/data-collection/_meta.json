@@ -1,0 +1,19 @@
+{
+  "title": "数据采集",
+  "description": "配置统一采集源、管理内容池、跟踪主题监测、生成研究报告并查看监控面板。",
+  "icon": "Database",
+  "groups": [
+    {
+      "title": "采集配置",
+      "docs": ["source-config", "collection-hub"]
+    },
+    {
+      "title": "数据消费",
+      "docs": ["content-pool", "topic-monitoring"]
+    },
+    {
+      "title": "分析与监控",
+      "docs": ["research-report", "monitoring-panel"]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+---
+title: AI 员工系统介绍
+description: 解释什么是 AI 员工、它和"聊天机器人"的区别、以及 Vibe Media 为什么做 8 个有人设的虚拟同事。
+category: ai-employees
+publishedAt: "2026-05-31"
+---
+
+AI 员工是 Vibe Media 的灵魂。本页解释什么是 AI 员工、它和市面上常见的"聊天机器人"有什么本质区别,以及我们为什么坚持做 8 个**有人设、有专长**的虚拟同事而不是一个"无所不能的 ChatGPT"。
+
+## 不只是对话框背后的 LLM
+
+很多产品所谓的"AI 助手"本质是**对话框 + LLM**:你打字,它回答。Vibe Media 的 AI 员工有几个本质差异:
+
+- **持久身份**:每个员工有名字、头像、性格、专长,而不是一个匿名 chat
+- **可绑定技能**:员工只会做他擅长的事,不是无所不能的通才
+- **有记忆**:每次执行后会沉淀经验,下次相似任务自动调用,**越用越聪明**
+- **可外挂知识库**:把团队规范、品牌话术、历史资料绑给他,执行任务时自动检索
+- **能加入工作流**:多个员工可以协作完成一个 mission,不是单点对话
+
+## 为什么是 8 个
+
+8 位常驻员工对应媒体内容生产的 8 个关键环节:
+
+<EmployeeBadge id="xiaolei" />
+
+<EmployeeBadge id="xiaoce" />
+
+<EmployeeBadge id="xiaozi" />
+
+<EmployeeBadge id="xiaowen" />
+
+<EmployeeBadge id="xiaojian" />
+
+<EmployeeBadge id="xiaoshen" />
+
+<EmployeeBadge id="xiaofa" />
+
+<EmployeeBadge id="xiaoshu" />
+
+完整职责矩阵在 <DocLink href="/help/ai-employees/employee-roster">8 位 AI 员工花名册</DocLink>。
+
+## 提示词层级
+
+每个员工执行任务时,系统都会**自动**为他组装一份 7 层结构的系统提示词:
+
+<Steps>
+1. **身份**:你是谁、性格如何
+2. **技能 + 熟练度**:你会哪些技能、各自练到什么程度
+3. **权限**:能调用哪些工具、不能碰什么
+4. **敏感主题**:哪些话题需要避让 / 慎报
+5. **知识库**:绑定的外挂资料
+6. **记忆**:top-10 最相关的历史经验
+7. **输出格式 + 质量自评**:固定输出 schema、自检维度
+</Steps>
+
+<Callout type="tip" title="为什么这么做">
+分层提示词让员工的行为可预测、可调试。你改一层,只影响那一层的行为,不会因为一句新加的话导致整体跑偏。
+</Callout>
+
+下一步建议读 <DocLink href="/help/ai-employees/skills">技能管理</DocLink>。

@@ -1,0 +1,19 @@
+{
+  "title": "创作生产",
+  "description": "从热点发现到同题对比、漏题筛查、超级创作与短视频工厂的完整内容生产链路。",
+  "icon": "PenLine",
+  "groups": [
+    {
+      "title": "选题发现",
+      "docs": ["inspiration", "topic-compare", "missing-topic"]
+    },
+    {
+      "title": "稿件生产",
+      "docs": ["super-creation", "production-templates"]
+    },
+    {
+      "title": "视频生产",
+      "docs": ["video-factory"]
+    }
+  ]
+}

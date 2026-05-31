@@ -1,0 +1,15 @@
+{
+  "title": "系统管理",
+  "description": "管理组织 / 用户 / 角色权限、定时任务、API 凭证与 CMS 配置。",
+  "icon": "Settings",
+  "groups": [
+    {
+      "title": "组织与权限",
+      "docs": ["organizations", "users-roles"]
+    },
+    {
+      "title": "运维配置",
+      "docs": ["scheduled-jobs", "api-credentials", "cms-config"]
+    }
+  ]
+}

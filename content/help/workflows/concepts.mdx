@@ -1,0 +1,64 @@
+---
+title: 工作流概念
+description: 解释 workflow / template / mission / step / artifact 五个核心概念,以及它们的依赖关系。
+category: workflows
+publishedAt: "2026-05-31"
+---
+
+理解工作流的概念模型是用好 Vibe Media 的关键。本页用一张图 + 五个术语解释清楚 workflow / template / mission / step / artifact 的关系,以及为什么平台采用 DAG(有向无环图)结构而不是简单的线性流水线。
+
+## 模板 vs 任务
+
+这是新人最容易混淆的两个概念:
+
+| 维度 | 工作流模板(template) | 任务(mission) |
+|---|---|---|
+| 本质 | 可复用定义 | 模板的一次具体执行 |
+| 类比 | 类(class) | 实例(instance) |
+| 数量 | 1 个 | N 个 |
+| 数据库表 | `workflow_templates` | `missions` |
+| 改了之后 | 不影响已跑过的 mission | 只影响这一次执行 |
+
+一个模板可以被启动任意多次,每次产出一个独立 mission。同一个团队改模板不会污染历史 mission 的执行结果。
+
+## DAG 不是线性流水线
+
+很多人第一次见工作流编辑器以为它是"step 1 → step 2 → step 3"的线性流。其实平台用的是 **DAG(有向无环图)**,也就是说:
+
+- **多个 step 可以并行**(没有依赖关系的话)
+- **一个 step 可以依赖多个上游**(等多个上游都完成才能跑)
+- **不能形成环**(避免死循环)
+
+<Callout type="tip" title="并行的好处">
+比如"深度报道"工作流的第二阶段:小策出大纲后,可以让小子、小文、小数**同时**跑(分别准备素材 / 写正文 / 整理数据),不必串行等。这能把整体耗时压缩 30-50%。
+</Callout>
+
+## Step 与 Artifact
+
+每一步骤(step)有 3 个核心字段:
+
+- **执行员工**:哪个 AI 员工跑这一步
+- **调用技能**:用什么技能
+- **输入映射**:从上游 step 拿哪些字段做输入
+
+step 跑完后产出 **artifact**(产物),写入 `workflow_artifacts` 表。下游 step 通过参数映射拿到上游 artifact 的字段。这种"artifact-passing"模式让每一步的输出都**可追溯、可重放**。
+
+## 状态机
+
+mission / step 各自有自己的状态机:
+
+```
+mission: pending → running → succeeded / failed / cancelled
+step:    pending → running → succeeded / failed / skipped
+```
+
+如果某个 step 失败:
+- 该 step 状态变 `failed`
+- 所有**依赖它**的下游 step 状态变 `skipped`
+- mission 整体状态变 `failed`
+- **不会自动回滚**已经成功的 step
+- 你可以手动 **重试**,系统从失败 step 继续(成功的 step 不重跑)
+
+## 接下来
+
+熟悉概念后建议跑一遍 <DocLink href="/help/workflows/start-first-workflow">第一个工作流</DocLink>;想让它定时跑,看 <DocLink href="/help/workflows/scheduling">定时任务配置</DocLink>。

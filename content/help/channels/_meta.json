@@ -1,0 +1,15 @@
+{
+  "title": "渠道与发布",
+  "description": "配置频道顾问、把稿件全渠道发布,并打通 CMS 映射与审核流程。",
+  "icon": "Radio",
+  "groups": [
+    {
+      "title": "渠道运营",
+      "docs": ["channel-advisor", "publishing"]
+    },
+    {
+      "title": "CMS 与审核",
+      "docs": ["cms-mapping", "audit-process"]
+    }
+  ]
+}

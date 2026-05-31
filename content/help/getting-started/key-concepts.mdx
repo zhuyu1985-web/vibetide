@@ -1,0 +1,42 @@
+---
+title: 核心概念速查
+description: 8 个最常用术语的一句话定义——员工、技能、知识库、记忆、场景、模板、任务、产物。
+category: getting-started
+publishedAt: "2026-05-31"
+---
+
+熟悉 Vibe Media 的核心概念是高效使用平台的前提。本页用"一句话定义 + 一个例子"的方式快速过 8 个最常用术语,后面所有文档都会反复出现这些词。
+
+## 概念清单
+
+| 术语 | 一句话定义 | 数据库表 |
+|---|---|---|
+| **AI 员工(employee)** | 有人设、有职责的 LLM 智能体 | `ai_employees` |
+| **技能(skill)** | 员工可调用的能力封装(prompt + 工具) | `skills` |
+| **知识库(knowledge base)** | 员工可检索的外挂资料,RAG 用 | `knowledge_bases` |
+| **记忆(memory)** | 员工执行后沉淀的经验,自动调用 | `employee_memories` |
+| **场景(scenario)** | 一类业务的固定打法,等于工作流模板 | `workflow_templates` |
+| **工作流(workflow)** | 多个步骤串联的执行流,DAG 结构 | `workflow_templates` |
+| **任务(mission)** | 工作流的一次具体执行 | `missions` |
+| **产物(artifact)** | 任务的输出物——稿件 / 视频 / 报告 | `workflow_artifacts` |
+
+## 它们怎么串起来
+
+<Callout type="info" title="从下到上的依赖链">
+**员工**绑定**技能**和**知识库**;某个**场景**(也叫**工作流模板**)规定哪些步骤要哪些员工跑什么技能;启动后变成一个**任务(mission)**,沿着 DAG 推进,产出**产物**写入对应业务表。
+</Callout>
+
+## 一个例子
+
+假设我们要跑"每日早报"场景:
+
+<Steps>
+1. **场景**是"每日早报"(workflow_template)
+2. **工作流**定义了 3 步:抓热点 → 选 5 条改写 → 排版生成稿件
+3. 启动后变成一个 **mission**(`mission_id = uuid-xxx`)
+4. 第 1 步交给小雷,调用"热点聚合"**技能**,沉淀"今天哪类话题最热"到他的**记忆**
+5. 第 2 步交给小子,调用"短稿改写"技能,从素材**知识库**取背景资料
+6. 第 3 步交给小文,调用"排版生成"技能,最终**产物**是 5 条早报稿件
+</Steps>
+
+理解了这一串,再看后续具体文档就不再眼花了。建议接下来读 <DocLink href="/help/workflows/concepts">工作流概念</DocLink>。

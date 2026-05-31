@@ -1,0 +1,19 @@
+{
+  "title": "媒资与内容",
+  "description": "管理智能媒资库、稿件、知识库、案例库,并启用基于内容的智能推荐。",
+  "icon": "FolderOpen",
+  "groups": [
+    {
+      "title": "媒资与稿件",
+      "docs": ["asset-intelligence", "article-management"]
+    },
+    {
+      "title": "知识沉淀",
+      "docs": ["knowledge-base", "case-library"]
+    },
+    {
+      "title": "智能能力",
+      "docs": ["smart-recommendation"]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "title": "AI 员工",
+  "description": "了解 8 位 AI 员工的能力、给他们配技能 / 知识库 / 记忆,以及创建自定义员工。",
+  "icon": "Bot",
+  "groups": [
+    {
+      "title": "团队总览",
+      "docs": ["intro", "employee-roster"]
+    },
+    {
+      "title": "能力配置",
+      "docs": ["skills", "knowledge-bindings", "memories"]
+    },
+    {
+      "title": "进阶",
+      "docs": ["custom-employee", "proficiency-and-stats"]
+    }
+  ]
+}

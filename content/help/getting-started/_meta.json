@@ -1,0 +1,19 @@
+{
+  "title": "快速开始",
+  "description": "认识 Vibe Media、完成注册登录,并在第一周内跑通从热点到发布的核心链路。",
+  "icon": "Rocket",
+  "groups": [
+    {
+      "title": "认识平台",
+      "docs": ["overview", "home-tour"]
+    },
+    {
+      "title": "账户与登录",
+      "docs": ["login-register"]
+    },
+    {
+      "title": "上手指南",
+      "docs": ["first-week-guide", "key-concepts"]
+    }
+  ]
+}
