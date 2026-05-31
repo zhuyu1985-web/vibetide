@@ -450,6 +450,22 @@ Top-level module at `/knowledge-bases` for managing AI employee knowledge bases 
 - **Retrieval:** `src/lib/knowledge/retrieval.ts` — application-layer cosine similarity over jsonb-stored vectors. V1 keeps jsonb (no pgvector); upgrade path documented when chunk count exceeds ~10k.
 - **Agent integration:** `kb_search` tool in `tool-registry.ts` (`createKnowledgeBaseTools`). Auto-injected at execution time when employee has KB bindings (see `assembly.ts` and `execution.ts`). Filters by employee's bound KBs and skips KBs with `vectorization_status != 'done'`.
 
+### Help Center Module
+
+公开访问的产品帮助中心,挂在独立路由段 `src/app/help/`(不在 `(dashboard)` / `(auth)` 下),包括首页、分类页、详情页、FAQ、更新日志、搜索结果页;dashboard 内左下角浮动「小帮」AI 员工入口(`<HelpLauncher />`)。详见 `docs/superpowers/specs/2026-05-31-help-center-design.md` + `docs/superpowers/plans/2026-05-31-help-center-plan.md`。
+
+- **Routes:** `src/app/help/` —— 独立 layout(不套 dashboard sidebar/topbar);6 个页面:`page.tsx`(首页)/ `[category]/page.tsx`(分类索引)/ `[category]/[slug]/page.tsx`(详情)/ `faq/page.tsx` / `changelog/page.tsx` / `search/page.tsx`;`not-found.tsx` 专属 404
+- **内容仓:** `content/help/` 走 MDX:`<category>/_meta.json` 描述分类元数据(title/icon/groups),`<category>/<slug>.mdx` 是文档正文,`faq.json` 是 FAQ 扁平 Q&A,`changelog/YYYY-MM.mdx` 是月度更新日志。**frontmatter 日期字段必须加引号** (`publishedAt: "2026-05-31"`),否则 gray-matter YAML 默认解析成 JS Date 对象,zod string regex 拒绝
+- **数据层:** `src/lib/help/` —— `types.ts`(`HelpFrontmatterSchema` / `HelpCategoryMetaSchema` zod)/ `content.ts`(5 个 cached loader:listAllDocs / listDocsByCategory / getCategoryMeta / getDocBySlug / listPopularDocs;`HELP_CONTENT_ROOT` env 可切换便于测试)/ `toc.ts`(remarkExtractToc plugin,用 `github-slugger` 与 rehype-slug 算法一致)/ `faq.ts` / `changelog.ts` / `search-client.ts`(客户端 pagefind) / `changelog-meta.ts`(构建期 auto-generated,LATEST_CHANGELOG_AT 时间戳)
+- **MDX 引擎:** `next-mdx-remote-client/rsc` 在 RSC 渲染期编译,`/help/**` 全部 `force-static`;`@shikijs/rehype` + `transformerNotationDiff` 构建期高亮(`// [!code ++]` 支持);`rehype-slug` + `rehype-autolink-headings` 给 H2/H3 加 id 与锚点;TOC 抽取**独立**于正文渲染(`getDocBySlug` 单跑一次 remark pipeline 把 vfile.data.toc 取出来,因 `<MDXRemote>` 不透传 vfile.data)
+- **8 个自定义 MDX 组件:** `src/components/help/mdx/` —— Callout(tip/warn/note/info 4 色)/ Steps / ScreenshotZoom(Dialog 全屏)/ VideoEmbed / EmployeeBadge(接 `EMPLOYEE_META` 渲染 SVG 头像)/ KeyboardKey / DocLink(构建期 verify)/ Tabs(包 `@/components/ui/tabs`,别名 MdxTabs)。`index.tsx` 统一导出 `mdxComponents`,含标准元素重写(`<a>` 内链 `startsWith("/") && !startsWith("//")` 排除 protocol-relative)
+- **搜索:** Pagefind v1,`scripts/build-help-search.ts` 是 `postbuild` 钩子(`pnpm run build` 串 `next build && tsx ...`)扫 `.next/server/app/help/**/*.html` 产出 `public/pagefind/*` 索引;`forceLanguage:"zh-cn"`,`excludeSelectors:["pre"]` 不索引代码块。客户端 `searchHelp(q)` 走 `import("/pagefind/pagefind.js")` 延迟加载 wasm(~200KB)。两个交互入口:顶栏 Cmd+K SearchDialog(`h-[400px]` 固定高度防抖)+ `/help/search?q=` 全量结果页
+- **HelpLauncher 5 态:** `src/components/help/launcher/help-launcher.tsx` + `xiaobang-avatar.tsx` —— idle(眨眼 + 问号灯泡 float)/ hover(framer-motion spring scale+rotate + 气泡)/ active(scale 0.92 → 跳 /help)/ wave(idle 30s 无活动 + 同 session ≤ 3 次 + 相邻 ≥ 5min,挥手 1.2s + 气泡)/ first-tip(localStorage 防重,首次 5s 弹气泡)。`?` Shift+/ 全局快捷键(屏蔽 input/textarea/contenteditable/`[data-help-shortcut-ignore]`)。红点 badge:`LATEST_CHANGELOG_AT > localStorage.help-changelog-last-seen` 时显示。**CSS 类用 `avatar-anim-hand-wave`,不要 `avatar-anim-wave`**(后者已被 XiaofaAvatar 雷达波占用)。`/help/*` 内自动 `return null`
+- **反馈表:** `help_feedback` 表(Drizzle schema `src/db/schema/help-feedback.ts`,7 字段 + 2 index),server action `src/app/actions/help-feedback.ts`(第一行必须 `"use server"`)。落表 + IP sha256 hash + `count() ... INTERVAL '1 minute' > HELP_FEEDBACK_RATE_LIMIT (env 默认 10)` 静默假成功防滥用。**MVP 不暴露读接口**,运营走 Drizzle Studio
+- **proxy 放行:** `src/proxy.ts:8` `isPublic()` 含 `pathname.startsWith("/help")`,未登录可访问全部 `/help/*`
+- **构建管道:** `package.json` scripts —— `predev` / `prebuild` 跑 `build-help-meta` 生成 changelog-meta.ts;`build` 串 `verify-help-links → next build → build-help-search`,任何一步失败构建挂
+- **文档维护流程:** 写新 mdx → 改/加 `_meta.json` 把 slug 列入 groups → 跑 `pnpm exec tsx scripts/verify-help-links.ts` 校验 DocLink 完整 → `pnpm run build` 全过 → commit。FAQ 直接改 `content/help/faq.json`(无 build 校验,但 relatedDocs 要与真实 slug 对齐)
+
 ## AI SDK Notes
 
 This project uses **AI SDK (Vercel) v6**. Key API differences from older versions:
