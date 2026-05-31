@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { ChatLauncher } from "@/components/shared/chat-launcher";
+import { HelpLauncher } from "@/components/help/launcher/help-launcher";
 import { cn } from "@/lib/utils";
 
 interface DashboardShellProps {
@@ -75,6 +76,7 @@ export function DashboardShell({
       </div>
 
       <ChatLauncher />
+      <HelpLauncher />
     </div>
   );
 }
