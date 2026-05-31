@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { submitDocFeedback } from "@/app/actions/help-feedback";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -8,15 +9,29 @@ interface DocFeedbackProps {
   docPath: string;
 }
 
-export function DocFeedback({ docPath: _docPath }: DocFeedbackProps) {
+export function DocFeedback({ docPath }: DocFeedbackProps) {
   const [vote, setVote] = useState<"up" | "down" | null>(null);
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  // Phase 8.2 才调 server action;现阶段只本地 setState 模拟交互
-  const submitVote = (v: "up" | "down") => setVote(v);
+  const submitVote = (helpful: boolean) => {
+    setVote(helpful ? "up" : "down");
+    startTransition(async () => {
+      await submitDocFeedback({ docPath, helpful });
+    });
+  };
+
   const submitComment = () => {
-    if (comment.trim()) setSubmitted(true);
+    if (!comment.trim() || !vote) return;
+    startTransition(async () => {
+      await submitDocFeedback({
+        docPath,
+        helpful: vote === "up",
+        comment,
+      });
+      setSubmitted(true);
+    });
   };
 
   if (submitted) {
@@ -34,14 +49,16 @@ export function DocFeedback({ docPath: _docPath }: DocFeedbackProps) {
         <Button
           variant={vote === "up" ? "default" : "ghost"}
           size="sm"
-          onClick={() => submitVote("up")}
+          onClick={() => submitVote(true)}
+          disabled={isPending}
         >
           👍 有帮助
         </Button>
         <Button
           variant={vote === "down" ? "default" : "ghost"}
           size="sm"
-          onClick={() => submitVote("down")}
+          onClick={() => submitVote(false)}
+          disabled={isPending}
         >
           👎 没帮助
         </Button>
@@ -54,7 +71,11 @@ export function DocFeedback({ docPath: _docPath }: DocFeedbackProps) {
             placeholder="怎么改进?(可选,最多 500 字)"
             maxLength={500}
           />
-          <Button size="sm" onClick={submitComment} disabled={!comment.trim()}>
+          <Button
+            size="sm"
+            onClick={submitComment}
+            disabled={isPending || !comment.trim()}
+          >
             提交评论
           </Button>
         </div>

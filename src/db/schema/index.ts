@@ -97,6 +97,9 @@ export * from "./account-analytics";
 
 // Scheduled Jobs (定时任务配置中心, 2026-05-26) — 替代各 Inngest 函数硬编码 cron
 export * from "./scheduled-jobs";
+
+// Help Center 文档反馈 (2026-05-31, Phase 8) — /help MDX 页面底部 DocFeedback 落库
+export * from "./help-feedback";
 // app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
