@@ -1003,8 +1003,9 @@ function isPublic(pathname: string): boolean {
 // dependencies
 "next-mdx-remote-client": "^1.x",
 "reading-time": "^1.x",
-"@sindresorhus/slugify": "^2.x",
+"github-slugger": "^2.x",                          // 与 rehype-slug 同一算法,保证 TOC id 与 DOM id 一致
 "@shikijs/rehype": "^1.x",
+"@shikijs/transformers": "^1.x",
 "remark-gfm": "^4.x",
 "rehype-slug": "^6.x",
 "rehype-autolink-headings": "^7.x",
