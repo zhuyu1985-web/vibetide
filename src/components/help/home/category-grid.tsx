@@ -26,7 +26,7 @@ export function CategoryGrid({ summaries }: CategoryGridProps) {
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
                     {meta.description}
                   </p>
-                  <p className="mt-2 text-[11px] text-muted-foreground/80">
+                  <p className="mt-2 text-[11px] text-muted-foreground">
                     {docCount} 篇文档
                   </p>
                 </div>

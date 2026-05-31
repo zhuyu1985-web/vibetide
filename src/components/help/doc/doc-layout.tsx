@@ -54,7 +54,7 @@ export function DocLayout({ category, meta, doc, children }: DocLayoutProps) {
           <p className="mt-3 text-sm text-muted-foreground">
             {doc.frontmatter.description}
           </p>
-          <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground/80">
+          <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Clock size={12} />
               {doc.readingTime}

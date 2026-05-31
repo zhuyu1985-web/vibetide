@@ -37,7 +37,7 @@ export function HelpHeader() {
             >
               <Search size={14} />
               <span className="flex-1 text-left text-[13px]">搜索文档…</span>
-              <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-background/60">⌘K</kbd>
+              <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-background text-foreground">⌘K</kbd>
             </Button>
           </div>
           <Button asChild variant="ghost" size="sm">

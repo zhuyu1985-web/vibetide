@@ -16,7 +16,8 @@ const VARIANTS: Record<
     icon: typeof Lightbulb;
     bar: string;
     bg: string;
-    iconColor: string;
+    iconColor: string;     // icon 显示色(浅 vs 深)
+    titleColor: string;    // 标题文字色 — 需满足 4.5:1 对比度 (小字)
     label: string;
   }
 > = {
@@ -25,6 +26,7 @@ const VARIANTS: Record<
     bar: "border-l-sky-500",
     bg: "bg-sky-50 dark:bg-sky-950/40",
     iconColor: "text-sky-600 dark:text-sky-400",
+    titleColor: "text-sky-800 dark:text-sky-200",
     label: "提示",
   },
   warn: {
@@ -32,6 +34,7 @@ const VARIANTS: Record<
     bar: "border-l-amber-500",
     bg: "bg-amber-50 dark:bg-amber-950/40",
     iconColor: "text-amber-600 dark:text-amber-400",
+    titleColor: "text-amber-800 dark:text-amber-200",
     label: "注意",
   },
   note: {
@@ -39,6 +42,7 @@ const VARIANTS: Record<
     bar: "border-l-slate-500",
     bg: "bg-slate-50 dark:bg-slate-900/60",
     iconColor: "text-slate-600 dark:text-slate-300",
+    titleColor: "text-slate-800 dark:text-slate-100",
     label: "备注",
   },
   info: {
@@ -46,6 +50,7 @@ const VARIANTS: Record<
     bar: "border-l-violet-500",
     bg: "bg-violet-50 dark:bg-violet-950/40",
     iconColor: "text-violet-600 dark:text-violet-400",
+    titleColor: "text-violet-800 dark:text-violet-200",
     label: "说明",
   },
 };
@@ -70,7 +75,7 @@ export function Callout({ type = "note", title, children }: CalloutProps) {
         <div
           className={cn(
             "mb-0.5 text-xs font-semibold",
-            variant.iconColor,
+            variant.titleColor,
           )}
         >
           {title ?? variant.label}

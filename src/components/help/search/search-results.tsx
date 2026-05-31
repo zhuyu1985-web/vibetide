@@ -72,7 +72,7 @@ export function SearchResults({ initialQuery }: { initialQuery: string }) {
                     className="mt-2 text-xs text-muted-foreground line-clamp-2 [&>mark]:bg-amber-200/50 [&>mark]:text-foreground [&>mark]:px-0.5 [&>mark]:rounded"
                     dangerouslySetInnerHTML={{ __html: r.excerpt }}
                   />
-                  <div className="mt-2 text-[11px] text-muted-foreground/70">{r.url}</div>
+                  <div className="mt-2 text-[11px] text-muted-foreground">{r.url}</div>
                 </Link>
               </li>
             ))}

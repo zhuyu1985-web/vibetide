@@ -18,7 +18,7 @@ export function CategoryHero({ meta, docCount, lastUpdated }: CategoryHeroProps)
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">{meta.title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{meta.description}</p>
-          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground/80">
+          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <FileText size={12} />
               {docCount} 篇文档

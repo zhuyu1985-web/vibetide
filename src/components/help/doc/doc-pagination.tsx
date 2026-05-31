@@ -33,7 +33,7 @@ export async function DocPagination({ category, meta, currentSlug }: DocPaginati
         >
           <ChevronLeft size={16} className="shrink-0 text-muted-foreground group-hover:text-foreground" />
           <div className="min-w-0">
-            <div className="text-[11px] text-muted-foreground/80">上一篇</div>
+            <div className="text-[11px] text-muted-foreground">上一篇</div>
             <div className="text-sm font-medium text-foreground truncate">
               {titleBySlug.get(prev) ?? prev}
             </div>
@@ -48,7 +48,7 @@ export async function DocPagination({ category, meta, currentSlug }: DocPaginati
           className="flex items-center justify-end gap-3 p-4 rounded-lg bg-muted/30 hover:bg-muted/60 transition-colors group text-right"
         >
           <div className="min-w-0">
-            <div className="text-[11px] text-muted-foreground/80">下一篇</div>
+            <div className="text-[11px] text-muted-foreground">下一篇</div>
             <div className="text-sm font-medium text-foreground truncate">
               {titleBySlug.get(next) ?? next}
             </div>

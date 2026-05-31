@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import Fuse from "fuse.js";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/shared/search-input";
 import type { FaqFile } from "@/lib/help/faq";
 
@@ -49,16 +49,26 @@ export function FaqAccordion({ data }: { data: FaqFile }) {
         onChange={(e) => setQ(e.target.value)}
         className="mb-6"
       />
-      <Tabs value={cat} onValueChange={setCat}>
-        <TabsList variant="line">
-          <TabsTrigger value="all">全部</TabsTrigger>
-          {data.categories.map((c) => (
-            <TabsTrigger key={c.id} value={c.id}>
-              {c.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {/* Filter chips(不是真 tabs — 下面是 accordion 不是不同 panel) */}
+      <div className="flex gap-2 flex-wrap" role="group" aria-label="按分类筛选">
+        <Button
+          variant={cat === "all" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setCat("all")}
+        >
+          全部
+        </Button>
+        {data.categories.map((c) => (
+          <Button
+            key={c.id}
+            variant={cat === c.id ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setCat(c.id)}
+          >
+            {c.name}
+          </Button>
+        ))}
+      </div>
       <Accordion
         type="multiple"
         className="mt-6"

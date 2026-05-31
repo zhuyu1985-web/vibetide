@@ -19,7 +19,7 @@ export async function DocSidebar({ category, meta, currentSlug }: DocSidebarProp
       <p className="px-2 mb-4 text-sm font-semibold text-foreground">{meta.title}</p>
       {meta.groups.map((g) => (
         <div key={g.title} className="mb-4">
-          <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {g.title}
           </p>
           <ul className="space-y-0.5">

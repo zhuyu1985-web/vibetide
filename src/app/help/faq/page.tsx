@@ -12,7 +12,7 @@ export default async function FaqPage() {
       <h1 className="text-3xl font-bold mb-2">常见问题</h1>
       <p className="text-muted-foreground mb-8">
         找不到你要的?试试{" "}
-        <Link href="/help/search" className="text-primary">
+        <Link href="/help/search" className="text-primary underline underline-offset-2">
           全文搜索
         </Link>
         。
