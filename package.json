@@ -139,5 +139,6 @@
       "esbuild",
       "sharp"
     ]
-  }
+  },
+  "packageManager": "pnpm@9.15.0"
 }
