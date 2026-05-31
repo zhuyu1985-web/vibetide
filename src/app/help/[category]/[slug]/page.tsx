@@ -1,7 +1,14 @@
 import { notFound } from "next/navigation";
+import { MDXRemote } from "next-mdx-remote-client/rsc";
+import remarkGfm from "remark-gfm";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypeShiki from "@shikijs/rehype";
+import { transformerNotationDiff } from "@shikijs/transformers";
 import { getDocBySlug, listAllDocs, getCategoryMeta } from "@/lib/help/content";
 import { HELP_CATEGORY_SLUGS, type HelpCategorySlug } from "@/lib/help/types";
 import { DocLayout } from "@/components/help/doc/doc-layout";
+import { mdxComponents } from "@/components/help/mdx";
 
 export const dynamic = "force-static";
 
@@ -43,10 +50,29 @@ export default async function DocPage({
 
   return (
     <DocLayout category={cat} meta={meta} doc={doc}>
-      {/* Phase 5.2 替换为 <MDXRemote source={doc.body} components={mdxComponents} /> */}
-      <pre className="whitespace-pre-wrap text-sm bg-muted/30 p-4 rounded-lg">
-        {doc.body}
-      </pre>
+      <MDXRemote
+        source={doc.body}
+        components={mdxComponents}
+        options={{
+          mdxOptions: {
+            remarkPlugins: [remarkGfm],
+            rehypePlugins: [
+              [
+                rehypeShiki,
+                {
+                  themes: {
+                    light: "github-light",
+                    dark: "github-dark-dimmed",
+                  },
+                  transformers: [transformerNotationDiff()],
+                },
+              ],
+              rehypeSlug,
+              [rehypeAutolinkHeadings, { behavior: "wrap" }],
+            ],
+          },
+        }}
+      />
     </DocLayout>
   );
 }
