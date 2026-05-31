@@ -1,0 +1,49 @@
+{
+  "categories": [
+    { "id": "workflow", "name": "工作流" },
+    { "id": "employee", "name": "AI 员工" },
+    { "id": "billing", "name": "账户与权限" }
+  ],
+  "items": [
+    {
+      "id": "wf-001",
+      "category": "workflow",
+      "question": "工作流跑到一半失败了,数据会回滚吗?",
+      "answer": "默认**不会**自动回滚。失败的 step 状态变为 `failed`,后续依赖步骤变为 `skipped`,你需要在任务详情页手动修复后重试。\n\n重试时会从失败的 step 重新开始,前面已完成的 step 输出会被复用,不会重复执行。",
+      "relatedDocs": ["/help/workflows/retry-state-machine"],
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "wf-002",
+      "category": "workflow",
+      "question": "工作流模板和 mission 是什么关系?",
+      "answer": "**模板**是可复用的工作流定义(类似类),**mission** 是模板的一次具体执行(类似实例)。同一个模板可以被多次启动,每次产出独立的 mission。",
+      "relatedDocs": ["/help/workflows/concepts"],
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "emp-001",
+      "category": "employee",
+      "question": "AI 员工的技能是怎么管理的?",
+      "answer": "每个 AI 员工可以绑定多个技能(skill),通过 `/skills` 页面管理。技能本质是封装的 prompt + 工具调用模板,员工通过技能完成具体任务。",
+      "popular": true,
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "emp-002",
+      "category": "employee",
+      "question": "员工记忆机制如何工作?",
+      "answer": "员工在对话/任务执行中会自动生成\"记忆\"条目(类似经验总结),后续相似任务会自动调用 top-10 最相关记忆作为上下文,实现\"越用越聪明\"。",
+      "updatedAt": "2026-05-31"
+    },
+    {
+      "id": "bill-001",
+      "category": "billing",
+      "question": "我可以邀请其他成员到组织吗?",
+      "answer": "可以。前提是你的角色有\"用户管理\"权限。前往\"系统管理 → 用户管理\"页面,点击\"邀请成员\"即可。",
+      "relatedDocs": ["/help/admin/users-roles"],
+      "updatedAt": "2026-05-31"
+    }
+  ]
+}

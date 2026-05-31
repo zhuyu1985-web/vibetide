@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "tsx scripts/build-help-meta.ts",
     "dev": "next dev -H 0.0.0.0",
+    "prebuild": "tsx scripts/build-help-meta.ts",
     "build": "next build && tsx scripts/build-help-search.ts",
     "build:help-search": "tsx scripts/build-help-search.ts",
     "start": "next start",
