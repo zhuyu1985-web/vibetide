@@ -67,7 +67,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // 排除 API（路由自带 requireAuth 鉴权；302 会破坏前端 fetch）与静态资源
+  // pagefind: 帮助中心搜索 wasm/index 资源在 public/pagefind/* — proxy 拦截会重定向到 /login 让搜索 broken
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
+    "/((?!api|_next/static|_next/image|pagefind|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
   ],
 };

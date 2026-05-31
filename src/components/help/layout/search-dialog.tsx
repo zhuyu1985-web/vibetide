@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { searchHelp, type PagefindResult } from "@/lib/help/search-client";
@@ -74,6 +74,8 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0">
+        {/* 屏幕阅读器专用 title,Radix Dialog 强制要求(不可见但 a11y 必需) */}
+        <DialogTitle className="sr-only">搜索文档</DialogTitle>
         <div className="border-b border-border/60 p-3 flex items-center gap-2">
           <Search size={16} className="text-muted-foreground shrink-0" />
           <Input
