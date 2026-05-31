@@ -1,0 +1,8 @@
+{
+  "title": "工作流",
+  "description": "创建工作流模板与启动 mission",
+  "icon": "Workflow",
+  "groups": [
+    { "title": "入门", "docs": ["start", "concepts"] }
+  ]
+}

@@ -5,12 +5,13 @@ import type { SessionPayload } from "@/lib/auth";
 const COOKIE_NAME = "vibetide-session";
 const DEFAULT_TTL = 604800; // 7d
 
-function isPublic(pathname: string): boolean {
+export function isPublic(pathname: string): boolean {
   return (
     pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
-    pathname.startsWith("/auth")
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/help")
   );
 }
 
