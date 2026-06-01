@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
-import { ChatLauncher } from "@/components/shared/chat-launcher";
+// HelpLauncher 已合并对话/帮助两个子入口,不再独立 mount ChatLauncher
 import { HelpLauncher } from "@/components/help/launcher/help-launcher";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +75,6 @@ export function DashboardShell({
         </main>
       </div>
 
-      <ChatLauncher />
       <HelpLauncher />
     </div>
   );
