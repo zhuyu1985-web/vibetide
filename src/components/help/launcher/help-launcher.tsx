@@ -163,8 +163,10 @@ export function HelpLauncher() {
       ? "有新公告 →"
       : "需要帮助吗?  按 ? 打开";
 
+  // 右下浮动工具栏: 小帮在 ChatLauncher (h-11+bottom-6) 上方堆叠
+  // bottom-24 (96px) 给下方 ChatLauncher 留位,气泡向左弹避免贴屏幕边缘
   return (
-    <div className="fixed bottom-6 left-6 z-50 select-none max-md:bottom-4 max-md:left-4">
+    <div className="fixed bottom-24 right-6 z-50 select-none max-md:bottom-20 max-md:right-4">
       <Link
         href="/help"
         aria-label="打开帮助中心"
@@ -174,7 +176,7 @@ export function HelpLauncher() {
         className="block relative"
       >
         <motion.div
-          whileHover={{ scale: 1.08, rotate: 8 }}
+          whileHover={{ scale: 1.08, rotate: -8 }}
           whileTap={{ scale: 0.92, rotate: 0 }}
           transition={{ type: "spring", stiffness: 280, damping: 18 }}
           className="w-14 h-14 max-md:w-12 max-md:h-12 drop-shadow-[0_8px_24px_rgba(14,165,233,0.35)]"
@@ -192,16 +194,16 @@ export function HelpLauncher() {
       <AnimatePresence>
         {(hovered || showFirstTip || waving) && (
           <motion.div
-            initial={{ opacity: 0, x: -8, scale: 0.9 }}
+            initial={{ opacity: 0, x: 8, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -8, scale: 0.9 }}
+            exit={{ opacity: 0, x: 8, scale: 0.9 }}
             transition={{ duration: 0.18, ease: [0.22, 0.68, 0.35, 1.0] }}
-            className="absolute left-16 bottom-2 whitespace-nowrap px-3 py-2 rounded-xl bg-popover/95 backdrop-blur-xl border border-border/60 shadow-lg text-[13px] font-medium text-foreground pointer-events-none max-md:left-14"
+            className="absolute right-16 bottom-2 whitespace-nowrap px-3 py-2 rounded-xl bg-popover/95 backdrop-blur-xl border border-border/60 shadow-lg text-[13px] font-medium text-foreground pointer-events-none max-md:right-14"
           >
             {waving ? "在这里呢 ✋" : bubbleText}
             <span
               aria-hidden
-              className="absolute -left-1.5 bottom-3 w-3 h-3 rotate-45 bg-popover/95 border-l border-b border-border/60"
+              className="absolute -right-1.5 bottom-3 w-3 h-3 rotate-45 bg-popover/95 border-r border-t border-border/60"
             />
           </motion.div>
         )}
