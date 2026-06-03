@@ -397,6 +397,46 @@ export type InngestEvents = {
   // payload 里带 workflowTemplateId / organizationId / inputParams 区分。
   // 订阅方:src/inngest/functions/workflow-template-scheduled-launch.ts
   "scheduled-jobs/workflow-template.run": WorkflowTemplateScheduledRunPayload;
+
+  // ─── Phase: topic-compare real-data upgrade ───
+
+  "collection/run.completed": {
+    data: {
+      runId: string;
+      sourceId: string;
+      organizationId: string | null;
+      itemsCollected: number;
+      status: "succeeded" | "partial" | "failed";
+      durationMs: number;
+    };
+  };
+
+  "topic-compare/my-post.created": {
+    data: {
+      organizationId: string;
+      myPostId: string;
+      contentFingerprint: string;
+      source: "sync" | "backfill" | "manual";
+    };
+  };
+
+  "topic-compare/backfill.requested": {
+    data: {
+      organizationId: string;
+      accountKind: "my" | "benchmark";
+      accountId: string;
+      triggeredBy: "toggle" | "admin-script";
+      triggeredByUserId: string | null;
+    };
+  };
+
+  "topic-compare/missed-topic-detection.triggered": {
+    data: {
+      organizationId: string;
+      sinceDays: number;
+      triggeredBy: "daily-cron" | "manual";
+    };
+  };
 };
 
 /** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */
