@@ -1,5 +1,6 @@
 import { db } from "@/db";
-import { benchmarkPosts } from "@/db/schema";
+import { sql } from "drizzle-orm";
+import { benchmarkPosts, myPostDistributions } from "@/db/schema";
 import { isTikhubAccountSupported } from "./constants";
 
 export type SyncSourceBinding =
@@ -40,7 +41,7 @@ export async function syncCollectedItems(params: {
   binding: SyncSourceBinding;
   items: CollectedItemInput[];
 }): Promise<SyncResult> {
-  const { organizationId: _organizationId, binding, items } = params;
+  const { organizationId, binding, items } = params;
   const empty: SyncResult = {
     skipped: false,
     processed: items.length,
@@ -96,8 +97,71 @@ export async function syncCollectedItems(params: {
         upserted++;
         succeeded++;
       } else {
-        // my 分支留给 Task 1.5
-        throw new Error("my-binding not implemented yet");
+        // my 分支：要求 contentFingerprint 才能 dedup
+        if (!item.contentFingerprint) {
+          parseFailed++;
+          continue;
+        }
+
+        // 用 Postgres 系统列 xmax=0 精确判断本次是 INSERT 还是 UPDATE
+        // （xmax=0 ⇔ 本事务首次插入；非 0 ⇔ update。比"createdAt 时间窗"可靠）
+        const insertedRows = await db.execute<{ id: string; is_new: boolean }>(sql`
+          INSERT INTO my_posts (
+            organization_id, title, summary, body, content_fingerprint,
+            original_source_url, published_at,
+            total_views, total_likes, total_shares, total_comments,
+            stats_aggregated_at
+          ) VALUES (
+            ${organizationId}, ${item.title!}, ${item.summary ?? null}, ${item.body ?? null}, ${item.contentFingerprint},
+            ${item.sourceUrl ?? null}, ${item.publishedAt ?? null},
+            ${item.views ?? 0}, ${item.likes ?? 0}, ${item.shares ?? 0}, ${item.comments ?? 0},
+            ${new Date()}
+          )
+          ON CONFLICT (organization_id, content_fingerprint) DO UPDATE SET
+            total_views = EXCLUDED.total_views,
+            total_likes = EXCLUDED.total_likes,
+            total_shares = EXCLUDED.total_shares,
+            total_comments = EXCLUDED.total_comments,
+            stats_aggregated_at = EXCLUDED.stats_aggregated_at
+          RETURNING id, (xmax = 0) AS is_new
+        `);
+
+        // drizzle execute 返回值类型按 driver 不同:postgres-js 直接返回数组
+        const rows = Array.isArray(insertedRows)
+          ? insertedRows
+          : ((insertedRows as { rows?: Array<{ id: string; is_new: boolean }> }).rows ?? []);
+        const insertedPost = rows[0];
+
+        if (insertedPost) {
+          if (insertedPost.is_new) newMyPostIds.push(insertedPost.id);
+
+          // upsert distribution（普通 Drizzle 调用即可）
+          await db
+            .insert(myPostDistributions)
+            .values({
+              myPostId: insertedPost.id,
+              myAccountId: binding.myAccountId,
+              publishedUrl: item.sourceUrl ?? null,
+              publishedAt: item.publishedAt ?? null,
+              views: item.views ?? 0,
+              likes: item.likes ?? 0,
+              shares: item.shares ?? 0,
+              comments: item.comments ?? 0,
+              rawMetadata: item.rawMetadata ?? null,
+            })
+            .onConflictDoUpdate({
+              target: [myPostDistributions.myPostId, myPostDistributions.myAccountId],
+              set: {
+                views: item.views ?? 0,
+                likes: item.likes ?? 0,
+                shares: item.shares ?? 0,
+                comments: item.comments ?? 0,
+                rawMetadata: item.rawMetadata ?? null,
+              },
+            });
+          upserted++;
+          succeeded++;
+        }
       }
     } catch (err) {
       console.error("[sync-collected] upsert failed:", { externalId: item.externalId, err });
