@@ -94,7 +94,8 @@ brainstorming 阶段已锁定的 4 个关键决策：
 
 ┌─ Daily 06:00 SH (★NEW) ───────────────────────────────────────────┐
 │  Inngest cron: missedTopicDetectionDaily                          │
-│   for each org with enabled benchmark_account (concurrency=2):    │
+│   for each org with (enabled benchmark_account OR enabled         │
+│   my_account) (concurrency=2):                                    │
 │     detectMissedTopicsForOrg({orgId, sinceDays:14})  (现有算法)    │
 └──────────────────────────────────────────────────────────────────┘
 
@@ -134,9 +135,10 @@ brainstorming 阶段已锁定的 4 个关键决策：
 | 文件 | 改动 |
 |---|---|
 | `src/inngest/functions/account-analytics/crawl-cron.ts` | 扩展循环：扫 `benchmark_accounts WHERE crawlCronEnabled=true AND (organization_id IS NULL OR organization_id=?)`。复用 `ensureTikHubAccountSource` |
-| `src/inngest/events.ts` | 加 3 个 event 类型（见 §5.1） |
+| `src/inngest/functions/collection/run-source.ts` | **在 run 结束（成功或失败）后 emit 新事件 `collection/run.completed`**（现有事件仅 `collection/source.run-requested` 和 per-item `collection/item.created`，没有 run 级 completion 信号）。事件 payload 见 §5.1 |
+| `src/inngest/events.ts` | 加 4 个 event 类型（见 §5.1，含上面的 `collection/run.completed`） |
 | `src/inngest/functions/index.ts` | 注册 3 个新函数 |
-| `src/app/actions/<my-or-benchmark-account-management>.ts` | toggle `crawlCronEnabled` 时，true 派 `topic-compare/backfill.requested`，false 不做事 |
+| `src/app/actions/<my-or-benchmark-account-management>.ts` | toggle `crawlCronEnabled` 时，true 派 `topic-compare/backfill.requested`，false 不做事。**toggle 旁 UI 文案"仅 4 平台可开"也在本次范围**（同一 action 里改对应客户端组件） |
 | `src/db/schema/topic-compare-v2.ts` | 加 unique constraint：① `benchmark_posts(benchmark_account_id, source_url)` ② `my_posts(organization_id, content_fingerprint)` 从 index 升级为 unique。`my_post_distributions` 已有 unique，不动 |
 
 ### 4.3 平台护栏
@@ -145,7 +147,7 @@ brainstorming 阶段已锁定的 4 个关键决策：
 
 - `crawl-cron` 启动前过滤，账号 platform 不在列表里直接 skip + step.run log "skipped: platform not in TikHub account mode"
 - backfill fn 同样过滤
-- UI 上 toggle 旁应标"仅 4 平台可开"（**plan 阶段决定是否合并到本次范围**）
+- **toggle 客户端组件**上 platform ∉ 白名单时禁用 toggle 并显示"仅 4 平台可开"文案（属于本次范围，见 §4.2 修改文件清单第 5 行）
 
 ### 4.4 Migration
 
@@ -172,6 +174,18 @@ npx tsx scripts/precheck-my-posts-fingerprint-dupes.ts
 ### 5.1 新增 Inngest events
 
 ```ts
+"collection/run.completed": {
+  // 由 src/inngest/functions/collection/run-source.ts 在 run 收尾时 emit
+  data: {
+    runId: string;
+    sourceId: string;
+    organizationId: string | null;  // 全局 preset benchmark source 时为 null
+    itemsCollected: number;
+    status: "succeeded" | "partial" | "failed";
+    durationMs: number;
+  };
+};
+
 "topic-compare/my-post.created": {
   data: {
     organizationId: string;
@@ -267,7 +281,7 @@ Inngest 函数级幂等：每个 fn 用 `step.run()` 包关键步骤，框架自
 |---|---|---|---|
 | TikHub 临时错误 (5xx / timeout / 429) | `http-client.ts` rate limiter + retry | Inngest step.run 3 次指数退避 | 无 |
 | TikHub 账号不存在 / 已注销 | adapter 返回 404 | sync fn 捕获 → 自动 `crawlCronEnabled=false` + 在 `notes` 字段追加 audit | 账号列表能看到 notes |
-| TikHub 配额耗尽 | adapter 抛专门错误 | sync fn 不重试，整批挂起，console.error + 派 budget event（如有 audit table） | 第二天在 Inngest UI 查 |
+| TikHub 配额耗尽 | adapter 抛专门错误 | sync fn 不重试，整批挂起，console.error。**V1 不派 budget event、不写 audit table**——靠 Inngest UI 错误页定位（YAGNI；项目当前无 audit table） | 第二天在 Inngest UI 查 |
 | `collected_items` 解析失败 | sync 层 try/catch 每行 | 跳过该行，`parseFailed++`，step output 报告 | 不阻塞同 run 其他行 |
 | fingerprint dedup 冲突（不同内容 hash 撞） | unique constraint 抛错 | 走 update（按 source_url 二次判断），冲突计数 | 极少 |
 | LLM 调用失败（DeepSeek 5xx） | `findSameTopicMatches` 抛错 | Inngest 自动重试 3 次，仍失败则该 my_post 当日无对比 | DAL 查不到就显示"暂无对标"，第二天 cron 再补 |
