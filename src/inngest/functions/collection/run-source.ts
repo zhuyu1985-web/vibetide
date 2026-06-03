@@ -15,6 +15,7 @@ export const runCollectionSource = inngest.createFunction(
   { event: "collection/source.run-requested" },
   async ({ event, step }) => {
     const { sourceId, organizationId, trigger } = event.data;
+    const startedAt = Date.now();
 
     // 1. Load source
     const source = await step.run("load-source", async () => {
@@ -124,6 +125,19 @@ export const runCollectionSource = inngest.createFunction(
           .where(eq(collectionSources.id, sourceId));
       });
 
+      // 7. Emit run-level completion (success / partial)
+      await step.sendEvent("emit-run-completed", {
+        name: "collection/run.completed",
+        data: {
+          runId,
+          sourceId,
+          organizationId: organizationId ?? null,
+          itemsCollected: result.writeResult.inserted,
+          status: hasFailures ? "partial" : "succeeded",
+          durationMs: Date.now() - startedAt,
+        },
+      });
+
       return { sourceId, runId, ...result.writeResult };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -139,6 +153,20 @@ export const runCollectionSource = inngest.createFunction(
           totalRuns: sql`${collectionSources.totalRuns} + 1`,
         })
         .where(eq(collectionSources.id, sourceId));
+
+      // Emit run-level completion for failed runs too — consumers decide whether to act
+      await step.sendEvent("emit-run-completed-failed", {
+        name: "collection/run.completed",
+        data: {
+          runId,
+          sourceId,
+          organizationId: organizationId ?? null,
+          itemsCollected: 0,
+          status: "failed",
+          durationMs: Date.now() - startedAt,
+        },
+      });
+
       throw err;
     }
   },
