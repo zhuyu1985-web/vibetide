@@ -54,6 +54,7 @@ import {
 import { topicCompareSyncFromCollection } from "./topic-compare/sync-on-run-completed";
 import { topicCompareBackfill } from "./topic-compare/backfill";
 import { topicCompareFindMatchesOnNew } from "./topic-compare/find-matches-on-new-mypost";
+import { missedTopicDetectionDaily } from "./topic-compare/missed-topic-cron";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -128,4 +129,6 @@ export const functions = [
   topicCompareBackfill,
   // Topic Compare find-matches (2026-05-31) — 监听 my-post.created,自动同题匹配 (concurrency=4)
   topicCompareFindMatchesOnNew,
+  // Topic Compare missed-topic detection (2026-05-31) — 06:00 SH 每天跑漏题检测
+  missedTopicDetectionDaily,
 ];
