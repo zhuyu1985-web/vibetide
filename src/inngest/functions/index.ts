@@ -52,6 +52,7 @@ import {
   // accountAnalyticsAnnotateAccountPosts,
 } from "./account-analytics";
 import { topicCompareSyncFromCollection } from "./topic-compare/sync-on-run-completed";
+import { topicCompareBackfill } from "./topic-compare/backfill";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -122,4 +123,6 @@ export const functions = [
   // Topic Compare real-data pipeline (2026-05-31) — 监听 collection/run.completed,
   // 按 source binding 把采集项同步到 my_posts / benchmark_posts
   topicCompareSyncFromCollection,
+  // Topic Compare backfill (2026-05-31) — 手工触发一次性 backfill 历史 30 条帖子
+  topicCompareBackfill,
 ];
