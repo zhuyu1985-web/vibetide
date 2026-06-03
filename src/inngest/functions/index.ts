@@ -53,6 +53,7 @@ import {
 } from "./account-analytics";
 import { topicCompareSyncFromCollection } from "./topic-compare/sync-on-run-completed";
 import { topicCompareBackfill } from "./topic-compare/backfill";
+import { topicCompareFindMatchesOnNew } from "./topic-compare/find-matches-on-new-mypost";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -125,4 +126,6 @@ export const functions = [
   topicCompareSyncFromCollection,
   // Topic Compare backfill (2026-05-31) — 手工触发一次性 backfill 历史 30 条帖子
   topicCompareBackfill,
+  // Topic Compare find-matches (2026-05-31) — 监听 my-post.created,自动同题匹配 (concurrency=4)
+  topicCompareFindMatchesOnNew,
 ];
