@@ -50,8 +50,9 @@ SELECT 'idx_workflow_templates_featured', CASE WHEN EXISTS(SELECT 1 FROM pg_inde
 SELECT 'workflow_category enum has advanced', CASE WHEN EXISTS(SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='workflow_category' AND e.enumlabel='advanced') THEN 'OK' ELSE 'MISSING' END;
 SELECT 'artifact_type enum has cms_publication', CASE WHEN EXISTS(SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='artifact_type' AND e.enumlabel='cms_publication') THEN 'OK' ELSE 'MISSING' END;
 
+-- V2 同题模块必备表（missed_topics 在 topic-compare-v2 重建为 v2 schema）
+SELECT 'missed_topics exists', CASE WHEN EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='missed_topics') THEN 'OK' ELSE 'MISSING' END;
 -- 废表应已删
-SELECT 'missed_topics dropped', CASE WHEN NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='missed_topics') THEN 'OK' ELSE 'STALE' END;
 SELECT 'platform_content dropped', CASE WHEN NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='platform_content') THEN 'OK' ELSE 'STALE' END;
 SELECT 'research_tasks dropped', CASE WHEN NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='research_tasks') THEN 'OK' ELSE 'STALE' END;
 SELECT 'app_channels dropped', CASE WHEN NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='app_channels') THEN 'OK' ELSE 'STALE' END;
