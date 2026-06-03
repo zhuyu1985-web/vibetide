@@ -5,7 +5,9 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { toggleAccountCrawlCron } from "@/app/actions/account-analytics";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { isTikhubAccountSupported } from "@/lib/topic-compare/constants";
 
 interface CrawlCronToggleProps {
   accountId: string;
@@ -21,8 +23,6 @@ interface CrawlCronToggleProps {
   variant?: "card" | "inline";
 }
 
-const CRAWLABLE_PLATFORMS = ["douyin", "weibo", "kuaishou", "wechat_oa"];
-
 /**
  * 自动抓取开关 —— 点击调 toggleAccountCrawlCron Server Action。
  *
@@ -30,6 +30,7 @@ const CRAWLABLE_PLATFORMS = ["douyin", "weibo", "kuaishou", "wechat_oa"];
  *   - 永远可点；如账号未绑 outlet，开启时 Server Action 自动建/复用占位 outlet
  *   - 需要补识别符时，左侧显示"前往媒体字典"链接而不是 inline 弹窗
  *     （识别符配置统一回到「采集配置 / 媒体字典」或「绑定账号」对话框里完成）
+ *   - 非白名单平台（仅 douyin/weibo/kuaishou/wechat_mp 支持）：toggle 灰掉并显示"仅 4 平台可开"
  */
 export function CrawlCronToggle({
   accountId,
@@ -46,38 +47,9 @@ export function CrawlCronToggle({
   const [enabled, setEnabled] = useState(initialEnabled);
   const [hasOutlet, setHasOutlet] = useState(hasOutletBinding);
   const [pending, startTransition] = useTransition();
-  const platformSupported = CRAWLABLE_PLATFORMS.includes(platform);
-
-  function handleToggle() {
-    if (pending) return;
-    const nextEnabled = !enabled;
-    setEnabled(nextEnabled); // optimistic
-    startTransition(async () => {
-      const res = await toggleAccountCrawlCron({
-        accountId,
-        accountSource,
-        enabled: nextEnabled,
-      });
-      if (!res.success) {
-        setEnabled(enabled); // rollback
-        toast.error(res.error ?? "切换失败");
-        return;
-      }
-      if (nextEnabled) {
-        if (res.needsSecUid) {
-          setHasOutlet(true);
-          toast.info(
-            "已开启自动抓取 · 接下来请到媒体字典补全识别符才能真正抓数据",
-            { duration: 5000 },
-          );
-        } else {
-          toast.success("已开启自动抓取（次日 05:00 SH 触发）");
-        }
-      } else {
-        toast.success("已关闭自动抓取");
-      }
-    });
-  }
+  const platformSupported = isTikhubAccountSupported(platform);
+  // 非白名单平台：toggle 整体禁用
+  const unsupported = !platformSupported;
 
   const lastText = lastCrawledAt
     ? `${lastCrawledAt.slice(5, 16).replace("T", " ")} 上次`
@@ -96,7 +68,11 @@ export function CrawlCronToggle({
       onClick={(e) => e.preventDefault()}
     >
       <div className="inline-flex items-center gap-1 text-gray-500 min-w-0">
-        {needsConfig ? (
+        {unsupported ? (
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            仅 4 平台可开
+          </span>
+        ) : needsConfig ? (
           <button
             type="button"
             onClick={(e) => {
@@ -122,39 +98,56 @@ export function CrawlCronToggle({
         )}
       </div>
 
-      <button
-        type="button"
+      <Switch
+        size="sm"
+        checked={enabled}
+        disabled={unsupported || pending}
+        onCheckedChange={(checked) => {
+          if (unsupported || pending) return;
+          setEnabled(checked); // optimistic
+          startTransition(async () => {
+            const res = await toggleAccountCrawlCron({
+              accountId,
+              accountSource,
+              enabled: checked,
+            });
+            if (!res.success) {
+              setEnabled(!checked); // rollback
+              toast.error(res.error ?? "切换失败");
+              return;
+            }
+            if (checked) {
+              if (res.needsSecUid) {
+                setHasOutlet(true);
+                toast.info(
+                  "已开启自动抓取 · 接下来请到媒体字典补全识别符才能真正抓数据",
+                  { duration: 5000 },
+                );
+              } else {
+                toast.success("已开启自动抓取（次日 05:00 SH 触发）");
+              }
+            } else {
+              toast.success("已关闭自动抓取");
+            }
+          });
+        }}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          handleToggle();
         }}
-        disabled={pending}
         title={
-          pending
-            ? "切换中…"
-            : enabled
-              ? "点击关闭自动抓取"
-              : "点击开启自动抓取（如未绑定 outlet 会自动创建）"
+          unsupported
+            ? "该平台不支持自动抓取（仅支持抖音/微博/快手/微信公众号）"
+            : pending
+              ? "切换中…"
+              : enabled
+                ? "点击关闭自动抓取"
+                : "点击开启自动抓取（如未绑定 outlet 会自动创建）"
         }
-        className={cn(
-          "relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors cursor-pointer border-0 p-0",
-          enabled ? "bg-[#2A9D8F]" : "bg-gray-300 dark:bg-gray-700",
-          pending && "opacity-50 cursor-wait",
-        )}
-      >
-        <span className="sr-only">{enabled ? "关闭" : "开启"}自动抓取</span>
-        <span
-          className={cn(
-            "inline-block h-3 w-3 rounded-full bg-white transition-transform shadow",
-            enabled ? "translate-x-4" : "translate-x-0.5",
-          )}
-        >
-          {pending && (
-            <RefreshCw size={8} className="animate-spin m-auto mt-0.5 text-gray-500" />
-          )}
-        </span>
-      </button>
+      />
+      {pending && (
+        <RefreshCw size={8} className="animate-spin text-gray-500 shrink-0" />
+      )}
     </div>
   );
 }
