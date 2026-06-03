@@ -18,6 +18,7 @@ import { db } from "@/db";
 import { myAccounts, benchmarkAccounts } from "@/db/schema";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { ensureTikHubAccountSource } from "@/lib/account-analytics/ensure-source";
+import { isTikhubAccountSupported } from "@/lib/topic-compare/constants";
 
 const HISTORY_DAYS = 7;
 
@@ -74,7 +75,7 @@ export const accountAnalyticsCrawlCron = inngest.createFunction(
             isNotNull(benchmarkAccounts.outletId),
           ),
         );
-      const all: AccountTarget[] = [
+      const allRaw: AccountTarget[] = [
         ...my.map((r) => ({ ...r, source: "my" as const, outletId: r.outletId! })),
         ...bench
           .filter((r): r is typeof r & { organizationId: string } => r.organizationId !== null)
@@ -84,6 +85,16 @@ export const accountAnalyticsCrawlCron = inngest.createFunction(
             outletId: r.outletId!,
           })),
       ];
+      const all = allRaw.filter((r) => isTikhubAccountSupported(r.platform));
+      const skippedPlatformCount = allRaw.length - all.length;
+      if (skippedPlatformCount > 0) {
+        const skippedNames = allRaw
+          .filter((r) => !isTikhubAccountSupported(r.platform))
+          .map((r) => `${r.name}(${r.platform})`);
+        console.log(
+          `[crawl-cron] skipped ${skippedPlatformCount} accounts: platform not in TikHub account whitelist —— ${skippedNames.join(", ")}`,
+        );
+      }
       return all;
     });
 
