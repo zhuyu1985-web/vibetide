@@ -536,39 +536,32 @@ Expected: 新加的 my 分支用例 FAIL（实现里还抛 "not implemented yet"
     continue;
   }
 
-  // upsert my_posts，先看是否新建
-  const [insertedPost] = await db
-    .insert(myPosts)
-    .values({
-      organizationId,
-      title: item.title!,
-      summary: item.summary ?? null,
-      body: item.body ?? null,
-      contentFingerprint: item.contentFingerprint,
-      originalSourceUrl: item.sourceUrl ?? null,
-      publishedAt: item.publishedAt ?? null,
-      totalViews: item.views ?? 0,
-      totalLikes: item.likes ?? 0,
-      totalShares: item.shares ?? 0,
-      totalComments: item.comments ?? 0,
-      statsAggregatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [myPosts.organizationId, myPosts.contentFingerprint],
-      set: {
-        totalViews: item.views ?? 0,
-        totalLikes: item.likes ?? 0,
-        totalShares: item.shares ?? 0,
-        totalComments: item.comments ?? 0,
-        statsAggregatedAt: new Date(),
-      },
-    })
-    .returning({ id: myPosts.id, createdAt: myPosts.createdAt });
+  // upsert my_posts，用 Postgres 系统列 xmax=0 精确判断本次是 insert 还是 update
+  // （xmax=0 ⇔ 本事务首次插入；非 0 ⇔ update。比"createdAt 时间窗"可靠）
+  const insertedRows = await db.execute<{ id: string; is_new: boolean }>(sql`
+    INSERT INTO my_posts (
+      organization_id, title, summary, body, content_fingerprint,
+      original_source_url, published_at,
+      total_views, total_likes, total_shares, total_comments,
+      stats_aggregated_at
+    ) VALUES (
+      ${organizationId}, ${item.title!}, ${item.summary ?? null}, ${item.body ?? null}, ${item.contentFingerprint},
+      ${item.sourceUrl ?? null}, ${item.publishedAt ?? null},
+      ${item.views ?? 0}, ${item.likes ?? 0}, ${item.shares ?? 0}, ${item.comments ?? 0},
+      ${new Date()}
+    )
+    ON CONFLICT (organization_id, content_fingerprint) DO UPDATE SET
+      total_views = EXCLUDED.total_views,
+      total_likes = EXCLUDED.total_likes,
+      total_shares = EXCLUDED.total_shares,
+      total_comments = EXCLUDED.total_comments,
+      stats_aggregated_at = EXCLUDED.stats_aggregated_at
+    RETURNING id, (xmax = 0) AS is_new
+  `);
+  const insertedPost = insertedRows[0];
 
   if (insertedPost) {
-    // createdAt === updatedAt 视为新建（5 秒容差，避免时钟漂移）
-    const isNew = Math.abs(Date.now() - insertedPost.createdAt.getTime()) < 5000;
-    if (isNew) newMyPostIds.push(insertedPost.id);
+    if (insertedPost.is_new) newMyPostIds.push(insertedPost.id);
 
     // upsert distribution
     await db
@@ -745,10 +738,27 @@ git commit -m "feat(collection): run 收尾发 collection/run.completed event(�
 
 **Files:**
 - Modify: `src/inngest/functions/account-analytics/crawl-cron.ts`
+- Modify: `src/lib/account-analytics/ensure-source.ts`（如果当前只接 my_account；本任务显式包含此 helper 的签名扩展）
 
 - [ ] **Step 1: 定位现有 my_accounts 扫描循环**
 
 读 `crawl-cron.ts`，找到类似 `db.select().from(myAccounts).where(eq(myAccounts.crawlCronEnabled, true))` 的位置。
+
+- [ ] **Step 1.5: 扩展 ensureTikHubAccountSource 接 union 签名**
+
+读 `src/lib/account-analytics/ensure-source.ts`，如果现有签名只是 `ensureTikHubAccountSource(myAccount: MyAccount)`，改成：
+
+```ts
+type AccountForSource =
+  | { kind: "my"; account: MyAccount }
+  | { kind: "benchmark"; account: BenchmarkAccount };
+
+export async function ensureTikHubAccountSource(input: AccountForSource): Promise<string /* sourceId */> {
+  // ... 内部按 kind 分支决定写 collection_sources.my_account_id 还是 benchmark_account_id
+}
+```
+
+如果已经是 union，本步跳过。**注意**：collection_sources 表必须同时有 `my_account_id` / `benchmark_account_id` 两列（其一非空），否则需要先加列 + migration。先确认 schema，schema 不支持时停下来跟 owner 同步是否本任务范围内扩。
 
 - [ ] **Step 2: 加 benchmark_accounts 并行扫描 + 白名单过滤**
 
@@ -1490,7 +1500,17 @@ git commit -m "chore(topic-compare): verify-pipeline.sh 巡检脚本"
 
 ### Task 5.2: 手动端到端联调
 
-不写代码，按下面顺序在本地跑一遍验证：
+不写代码，按下面顺序在本地跑一遍验证。
+
+**前置条件**（开始前务必确认 `.env.local` 已配齐，否则中途会卡）：
+
+- `DATABASE_URL` — 本地或 Sealos 测试库
+- `TIKHUB_API_KEY` —（或项目实际用的 env 名，看 `src/lib/collection/adapters/tikhub/config.ts`）
+- `OPENAI_API_KEY` + `OPENAI_API_BASE_URL` + `OPENAI_MODEL` — `findSameTopicMatches` 需要 LLM
+- 本地 Inngest dev server URL（默认 `http://localhost:8288`）能开
+
+Run: `grep -E 'TIKHUB|OPENAI|DATABASE_URL' .env.local | sed 's/=.*/=***/'`
+Expected: 至少 4 行（key 不空）
 
 - [ ] **Step 1: schema 同步检查**
 
