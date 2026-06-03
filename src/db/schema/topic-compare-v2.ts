@@ -113,10 +113,9 @@ export const myPosts = pgTable(
   (t) => ({
     orgPubIdx: index("idx_my_posts_org_published").on(t.organizationId, t.publishedAt),
     orgTopicIdx: index("idx_my_posts_org_topic").on(t.organizationId, t.topic),
-    orgFingerprintIdx: index("idx_my_posts_org_fingerprint").on(
-      t.organizationId,
-      t.contentFingerprint,
-    ),
+    orgFingerprintUniq: uniqueIndex("idx_my_posts_org_fingerprint")
+      .on(t.organizationId, t.contentFingerprint)
+      .where(sql`${t.contentFingerprint} IS NOT NULL`),
     articleIdx: index("idx_my_posts_article_id").on(t.internalArticleId),
     titleTrgmIdx: index("idx_my_posts_title_trgm").using(
       "gin",
@@ -280,6 +279,9 @@ export const benchmarkPosts = pgTable(
     aigcAnnotatedAtIdx: index("benchmark_posts_aigc_annotated_at_idx")
       .on(t.aigcAnnotatedAt)
       .where(sql`aigc_annotated_at IS NULL`),
+    accSourceUrlUniq: uniqueIndex("uq_benchmark_posts_acc_source_url")
+      .on(t.benchmarkAccountId, t.sourceUrl)
+      .where(sql`${t.sourceUrl} IS NOT NULL`),
   }),
 );
 

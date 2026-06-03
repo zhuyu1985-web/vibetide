@@ -1,0 +1,3 @@
+DROP INDEX "idx_my_posts_org_fingerprint";--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_benchmark_posts_acc_source_url" ON "benchmark_posts" USING btree ("benchmark_account_id","source_url") WHERE "benchmark_posts"."source_url" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_my_posts_org_fingerprint" ON "my_posts" USING btree ("organization_id","content_fingerprint") WHERE "my_posts"."content_fingerprint" IS NOT NULL;
