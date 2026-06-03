@@ -17,7 +17,7 @@ vi.mock("@/db", () => {
   };
 });
 
-import { syncCollectedItems } from "../sync-collected";
+import { syncCollectedItems, type CollectedItemInput } from "../sync-collected";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,7 +28,7 @@ describe("syncCollectedItems — benchmark binding", () => {
     const result = await syncCollectedItems({
       organizationId: "org-1",
       binding: { kind: "benchmark", platform: "xiaohongshu", benchmarkAccountId: "ba-1" },
-      items: [{ externalId: "x1", title: "t", sourceUrl: "u", views: 0, likes: 0 } as any],
+      items: [{ externalId: "x1", title: "t", sourceUrl: "u", views: 0, likes: 0 } as CollectedItemInput],
     });
     expect(result).toEqual({
       skipped: true,
@@ -56,7 +56,7 @@ describe("syncCollectedItems — benchmark binding", () => {
           comments: 2,
           publishedAt: new Date("2026-06-01T00:00:00Z"),
           contentFingerprint: "fp1",
-        } as any,
+        } as CollectedItemInput,
       ],
     });
     expect(result.processed).toBe(1);
@@ -70,9 +70,9 @@ describe("syncCollectedItems — benchmark binding", () => {
       organizationId: "org-1",
       binding: { kind: "benchmark", platform: "douyin", benchmarkAccountId: "ba-1" },
       items: [
-        { externalId: "ok", title: "正常", sourceUrl: "u1" } as any,
-        { externalId: "bad" } as any, // 缺 title
-        { externalId: "ok2", title: "正常 2", sourceUrl: "u2" } as any,
+        { externalId: "ok", title: "正常", sourceUrl: "u1" } as CollectedItemInput,
+        { externalId: "bad" } as CollectedItemInput, // 缺 title
+        { externalId: "ok2", title: "正常 2", sourceUrl: "u2" } as CollectedItemInput,
       ],
     });
     expect(result.processed).toBe(3);
@@ -96,7 +96,7 @@ describe("syncCollectedItems — my binding", () => {
           contentFingerprint: "new-fp",
           views: 1,
           likes: 1,
-        } as any,
+        } as CollectedItemInput,
       ],
     });
     expect(result.skipped).toBe(false);
@@ -109,7 +109,7 @@ describe("syncCollectedItems — my binding", () => {
     const result = await syncCollectedItems({
       organizationId: "org-1",
       binding: { kind: "my", platform: "douyin", myAccountId: "ma-1" },
-      items: [{ externalId: "x", title: "无指纹" } as any],
+      items: [{ externalId: "x", title: "无指纹" } as CollectedItemInput],
     });
     expect(result.parseFailed).toBe(1);
     expect(result.succeeded).toBe(0);
