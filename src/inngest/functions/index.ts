@@ -51,6 +51,7 @@ import {
   // 后续如需启用：取消下方两处注释 + 重启 Inngest dev server + 跑 npm run db:backfill-aigc
   // accountAnalyticsAnnotateAccountPosts,
 } from "./account-analytics";
+import { topicCompareSyncFromCollection } from "./topic-compare/sync-on-run-completed";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -118,4 +119,7 @@ export const functions = [
   // Workflow Template scheduled launch (2026-05-29) — 订阅 scheduledJobsRunner 派的统一
   // event,把 schedule 触发翻译为 mission(走 startMissionFromTemplateScheduled service 入口)
   workflowTemplateScheduledLaunch,
+  // Topic Compare real-data pipeline (2026-05-31) — 监听 collection/run.completed,
+  // 按 source binding 把采集项同步到 my_posts / benchmark_posts
+  topicCompareSyncFromCollection,
 ];
