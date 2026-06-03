@@ -264,6 +264,25 @@ export async function toggleAccountCrawlCron(input: {
         .where(eq(benchmarkAccounts.id, input.accountId));
     }
 
+    // 4. 开启时派发 backfill 事件，立即补拉最近 30 条历史数据，无需等下次 cron
+    if (input.enabled) {
+      try {
+        await inngest.send({
+          name: "topic-compare/backfill.requested",
+          data: {
+            organizationId: auth.organizationId,
+            accountKind: input.accountSource,
+            accountId: input.accountId,
+            triggeredBy: "toggle",
+            triggeredByUserId: auth.userId,
+          },
+        });
+      } catch (err) {
+        // backfill 事件派发失败不影响主流程（toggle 已写入 DB）
+        console.warn("[account-analytics] toggleAccountCrawlCron 派发 backfill 事件失败:", err);
+      }
+    }
+
     revalidatePath("/account-analytics");
     revalidatePath(`/account-analytics/${input.accountId}`);
     return {
