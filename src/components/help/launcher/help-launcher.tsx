@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, MessagesSquare, type LucideIcon } from "lucide-react";
 
@@ -66,6 +66,9 @@ const SUB_ACTIONS: SubAction[] = [
   },
 ];
 
+// hover-intent 延迟收起 ms(防鼠标穿越 gap 时立刻 collapse)
+const COLLAPSE_DELAY_MS = 200;
+
 export function HelpLauncher() {
   const pathname = usePathname();
   const router = useRouter();
@@ -74,6 +77,27 @@ export function HelpLauncher() {
   const [showFirstTip, setShowFirstTip] = useState(false);
   const [waving, setWaving] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // hover-intent: 鼠标进入容器立即取消待执行的收起
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
+  // hover-intent: 鼠标离开容器后延迟收起(给用户时间穿越 gap 拐回来)
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => {
+      setExpanded(false);
+      closeTimerRef.current = null;
+    }, COLLAPSE_DELAY_MS);
+  }, [cancelClose]);
+
+  // 卸载时清理 timer
+  useEffect(() => () => cancelClose(), [cancelClose]);
 
   // 红点 badge: 本地存的"上次看到 changelog 时间" < 当前 changelog 时间 → 显示
   useEffect(() => {
@@ -210,16 +234,23 @@ export function HelpLauncher() {
   const showIdleBubble = !expanded && (waving || showFirstTip || hasUnread);
 
   return (
+    // flex-col-reverse: 主按钮 (DOM 第 1) 在视觉底部,子按钮组 (DOM 第 2) 在主按钮上方
+    // gap-3 = 12px 间距在 flex layout 内,鼠标穿越仍在容器 hit area 内 → 不触发 mouseleave
+    // hover-intent: enter cancel close, leave 延迟 200ms (子按钮渲染中拐回主按钮也安全)
     <div
-      className="fixed bottom-6 right-6 z-50 select-none max-md:bottom-4 max-md:right-4"
-      onMouseLeave={() => setExpanded(false)}
+      className="fixed bottom-6 right-6 z-50 select-none max-md:bottom-4 max-md:right-4 flex flex-col-reverse items-end gap-3"
+      onMouseEnter={cancelClose}
+      onMouseLeave={scheduleClose}
     >
       {/* 主入口: 小帮 (button 而非 Link,因为现在主要是 toggle 而非导航) */}
       <button
         type="button"
         aria-label="助手菜单"
         aria-expanded={expanded}
-        onMouseEnter={() => setExpanded(true)}
+        onMouseEnter={() => {
+          cancelClose();
+          setExpanded(true);
+        }}
         onClick={() => setExpanded((v) => !v)}
         className="relative block bg-transparent border-0 p-0 cursor-pointer"
       >
@@ -258,7 +289,9 @@ export function HelpLauncher() {
         )}
       </AnimatePresence>
 
-      {/* hover/click 展开的 2 个子按钮: 对话 + 帮助 */}
+      {/* hover/click 展开的 2 个子按钮: 对话 + 帮助
+          flow-in (非 absolute),作为外层 flex-col-reverse 的第 2 个 child,
+          视觉上撑在主按钮上方,gap-3 由外层提供 */}
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -266,7 +299,7 @@ export function HelpLauncher() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.1 }}
-            className="absolute bottom-full right-1 mb-3 flex flex-col-reverse items-end gap-3"
+            className="flex flex-col-reverse items-end gap-3"
           >
             {SUB_ACTIONS.map((action, i) => {
               const Icon = action.icon;
