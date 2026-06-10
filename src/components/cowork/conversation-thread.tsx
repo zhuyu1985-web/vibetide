@@ -19,10 +19,13 @@ export function ConversationThread({ active, focusedMissionId, onMissionFocus }:
   const router = useRouter();
   const [input, setInput] = useState("");
   const [pending, startTransition] = useTransition();
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 只滚消息容器自身的 scrollTop,绝不用 scrollIntoView —— 后者会向上冒泡
+  // 滚动外层 overflow-hidden 的 dashboard <main>,把整页推上去且拖不回(实测 bug)。
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [active?.messages.length]);
 
   function handleSend() {
@@ -56,7 +59,7 @@ export function ConversationThread({ active, focusedMissionId, onMissionFocus }:
       </div>
 
       {/* 消息流 —— 居中、最大宽度约束(贴 Claude) */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-3 px-4 py-4">
           {active.messages.length === 0 ? (
             <p className="pt-10 text-center text-xs text-muted-foreground">
@@ -72,7 +75,6 @@ export function ConversationThread({ active, focusedMissionId, onMissionFocus }:
               />
             ))
           )}
-          <div ref={bottomRef} />
         </div>
       </div>
 

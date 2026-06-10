@@ -54,7 +54,7 @@ export function CoworkClient({ projects, conversations, active }: Props) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-xl border border-border">
+    <div className="flex h-full overflow-hidden rounded-xl border border-border">
       <CoworkSidebar
         projects={projects}
         conversations={conversations}
