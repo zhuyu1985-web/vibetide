@@ -10,7 +10,7 @@
  */
 import { db } from "@/db";
 import { conversations, conversationMessages } from "@/db/schema";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 export interface CreateConversationInput {
   title: string;
@@ -36,6 +36,8 @@ export interface UpdateConversationInput {
   summary?: string | null;
   projectId?: string | null;
   status?: "active" | "archived";
+  /** 置顶时间;传 Date 置顶、传 null 取消置顶 */
+  pinnedAt?: Date | null;
 }
 
 /** 列出某用户的会话(默认只 active,按最近活跃倒序);可选按项目过滤 */
@@ -56,7 +58,11 @@ export async function listConversationsByUser(
     .select()
     .from(conversations)
     .where(and(...filters))
-    .orderBy(desc(conversations.lastMessageAt));
+    // 置顶组(pinnedAt 非 null)在前,组内均按最近活跃倒序
+    .orderBy(
+      sql`${conversations.pinnedAt} IS NOT NULL DESC`,
+      desc(conversations.lastMessageAt),
+    );
 }
 
 /** 取单个会话(校验 org + user ownership);不存在/越权返回 null */
@@ -168,6 +174,7 @@ export async function updateConversation(
   if (input.summary !== undefined) patch.summary = input.summary;
   if (input.projectId !== undefined) patch.projectId = input.projectId;
   if (input.status !== undefined) patch.status = input.status;
+  if (input.pinnedAt !== undefined) patch.pinnedAt = input.pinnedAt;
 
   const [row] = await db
     .update(conversations)

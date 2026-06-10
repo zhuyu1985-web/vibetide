@@ -40,6 +40,9 @@ export const conversations = pgTable(
       .defaultNow()
       .notNull(),
 
+    // 置顶时间;非 null = 已置顶(会话列表置顶组按此倒序,普通组按 lastMessageAt)
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 
     createdAt: timestamp("created_at", { withTimezone: true })

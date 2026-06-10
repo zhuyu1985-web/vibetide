@@ -91,10 +91,29 @@ export async function archiveConversationAction(
 
   const updated = await updateConversation(orgId, user.id, id, {
     status: archived ? "archived" : "active",
+    // 归档时自动清置顶(正交边界:归档的会话不再占置顶位)
+    ...(archived ? { pinnedAt: null } : {}),
   });
   if (!updated) return { ok: false, errors: { _global: "对话不存在或无权访问" } };
 
-  revalidatePath("/cowork");
+  revalidatePath("/home");
+  return { ok: true, data: updated };
+}
+
+export async function pinConversationAction(
+  id: string,
+  pinned: boolean,
+): Promise<ActionResult<Conversation>> {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false, errors: { _global: "用户未关联组织" } };
+
+  const updated = await updateConversation(orgId, user.id, id, {
+    pinnedAt: pinned ? new Date() : null,
+  });
+  if (!updated) return { ok: false, errors: { _global: "对话不存在或无权访问" } };
+
+  revalidatePath("/home");
   return { ok: true, data: updated };
 }
 
