@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# Help Center 搜索索引(postbuild 由 pagefind 扫 .next 产出,构建产物不入仓)
+/public/pagefind/
+
 # production
 /build
 
