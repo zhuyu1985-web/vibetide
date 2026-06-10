@@ -55,28 +55,30 @@ export function ConversationThread({ active, focusedMissionId, onMissionFocus }:
         <span className="truncate text-sm font-medium">{active.conversation.title}</span>
       </div>
 
-      {/* 消息流 */}
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {active.messages.length === 0 ? (
-          <p className="pt-10 text-center text-xs text-muted-foreground">
-            说点什么，我会解析意图并安排任务执行
-          </p>
-        ) : (
-          active.messages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              focused={m.missionId != null && m.missionId === focusedMissionId}
-              onMissionFocus={onMissionFocus}
-            />
-          ))
-        )}
-        <div ref={bottomRef} />
+      {/* 消息流 —— 居中、最大宽度约束(贴 Claude) */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl space-y-3 px-4 py-4">
+          {active.messages.length === 0 ? (
+            <p className="pt-10 text-center text-xs text-muted-foreground">
+              说点什么，我会解析意图并安排任务执行
+            </p>
+          ) : (
+            active.messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                focused={m.missionId != null && m.missionId === focusedMissionId}
+                onMissionFocus={onMissionFocus}
+              />
+            ))
+          )}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
       {/* 输入框 */}
       <div className="border-t border-border p-3">
-        <div className="flex items-end gap-2">
+        <div className="mx-auto flex max-w-3xl items-end gap-2">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

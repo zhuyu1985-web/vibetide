@@ -12,14 +12,22 @@ import {
   Image as ImageIcon,
   Video,
   AudioLines,
+  X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getCoworkMissionDetail } from "@/app/actions/cowork-submit";
 import type { MissionWithDetails } from "@/lib/types";
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 
-export function CoworkMissionPanel({ missionId }: { missionId: string | null }) {
+export function CoworkMissionPanel({
+  missionId,
+  onClose,
+}: {
+  missionId: string | null;
+  onClose?: () => void;
+}) {
   const [mission, setMission] = useState<MissionWithDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const esRef = useRef<EventSource | null>(null);
@@ -105,6 +113,20 @@ export function CoworkMissionPanel({ missionId }: { missionId: string | null }) 
             <span className="ml-auto rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
               {doneCount}/{tasks.length}
             </span>
+          )}
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="关闭任务面板"
+              className={cn(
+                "size-6 text-muted-foreground",
+                tasks.length === 0 && "ml-auto",
+              )}
+            >
+              <X className="size-4" />
+            </Button>
           )}
         </div>
         {mission && (
