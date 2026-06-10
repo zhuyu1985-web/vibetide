@@ -44,7 +44,7 @@ export async function saveConversation(data: {
     })
     .returning();
 
-  revalidatePath("/chat");
+  revalidatePath("/home");
   return row;
 }
 
@@ -60,7 +60,7 @@ export async function deleteSavedConversation(id: string) {
       )
     );
 
-  revalidatePath("/chat");
+  revalidatePath("/home");
 }
 
 export async function updateConversationTitle(id: string, title: string) {
@@ -77,6 +77,6 @@ export async function updateConversationTitle(id: string, title: string) {
     )
     .returning();
 
-  revalidatePath("/chat");
+  revalidatePath("/home");
   return updated ?? null;
 }

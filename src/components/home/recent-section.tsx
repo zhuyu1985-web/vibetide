@@ -93,7 +93,7 @@ export const RecentSection = memo(function RecentSection({ missions, conversatio
             <span className="text-sm font-medium text-gray-800 dark:text-white/80">最近对话</span>
           </div>
           <Link
-            href="/chat"
+            href="/cowork"
             className={cn(
               "flex items-center gap-1 text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 transition-colors"
             )}
@@ -118,7 +118,7 @@ export const RecentSection = memo(function RecentSection({ missions, conversatio
               return (
                 <Link
                   key={conv.id}
-                  href={`/chat/${conv.id}`}
+                  href="/cowork"
                   className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-300"
                 >
                   {/* Employee icon */}

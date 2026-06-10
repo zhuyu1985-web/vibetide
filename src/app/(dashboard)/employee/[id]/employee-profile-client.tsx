@@ -315,7 +315,7 @@ export function EmployeeProfileClient({
                 size="sm"
                 variant="default"
                 className="ml-auto"
-                onClick={() => router.push(`/chat?employee=${employee.id}`)}
+                onClick={() => router.push("/cowork")}
               >
                 <MessageSquare size={14} className="mr-1.5" />
                 进入对话

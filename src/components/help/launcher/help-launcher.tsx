@@ -48,7 +48,7 @@ interface SubAction {
 const SUB_ACTIONS: SubAction[] = [
   {
     id: "chat",
-    href: "/chat",
+    href: "/cowork",
     icon: MessagesSquare,
     label: "需要对话吗?",
     ariaLabel: "打开对话中心",

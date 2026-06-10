@@ -10,7 +10,7 @@ export function ContactSection() {
       </p>
       <div className="mt-6 flex gap-3 justify-center flex-wrap">
         <Button asChild>
-          <Link href="/chat">打开 AI 员工对话中心</Link>
+          <Link href="/cowork">打开 AI 员工对话中心</Link>
         </Button>
         <Button asChild variant="secondary">
           <Link href="mailto:help@vibetide.local">提交文档反馈</Link>

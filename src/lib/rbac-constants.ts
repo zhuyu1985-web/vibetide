@@ -84,7 +84,7 @@ export const MENU_PERMISSION_MAP: Record<string, string | undefined> = {
   "/case-library": PERMISSIONS.MENU_CASE_LIBRARY,
   // Legacy routes (kept for backward compatibility)
   "/employee-marketplace": PERMISSIONS.MENU_EMPLOYEES,
-  "/chat": PERMISSIONS.MENU_CHAT,
+  "/cowork": PERMISSIONS.MENU_CHAT,
   "/skills": PERMISSIONS.MENU_SKILLS,
   "/media-assets": PERMISSIONS.MENU_MEDIA_ASSETS,
   "/articles": PERMISSIONS.MENU_ARTICLES,

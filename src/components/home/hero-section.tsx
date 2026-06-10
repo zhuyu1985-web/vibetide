@@ -79,7 +79,7 @@ export const HeroSection = memo(function HeroSection() {
           与 AI 团队协作，高效完成内容生产
         </p>
         <Link
-          href="/chat"
+          href="/cowork"
           className="inline-flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-lg text-xs font-medium
             text-blue-600 dark:text-blue-400 bg-blue-500/8 hover:bg-blue-500/15
             transition-all duration-200 group"

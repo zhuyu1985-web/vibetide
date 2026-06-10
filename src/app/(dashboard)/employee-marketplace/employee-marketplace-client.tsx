@@ -322,7 +322,7 @@ export function EmployeeMarketplaceClient({
                 </Link>
                 <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Link
-                    href={`/chat?employee=${emp.id}`}
+                    href="/cowork"
                     onClick={(e) => e.stopPropagation()}
                     className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-500 dark:text-blue-400 border-none"
                     title="对话"

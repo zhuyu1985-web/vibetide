@@ -84,15 +84,15 @@ export function AiEmployeesClient({
 
   // ── Handlers ──
   const handleDispatchTask = useCallback(
-    (slug: string) => {
-      router.push(`/chat?employee=${slug}`);
+    () => {
+      router.push("/cowork");
     },
     [router]
   );
 
   const handleHotTaskClick = useCallback(
-    (slug: string, prompt: string) => {
-      router.push(`/chat?employee=${slug}&task=${encodeURIComponent(prompt)}`);
+    () => {
+      router.push("/cowork");
     },
     [router]
   );

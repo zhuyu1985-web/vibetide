@@ -297,13 +297,8 @@ export function EmbeddedChatPanel({
       // Quota / serialization errors — best-effort only
     }
 
-    if (conversationId) {
-      router.push(
-        `/chat?employee=${activeEmployee}&continue=${conversationId}&handoff=1`
-      );
-    } else {
-      router.push(`/chat?employee=${activeEmployee}&handoff=1`);
-    }
+    // cowork 单窗口模型无 employee/handoff 概念,统一进入 /cowork
+    router.push("/cowork");
   };
 
   return (

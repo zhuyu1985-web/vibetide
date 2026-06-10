@@ -7,11 +7,11 @@ import { cn } from "@/lib/utils";
 
 export function ChatLauncher() {
   const pathname = usePathname();
-  if (pathname?.startsWith("/chat")) return null;
+  if (pathname?.startsWith("/cowork")) return null;
 
   return (
     <Link
-      href="/chat"
+      href="/cowork"
       aria-label="进入对话中心"
       title="对话中心"
       className={cn(
