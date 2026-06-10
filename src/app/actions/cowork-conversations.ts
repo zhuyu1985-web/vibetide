@@ -11,11 +11,16 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
+  appendMessage,
   createConversation,
   deleteConversation,
+  getConversationById,
   updateConversation,
 } from "@/lib/dal/cowork-conversations";
-import type { Conversation } from "@/db/schema/conversations";
+import type {
+  Conversation,
+  ConversationMessage,
+} from "@/db/schema/conversations";
 
 type FieldErrors = Record<string, string>;
 type ActionResult<T = void> =
@@ -105,4 +110,73 @@ export async function deleteConversationAction(
 
   revalidatePath("/cowork");
   return { ok: true };
+}
+
+// ─── 消息追加(P3 前端编排对话线程时调用)─────────────────────────────────
+// 三类消息:用户输入 / free_chat 助手文本 / mission_card(承载 mission)。
+// 每个 action 先校验会话 ownership,再调 DAL appendMessage(同时顶 lastMessageAt)。
+
+/** 校验会话归属;成功返回 null,失败返回错误结果 */
+async function _assertConversationOwned(
+  conversationId: string,
+): Promise<{ ok: true; userId: string } | { ok: false; errors: FieldErrors }> {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false, errors: { _global: "用户未关联组织" } };
+  const convo = await getConversationById(orgId, user.id, conversationId);
+  if (!convo) return { ok: false, errors: { _global: "对话不存在或无权访问" } };
+  return { ok: true, userId: user.id };
+}
+
+export async function appendUserMessageAction(
+  conversationId: string,
+  content: string,
+): Promise<ActionResult<ConversationMessage>> {
+  if (!content.trim()) return { ok: false, errors: { content: "消息不能为空" } };
+  const owned = await _assertConversationOwned(conversationId);
+  if (!owned.ok) return owned;
+
+  const message = await appendMessage(conversationId, {
+    role: "user",
+    content: content.trim(),
+    kind: "text",
+  });
+  revalidatePath(`/cowork/${conversationId}`);
+  return { ok: true, data: message };
+}
+
+export async function appendAssistantTextMessageAction(
+  conversationId: string,
+  content: string,
+  meta?: Record<string, unknown>,
+): Promise<ActionResult<ConversationMessage>> {
+  const owned = await _assertConversationOwned(conversationId);
+  if (!owned.ok) return owned;
+
+  const message = await appendMessage(conversationId, {
+    role: "assistant",
+    content,
+    kind: "text",
+    meta: meta ?? null,
+  });
+  revalidatePath(`/cowork/${conversationId}`);
+  return { ok: true, data: message };
+}
+
+export async function appendMissionCardMessageAction(
+  conversationId: string,
+  missionId: string,
+  content?: string,
+): Promise<ActionResult<ConversationMessage>> {
+  const owned = await _assertConversationOwned(conversationId);
+  if (!owned.ok) return owned;
+
+  const message = await appendMessage(conversationId, {
+    role: "assistant",
+    content: content ?? "",
+    kind: "mission_card",
+    missionId,
+  });
+  revalidatePath(`/cowork/${conversationId}`);
+  return { ok: true, data: message };
 }

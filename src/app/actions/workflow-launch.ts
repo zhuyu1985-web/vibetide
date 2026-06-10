@@ -82,6 +82,13 @@ export interface StartMissionOptions {
    * generic template label.
    */
   titleOverride?: string;
+  /**
+   * Cowork 化(2026-06):把 mission 关联到发起它的会话 / 项目,落到
+   * `mission.conversationId` / `projectId` 供右栏聚合与反查。旧调用方不传 →
+   * null,完全向后兼容。
+   */
+  conversationId?: string | null;
+  projectId?: string | null;
 }
 
 /**
@@ -235,6 +242,8 @@ async function _insertMissionRow(
     sourceModule: options?.source?.module,
     sourceEntityId: options?.source?.entityId,
     sourceEntityType: options?.source?.entityType,
+    conversationId: options?.conversationId ?? null,
+    projectId: options?.projectId ?? null,
   };
 
   const tryInsert = () =>
