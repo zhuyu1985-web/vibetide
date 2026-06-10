@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
+  MessagesSquare,
   Bot,
   Workflow,
   ListTodo,
@@ -98,6 +99,7 @@ interface NavItem extends SubItem { children?: SubItem[] }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "首页", href: "/home", icon: Home },
+  { label: "对话", href: "/cowork", icon: MessagesSquare },
   {
     label: "智能体", href: "#agents", icon: Bot,
     children: [

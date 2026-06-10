@@ -1,0 +1,131 @@
+"use server";
+
+/**
+ * submitCoworkMessage —— cowork 单窗口的"发一句话"统一入口(MVP)。
+ *
+ * 流程:落用户消息 → recognizeIntent → 路由:
+ *   - 有可执行步骤(steps>0)→ startAdHocMission,落一条 mission_card 消息
+ *   - general_chat(无步骤)→ 非流式 generateText 简单回复(流式留 P4),落 text 消息
+ *
+ * 说明:为聚焦原型形态,workflow 类意图本批也走 ad-hoc(intent.steps),不处理
+ * 模板输入表单;workflow-template 精确路由 + 流式自由聊天留 P4 细化。
+ */
+import { revalidatePath } from "next/cache";
+import { generateText } from "ai";
+import { requireAuth } from "@/lib/auth";
+import { getCurrentUserOrg } from "@/lib/dal/auth";
+import {
+  appendMessage,
+  getConversationById,
+} from "@/lib/dal/cowork-conversations";
+import { recognizeIntentForOrg } from "@/lib/cowork/intent-routing";
+import { startAdHocMission } from "@/app/actions/ad-hoc-mission";
+import { getMissionById } from "@/lib/dal/missions";
+import { getLanguageModel } from "@/lib/agent/model-router";
+
+export type CoworkSubmitResult =
+  | { ok: false; error: string }
+  | { ok: true; kind: "mission"; missionId: string; intentSummary: string }
+  | { ok: true; kind: "chat"; reply: string };
+
+export async function submitCoworkMessage(
+  conversationId: string,
+  message: string,
+): Promise<CoworkSubmitResult> {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false, error: "用户未关联组织" };
+  const text = message.trim();
+  if (!text) return { ok: false, error: "消息不能为空" };
+
+  const convo = await getConversationById(orgId, user.id, conversationId);
+  if (!convo) return { ok: false, error: "对话不存在或无权访问" };
+
+  // 1. 落用户消息
+  await appendMessage(conversationId, {
+    role: "user",
+    content: text,
+    kind: "text",
+  });
+
+  // 2. 意图识别
+  const intent = await recognizeIntentForOrg(orgId, user.id, text);
+
+  // 3. 路由
+  if (intent.steps && intent.steps.length > 0) {
+    const res = await startAdHocMission({
+      message: text,
+      steps: intent.steps,
+      summary: intent.summary,
+      conversationId,
+      projectId: convo.projectId,
+    });
+    if (!res.ok) {
+      const err = res.errors?._global ?? "任务启动失败";
+      await appendMessage(conversationId, {
+        role: "assistant",
+        content: `任务启动失败：${err}`,
+        kind: "text",
+      });
+      revalidatePath(`/cowork/${conversationId}`);
+      return { ok: false, error: err };
+    }
+    await appendMessage(conversationId, {
+      role: "assistant",
+      content: intent.summary || "已为你启动任务",
+      kind: "mission_card",
+      missionId: res.missionId,
+      meta: { intentSummary: intent.summary, confidence: intent.confidence },
+    });
+    revalidatePath(`/cowork/${conversationId}`);
+    return {
+      ok: true,
+      kind: "mission",
+      missionId: res.missionId,
+      intentSummary: intent.summary,
+    };
+  }
+
+  // general_chat → 非流式简单回复(MVP)
+  let reply = "";
+  try {
+    const modelName = process.env.OPENAI_MODEL;
+    if (modelName) {
+      const model = getLanguageModel({
+        provider: "openai",
+        model: modelName,
+        temperature: 0.7,
+        maxTokens: 800,
+      });
+      const result = await generateText({
+        model,
+        system: "你是融媒云的 AI 助手，用简洁专业的中文回答用户。",
+        prompt: text,
+        maxOutputTokens: 800,
+      });
+      reply = result.text?.trim() ?? "";
+    }
+  } catch (err) {
+    console.error("[cowork-submit] free chat failed:", err);
+  }
+  if (!reply) reply = "好的，我在。需要我帮你执行什么任务吗？";
+
+  await appendMessage(conversationId, {
+    role: "assistant",
+    content: reply,
+    kind: "text",
+  });
+  revalidatePath(`/cowork/${conversationId}`);
+  return { ok: true, kind: "chat", reply };
+}
+
+/**
+ * 右栏取 mission 详情(初始渲染 + 校验 org 归属);客户端再订阅 progress SSE。
+ */
+export async function getCoworkMissionDetail(missionId: string) {
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return null;
+  const mission = await getMissionById(missionId);
+  if (!mission || mission.organizationId !== orgId) return null;
+  return mission;
+}
