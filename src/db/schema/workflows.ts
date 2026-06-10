@@ -117,6 +117,11 @@ export const workflowTemplates = pgTable("workflow_templates", {
   featuredIdx: index("idx_workflow_templates_featured")
     .on(table.organizationId, table.isFeatured)
     .where(sql`${table.isFeatured} = true AND ${table.isPublic} = true`),
+  // (org_id, owner_employee_id) —— 仅 owner 非 null 时生效。
+  // 原仅存于手工 migration 20260420000001，上行到 schema 防 push 丢索引。
+  ownerEmployeeIdx: index("idx_workflow_templates_owner_employee")
+    .on(table.organizationId, table.ownerEmployeeId)
+    .where(sql`${table.ownerEmployeeId} IS NOT NULL`),
 }));
 
 // ─── Homepage Template Tab Order (per-tab drag / pin state for /home) ───

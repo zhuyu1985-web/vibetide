@@ -1,0 +1,1 @@
+CREATE INDEX "idx_workflow_templates_owner_employee" ON "workflow_templates" USING btree ("organization_id","owner_employee_id") WHERE "workflow_templates"."owner_employee_id" IS NOT NULL;
