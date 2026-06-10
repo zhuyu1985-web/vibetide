@@ -7,6 +7,8 @@ interface FetchOptions {
   endpoint: string;
   params?: Record<string, string | number | boolean | undefined>;
   retryOn5xx?: boolean;
+  /** 默认 true。TikHub 上游(weibo/douyin)瞬时抖动会回 400 + "Please retry",且不扣费,可安全重试 */
+  retryOn400Retryable?: boolean;
 }
 
 export interface TikhubFetchResult<T = unknown> {
@@ -14,6 +16,8 @@ export interface TikhubFetchResult<T = unknown> {
   costUsd: number;
   endpoint: string;
 }
+
+const TIKHUB_RETRYABLE_400_PATTERN = /Please retry|请求失败.*请重试|won.?t be charged|不会被扣费/i;
 
 export async function tikhubFetch<T = unknown>(opts: FetchOptions): Promise<TikhubFetchResult<T>> {
   const apiKey = process.env.TIKHUB_API_KEY;
@@ -43,6 +47,19 @@ export async function tikhubFetch<T = unknown>(opts: FetchOptions): Promise<Tikh
   if (response.status >= 500 && opts.retryOn5xx !== false) {
     await new Promise<void>((r) => setTimeout(r, 5000));
     response = await fetchOnce();
+  }
+
+  // TikHub 上游(weibo/douyin)瞬时抖动 400:错误体里带 "Please retry" 字样,
+  // 且 TikHub 明确不扣费,可安全重试一次,避免账号分析多页抓取因一页失败而 break 整次任务
+  if (
+    response.status === 400 &&
+    opts.retryOn400Retryable !== false
+  ) {
+    const bodyText = await response.clone().text().catch(() => "");
+    if (TIKHUB_RETRYABLE_400_PATTERN.test(bodyText)) {
+      await new Promise<void>((r) => setTimeout(r, 3000));
+      response = await fetchOnce();
+    }
   }
 
   if (!response.ok) {
