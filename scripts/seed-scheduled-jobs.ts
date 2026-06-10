@@ -48,6 +48,15 @@ const SEED_JOBS: NewScheduledJob[] = [
     category: "account-analytics",
   },
   {
+    name: "account-analytics-weekly-report",
+    displayName: "账号分析 · 周报",
+    description: "每周一 07:00 SH 生成上一个完整自然周(上周一 ~ 上周日)的账号周报",
+    eventName: "scheduled-jobs/account-analytics-weekly-report.run",
+    cronExpression: "0 7 * * 1",
+    timezone: "Asia/Shanghai",
+    category: "account-analytics",
+  },
+  {
     name: "account-analytics-monthly-report",
     displayName: "账号分析 · 月报",
     description: "每月 1 号生成上个月完整自然月报告(覆盖上月 1 日 ~ 上月末日)",

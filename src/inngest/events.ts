@@ -377,10 +377,10 @@ export type InngestEvents = {
   // ─── Scheduled Jobs Events (2026-05-26) ───
   // scheduledJobsRunner 每分钟扫 scheduled_jobs 表派发的事件。
   // 业务函数订阅这些事件而不是 cron,cron 表达式由 DB / UI 管理。
-  // 13 条 event 对应 13 个原 cron 函数 + 1 个新增 monthly-report。
   "scheduled-jobs/account-analytics-crawl.run": ScheduledJobPayload;
   "scheduled-jobs/account-analytics-daily-snapshot.run": ScheduledJobPayload;
   "scheduled-jobs/account-analytics-annotate-posts.run": ScheduledJobPayload;
+  "scheduled-jobs/account-analytics-weekly-report.run": ScheduledJobPayload;
   "scheduled-jobs/account-analytics-monthly-report.run": ScheduledJobPayload;
   "scheduled-jobs/cms-catalog-sync-daily.run": ScheduledJobPayload;
   "scheduled-jobs/collection-hot-topic-cron.run": ScheduledJobPayload;

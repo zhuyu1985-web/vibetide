@@ -5,10 +5,14 @@
  *   1. 查所有 crawl_cron_enabled = true 且 outlet_id IS NOT NULL 的 my/benchmark 账号
  *   2. 对每个账号：ensureTikHubAccountSource → 派发 collection/source.run-requested
  *   3. 更新 account.last_crawled_at
- *   4. 派发 account-analytics/daily-report.requested（区间 = 过去 7 天）
  *
- * 设计：
- *   - 默认 7 天窗口，覆盖大多数账号 daily 节奏
+ * 说明：
+ *   - 本函数只负责"拉数据"。日报由 account-analytics-daily-snapshot(06:00)
+ *     处理,周报由 account-analytics-weekly-report(每周一 07:00)处理,
+ *     月报由 account-analytics-monthly-report(每月 1 号 05:00)处理。
+ *   - 历史 bug 修正(2026-05-31):之前这里每天都派一份 reportType=weekly 的
+ *     "过去 7 天"报告,导致每个账号每天产生一份周报,周期 overlapping。
+ *     现已拆分到独立 weekly-report.ts,按"上一个完整自然周"窗口跑。
  *   - 用户用 toggleAccountCrawlCron Server Action 在 UI 上勾选要自动抓的账号
  *   - 未配置 outlet/secUid 的账号会被跳过并记录 warn 日志
  */
@@ -19,8 +23,6 @@ import { myAccounts, benchmarkAccounts } from "@/db/schema";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { ensureTikHubAccountSource } from "@/lib/account-analytics/ensure-source";
 import { isTikhubAccountSupported } from "@/lib/topic-compare/constants";
-
-const HISTORY_DAYS = 7;
 
 interface AccountTarget {
   id: string;
@@ -162,41 +164,10 @@ export const accountAnalyticsCrawlCron = inngest.createFunction(
       dispatched++;
     }
 
-    // Step 3：等待 5 分钟让 TikHub 抓取 + writeItems 完成，然后派发报告生成事件
-    // （注意：collection-run-source 是另一条独立 Inngest 函数，不能 await，只能等估计时间）
-    await step.sleep("wait-for-crawl", "5m");
-
-    // Step 4：派发日报生成事件（默认窗口 = 过去 7 天，但 report-generator 内部会自动收敛）
-    const today = new Date();
-    const sevenDaysAgo = new Date(today.getTime() - HISTORY_DAYS * 24 * 3600 * 1000);
-    const periodStart = sevenDaysAgo.toISOString().slice(0, 10);
-    const periodEnd = today.toISOString().slice(0, 10);
-
-    for (const t of targets) {
-      // 只对成功抓取的派
-      const skippedIds = new Set(skippedDetails.map((s) => s.accountId));
-      if (skippedIds.has(t.id)) continue;
-
-      await step.sendEvent(`gen-report-${t.id}`, {
-        name: "account-analytics/daily-report.requested",
-        data: {
-          organizationId: t.organizationId,
-          accountId: t.id,
-          accountSource: t.source,
-          periodStart,
-          periodEnd,
-          reportType: "weekly", // 7 天默认 = 周报；report-generator 内部会按实际数据跨度回收
-          forceRefresh: true,
-        },
-      });
-    }
-
     return {
       dispatched,
       skipped,
       skippedDetails,
-      periodStart,
-      periodEnd,
     };
   },
 );

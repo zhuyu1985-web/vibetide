@@ -45,6 +45,7 @@ import {
   accountAnalyticsReportReanalyze,
   accountAnalyticsCrawlOnDemand,
   accountAnalyticsCrawlCron,
+  accountAnalyticsWeeklyReport,
   accountAnalyticsMonthlyReport,
   // 2026-05-25 暂停：AIGC 账号发文标注（区块 C 类型占比+词云）
   // 数据量极小（my_posts 3 + benchmark_posts 17 = 20 条全部标注完成）。
@@ -113,6 +114,7 @@ export const functions = [
   accountAnalyticsReportReanalyze,
   accountAnalyticsCrawlOnDemand,
   accountAnalyticsCrawlCron,
+  accountAnalyticsWeeklyReport,
   accountAnalyticsMonthlyReport,
   // Account Analytics Phase 2: AIGC 账号发文标注 (2026-05-25 修正：从 collected_items 迁到 my_posts + benchmark_posts)
   // ⚠️ 2026-05-25 暂停注册：20 条数据已全量标注完成；后续启用取消注释即可
