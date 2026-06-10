@@ -15,8 +15,6 @@ import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
-import { createConversationAction } from "@/app/actions/cowork-conversations";
-import { createProjectAction } from "@/app/actions/projects";
 import { startCoworkConversation } from "@/app/actions/cowork-start";
 import type { Project } from "@/db/schema/projects";
 import type { Conversation } from "@/db/schema/conversations";
@@ -45,7 +43,6 @@ export function HomeWorkspaceClient({
   const router = useRouter();
   const [input, setInput] = useState("");
   const [submitting, startSubmit] = useTransition();
-  const [sidebarPending, startSidebar] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function submit() {
@@ -65,29 +62,12 @@ export function HomeWorkspaceClient({
     textareaRef.current?.focus();
   }
 
-  function handleNewConversation() {
-    startSidebar(async () => {
-      const res = await createConversationAction({ projectId: null });
-      if (res.ok) router.push(`/cowork/${res.data.id}`);
-    });
-  }
-
-  function handleNewProject() {
-    startSidebar(async () => {
-      await createProjectAction({ name: "新项目" });
-      router.refresh();
-    });
-  }
-
   return (
     <div className="flex h-full overflow-hidden">
       <CoworkSidebar
         projects={projects}
         conversations={conversations}
         activeId={null}
-        onNewConversation={handleNewConversation}
-        onNewProject={handleNewProject}
-        pending={sidebarPending}
       />
 
       <div className="relative flex-1 overflow-y-auto scrollbar-thin">

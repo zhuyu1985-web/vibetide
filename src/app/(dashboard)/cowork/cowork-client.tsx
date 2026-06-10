@@ -1,13 +1,10 @@
 "use client";
 
-import { useReducer, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useReducer } from "react";
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
 import { ConversationThread } from "@/components/cowork/conversation-thread";
 import { MissionDrawer } from "@/components/cowork/mission-drawer";
 import { missionDrawerReducer } from "@/lib/cowork/mission-drawer-state";
-import { createConversationAction } from "@/app/actions/cowork-conversations";
-import { createProjectAction } from "@/app/actions/projects";
 import type { Project } from "@/db/schema/projects";
 import type {
   Conversation,
@@ -21,14 +18,11 @@ interface Props {
 }
 
 /**
- * cowork 会话页:左 CoworkSidebar(工作区栏)+ 中居中对话流 + 右 mission 抽屉。
+ * cowork 会话页:左 CoworkSidebar(自包含工作区栏)+ 中居中对话流 + 右 mission 抽屉。
  * 页面按会话 id 给本组件传 key,切换会话整体 remount —— 抽屉状态用 useReducer
  * 初始值派生(默认收起,即便该会话已有 mission,也要点卡片才滑出)。
  */
 export function CoworkClient({ projects, conversations, active }: Props) {
-  const router = useRouter();
-  const [sidebarPending, startSidebar] = useTransition();
-
   const initialMissionId =
     active?.messages
       .filter((m) => m.kind === "mission_card" && m.missionId)
@@ -39,29 +33,12 @@ export function CoworkClient({ projects, conversations, active }: Props) {
     open: false,
   });
 
-  function handleNewConversation() {
-    startSidebar(async () => {
-      const res = await createConversationAction({ projectId: null });
-      if (res.ok) router.push(`/cowork/${res.data.id}`);
-    });
-  }
-
-  function handleNewProject() {
-    startSidebar(async () => {
-      await createProjectAction({ name: "新项目" });
-      router.refresh();
-    });
-  }
-
   return (
-    <div className="flex h-full overflow-hidden rounded-xl border border-border">
+    <div className="flex h-full overflow-hidden rounded-xl border border-border/60">
       <CoworkSidebar
         projects={projects}
         conversations={conversations}
         activeId={active?.conversation.id ?? null}
-        onNewConversation={handleNewConversation}
-        onNewProject={handleNewProject}
-        pending={sidebarPending}
       />
       <ConversationThread
         active={active}
