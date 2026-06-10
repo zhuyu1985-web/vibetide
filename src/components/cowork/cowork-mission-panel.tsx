@@ -42,16 +42,23 @@ export function CoworkMissionPanel({ missionId }: { missionId: string | null }) 
       if (!cancelled) setLoading(false);
     });
 
-    // 订阅进度:任何事件触发即重拉详情(MVP 简单稳健)
+    // 订阅进度:任何事件触发即重拉详情(MVP 简单稳健)。
+    // 注意 progress 端点发的是具名事件(mission-init / mission-progress /
+    // task-update),EventSource.onmessage 只接收无名 "message" 事件,收不到
+    // 具名事件 —— 必须 addEventListener,否则首屏拉取后右栏再无更新、卡在
+    // 初始态直到刷新。
     const es = new EventSource(`/api/missions/${missionId}/progress`);
     esRef.current = es;
-    es.onmessage = async () => {
+    const onProgress = async () => {
       const m = await refetch(missionId);
       if (m && TERMINAL.has(m.status)) {
         es.close();
         esRef.current = null;
       }
     };
+    es.addEventListener("mission-init", onProgress);
+    es.addEventListener("mission-progress", onProgress);
+    es.addEventListener("task-update", onProgress);
     es.onerror = () => {
       es.close();
       esRef.current = null;
