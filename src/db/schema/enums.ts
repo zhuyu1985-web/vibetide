@@ -702,3 +702,17 @@ export const scheduledJobKindEnum = pgEnum("scheduled_job_kind", [
   "platform",
   "workflow_template",
 ]);
+
+// =====================================================================
+// Cowork 化对话中心 (2026-06-10)
+// projects 项目分组容器 / conversations 会话,二者状态都是 active|archived
+// =====================================================================
+export const projectStatusEnum = pgEnum("project_status", [
+  "active",
+  "archived",
+]);
+
+export const conversationStatusEnum = pgEnum("conversation_status", [
+  "active",
+  "archived",
+]);

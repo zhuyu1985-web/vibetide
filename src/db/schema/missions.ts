@@ -64,6 +64,14 @@ export const missions = pgTable("missions", {
   // 2026-04-20 realignment: serialized scenario input form values.
   inputParams: jsonb("input_params").$type<Record<string, unknown>>().default({}).notNull(),
 
+  // Cowork 化 (2026-06-10): mission 归属的项目 / 会话。
+  // 软引用(无 .references()):conversations.ts import missions.ts(消息行 FK
+  // 到 mission),若 missions 反向 import conversations 会成 ES module 循环,
+  // 故此处不声明 FK,由应用层保证一致性(与 workflowTemplateId 同款思路)。
+  // projects 删除走归档不真删,conversation 删除时其 mission 仍独立有价值。
+  projectId: uuid("project_id"),
+  conversationId: uuid("conversation_id"),
+
   // Token budget
   tokenBudget: integer("token_budget").notNull().default(200000),
   tokensUsed: integer("tokens_used").notNull().default(0),
