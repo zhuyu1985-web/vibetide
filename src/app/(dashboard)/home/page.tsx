@@ -1,20 +1,20 @@
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/db";
-import { missions } from "@/db/schema/missions";
-import { savedConversations } from "@/db/schema/saved-conversations";
-import { desc, eq } from "drizzle-orm";
 import { getCurrentUserProfile } from "@/lib/dal/auth";
+import { listProjectsByOrg } from "@/lib/dal/projects";
+import { listConversationsByUser } from "@/lib/dal/cowork-conversations";
 import {
   listTemplatesForHomepageByTab,
   type HomepageTabKey,
 } from "@/lib/dal/workflow-templates-listing";
-import type { ScenarioCardData } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
-import { HomeClient } from "./home-client";
+import type { Project } from "@/db/schema/projects";
+import type { Conversation } from "@/db/schema/conversations";
+import { HomeWorkspaceClient } from "./home-workspace-client";
 
-// 2026-04-20 首页 tab 重构 — "主流场景 + 8 职能 + 我的工作流" = 10 tab，
-// 服务端并行 fetch 所有 tab 数据，支持切换无感。
+export const dynamic = "force-dynamic";
+
+// 首页 tab — "主流场景 + 8 职能 + 我的工作流" = 10 tab，服务端并行 fetch。
 const HOMEPAGE_TAB_KEYS: HomepageTabKey[] = [
   "featured",
   "xiaolei",
@@ -29,23 +29,8 @@ const HOMEPAGE_TAB_KEYS: HomepageTabKey[] = [
 ];
 
 export default async function HomePage() {
-  let recentMissions: Array<{
-    id: string;
-    title: string;
-    status: string;
-    createdAt: string;
-    sourceModule?: string;
-  }> = [];
-  let recentConversations: Array<{
-    id: string;
-    title: string;
-    employeeSlug: string;
-    updatedAt: string;
-  }> = [];
-  const scenarioMap: Record<string, ScenarioCardData[]> = {};
-  // employeeDbIdMap removed 2026-05-08 — HomeClient never used it (`void _employeeDbIdMap`)，
-  // 但每次首页加载都跑一份完整 getEmployees()（13 行 + skills join，慢网下 6-24s）
-  // 完全是浪费 + 与 layout / 其他页面并发跑 employees 竞争 DB pooler。
+  let projects: Project[] = [];
+  let conversations: Conversation[] = [];
   let templatesByTab: Record<
     string,
     (WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[]
@@ -54,53 +39,16 @@ export default async function HomePage() {
 
   try {
     const user = await getCurrentUser();
-
     if (user) {
       const orgId = user.organizationId;
-
-      // Fetch recent missions (missions belong to org)
       if (orgId) {
-        const missionsResult = await db
-          .select({
-            id: missions.id,
-            title: missions.title,
-            status: missions.status,
-            createdAt: missions.createdAt,
-            sourceModule: missions.sourceModule,
-          })
-          .from(missions)
-          .where(eq(missions.organizationId, orgId))
-          .orderBy(desc(missions.createdAt))
-          .limit(5);
+        // cowork 工作区栏数据(项目 + 最近对话)
+        [projects, conversations] = await Promise.all([
+          listProjectsByOrg(orgId),
+          listConversationsByUser(orgId, user.id),
+        ]);
 
-        recentMissions = missionsResult.map((m) => ({
-          ...m,
-          createdAt: m.createdAt.toISOString(),
-          sourceModule: m.sourceModule ?? undefined,
-        }));
-      }
-
-      // Fetch recent conversations (owned by user)
-      const convsResult = await db
-        .select({
-          id: savedConversations.id,
-          title: savedConversations.title,
-          employeeSlug: savedConversations.employeeSlug,
-          updatedAt: savedConversations.updatedAt,
-        })
-        .from(savedConversations)
-        .where(eq(savedConversations.userId, user.id))
-        .orderBy(desc(savedConversations.updatedAt))
-        .limit(5);
-
-      recentConversations = convsResult.map((c) => ({
-        ...c,
-        updatedAt: c.updatedAt.toISOString(),
-      }));
-
-      // 2026-04-20 首页 tab 重构 — 并行 fetch 10 个 tab 数据。
-      // custom tab 需要 userId 来匹配 /workflows 页 "我的工作流" 语义（只显示当前用户创建的）。
-      if (orgId) {
+        // 场景宫格 — 并行 fetch 10 个 tab。
         try {
           const results = await Promise.all(
             HOMEPAGE_TAB_KEYS.map((key) =>
@@ -111,41 +59,32 @@ export default async function HomePage() {
             HOMEPAGE_TAB_KEYS.map((key, i) => [key, results[i]]),
           );
         } catch {
-          // Graceful degradation — fall through with an empty tab map.
+          // 优雅降级 — 空 tab map。
         }
       }
-    }
 
-    // Legacy `employee_scenarios` table dropped 2026-04-20 —
-    // scenarioMap stays as an empty record; per-employee "chip" scenarios in
-    // the chat input are sourced elsewhere now.
-
-    // 2026-05-08 删除 getEmployees() — HomeClient 不再使用 employeeDbIdMap，
-    // 每次首页加载多查一份慢 query（13 行 + skills join）实际是死代码。
-
-    // Task 4 — 判定当前用户是否可管理首页（admin / owner / 超级管理员）。
-    // 失败时落到 false（普通用户视图），不阻断首页加载。
-    try {
-      const profile = await getCurrentUserProfile();
-      if (profile) {
-        canManageHomepage =
-          profile.isSuperAdmin ||
-          profile.role === "admin" ||
-          profile.role === "owner";
+      // 是否可管理首页(admin / owner / 超级管理员)。
+      try {
+        const profile = await getCurrentUserProfile();
+        if (profile) {
+          canManageHomepage =
+            profile.isSuperAdmin ||
+            profile.role === "admin" ||
+            profile.role === "owner";
+        }
+      } catch {
+        // 普通用户视图
       }
-    } catch {
-      // Graceful degrade to normal user
     }
   } catch {
-    // Graceful degradation — show empty data
+    // 优雅降级 — 空数据
   }
 
   return (
     <Suspense>
-      <HomeClient
-        recentMissions={recentMissions}
-        recentConversations={recentConversations}
-        scenarioMap={scenarioMap}
+      <HomeWorkspaceClient
+        projects={projects}
+        conversations={conversations}
         templatesByTab={templatesByTab}
         canManageHomepage={canManageHomepage}
       />
