@@ -17,10 +17,12 @@ import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
 import { startCoworkConversation } from "@/app/actions/cowork-start";
 import type { Conversation } from "@/db/schema/conversations";
+import type { Project } from "@/db/schema/projects";
 import type { WorkflowTemplateRow } from "@/db/types";
 
 interface HomeWorkspaceClientProps {
   conversations: Conversation[];
+  projects?: Project[];
   templatesByTab?: Record<
     string,
     (WorkflowTemplateRow & { __homepagePinnedAt?: Date | null })[]
@@ -34,6 +36,7 @@ interface HomeWorkspaceClientProps {
  */
 export function HomeWorkspaceClient({
   conversations,
+  projects,
   templatesByTab = {},
   canManageHomepage = false,
 }: HomeWorkspaceClientProps) {
@@ -61,7 +64,11 @@ export function HomeWorkspaceClient({
 
   return (
     <div className="flex h-full overflow-hidden">
-      <CoworkSidebar conversations={conversations} activeId={null} />
+      <CoworkSidebar
+        conversations={conversations}
+        projects={projects}
+        activeId={null}
+      />
 
       <div className="relative flex-1 overflow-y-auto scrollbar-thin">
         <ParticleBackground

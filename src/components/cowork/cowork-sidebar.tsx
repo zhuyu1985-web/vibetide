@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,6 +19,7 @@ import {
   PinOff,
   Archive,
   Trash2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,19 +40,45 @@ import {
   deleteConversationAction,
 } from "@/app/actions/cowork-conversations";
 import type { Conversation } from "@/db/schema/conversations";
+import type { Project } from "@/db/schema/projects";
+
+type GroupBy = "none" | "date" | "project";
+
+const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: "none", label: "默认" },
+  { value: "date", label: "按日期" },
+  { value: "project", label: "按项目" },
+];
+
+const GROUPBY_STORAGE_KEY = "cowork-conv-groupby";
+
+type ConvGroup = { key: string; label: string; items: Conversation[] };
+
+/** 按"自然日"差把会话分到 今天 / 昨天 / 过去 7 天 / 更早。 */
+function dateBucket(d: Date, now: Date): { key: string; label: string; order: number } {
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.floor((startOfDay(now) - startOfDay(d)) / 86_400_000);
+  if (diffDays <= 0) return { key: "today", label: "今天", order: 0 };
+  if (diffDays === 1) return { key: "yesterday", label: "昨天", order: 1 };
+  if (diffDays <= 7) return { key: "week", label: "过去 7 天", order: 2 };
+  return { key: "older", label: "更早", order: 3 };
+}
 
 /**
  * Cowork 工作区左栏(共享于 /home 与 /cowork/[id])。自包含:内部直接调用
  * server actions + router 处理会话的新建/重命名/置顶/归档/删除,父组件只传数据。
  *
- * 结构:新建对话 → 项目(单入口,→ /cowork/projects 在主区管理)→ 定时任务 →
- * 定制 → 最近对话(置顶的会话排在列表最上面,不单列分组)。
+ * 结构:新建对话 → 项目(单入口)→ 定时任务 → 定制 →(分割线)→ 最近对话
+ * (可按 默认/日期/项目 分组;projects 仅用于"按项目"分组的表头,不在侧栏铺列表)。
  */
 export function CoworkSidebar({
   conversations,
+  projects = [],
   activeId,
 }: {
   conversations: Conversation[];
+  projects?: Project[];
   activeId: string | null;
 }) {
   const router = useRouter();
@@ -60,24 +87,80 @@ export function CoworkSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
   const [query, setQuery] = useState("");
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
 
-  // 单一列表:按 query 过滤后,置顶的排在最上面(置顶不单列分组)。
-  const list = useMemo(() => {
+  // groupBy 从 localStorage 恢复(默认 none;挂载后再读,避免 SSR 水合不一致)。
+  useEffect(() => {
+    const saved = localStorage.getItem(GROUPBY_STORAGE_KEY);
+    if (saved === "date" || saved === "project") setGroupBy(saved);
+  }, []);
+  function changeGroupBy(g: GroupBy) {
+    setGroupBy(g);
+    try {
+      localStorage.setItem(GROUPBY_STORAGE_KEY, g);
+    } catch {
+      // localStorage 不可用时忽略
+    }
+  }
+
+  const searching = query.trim().length > 0;
+
+  // 过滤 + 按所选方式归组。
+  const groups: ConvGroup[] = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = q
       ? conversations.filter((c) => c.title.toLowerCase().includes(q))
       : conversations;
-    return [...filtered].sort((a, b) => {
+    const byRecency = (a: Conversation, b: Conversation) =>
+      new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+
+    if (groupBy === "date") {
+      const now = new Date();
+      const m = new Map<string, ConvGroup & { order: number }>();
+      for (const c of [...filtered].sort(byRecency)) {
+        const b = dateBucket(new Date(c.lastMessageAt), now);
+        let g = m.get(b.key);
+        if (!g) {
+          g = { key: b.key, label: b.label, order: b.order, items: [] };
+          m.set(b.key, g);
+        }
+        g.items.push(c);
+      }
+      return [...m.values()].sort((a, b) => a.order - b.order);
+    }
+
+    if (groupBy === "project") {
+      const nameOf = new Map(projects.map((p) => [p.id, p.name]));
+      const m = new Map<string, ConvGroup>();
+      for (const c of [...filtered].sort(byRecency)) {
+        const pid = c.projectId ?? "__none__";
+        const label = c.projectId
+          ? (nameOf.get(c.projectId) ?? "未命名项目")
+          : "未归类";
+        let g = m.get(pid);
+        if (!g) {
+          g = { key: pid, label, items: [] };
+          m.set(pid, g);
+        }
+        g.items.push(c);
+      }
+      // "未归类"排最后,其余保持插入序(已按最近活跃)
+      return [...m.values()].sort((a, b) =>
+        a.key === "__none__" ? 1 : b.key === "__none__" ? -1 : 0,
+      );
+    }
+
+    // none —— 单组,置顶排最上
+    const sorted = [...filtered].sort((a, b) => {
       const ap = a.pinnedAt ? 1 : 0;
       const bp = b.pinnedAt ? 1 : 0;
       if (ap !== bp) return bp - ap;
-      return (
-        new Date(b.lastMessageAt).getTime() -
-        new Date(a.lastMessageAt).getTime()
-      );
+      return byRecency(a, b);
     });
-  }, [conversations, query]);
-  const searching = query.trim().length > 0;
+    return [{ key: "recent", label: "最近对话", items: sorted }];
+  }, [conversations, query, groupBy, projects]);
+
+  const totalConversations = groups.reduce((n, g) => n + g.items.length, 0);
 
   // 删除/归档当前正在看的会话后,跳到下一条;无则回 /home
   function jumpAfterRemoval(removedId: string) {
@@ -175,28 +258,71 @@ export function CoworkSidebar({
           </div>
         )}
 
-        {/* 最近对话(置顶的排在最上面) */}
-        <div className="px-2 pb-1 pt-3 text-xs font-medium text-muted-foreground">
-          最近对话
+        {/* ── 分割线:把"项目/定时任务/定制"与"最近对话"在视觉上隔开 ── */}
+        <div className="mx-1 my-2 border-t border-border/50" />
+
+        {/* 最近对话 —— 标题 + 分组方式(默认 / 按日期 / 按项目) */}
+        <div className="flex items-center justify-between px-2 pb-1 pt-1">
+          <span className="text-xs font-medium text-muted-foreground">
+            最近对话
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="对话分组方式"
+                className="text-muted-foreground"
+              >
+                <SlidersHorizontal className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
+                分组方式
+              </div>
+              {GROUP_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onSelect={() => changeGroupBy(opt.value)}
+                >
+                  <span className="flex-1">{opt.label}</span>
+                  {groupBy === opt.value && (
+                    <Check className="size-3.5 text-primary" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        {list.length === 0 ? (
+
+        {totalConversations === 0 ? (
           <p className="px-2.5 py-1 text-xs text-muted-foreground/60">
             {searching ? "无匹配的对话" : "还没有对话,点上方新建"}
           </p>
         ) : (
-          list.map((c) => (
-            <ConversationRow
-              key={c.id}
-              conversation={c}
-              activeId={activeId}
-              renaming={renamingId === c.id}
-              onStartRename={() => setRenamingId(c.id)}
-              onRename={handleRename}
-              onCancelRename={() => setRenamingId(null)}
-              onPin={handlePin}
-              onArchive={handleArchive}
-              onRequestDelete={() => setDeleteTarget(c)}
-            />
+          groups.map((g) => (
+            <div key={g.key}>
+              {groupBy !== "none" && (
+                <div className="px-2 pb-0.5 pt-2 text-[11px] font-medium text-muted-foreground/70">
+                  {g.label}
+                </div>
+              )}
+              {g.items.map((c) => (
+                <ConversationRow
+                  key={c.id}
+                  conversation={c}
+                  activeId={activeId}
+                  renaming={renamingId === c.id}
+                  onStartRename={() => setRenamingId(c.id)}
+                  onRename={handleRename}
+                  onCancelRename={() => setRenamingId(null)}
+                  onPin={handlePin}
+                  onArchive={handleArchive}
+                  onRequestDelete={() => setDeleteTarget(c)}
+                />
+              ))}
+            </div>
           ))
         )}
       </div>

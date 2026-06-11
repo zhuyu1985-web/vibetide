@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
-import { getProjectById } from "@/lib/dal/projects";
+import { getProjectById, listProjectsByOrg } from "@/lib/dal/projects";
 import { listConversationsByUser } from "@/lib/dal/cowork-conversations";
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
 import { ProjectDetailClient } from "./project-detail-client";
@@ -19,15 +19,21 @@ export default async function CoworkProjectDetailPage({
   const project = await getProjectById(ctx.organizationId, projectId);
   if (!project) notFound();
 
-  // 侧栏要全部最近对话;详情区只要本项目下的会话
-  const [allConversations, projectConversations] = await Promise.all([
-    listConversationsByUser(ctx.organizationId, ctx.userId),
-    listConversationsByUser(ctx.organizationId, ctx.userId, { projectId }),
-  ]);
+  // 侧栏要全部最近对话 + 全量项目(用于"按项目"分组);详情区只要本项目下的会话
+  const [allConversations, projectConversations, allProjects] =
+    await Promise.all([
+      listConversationsByUser(ctx.organizationId, ctx.userId),
+      listConversationsByUser(ctx.organizationId, ctx.userId, { projectId }),
+      listProjectsByOrg(ctx.organizationId),
+    ]);
 
   return (
     <div className="flex h-full overflow-hidden">
-      <CoworkSidebar conversations={allConversations} activeId={null} />
+      <CoworkSidebar
+        conversations={allConversations}
+        projects={allProjects}
+        activeId={null}
+      />
       <div className="flex-1 overflow-y-auto">
         <ProjectDetailClient
           project={project}

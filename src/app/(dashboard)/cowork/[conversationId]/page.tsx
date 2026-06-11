@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCurrentUserAndOrg } from "@/lib/dal/auth";
+import { listProjectsByOrg } from "@/lib/dal/projects";
 import {
   listConversationsByUser,
   getConversationWithMessages,
@@ -17,9 +18,10 @@ export default async function CoworkConversationPage({
   const ctx = await getCurrentUserAndOrg();
   if (!ctx) notFound();
 
-  const [conversations, active] = await Promise.all([
+  const [conversations, active, projects] = await Promise.all([
     listConversationsByUser(ctx.organizationId, ctx.userId),
     getConversationWithMessages(ctx.organizationId, ctx.userId, conversationId),
+    listProjectsByOrg(ctx.organizationId),
   ]);
   if (!active) notFound();
 
@@ -27,6 +29,7 @@ export default async function CoworkConversationPage({
     <CoworkClient
       key={conversationId}
       conversations={conversations}
+      projects={projects}
       active={active}
     />
   );
