@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import {
   Loader2,
   ListChecks,
-  ArrowRight,
   Sparkles,
   Mic,
   Paperclip,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MissionStepStream } from "@/components/cowork/mission-step-stream";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
 import type {
   Conversation,
@@ -220,30 +220,33 @@ function MessageBubble({
   if (message.kind === "mission_card" && message.missionId) {
     const missionId = message.missionId;
     return (
-      <div className="flex justify-start">
-        <button
-          type="button"
-          onClick={() => onMissionFocus(missionId)}
-          className={cn(
-            "group flex w-full max-w-[88%] items-center gap-3 rounded-2xl rounded-bl-md px-3.5 py-3 text-left transition-all duration-200",
-            focused
-              ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
-              : "bg-card shadow-sm ring-1 ring-inset ring-border/60 hover:shadow-md hover:ring-primary/30",
-          )}
-        >
-          <span className="flex size-9 flex-none items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <ListChecks className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-foreground">
-              {message.content || "已启动任务"}
+      <div className="space-y-2">
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={() => onMissionFocus(missionId)}
+            className={cn(
+              "group flex max-w-[88%] items-center gap-2.5 rounded-2xl rounded-bl-md px-3 py-2 text-left transition-all duration-200",
+              focused
+                ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
+                : "bg-card shadow-sm ring-1 ring-inset ring-border/60 hover:ring-primary/30",
+            )}
+          >
+            <span className="flex size-7 flex-none items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ListChecks className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-medium text-foreground">
+                {message.content || "已组建 AI 团队并开始执行"}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                执行步骤见下方,右侧面板可看清单进度
+              </div>
             </div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              点击在右侧查看执行步骤与产出
-            </div>
-          </div>
-          <ArrowRight className="size-4 flex-none text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-        </button>
+          </button>
+        </div>
+        {/* 步骤流式输出到对话框(核心概要逐条打字 + 终态交付/失败) */}
+        <MissionStepStream missionId={missionId} />
       </div>
     );
   }
