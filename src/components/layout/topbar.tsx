@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/app/actions/auth";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { MountGate } from "@/components/shared/mount-gate";
 
 const pageTitles: Record<string, string> = {
   "/missions": "任务中心",
@@ -141,25 +142,32 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
           )}
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        {(() => {
+          const userTrigger = (
             <Button variant="ghost" size="sm" className="h-8 gap-2 px-2">
               <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.85), rgba(96,165,250,0.85))" }}>
                 <User size={12} className="text-white" />
               </div>
               <span className="text-sm text-foreground">{userName}</span>
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => signOut()}
-              className="text-red-600 dark:text-red-400 cursor-pointer"
-            >
-              <LogOut size={14} className="mr-2" />
-              退出登录
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          );
+          return (
+            <MountGate fallback={userTrigger}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>{userTrigger}</DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => signOut()}
+                    className="text-red-600 dark:text-red-400 cursor-pointer"
+                  >
+                    <LogOut size={14} className="mr-2" />
+                    退出登录
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </MountGate>
+          );
+        })()}
       </div>
     </header>
   );

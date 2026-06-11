@@ -51,6 +51,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { MountGate } from "@/components/shared/mount-gate";
 import { cn } from "@/lib/utils";
 import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
 
@@ -214,37 +215,41 @@ function SubMenuList({ items, pathname }: { items: SubItem[]; pathname: string }
 function SettingsButton({ pathname, expanded }: { pathname: string; expanded: boolean }) {
   const { open, setOpen, openNow, closeSoon } = useHoverPopover();
 
+  const trigger = (
+    <button
+      onMouseEnter={expanded ? undefined : openNow}
+      onMouseLeave={expanded ? undefined : closeSoon}
+      className={cn(
+        "flex items-center rounded-xl transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 active:translate-y-0",
+        !expanded && "hover:rotate-[15deg] active:rotate-0",
+        "border-0 bg-transparent cursor-pointer",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        expanded ? "gap-3 px-3 py-2 w-full" : "justify-center w-11 h-11"
+      )}
+    >
+      <Settings size={20} strokeWidth={1.7} className="shrink-0" />
+      {expanded && <span className="text-[13px] font-medium">设置</span>}
+    </button>
+  );
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
+    <MountGate fallback={trigger}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="end"
+          sideOffset={10}
           onMouseEnter={expanded ? undefined : openNow}
           onMouseLeave={expanded ? undefined : closeSoon}
-          className={cn(
-            "flex items-center rounded-xl transition-all duration-200 ease-out",
-            "hover:-translate-y-0.5 active:translate-y-0",
-            !expanded && "hover:rotate-[15deg] active:rotate-0",
-            "border-0 bg-transparent cursor-pointer",
-            "text-muted-foreground hover:bg-accent hover:text-foreground",
-            expanded ? "gap-3 px-3 py-2 w-full" : "justify-center w-11 h-11"
-          )}
+          className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
         >
-          <Settings size={20} strokeWidth={1.7} className="shrink-0" />
-          {expanded && <span className="text-[13px] font-medium">设置</span>}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="end"
-        sideOffset={10}
-        onMouseEnter={expanded ? undefined : openNow}
-        onMouseLeave={expanded ? undefined : closeSoon}
-        className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
-      >
-        <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55">系统管理</p>
-        <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
-      </PopoverContent>
-    </Popover>
+          <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55">系统管理</p>
+          <SubMenuList items={ADMIN_ITEMS} pathname={pathname} />
+        </PopoverContent>
+      </Popover>
+    </MountGate>
   );
 }
 
@@ -255,38 +260,42 @@ function MoreButton({ items, pathname, expanded }: {
 }) {
   const { open, setOpen, openNow, closeSoon } = useHoverPopover();
 
+  const trigger = (
+    <button
+      onMouseEnter={expanded ? undefined : openNow}
+      onMouseLeave={expanded ? undefined : closeSoon}
+      className={cn(
+        "flex items-center rounded-xl transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 active:translate-y-0",
+        !expanded && "hover:rotate-[15deg] active:rotate-0",
+        "border-0 bg-transparent cursor-pointer",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        expanded
+          ? "flex-row gap-3 px-3 py-2 w-full"
+          : "justify-center w-11 h-11"
+      )}
+    >
+      <MoreHorizontal size={20} strokeWidth={1.7} className="shrink-0" />
+      {expanded && <span className="text-[13px] font-medium whitespace-nowrap">更多</span>}
+    </button>
+  );
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
+    <MountGate fallback={trigger}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          sideOffset={10}
           onMouseEnter={expanded ? undefined : openNow}
           onMouseLeave={expanded ? undefined : closeSoon}
-          className={cn(
-            "flex items-center rounded-xl transition-all duration-200 ease-out",
-            "hover:-translate-y-0.5 active:translate-y-0",
-            !expanded && "hover:rotate-[15deg] active:rotate-0",
-            "border-0 bg-transparent cursor-pointer",
-            "text-muted-foreground hover:bg-accent hover:text-foreground",
-            expanded
-              ? "flex-row gap-3 px-3 py-2 w-full"
-              : "justify-center w-11 h-11"
-          )}
+          className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
         >
-          <MoreHorizontal size={20} strokeWidth={1.7} className="shrink-0" />
-          {expanded && <span className="text-[13px] font-medium whitespace-nowrap">更多</span>}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="start"
-        sideOffset={10}
-        onMouseEnter={expanded ? undefined : openNow}
-        onMouseLeave={expanded ? undefined : closeSoon}
-        className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
-      >
-        <SubMenuList items={items} pathname={pathname} />
-      </PopoverContent>
-    </Popover>
+          <SubMenuList items={items} pathname={pathname} />
+        </PopoverContent>
+      </Popover>
+    </MountGate>
   );
 }
 
@@ -301,38 +310,42 @@ function HoverNavGroup({ item, active, subItems, pathname, Icon }: {
 }) {
   const { open, setOpen, openNow, closeSoon } = useHoverPopover();
 
+  const trigger = (
+    <button
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
+      className={cn(
+        "flex items-center justify-center w-11 h-11 rounded-xl",
+        "transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:rotate-[15deg] active:translate-y-0 active:rotate-0",
+        "border-0 bg-transparent cursor-pointer",
+        active ? "nav-selected"
+               : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+    >
+      <Icon size={iconSizeFor(item.label)} strokeWidth={active ? 2 : 1.7} />
+    </button>
+  );
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
+    <MountGate fallback={trigger}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          sideOffset={10}
           onMouseEnter={openNow}
           onMouseLeave={closeSoon}
-          className={cn(
-            "flex items-center justify-center w-11 h-11 rounded-xl",
-            "transition-all duration-200 ease-out",
-            "hover:-translate-y-0.5 hover:rotate-[15deg] active:translate-y-0 active:rotate-0",
-            "border-0 bg-transparent cursor-pointer",
-            active ? "nav-selected"
-                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
-          )}
+          className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
         >
-          <Icon size={iconSizeFor(item.label)} strokeWidth={active ? 2 : 1.7} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="start"
-        sideOffset={10}
-        onMouseEnter={openNow}
-        onMouseLeave={closeSoon}
-        className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
-      >
-        <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55">
-          {item.label}
-        </p>
-        <SubMenuList items={subItems} pathname={pathname} />
-      </PopoverContent>
-    </Popover>
+          <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55">
+            {item.label}
+          </p>
+          <SubMenuList items={subItems} pathname={pathname} />
+        </PopoverContent>
+      </Popover>
+    </MountGate>
   );
 }
 
