@@ -29,13 +29,20 @@ import type {
 interface Props {
   active: { conversation: Conversation; messages: ConversationMessage[] } | null;
   focusedMissionId: string | null;
+  /** 点对话里 mission 卡片 → 打开抽屉加载该 mission */
   onMissionFocus: (missionId: string) => void;
+  /** 发送瞬间 → 乐观打开抽屉 loading 态 */
+  onSendStart?: () => void;
+  /** 结果回来 → 有 mission 则加载,无则关抽屉 */
+  onSendSettled?: (missionId: string | null) => void;
 }
 
 export function ConversationThread({
   active,
   focusedMissionId,
   onMissionFocus,
+  onSendStart,
+  onSendSettled,
 }: Props) {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -56,9 +63,10 @@ export function ConversationThread({
     const conversationId = active.conversation.id;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+    onSendStart?.(); // 乐观打开右侧执行面板(loading)
     startTransition(async () => {
       const res = await submitCoworkMessage(conversationId, text);
-      if (res.ok && res.kind === "mission") onMissionFocus(res.missionId);
+      onSendSettled?.(res.ok && res.kind === "mission" ? res.missionId : null);
       router.refresh();
     });
   }

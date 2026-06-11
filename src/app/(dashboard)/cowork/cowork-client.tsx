@@ -44,6 +44,12 @@ export function CoworkClient({ projects, conversations, active }: Props) {
         active={active}
         focusedMissionId={drawer.open ? drawer.missionId : null}
         onMissionFocus={(missionId) => dispatch({ type: "focus", missionId })}
+        onSendStart={() => dispatch({ type: "pending" })}
+        onSendSettled={(missionId) =>
+          dispatch(
+            missionId ? { type: "focus", missionId } : { type: "close" },
+          )
+        }
       />
       <MissionDrawer
         missionId={drawer.missionId}

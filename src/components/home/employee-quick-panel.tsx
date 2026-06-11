@@ -67,7 +67,7 @@ export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
 
       {/* Employee row */}
       <motion.div
-        className="flex flex-wrap justify-center gap-3 pb-2"
+        className="grid grid-cols-8 gap-1 pb-2"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -84,7 +84,7 @@ export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
               whileHover={{ y: -1 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
-                "flex-shrink-0 w-[88px] flex flex-col items-center gap-2 py-3 px-2 rounded-xl",
+                "flex w-full flex-col items-center gap-2 rounded-xl px-1 py-3",
                 "cursor-pointer transition-colors duration-200 border-0",
                 isActive
                   ? "bg-accent"

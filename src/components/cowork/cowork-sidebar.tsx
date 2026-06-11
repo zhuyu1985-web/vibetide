@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,13 +65,19 @@ export function CoworkSidebar({
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
+  const [query, setQuery] = useState("");
 
   const { pinned, recent } = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? conversations.filter((c) => c.title.toLowerCase().includes(q))
+      : conversations;
     const pinned: Conversation[] = [];
     const recent: Conversation[] = [];
-    for (const c of conversations) (c.pinnedAt ? pinned : recent).push(c);
+    for (const c of list) (c.pinnedAt ? pinned : recent).push(c);
     return { pinned, recent };
-  }, [conversations]);
+  }, [conversations, query]);
+  const searching = query.trim().length > 0;
 
   // 删除/归档当前正在看的会话后,跳到下一条;无则回 /home
   function jumpAfterRemoval(removedId: string) {
@@ -131,10 +138,10 @@ export function CoworkSidebar({
 
   return (
     <aside className="flex w-60 flex-none flex-col border-r border-border/60 bg-muted/30">
-      <div className="p-2.5">
+      <div className="space-y-2 p-2.5">
         <Button
           variant="secondary"
-          className="w-full justify-center gap-1.5"
+          className="w-full justify-start gap-2"
           disabled={pending}
           onClick={handleNewConversation}
         >
@@ -145,6 +152,12 @@ export function CoworkSidebar({
           )}
           新建对话
         </Button>
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索对话"
+          inputClassName="h-8 text-xs"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
@@ -249,7 +262,7 @@ export function CoworkSidebar({
         </div>
         {recent.length === 0 ? (
           <p className="px-2.5 py-1 text-[11px] text-muted-foreground/60">
-            还没有对话,点上方新建
+            {searching ? "无匹配的对话" : "还没有对话,点上方新建"}
           </p>
         ) : (
           recent.map((c) => (

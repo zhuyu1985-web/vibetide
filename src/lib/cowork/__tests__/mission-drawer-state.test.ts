@@ -31,4 +31,15 @@ describe("missionDrawerReducer", () => {
     );
     expect(s).toEqual({ missionId: "m2", open: true });
   });
+
+  it("pending 乐观打开(无 missionId,供 loading 态)", () => {
+    const s = missionDrawerReducer(closed, { type: "pending" });
+    expect(s).toEqual({ missionId: null, open: true });
+  });
+
+  it("pending 后 focus 加载真实 mission", () => {
+    const p = missionDrawerReducer(closed, { type: "pending" });
+    const s = missionDrawerReducer(p, { type: "focus", missionId: "m1" });
+    expect(s).toEqual({ missionId: "m1", open: true });
+  });
 });
