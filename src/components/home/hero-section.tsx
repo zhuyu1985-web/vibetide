@@ -2,8 +2,6 @@
 
 import { memo } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare, ArrowRight } from "lucide-react";
-import Link from "next/link";
 
 // memo: 父组件 home-client 每个 keystroke 都重 render,而 HeroSection 完全静态,
 // 不需要跟着重 render(motion 入场动画也只在 mount 时跑一次)。
@@ -27,68 +25,25 @@ export const HeroSection = memo(function HeroSection() {
         </div>
       </motion.div>
 
-      {/* Brand + Title — single line */}
-      <h1 className="flex items-baseline justify-center gap-3 md:gap-4 text-4xl md:text-5xl font-bold tracking-tight text-center">
-        {/* MClaw — paint-on scale animation */}
-        <motion.span
-          className="relative inline-block font-black leading-none"
-          style={{
-            background:
-              "linear-gradient(135deg, #0b1224 0%, #1e3a8a 40%, #0ea5e9 90%, #22d3ee 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-          initial={{ opacity: 0, scale: 2.2, filter: "blur(10px)" }}
-          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-          transition={{ duration: 0.9, ease: [0.22, 1.2, 0.36, 1] }}
-        >
-          MClaw
-          {/* brushstroke underline */}
-          <motion.span
-            className="absolute left-1/2 -bottom-1 h-[3px] rounded-full"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, #0ea5e9, #22d3ee, transparent)",
-            }}
-            initial={{ width: 0, x: "-50%", opacity: 0 }}
-            animate={{ width: "80%", x: "-50%", opacity: 0.85 }}
-            transition={{ duration: 0.6, delay: 0.55, ease: "easeOut" }}
-          />
-        </motion.span>
+      {/* Title — 新建会话提示语(每次新建会话即首页模板) */}
+      <motion.h1
+        className="text-center text-4xl font-bold tracking-tight text-foreground md:text-5xl"
+        initial={{ opacity: 0, scale: 0.9, filter: "blur(8px)" }}
+        animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+        transition={{ duration: 0.7, ease: [0.22, 1.1, 0.36, 1] }}
+      >
+        说点什么，开始新会话
+      </motion.h1>
 
-        {/* 你的智媒工作空间 — elastic settle */}
-        <motion.span
-          className="text-foreground"
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.85, ease: [0.34, 1.56, 0.64, 1] }}
-        >
-          你的智媒工作空间
-        </motion.span>
-      </h1>
-
-      {/* Subtitle + link — fade in after title */}
-      <motion.div
-        className="flex flex-col items-center gap-2 text-center"
+      {/* Subtitle — fade in after title */}
+      <motion.p
+        className="text-center text-base text-muted-foreground"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 1.15, ease: "easeOut" }}
+        transition={{ duration: 0.4, delay: 0.45, ease: "easeOut" }}
       >
-        <p className="text-base text-muted-foreground">
-          与 AI 团队协作，高效完成内容生产
-        </p>
-        <Link
-          href="/cowork"
-          className="inline-flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-lg text-xs font-medium
-            text-blue-600 dark:text-blue-400 bg-blue-500/8 hover:bg-blue-500/15
-            transition-all duration-200 group"
-        >
-          <MessageSquare size={13} />
-          进入对话中心
-          <ArrowRight size={12} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-        </Link>
-      </motion.div>
+        描述你的需求，AI 团队会解析意图、组建专家并安排任务执行
+      </motion.p>
     </div>
   );
 });

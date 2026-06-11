@@ -77,7 +77,7 @@ export function ConversationThread({
         <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
           <Sparkles className="size-7 text-primary" />
         </div>
-        <p className="text-sm text-muted-foreground">新建或选择一个对话,开始 cowork</p>
+        <p className="text-sm text-muted-foreground">新建或选择一个对话,开始协作</p>
       </main>
     );
   }
@@ -101,7 +101,7 @@ export function ConversationThread({
               <Sparkles className="size-7 text-primary" />
             </div>
             <h3 className="mt-4 text-base font-medium text-foreground">
-              说点什么,开始 cowork
+              说点什么,开始新会话
             </h3>
             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
               描述你的需求,我会解析意图、组建 AI 团队并安排任务执行。

@@ -11,9 +11,38 @@ import {
   MessageSquare,
   ArrowUp,
   Loader2,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  Archive,
+  Trash2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { startCoworkConversation } from "@/app/actions/cowork-start";
+import {
+  updateProjectAction,
+  pinProjectAction,
+  archiveProjectAction,
+  deleteProjectAction,
+} from "@/app/actions/projects";
 import type { Project } from "@/db/schema/projects";
 import type { Conversation } from "@/db/schema/conversations";
 
@@ -28,6 +57,9 @@ export function ProjectDetailClient({
   const [input, setInput] = useState("");
   const [pending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState(project.name);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   function submit() {
     const text = input.trim();
@@ -38,6 +70,37 @@ export function ProjectDetailClient({
       const res = await startCoworkConversation(text, { projectId: project.id });
       if (res.ok) router.push(`/cowork/${res.conversationId}`);
       else setInput(text);
+    });
+  }
+
+  function commitRename() {
+    const name = renameDraft.trim();
+    setRenameOpen(false);
+    if (!name || name === project.name) return;
+    startTransition(async () => {
+      await updateProjectAction({ id: project.id, name });
+      router.refresh();
+    });
+  }
+
+  function handlePin() {
+    startTransition(async () => {
+      await pinProjectAction(project.id, project.pinnedAt == null);
+      router.refresh();
+    });
+  }
+
+  function handleArchive() {
+    startTransition(async () => {
+      await archiveProjectAction(project.id, true);
+      router.push("/cowork/projects");
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      await deleteProjectAction(project.id);
+      router.push("/cowork/projects");
     });
   }
 
@@ -57,7 +120,52 @@ export function ProjectDetailClient({
         >
           <Folder className="size-5" style={{ color: project.color ?? "#6b7280" }} />
         </span>
-        <h1 className="truncate text-2xl font-medium">{project.name}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-medium">
+          {project.name}
+        </h1>
+        {project.pinnedAt && (
+          <Pin className="size-4 flex-none text-primary/70" />
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="项目操作"
+              className="flex-none text-muted-foreground"
+            >
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem
+              onSelect={() => {
+                setRenameDraft(project.name);
+                setRenameOpen(true);
+              }}
+            >
+              <Pencil className="size-3.5" /> 重命名
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handlePin}>
+              {project.pinnedAt ? (
+                <PinOff className="size-3.5" />
+              ) : (
+                <Pin className="size-3.5" />
+              )}
+              {project.pinnedAt ? "取消置顶" : "置顶"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleArchive}>
+              <Archive className="size-3.5" /> 归档
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="size-3.5" /> 删除
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* 项目内新对话输入 */}
@@ -136,6 +244,42 @@ export function ProjectDetailClient({
           </div>
         )}
       </div>
+
+      {/* 重命名弹窗 */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="glass-panel sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>重命名项目</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitRename();
+            }}
+            placeholder="项目名称"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenameOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={commitRename} disabled={!renameDraft.trim()}>
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="删除项目"
+        description={`确定删除项目「${project.name}」?项目下的会话会保留(解除归类),但项目本身将被永久删除。`}
+        confirmText="删除"
+        variant="danger"
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

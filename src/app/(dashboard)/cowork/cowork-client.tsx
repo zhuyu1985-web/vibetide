@@ -20,7 +20,7 @@ interface Props {
 /**
  * cowork 会话页:左 CoworkSidebar(自包含工作区栏)+ 中居中对话流 + 右 mission 抽屉。
  * 页面按会话 id 给本组件传 key,切换会话整体 remount —— 抽屉状态用 useReducer
- * 初始值派生(默认收起,即便该会话已有 mission,也要点卡片才滑出)。
+ * 初始值派生:会话已有 mission 则默认展开任务执行面板(直接看步骤与产出),否则收起。
  */
 export function CoworkClient({ projects, conversations, active }: Props) {
   const initialMissionId =
@@ -30,7 +30,7 @@ export function CoworkClient({ projects, conversations, active }: Props) {
       .pop() ?? null;
   const [drawer, dispatch] = useReducer(missionDrawerReducer, {
     missionId: initialMissionId,
-    open: false,
+    open: initialMissionId != null,
   });
 
   return (
