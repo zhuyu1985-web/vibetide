@@ -161,9 +161,14 @@ export function CoworkSidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
-        {/* 项目 —— 置顶,在最近对话上方 */}
+        {/* 项目 —— 标题链到项目列表页,条目链到项目详情(置顶,在最近对话上方) */}
         <div className="flex items-center justify-between px-2 pb-1 pt-1.5">
-          <span className="text-[11px] font-medium text-muted-foreground">项目</span>
+          <Link
+            href="/cowork/projects"
+            className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            项目
+          </Link>
           <Button
             variant="ghost"
             size="icon-xs"
@@ -177,10 +182,11 @@ export function CoworkSidebar({
         {projects.length === 0 ? (
           <p className="px-2.5 py-1 text-[11px] text-muted-foreground/60">暂无项目</p>
         ) : (
-          projects.map((p, i) => (
-            <div
+          projects.slice(0, 5).map((p, i) => (
+            <Link
               key={p.id}
-              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted"
+              href={`/cowork/projects/${p.id}`}
+              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-muted"
             >
               <span
                 className="size-2 flex-none rounded-sm"
@@ -190,7 +196,7 @@ export function CoworkSidebar({
                 }}
               />
               <span className="truncate">{p.name}</span>
-            </div>
+            </Link>
           ))
         )}
 

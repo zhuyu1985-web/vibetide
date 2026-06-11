@@ -6,7 +6,7 @@
  */
 import { db } from "@/db";
 import { projects } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 export interface CreateProjectInput {
   name: string;
@@ -20,6 +20,8 @@ export interface UpdateProjectInput {
   description?: string | null;
   icon?: string | null;
   color?: string | null;
+  /** 置顶时间;传 Date 置顶、传 null 取消 */
+  pinnedAt?: Date | null;
 }
 
 /** 列出某 org 的项目(默认只 active,按最近更新倒序) */
@@ -30,7 +32,15 @@ export async function listProjectsByOrg(
   const where = opts.includeArchived
     ? eq(projects.organizationId, orgId)
     : and(eq(projects.organizationId, orgId), eq(projects.status, "active"));
-  return db.select().from(projects).where(where).orderBy(desc(projects.updatedAt));
+  return db
+    .select()
+    .from(projects)
+    .where(where)
+    // 置顶组(pinnedAt 非 null)优先,组内按最近更新倒序
+    .orderBy(
+      sql`${projects.pinnedAt} IS NOT NULL DESC`,
+      desc(projects.updatedAt),
+    );
 }
 
 /** 取单个项目;不属于该 org 返回 null(避免泄露) */
@@ -72,6 +82,7 @@ export async function updateProject(
   if (input.description !== undefined) patch.description = input.description;
   if (input.icon !== undefined) patch.icon = input.icon;
   if (input.color !== undefined) patch.color = input.color;
+  if (input.pinnedAt !== undefined) patch.pinnedAt = input.pinnedAt;
 
   const [row] = await db
     .update(projects)
@@ -92,6 +103,8 @@ export async function setProjectArchived(
     .set({
       status: archived ? "archived" : "active",
       archivedAt: archived ? new Date() : null,
+      // 归档自动清置顶(正交边界)
+      ...(archived ? { pinnedAt: null } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(projects.organizationId, orgId), eq(projects.id, id)))

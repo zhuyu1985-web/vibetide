@@ -23,6 +23,9 @@ export const projects = pgTable(
     status: projectStatusEnum("status").notNull().default("active"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
 
+    // 置顶时间;非 null = 已置顶(项目列表置顶组优先,组内按 updatedAt)
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

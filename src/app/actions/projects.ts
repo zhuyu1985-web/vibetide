@@ -103,6 +103,26 @@ export async function archiveProjectAction(
   return { ok: true, data: updated };
 }
 
+export async function pinProjectAction(
+  id: string,
+  pinned: boolean,
+): Promise<ActionResult<Project>> {
+  await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false, errors: { _global: "用户未关联组织" } };
+
+  const existing = await getProjectById(orgId, id);
+  if (!existing) return { ok: false, errors: { _global: "项目不存在或无权访问" } };
+
+  const updated = await updateProject(orgId, id, {
+    pinnedAt: pinned ? new Date() : null,
+  });
+  if (!updated) return { ok: false, errors: { _global: "操作失败" } };
+
+  revalidatePath("/cowork/projects");
+  return { ok: true, data: updated };
+}
+
 export async function deleteProjectAction(id: string): Promise<ActionResult> {
   await requireAuth();
   const orgId = await getCurrentUserOrg();
