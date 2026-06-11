@@ -25,7 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { DatePicker, DateRangePicker } from "@/components/shared/date-picker";
 
-import { startMissionFromTemplate } from "@/app/actions/workflow-launch";
+import { startCoworkScenario } from "@/app/actions/cowork-start";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { InputFieldDef, InputFieldOption } from "@/lib/types";
 import { normalizeFieldOption } from "@/lib/types";
@@ -35,8 +35,9 @@ import { normalizeFieldOption } from "@/lib/types";
  *
  * Renders all 9 `InputFieldDef` types (text / textarea / url / number /
  * toggle / select / multiselect / date / daterange) using shared design-system
- * primitives. On submit, delegates to `startMissionFromTemplate` (Task 2.1),
- * surfaces per-field errors, and navigates to the new mission on success.
+ * primitives. On submit, delegates to `startCoworkScenario`, surfaces
+ * per-field errors, and navigates to the new cowork conversation on success
+ * (统一工作台:场景启动进对话框模式,mission 在右侧抽屉实时展示).
  */
 
 // ─────────────────────── helpers ───────────────────────
@@ -294,11 +295,6 @@ export interface WorkflowLaunchDialogProps {
   template: WorkflowTemplateRow;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /**
-   * 启动成功回调。如果未传，沿用旧行为（router.push 到 mission console）。
-   * Chat 入口必须传这个：拿到 missionId 后向对话流插入 mission_card 消息。
-   */
-  onLaunched?: (result: { missionId: string; template: WorkflowTemplateRow }) => void;
 }
 
 /**
@@ -316,7 +312,6 @@ export function WorkflowLaunchDialog({
   template,
   open,
   onOpenChange,
-  onLaunched,
 }: WorkflowLaunchDialogProps) {
   const router = useRouter();
   const fields: InputFieldDef[] = React.useMemo(
@@ -349,18 +344,15 @@ export function WorkflowLaunchDialog({
       fields.forEach((f, idx) => {
         if (values[idx] !== undefined) nameKeyed[f.name] = values[idx];
       });
-      const res = await startMissionFromTemplate(template.id, nameKeyed);
+      const res = await startCoworkScenario(template.id, nameKeyed);
       if (!res.ok) {
         // server 返回 name-keyed errors，直接存；渲染时按 name 查。
         setErrors(res.errors);
         return;
       }
       onOpenChange(false);
-      if (onLaunched) {
-        onLaunched({ missionId: res.missionId, template });
-      } else {
-        router.push(`/missions/${res.missionId}`);
-      }
+      // 对话框模式:进入新建的 cowork 会话,mission 抽屉自动展开。
+      router.push(`/cowork/${res.conversationId}`);
     } catch (e) {
       setErrors({
         _global: e instanceof Error ? e.message : "启动失败",

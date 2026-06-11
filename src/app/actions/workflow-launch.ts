@@ -13,48 +13,7 @@ import { revalidatePath } from "next/cache";
 import { executeMissionDirect } from "@/lib/mission-executor";
 import { getOrProvisionLeader } from "@/app/actions/missions";
 import { isUniqueViolation } from "@/lib/db/pg-errors";
-
-/**
- * Replace `{{key}}` placeholders in a prompt template with values from `params`.
- * Unknown keys are replaced with empty string. Non-primitive values are JSON-encoded.
- */
-function renderTemplate(tpl: string, params: Record<string, unknown>): string {
-  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => {
-    const v = params[k];
-    if (v === undefined || v === null) return "";
-    if (typeof v === "object") return JSON.stringify(v);
-    return String(v);
-  });
-}
-
-/**
- * Build a natural-language user instruction for the mission from the template
- * definition + user-provided params.
- *
- * Priority:
- *   1. If `promptTemplate` is present and renders to non-empty, use rendered result.
- *   2. Otherwise fall back to a human-readable "启动场景 + 参数列表" dump.
- */
-function buildUserInstruction(
-  templateName: string,
-  cleaned: Record<string, unknown>,
-  promptTemplate: string | null,
-): string {
-  if (promptTemplate) {
-    const rendered = renderTemplate(promptTemplate, cleaned);
-    if (rendered.trim().length > 0) return rendered;
-  }
-  const paramLines = Object.entries(cleaned)
-    .map(
-      ([k, v]) =>
-        `- ${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`,
-    )
-    .join("\n");
-  if (paramLines.length === 0) {
-    return `启动场景：${templateName}`;
-  }
-  return `启动场景：${templateName}\n参数：\n${paramLines}`;
-}
+import { buildUserInstruction } from "@/lib/workflow-instruction";
 
 export type StartMissionResult =
   | { ok: true; missionId: string }
