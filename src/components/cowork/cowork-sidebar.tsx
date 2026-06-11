@@ -227,15 +227,9 @@ export function CoworkSidebar({
         </Button>
         {customizeOpen && (
           <div className="ml-3 border-l border-border/60 pl-1.5">
-            <Link
-              href="/skills"
-              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] text-foreground/75 transition-colors hover:bg-muted"
-            >
-              <Sparkles className="size-3 flex-none opacity-70" />
-              <span className="truncate">SKILLS</span>
-            </Link>
-            <PlaceholderItem icon={Plug} label="连接器" />
-            <PlaceholderItem icon={Puzzle} label="个人插件" />
+            <CustomizeLink href="/skills" icon={Sparkles} label="SKILLS" />
+            <CustomizeLink href="/cowork/connectors" icon={Plug} label="连接器" />
+            <CustomizeLink href="/cowork/plugins" icon={Puzzle} label="个人插件" />
           </div>
         )}
 
@@ -408,23 +402,22 @@ function ConversationRow({
   );
 }
 
-function PlaceholderItem({
+function CustomizeLink({
+  href,
   icon: Icon,
   label,
 }: {
+  href: string;
   icon: typeof Plug;
   label: string;
 }) {
   return (
-    <div
-      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] text-muted-foreground/50"
-      title="敬请期待"
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] text-foreground/75 transition-colors hover:bg-muted"
     >
-      <Icon className="size-3 flex-none opacity-50" />
+      <Icon className="size-3 flex-none opacity-70" />
       <span className="truncate">{label}</span>
-      <span className="ml-auto rounded bg-muted px-1 py-px text-[10px] text-muted-foreground/60">
-        待建
-      </span>
-    </div>
+    </Link>
   );
 }
