@@ -16,12 +16,10 @@ import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
 import { startCoworkConversation } from "@/app/actions/cowork-start";
-import type { Project } from "@/db/schema/projects";
 import type { Conversation } from "@/db/schema/conversations";
 import type { WorkflowTemplateRow } from "@/db/types";
 
 interface HomeWorkspaceClientProps {
-  projects: Project[];
   conversations: Conversation[];
   templatesByTab?: Record<
     string,
@@ -35,7 +33,6 @@ interface HomeWorkspaceClientProps {
  * 输入提交 → startCoworkConversation → 跳 /cowork/[id];点员工 = 预填输入聚焦。
  */
 export function HomeWorkspaceClient({
-  projects,
   conversations,
   templatesByTab = {},
   canManageHomepage = false,
@@ -64,11 +61,7 @@ export function HomeWorkspaceClient({
 
   return (
     <div className="flex h-full overflow-hidden">
-      <CoworkSidebar
-        projects={projects}
-        conversations={conversations}
-        activeId={null}
-      />
+      <CoworkSidebar conversations={conversations} activeId={null} />
 
       <div className="relative flex-1 overflow-y-auto scrollbar-thin">
         <ParticleBackground

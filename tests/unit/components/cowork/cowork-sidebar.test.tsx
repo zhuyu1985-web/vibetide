@@ -8,55 +8,60 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/app/actions/cowork-conversations", () => ({
-  createConversationAction: vi.fn(),
   renameConversationAction: vi.fn(),
   pinConversationAction: vi.fn(),
   archiveConversationAction: vi.fn(),
   deleteConversationAction: vi.fn(),
 }));
-vi.mock("@/app/actions/projects", () => ({
-  createProjectAction: vi.fn(),
-}));
 
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
-import type { Project } from "@/db/schema/projects";
 import type { Conversation } from "@/db/schema/conversations";
 
-const projects = [{ id: "p1", name: "时政组", color: null }] as unknown as Project[];
 const conversations = [
-  { id: "c1", title: "置顶会话", pinnedAt: new Date() },
-  { id: "c2", title: "普通会话A", pinnedAt: null },
-  { id: "c3", title: "普通会话B", pinnedAt: null },
+  {
+    id: "c1",
+    title: "置顶会话",
+    pinnedAt: new Date("2026-01-01"),
+    lastMessageAt: new Date("2026-01-01"),
+  },
+  {
+    id: "c2",
+    title: "普通会话A",
+    pinnedAt: null,
+    lastMessageAt: new Date("2026-02-01"),
+  },
+  {
+    id: "c3",
+    title: "普通会话B",
+    pinnedAt: null,
+    lastMessageAt: new Date("2026-01-15"),
+  },
 ] as unknown as Conversation[];
 
 function renderSidebar(activeId: string | null = null) {
   return render(
-    <CoworkSidebar
-      projects={projects}
-      conversations={conversations}
-      activeId={activeId}
-    />,
+    <CoworkSidebar conversations={conversations} activeId={activeId} />,
   );
 }
 
 describe("CoworkSidebar", () => {
-  it("分组顺序:项目 在 最近对话 之前", () => {
+  it("项目入口在 最近对话 之前", () => {
     const t = renderSidebar().container.textContent ?? "";
     expect(t.indexOf("项目")).toBeGreaterThanOrEqual(0);
     expect(t.indexOf("最近对话")).toBeGreaterThan(t.indexOf("项目"));
   });
 
-  it("含新建对话/定时任务/定制 + 项目名 + 会话名", () => {
+  it("含新建对话/项目/定时任务/定制 + 会话名(项目只做入口,不在侧栏铺项目列表)", () => {
     const t = renderSidebar().container.textContent ?? "";
-    ["新建对话", "定时任务", "定制", "时政组", "置顶会话", "普通会话A"].forEach(
+    ["新建对话", "项目", "定时任务", "定制", "置顶会话", "普通会话A"].forEach(
       (s) => expect(t).toContain(s),
     );
   });
 
-  it("有置顶会话时渲染「置顶」分组,且在最近对话之上", () => {
+  it("置顶会话排在最近对话最上面(普通会话之前),不单列「置顶」分组", () => {
     const t = renderSidebar().container.textContent ?? "";
-    expect(t).toContain("置顶");
-    expect(t.indexOf("置顶")).toBeLessThan(t.indexOf("最近对话"));
+    expect(t.indexOf("置顶会话")).toBeLessThan(t.indexOf("普通会话A"));
+    expect(t.indexOf("置顶会话")).toBeLessThan(t.indexOf("普通会话B"));
   });
 
   it("定制默认收起,点击展开 SKILLS/连接器/个人插件", () => {

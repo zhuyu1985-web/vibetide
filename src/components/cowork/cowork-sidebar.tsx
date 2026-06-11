@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
-  FolderPlus,
+  FolderOpen,
   MessageSquare,
   Clock,
   SlidersHorizontal,
@@ -33,57 +33,49 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { cn } from "@/lib/utils";
 import {
-  createProjectAction,
-  updateProjectAction,
-  pinProjectAction,
-  archiveProjectAction,
-  deleteProjectAction,
-} from "@/app/actions/projects";
-import {
   renameConversationAction,
   pinConversationAction,
   archiveConversationAction,
   deleteConversationAction,
 } from "@/app/actions/cowork-conversations";
-import type { Project } from "@/db/schema/projects";
 import type { Conversation } from "@/db/schema/conversations";
-
-const PROJECT_DOT_COLORS = ["#378ADD", "#1D9E75", "#D85A30", "#7F77DD", "#BA7517"];
 
 /**
  * Cowork 工作区左栏(共享于 /home 与 /cowork/[id])。自包含:内部直接调用
- * server actions + router 处理新建/重命名/置顶/归档/删除,父组件只传数据。
- * 结构:新建对话 → 项目(置顶) → 定时任务 → 定制 → 最近对话(置顶组 + 普通组)。
+ * server actions + router 处理会话的新建/重命名/置顶/归档/删除,父组件只传数据。
+ *
+ * 结构:新建对话 → 项目(单入口,→ /cowork/projects 在主区管理)→ 定时任务 →
+ * 定制 → 最近对话(置顶的会话排在列表最上面,不单列分组)。
  */
 export function CoworkSidebar({
-  projects,
   conversations,
   activeId,
 }: {
-  projects: Project[];
   conversations: Conversation[];
   activeId: string | null;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
-  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
-  const [deleteProjectTarget, setDeleteProjectTarget] = useState<Project | null>(
-    null,
-  );
   const [query, setQuery] = useState("");
 
-  const { pinned, recent } = useMemo(() => {
+  // 单一列表:按 query 过滤后,置顶的排在最上面(置顶不单列分组)。
+  const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q
+    const filtered = q
       ? conversations.filter((c) => c.title.toLowerCase().includes(q))
       : conversations;
-    const pinned: Conversation[] = [];
-    const recent: Conversation[] = [];
-    for (const c of list) (c.pinnedAt ? pinned : recent).push(c);
-    return { pinned, recent };
+    return [...filtered].sort((a, b) => {
+      const ap = a.pinnedAt ? 1 : 0;
+      const bp = b.pinnedAt ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return (
+        new Date(b.lastMessageAt).getTime() -
+        new Date(a.lastMessageAt).getTime()
+      );
+    });
   }, [conversations, query]);
   const searching = query.trim().length > 0;
 
@@ -95,46 +87,6 @@ export function CoworkSidebar({
     }
     const next = conversations.find((c) => c.id !== removedId);
     router.push(next ? `/cowork/${next.id}` : "/home");
-  }
-
-  function handleNewProject() {
-    startTransition(async () => {
-      await createProjectAction({ name: "新项目" });
-      router.refresh();
-    });
-  }
-
-  function handleRenameProject(id: string, name: string) {
-    setRenamingProjectId(null);
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const current = projects.find((p) => p.id === id);
-    if (current && current.name === trimmed) return;
-    startTransition(async () => {
-      await updateProjectAction({ id, name: trimmed });
-      router.refresh();
-    });
-  }
-
-  function handlePinProject(id: string, pinned: boolean) {
-    startTransition(async () => {
-      await pinProjectAction(id, pinned);
-      router.refresh();
-    });
-  }
-
-  function handleArchiveProject(id: string) {
-    startTransition(async () => {
-      await archiveProjectAction(id, true);
-      router.refresh();
-    });
-  }
-
-  function handleDeleteProject(id: string) {
-    startTransition(async () => {
-      await deleteProjectAction(id);
-      router.refresh();
-    });
   }
 
   function handleRename(id: string, title: string) {
@@ -185,70 +137,32 @@ export function CoworkSidebar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索对话"
-          inputClassName="h-8 text-xs"
+          inputClassName="h-8 text-sm"
         />
       </div>
 
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
-        {/* 项目 —— 标题链到项目列表页,条目链到项目详情(置顶,在最近对话上方) */}
-        <div className="flex items-center justify-between px-2 pb-1 pt-1.5">
-          <Link
-            href="/cowork/projects"
-            className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            项目
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="新建项目"
-            className="text-muted-foreground"
-            disabled={pending}
-            onClick={handleNewProject}
-          >
-            <FolderPlus className="size-3.5" />
-          </Button>
-        </div>
-        {projects.length === 0 ? (
-          <p className="px-2.5 py-1 text-[11px] text-muted-foreground/60">暂无项目</p>
-        ) : (
-          projects.slice(0, 5).map((p, i) => (
-            <ProjectRow
-              key={p.id}
-              project={p}
-              color={p.color || PROJECT_DOT_COLORS[i % PROJECT_DOT_COLORS.length]}
-              renaming={renamingProjectId === p.id}
-              onStartRename={() => setRenamingProjectId(p.id)}
-              onRename={handleRenameProject}
-              onCancelRename={() => setRenamingProjectId(null)}
-              onPin={handlePinProject}
-              onArchive={handleArchiveProject}
-              onRequestDelete={() => setDeleteProjectTarget(p)}
-            />
-          ))
-        )}
-
+        {/* 项目 —— 单入口,点进 /cowork/projects 在主区查看/管理(不在侧栏铺列表) */}
+        <NavRow href="/cowork/projects" icon={FolderOpen} label="项目" />
         {/* 定时任务 */}
-        <Link
+        <NavRow
           href="/settings/scheduled-jobs"
-          className="mt-1.5 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-muted"
-        >
-          <Clock className="size-3.5 flex-none opacity-70" />
-          <span className="truncate">定时任务</span>
-        </Link>
+          icon={Clock}
+          label="定时任务"
+        />
 
         {/* 定制 —— 可展开:SKILLS / 连接器 / 个人插件 */}
         <Button
           variant="ghost"
-          className="h-auto w-full justify-start gap-2 px-2.5 py-1.5 text-xs font-normal text-foreground/80"
+          className="h-auto w-full justify-start gap-2 px-2.5 py-1.5 text-sm font-normal text-foreground/80"
           aria-expanded={customizeOpen}
           onClick={() => setCustomizeOpen((v) => !v)}
         >
-          <SlidersHorizontal className="size-3.5 flex-none opacity-70" />
+          <SlidersHorizontal className="size-4 flex-none opacity-70" />
           <span className="flex-1 text-left">定制</span>
           <ChevronRight
             className={cn(
-              "size-3.5 opacity-50 transition-transform",
+              "size-4 opacity-50 transition-transform",
               customizeOpen && "rotate-90",
             )}
           />
@@ -261,39 +175,16 @@ export function CoworkSidebar({
           </div>
         )}
 
-        {/* 置顶组 */}
-        {pinned.length > 0 && (
-          <>
-            <div className="flex items-center gap-1 px-2 pb-1 pt-3 text-[11px] font-medium text-muted-foreground">
-              <Pin className="size-3 text-primary/70" /> 置顶
-            </div>
-            {pinned.map((c) => (
-              <ConversationRow
-                key={c.id}
-                conversation={c}
-                activeId={activeId}
-                renaming={renamingId === c.id}
-                onStartRename={() => setRenamingId(c.id)}
-                onRename={handleRename}
-                onCancelRename={() => setRenamingId(null)}
-                onPin={handlePin}
-                onArchive={handleArchive}
-                onRequestDelete={() => setDeleteTarget(c)}
-              />
-            ))}
-          </>
-        )}
-
-        {/* 最近对话 */}
-        <div className="px-2 pb-1 pt-3 text-[11px] font-medium text-muted-foreground">
+        {/* 最近对话(置顶的排在最上面) */}
+        <div className="px-2 pb-1 pt-3 text-xs font-medium text-muted-foreground">
           最近对话
         </div>
-        {recent.length === 0 ? (
-          <p className="px-2.5 py-1 text-[11px] text-muted-foreground/60">
+        {list.length === 0 ? (
+          <p className="px-2.5 py-1 text-xs text-muted-foreground/60">
             {searching ? "无匹配的对话" : "还没有对话,点上方新建"}
           </p>
         ) : (
-          recent.map((c) => (
+          list.map((c) => (
             <ConversationRow
               key={c.id}
               conversation={c}
@@ -322,20 +213,28 @@ export function CoworkSidebar({
           setDeleteTarget(null);
         }}
       />
-
-      <ConfirmDialog
-        open={deleteProjectTarget != null}
-        onOpenChange={(open) => !open && setDeleteProjectTarget(null)}
-        title="删除项目"
-        description={`确定删除项目「${deleteProjectTarget?.name ?? ""}」?项目下的会话会保留(解除归类),但项目本身将被永久删除。`}
-        confirmText="删除"
-        variant="danger"
-        onConfirm={() => {
-          if (deleteProjectTarget) handleDeleteProject(deleteProjectTarget.id);
-          setDeleteProjectTarget(null);
-        }}
-      />
     </aside>
+  );
+}
+
+/** 侧栏顶层导航行(项目 / 定时任务),与 cowork 一致:图标 + 文案,整行可点。 */
+function NavRow({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: typeof Clock;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-muted"
+    >
+      <Icon className="size-4 flex-none opacity-70" />
+      <span className="truncate">{label}</span>
+    </Link>
   );
 }
 
@@ -379,7 +278,7 @@ function ConversationRow({
           name="title"
           autoFocus
           defaultValue={c.title}
-          className="h-7 text-xs"
+          className="h-7 text-sm"
           onBlur={(e) => onRename(c.id, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") onCancelRename();
@@ -399,16 +298,16 @@ function ConversationRow({
       <Link
         href={`/cowork/${c.id}`}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 pr-7",
+          "flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2.5 pr-7",
           isActive ? "text-primary" : "text-foreground/80",
         )}
       >
         {isPinned ? (
-          <Pin className="size-3 flex-none text-primary/70" />
+          <Pin className="size-3.5 flex-none text-primary/70" />
         ) : (
-          <MessageSquare className="size-3 flex-none opacity-60" />
+          <MessageSquare className="size-3.5 flex-none opacity-60" />
         )}
-        <span className="truncate text-xs">{c.title}</span>
+        <span className="truncate text-sm">{c.title}</span>
       </Link>
 
       <DropdownMenu>
@@ -443,101 +342,6 @@ function ConversationRow({
   );
 }
 
-function ProjectRow({
-  project: p,
-  color,
-  renaming,
-  onStartRename,
-  onRename,
-  onCancelRename,
-  onPin,
-  onArchive,
-  onRequestDelete,
-}: {
-  project: Project;
-  color: string;
-  renaming: boolean;
-  onStartRename: () => void;
-  onRename: (id: string, name: string) => void;
-  onCancelRename: () => void;
-  onPin: (id: string, pinned: boolean) => void;
-  onArchive: (id: string) => void;
-  onRequestDelete: () => void;
-}) {
-  const isPinned = p.pinnedAt != null;
-
-  if (renaming) {
-    return (
-      <form
-        className="px-1.5 py-0.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const input = e.currentTarget.elements.namedItem(
-            "name",
-          ) as HTMLInputElement;
-          onRename(p.id, input.value);
-        }}
-      >
-        <Input
-          name="name"
-          autoFocus
-          defaultValue={p.name}
-          className="h-7 text-xs"
-          onBlur={(e) => onRename(p.id, e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onCancelRename();
-          }}
-        />
-      </form>
-    );
-  }
-
-  return (
-    <div className="group/prow relative flex items-center rounded-md transition-colors hover:bg-muted">
-      <Link
-        href={`/cowork/projects/${p.id}`}
-        className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2.5 pr-7 text-xs text-foreground/80"
-      >
-        <span
-          className="size-2 flex-none rounded-sm"
-          style={{ background: color }}
-        />
-        <span className="truncate">{p.name}</span>
-        {isPinned && <Pin className="size-3 flex-none text-primary/70" />}
-      </Link>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="项目操作"
-            className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover/prow:opacity-100 data-[state=open]:opacity-100"
-          >
-            <MoreHorizontal className="size-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
-          <DropdownMenuItem onSelect={onStartRename}>
-            <Pencil className="size-3.5" /> 重命名
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onPin(p.id, !isPinned)}>
-            {isPinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-            {isPinned ? "取消置顶" : "置顶"}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onArchive(p.id)}>
-            <Archive className="size-3.5" /> 归档
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={onRequestDelete}>
-            <Trash2 className="size-3.5" /> 删除
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
 function CustomizeLink({
   href,
   icon: Icon,
@@ -550,9 +354,9 @@ function CustomizeLink({
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] text-foreground/75 transition-colors hover:bg-muted"
+      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground/75 transition-colors hover:bg-muted"
     >
-      <Icon className="size-3 flex-none opacity-70" />
+      <Icon className="size-3.5 flex-none opacity-70" />
       <span className="truncate">{label}</span>
     </Link>
   );

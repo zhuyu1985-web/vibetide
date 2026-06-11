@@ -26,11 +26,7 @@ export default async function CoworkProjectsPage() {
   // 与 /home、/cowork/[id] 一致:左 CoworkSidebar 工作区栏 + 主区项目网格
   return (
     <div className="flex h-full overflow-hidden">
-      <CoworkSidebar
-        projects={projects}
-        conversations={conversations}
-        activeId={null}
-      />
+      <CoworkSidebar conversations={conversations} activeId={null} />
       <div className="flex-1 overflow-y-auto">
         <ProjectsClient projects={projects} />
       </div>
