@@ -20,7 +20,12 @@ export interface AdHocTaskDef {
   assignedRole: string | null;
   /** 依赖的前置 task 在本数组中的下标(写库时映射为 task id) */
   dependsOnIndices: number[];
-  /** 越靠前优先级越高(与 hot-topics 习惯一致:数值大=先) */
+  /**
+   * 步骤序(1 起,越小越早)。与 mission 体系唯一语义对齐:模板路径写
+   * step.order、leader 伪任务 pinned 0,执行器 `{{stepN}}` 渲染与所有
+   * UI(mission console / cowork 面板)都按 priority **升序** = 执行顺序。
+   * 曾按 hot-topics 习惯写"数值大=先",导致 cowork 步骤清单整体倒序。
+   */
   priority: number;
 }
 
@@ -67,7 +72,7 @@ export function buildAdHocTasks(
       assignedEmployeeId,
       assignedRole,
       dependsOnIndices,
-      priority: steps.length - index,
+      priority: index + 1,
     };
   });
 

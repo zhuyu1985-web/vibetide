@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import {
-  CheckCircle2,
-  Circle,
+  Check,
   Loader2,
   XCircle,
   Ban,
@@ -14,11 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMissionLive } from "@/lib/cowork/use-mission-live";
+import type { MissionTask } from "@/lib/types";
 
 /**
- * cowork 右栏「任务执行」面板 —— **只做步骤清单**:把分解好的步骤列出来,每完成
- * 一步打勾(○ 待执行 / ⟳ 执行中 / ✓ 完成 / ✕ 失败)。每一步的核心概要与最终交付
- * **在对话流里流式呈现**(见 MissionStepStream),不在此重复堆详细输出。
+ * cowork 右栏「执行过程」面板 —— 只做步骤清单:把分解好的步骤按执行顺序
+ * (priority 升序 = 步骤序)从上到下列出。每步参照设计稿呈现:状态图标
+ * (✓ 完成 / ◉ 进行中 / 序号圈 等待)+ 步骤名 + 「执行者 · 状态」副行 +
+ * 产物计数 badge,步骤间虚线分隔。每一步的核心概要与最终交付在对话流里
+ * 流式呈现(见 MissionStepStream),不在此重复堆详细输出。
  */
 export function CoworkMissionPanel({
   missionId,
@@ -40,24 +42,23 @@ export function CoworkMissionPanel({
     );
   }
 
+  // priority = 步骤序(leader 伪任务 0、其余 1..N),升序即执行顺序,
+  // 与对话流 MissionStepStream / 任务中心控制台保持同一排序。
   const tasks = mission?.tasks
     ? [...mission.tasks].sort(
         (a, b) =>
-          (b.priority ?? 0) - (a.priority ?? 0) ||
+          (a.priority ?? 0) - (b.priority ?? 0) ||
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       )
     : [];
   const doneCount = tasks.filter((t) => t.status === "completed").length;
-  const teamMap = new Map<string, string>(
-    (mission?.team ?? []).map((e) => [e.id as string, e.name]),
-  );
 
   return (
     <aside className="flex w-72 flex-none flex-col border-l border-border bg-muted/20">
       {/* 头部 */}
       <div className="border-b border-border px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="truncate text-xs font-medium">执行步骤</span>
+          <span className="truncate text-xs font-medium">执行过程</span>
           {tasks.length > 0 && (
             <span className="ml-auto rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
               {doneCount}/{tasks.length}
@@ -91,24 +92,36 @@ export function CoworkMissionPanel({
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          {/* 步骤清单(每完成一步打勾) */}
-          <div className="px-2.5 py-2">
+          {/* 步骤清单(执行顺序从上到下,步骤间虚线分隔) */}
+          <div className="px-3 py-1.5">
             {tasks.length === 0 ? (
               <p className="px-1 py-2 text-[11px] text-muted-foreground/70">
                 正在拆解执行步骤…
               </p>
             ) : (
-              tasks.map((t) => (
-                <div key={t.id} className="flex items-start gap-2 px-1 py-1.5">
-                  <StatusIcon status={t.status} />
-                  <div className="min-w-0">
-                    <div className="text-[11.5px] leading-snug">{t.title}</div>
-                    {t.assignedEmployeeId &&
-                      teamMap.get(t.assignedEmployeeId) && (
-                        <div className="text-[10px] text-muted-foreground">
-                          {teamMap.get(t.assignedEmployeeId)}
-                        </div>
-                      )}
+              tasks.map((t, i) => (
+                <div
+                  key={t.id}
+                  className={cn(
+                    "flex items-start gap-2.5 py-2.5",
+                    i > 0 && "border-t border-dashed border-border/70",
+                  )}
+                >
+                  <StepStatusIcon status={t.status} stepNo={i + 1} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-medium leading-snug text-foreground">
+                      {t.title}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="truncate text-[11px] text-muted-foreground">
+                        {/* assignedEmployee 由 DAL 按全 org 员工表解析,覆盖
+                            leader 伪任务(leader 不在 mission.teamMembers 里) */}
+                        {[t.assignedEmployee?.name, taskStatusLabel(t.status)]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                      <ArtifactBadge task={t} />
+                    </div>
                   </div>
                 </div>
               ))
@@ -132,16 +145,82 @@ export function CoworkMissionPanel({
   );
 }
 
-function StatusIcon({ status }: { status: string }) {
+/**
+ * 设计稿样式的步骤状态图标:
+ *   完成 = 绿色实心圆白勾;进行中 = 琥珀色环+内心点(pulse);
+ *   等待 = 灰圈内步骤序号;失败 = 红;取消/阻塞 = 禁止符。
+ */
+function StepStatusIcon({
+  status,
+  stepNo,
+}: {
+  status: string;
+  stepNo: number;
+}) {
   if (status === "completed")
-    return <CheckCircle2 className="mt-0.5 size-3.5 flex-none text-emerald-500" />;
-  if (status === "in_progress")
-    return <Loader2 className="mt-0.5 size-3.5 flex-none animate-spin text-primary" />;
+    return (
+      <span className="mt-0.5 flex size-5 flex-none items-center justify-center rounded-full bg-emerald-500 text-white">
+        <Check className="size-3" strokeWidth={3} />
+      </span>
+    );
+  if (status === "in_progress" || status === "in_review" || status === "claimed")
+    return (
+      <span className="mt-0.5 flex size-5 flex-none animate-pulse items-center justify-center rounded-full border-2 border-amber-500">
+        <span className="size-2 rounded-full bg-amber-500" />
+      </span>
+    );
   if (status === "failed")
-    return <XCircle className="mt-0.5 size-3.5 flex-none text-red-500" />;
+    return (
+      <span className="mt-0.5 flex size-5 flex-none items-center justify-center">
+        <XCircle className="size-5 text-red-500" />
+      </span>
+    );
   if (status === "cancelled" || status === "blocked")
-    return <Ban className="mt-0.5 size-3.5 flex-none text-muted-foreground/50" />;
-  return <Circle className="mt-0.5 size-3.5 flex-none text-muted-foreground/50" />;
+    return (
+      <span className="mt-0.5 flex size-5 flex-none items-center justify-center">
+        <Ban className="size-4 text-muted-foreground/50" />
+      </span>
+    );
+  // pending / ready —— 灰圈内显示步骤序号
+  return (
+    <span className="mt-0.5 flex size-5 flex-none items-center justify-center rounded-full border border-border bg-muted text-[10px] font-medium text-muted-foreground">
+      {stepNo}
+    </span>
+  );
+}
+
+/** 完成步骤的产物计数 badge(outputData.artifacts 非空时展示) */
+function ArtifactBadge({ task }: { task: MissionTask }) {
+  if (task.status !== "completed") return null;
+  const od = task.outputData as
+    | { artifacts?: Array<{ content?: string }> }
+    | null;
+  const count = Array.isArray(od?.artifacts)
+    ? od.artifacts.filter(
+        (a) => typeof a?.content === "string" && a.content.trim(),
+      ).length
+    : 0;
+  if (count === 0) return null;
+  return (
+    <span className="flex-none rounded border border-amber-300/60 bg-amber-50 px-1 py-px text-[10px] text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+      产物 ×{count}
+    </span>
+  );
+}
+
+function taskStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    pending: "等待上一步",
+    ready: "等待执行",
+    claimed: "进行中",
+    in_progress: "进行中",
+    in_review: "审核中",
+    completed: "完成",
+    failed: "失败",
+    cancelled: "已取消",
+    blocked: "已阻塞",
+  };
+  return map[status] ?? status;
 }
 
 function statusLabel(status: string): string {

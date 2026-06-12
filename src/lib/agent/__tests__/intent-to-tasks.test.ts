@@ -6,7 +6,7 @@
  *   2. assignedRole 取第一个非空 skill,无 skill 为 null
  *   3. dependsOn 只保留合法的后向依赖(0<=dep<index),前向/越界丢弃(防环)
  *   4. teamMemberIds 去重
- *   5. priority 递减 + title 截断(description 保留全文)
+ *   5. priority = 步骤序(1 起递增) + title 截断(description 保留全文)
  */
 import { describe, expect, it } from "vitest";
 import { buildAdHocTasks } from "../intent-to-tasks";
@@ -79,14 +79,15 @@ describe("buildAdHocTasks", () => {
     expect([...teamMemberIds].sort()).toEqual(["e-lei", "e-wen"]);
   });
 
-  it("priority 递减(靠前步骤更高);title 截断但 description 保留全文", () => {
+  it("priority = 步骤序(1 起递增,升序即执行顺序);title 截断但 description 保留全文", () => {
     const long = "一".repeat(60);
     const { tasks } = buildAdHocTasks(
       [step({ taskDescription: long }), step({})],
       employees,
       LEADER,
     );
-    expect(tasks[0].priority).toBeGreaterThan(tasks[1].priority);
+    expect(tasks[0].priority).toBe(1);
+    expect(tasks[1].priority).toBe(2);
     expect(tasks[0].title.length).toBeLessThanOrEqual(40);
     expect(tasks[0].description).toBe(long);
   });

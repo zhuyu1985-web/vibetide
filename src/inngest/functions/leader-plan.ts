@@ -261,7 +261,9 @@ export const leaderPlan = inngest.createFunction(
             expectedOutput: taskDef.expectedOutput || null,
             assignedEmployeeId: employeeId,
             dependencies: depTaskIds,
-            priority: taskDef.priority ?? 0,
+            // priority 全系统统一语义 = 步骤序(升序即执行/展示顺序);LLM 计划
+            // 里的 priority 是"重要性",落库时覆盖为数组序与模板路径对齐。
+            priority: i + 1,
             status: "pending",
           })
           .returning({ id: missionTasks.id });

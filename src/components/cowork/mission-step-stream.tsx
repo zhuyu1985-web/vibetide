@@ -66,15 +66,14 @@ export function MissionStepStream({ missionId }: { missionId: string }) {
   const { mission } = useMissionLive(missionId);
   if (!mission) return null;
 
+  // priority = 步骤序(leader 伪任务 0、模板 step.order / 计划数组序 1..N),
+  // 升序即执行顺序 —— 步骤 1 在最上,新步骤随执行追加在下方。
   const tasks = [...mission.tasks].sort(
     (a, b) =>
-      (b.priority ?? 0) - (a.priority ?? 0) ||
+      (a.priority ?? 0) - (b.priority ?? 0) ||
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
   const stepNoOf = new Map(tasks.map((t, i) => [t.id, i + 1]));
-  const teamMap = new Map<string, string>(
-    mission.team.map((e) => [e.id as string, e.name]),
-  );
   const started = tasks.filter((t) => t.status !== "pending");
   const isTerminal = TERMINAL.has(mission.status);
   const isFailed = mission.status === "failed";
@@ -101,11 +100,7 @@ export function MissionStepStream({ missionId }: { missionId: string }) {
           task={t}
           stepNo={stepNoOf.get(t.id) ?? 0}
           total={tasks.length}
-          employeeName={
-            t.assignedEmployeeId
-              ? teamMap.get(t.assignedEmployeeId)
-              : undefined
-          }
+          employeeName={t.assignedEmployee?.name}
         />
       ))}
 

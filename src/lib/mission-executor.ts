@@ -439,7 +439,9 @@ export async function leaderPlanDirect(
         expectedOutput: taskDef.expectedOutput || null,
         assignedEmployeeId: employeeId,
         dependencies: depTaskIds,
-        priority: taskDef.priority ?? 0,
+        // priority 全系统统一语义 = 步骤序(升序即执行/展示顺序);LLM 计划里的
+        // priority 是"重要性",无任何消费方,落库时覆盖为数组序与模板路径对齐。
+        priority: taskIds.length + 1,
         status: "pending",
       })
       .returning({ id: missionTasks.id });
