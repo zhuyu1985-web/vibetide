@@ -35,6 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { GeminiRing } from "@/components/shared/gemini-ring";
 import { cn } from "@/lib/utils";
 import { startCoworkConversation } from "@/app/actions/cowork-start";
 import {
@@ -170,6 +171,7 @@ export function ProjectDetailClient({
 
       {/* 项目内新对话输入 */}
       <div className="gemini-border rounded-2xl bg-card transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
+        <GeminiRing />
         <div className="px-4 pb-1.5 pt-3">
           <textarea
             ref={textareaRef}

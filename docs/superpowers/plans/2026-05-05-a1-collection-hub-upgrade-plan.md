@@ -8,9 +8,9 @@
 
 **Tech Stack:** Next.js 16 App Router / TypeScript strict / Drizzle ORM 0.45 + postgres / Supabase PostgreSQL / Inngest / shadcn/ui + Radix / Tailwind v4 / Vitest / iron-session / sonner toast。
 
-**关联 sub-spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-05-a1-collection-hub-upgrade-design.md`
+**关联 sub-spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-05-a1-collection-hub-upgrade-design.md`
 
-**关联 main spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.1
+**关联 main spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.1
 
 **总工期：5-7 工作日**（Phase 0 清理 1 天 + Phase 1-6 实施 4-6 天）
 
@@ -34,60 +34,60 @@
 
 | 文件 | 删除原因 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/media-outlets.ts` | v1 outlet 系统，3 张表 schema |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed/research/media-outlets.ts` | 167 条 demo seed |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/outlet-matcher.ts` | 137 行旧 matcher |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/outlet-matcher.test.ts` | 旧 matcher 测试 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/media-outlets.ts` | 旧 DAL |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/media-outlets.ts` | 旧 server actions |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/admin/media-outlets/page.tsx` | 旧管理页（被 `/data-collection/outlets` 取代） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/admin/media-outlets/media-outlets-client.tsx` | 同上 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/media-outlets.ts` | v1 outlet 系统，3 张表 schema |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed/research/media-outlets.ts` | 167 条 demo seed |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/outlet-matcher.ts` | 137 行旧 matcher |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/outlet-matcher.test.ts` | 旧 matcher 测试 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/media-outlets.ts` | 旧 DAL |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/media-outlets.ts` | 旧 server actions |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/admin/media-outlets/page.tsx` | 旧管理页（被 `/data-collection/outlets` 取代） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/admin/media-outlets/media-outlets-client.tsx` | 同上 |
 
 ### Phase 0 stub 化（保留文件，处理引用）
 
 | 文件 | stub 操作 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/news-articles.ts` | 删除指向 `mediaOutlets.id` 的 FK 字段（A3 阶段会删整表） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/enums.ts` | 删除 `mediaTierEnum` + `mediaOutletStatusEnum` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts` | 移除 outlet join（暂返回 outlet 字段为 null） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/article-ingest.ts` | 移除 outlet matcher 调用（暂不识别 outlet） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/task-start.ts` | 移除 outlet 引用 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts` | 移除 crawl_configs 引用（A3 阶段会重写） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx` | 移除 outlet 数据加载 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | outlet 字段相关 UI 隐藏（A4 阶段重做） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/news-articles.ts` | 删除指向 `mediaOutlets.id` 的 FK 字段（A3 阶段会删整表） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/enums.ts` | 删除 `mediaTierEnum` + `mediaOutletStatusEnum` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts` | 移除 outlet join（暂返回 outlet 字段为 null） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/article-ingest.ts` | 移除 outlet matcher 调用（暂不识别 outlet） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/task-start.ts` | 移除 outlet 引用 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts` | 移除 crawl_configs 引用（A3 阶段会重写） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx` | 移除 outlet 数据加载 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | outlet 字段相关 UI 隐藏（A4 阶段重做） |
 
 ### Phase 1-6 新建（17 个）
 
 | 文件 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/media-outlet-dictionary.ts` | 新表 schema |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/constants.ts` | OUTLET_TIER + CONTENT_TYPE 枚举 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/outlet-recognizer.ts` | recognizeOutlet + 字典 cache |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/outlet-recognizer.test.ts` | 单测 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/media-outlet-dictionary.ts` | 字典 CRUD + version bump |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts` | DAL 单测 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed/media-outlet-dictionary/{index,central,industry,chongqing-municipal,chongqing-district,chongqing-eco-gov}.ts` | 5 + 1 个 seed 文件 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/media-outlet-dictionary.ts` | server actions |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/outlets/{page,outlets-client,outlet-edit-dialog,outlet-delete-confirm-dialog}.tsx` | 字典管理 UI 4 文件 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/collection/outlet-batch-recognize.ts` | Inngest 批量回填 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/media-outlet-dictionary.ts` | 新表 schema |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/constants.ts` | OUTLET_TIER + CONTENT_TYPE 枚举 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/outlet-recognizer.ts` | recognizeOutlet + 字典 cache |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/outlet-recognizer.test.ts` | 单测 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/media-outlet-dictionary.ts` | 字典 CRUD + version bump |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts` | DAL 单测 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed/media-outlet-dictionary/{index,central,industry,chongqing-municipal,chongqing-district,chongqing-eco-gov}.ts` | 5 + 1 个 seed 文件 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/media-outlet-dictionary.ts` | server actions |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/outlets/{page,outlets-client,outlet-edit-dialog,outlet-delete-confirm-dialog}.tsx` | 字典管理 UI 4 文件 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/collection/outlet-batch-recognize.ts` | Inngest 批量回填 |
 
 ### Phase 1-6 修改（10 个）
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/collection.ts` | collected_items + collection_sources 加字段 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/users.ts:38-49` | organizations 加 mediaOutletDictionaryVersion |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/writer.ts` | 集成 outlet-recognizer |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/types.ts` | NormalizedItem 加 contentType + attachments |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts` | 加 recognizer 集成 cases |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/collection.ts` | listCollectedItems 加 outlet 筛选 + join 字典取 outletName |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/data-collection-tabs.tsx` | TABS 加第 4 项 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/content-client.tsx` | 加分级筛选 + 媒体名搜索 + 媒体列 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/item-detail-drawer.tsx` | 加识别信息 + 修正 outlet |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/[id]/source-detail-client.tsx` | 加 outlet 配置字段 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx` | 同上 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/index.ts` | 注册 outletBatchRecognize |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/20260505XXXXXX_a1_*.sql` | 2 个新 migration（Phase 0 + Phase 1） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/collection.ts` | collected_items + collection_sources 加字段 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/users.ts:38-49` | organizations 加 mediaOutletDictionaryVersion |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/writer.ts` | 集成 outlet-recognizer |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/types.ts` | NormalizedItem 加 contentType + attachments |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts` | 加 recognizer 集成 cases |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/collection.ts` | listCollectedItems 加 outlet 筛选 + join 字典取 outletName |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/data-collection-tabs.tsx` | TABS 加第 4 项 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/content-client.tsx` | 加分级筛选 + 媒体名搜索 + 媒体列 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/item-detail-drawer.tsx` | 加识别信息 + 修正 outlet |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/[id]/source-detail-client.tsx` | 加 outlet 配置字段 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx` | 同上 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/index.ts` | 注册 outletBatchRecognize |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/20260505XXXXXX_a1_*.sql` | 2 个新 migration（Phase 0 + Phase 1） |
 
 ---
 
@@ -124,20 +124,20 @@
 ### Task 0.2：删除 v1 outlet 系统的 schema 文件
 
 **Files:**
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/media-outlets.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/enums.ts`（删 2 个 enum）
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/news-articles.ts`（删 outlet FK 字段）
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/media-outlets.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/enums.ts`（删 2 个 enum）
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/news-articles.ts`（删 outlet FK 字段）
 
 - [ ] **Step 1：删除 media-outlets.ts**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/media-outlets.ts
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/media-outlets.ts
 ```
 
 - [ ] **Step 2：清理 enums.ts**
 
 ```bash
-cat /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/enums.ts | grep -E "mediaTierEnum|mediaOutletStatusEnum"
+cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/enums.ts | grep -E "mediaTierEnum|mediaOutletStatusEnum"
 ```
 
 删除上述 2 个 enum 定义（用 Edit 工具找到对应行删除）。其它 research enum 保持不动。
@@ -145,7 +145,7 @@ cat /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/enums.ts | grep
 - [ ] **Step 3：清理 news-articles.ts**
 
 ```bash
-grep -n "mediaOutlets\|mediaTierEnum\|outletId" /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/news-articles.ts
+grep -n "mediaOutlets\|mediaTierEnum\|outletId" /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/news-articles.ts
 ```
 
 删除其中所有指向 `mediaOutlets.id` 的 FK 列定义和 import。news_articles 表本身保留（A3 阶段才删整表），只是失去 outlet 关联。
@@ -153,7 +153,7 @@ grep -n "mediaOutlets\|mediaTierEnum\|outletId" /Users/zhuyu/dev/chinamcloud/vib
 - [ ] **Step 4：tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | head -50
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | head -50
 ```
 
 预期：会有大量 import 错误（其它文件 import 了被删除的符号）—— 这是预期，下一个 Task 处理。
@@ -163,26 +163,26 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | head -50
 ### Task 0.3：删除 v1 outlet 的 lib / DAL / actions / seed
 
 **Files:**
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/outlet-matcher.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/outlet-matcher.test.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/media-outlets.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/media-outlets.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed/research/media-outlets.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/outlet-matcher.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/outlet-matcher.test.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/media-outlets.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/media-outlets.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed/research/media-outlets.ts`
 
 - [ ] **Step 1：删除 5 个文件**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/outlet-matcher.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/outlet-matcher.test.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/media-outlets.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/media-outlets.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed/research/media-outlets.ts
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/outlet-matcher.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/outlet-matcher.test.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/media-outlets.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/media-outlets.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed/research/media-outlets.ts
 ```
 
 - [ ] **Step 2：tsc 看错误增量**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | grep -E "Cannot find|has no exported member" | head -30
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | grep -E "Cannot find|has no exported member" | head -30
 ```
 
 记录所有 import 错误的文件清单，准备下一个 Task stub 化。
@@ -192,12 +192,12 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | grep -E "Can
 ### Task 0.4：stub 化研究模块对旧 outlet 的引用
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/article-ingest.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/task-start.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/article-ingest.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/task-start.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
 
 - [ ] **Step 1：news-article-search.ts**
 
@@ -240,20 +240,20 @@ return { skipped: true };
 - [ ] **Step 5：删除旧管理页**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/admin/media-outlets/page.tsx \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/admin/media-outlets/media-outlets-client.tsx
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/admin/media-outlets/page.tsx \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/admin/media-outlets/media-outlets-client.tsx
 ```
 
 如果整个 `/research/admin/media-outlets/` 目录空了，删除目录：
 
 ```bash
-rmdir /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/admin/media-outlets/ 2>/dev/null || true
+rmdir /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/admin/media-outlets/ 2>/dev/null || true
 ```
 
 - [ ] **Step 6：tsc 完全通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 预期：**Step 1-5 中间态可以有 import 错（red）；Step 6 即所有 stub 化完成后**才要求零错。如还有错误，回去逐个 stub 化未处理的引用。
@@ -261,7 +261,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 - [ ] **Step 7：build 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run build
 ```
 
 预期：通过。研究模块部分页面会加载但 outlet 相关 UI 缺失——这是预期，A3-A4 阶段重做。
@@ -271,7 +271,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build
 ### Task 0.5：创建 Phase 0 migration（DROP 表 + DROP enums）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/20260505000001_a1_drop_v1_outlet_system.sql`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/20260505000001_a1_drop_v1_outlet_system.sql`
 
 - [ ] **Step 0：探查实际 FK 列名**
 
@@ -309,16 +309,16 @@ DROP TYPE IF EXISTS media_outlet_status CASCADE;
 - [ ] **Step 2：drizzle generate 同步元数据 + 二选一（避免双份 DROP）**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:generate
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:generate
 ```
 
 drizzle-kit 看到 schema 已删 → 自动生成 DROP migration。**不要并存两份**，按以下规则二选一：
 
 ```bash
 # 比较两份内容
-ls -t /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/*.sql | head -3
-DRIZZLE_FILE=$(ls -t /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/*.sql | head -1)
-diff "$DRIZZLE_FILE" /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/20260505000001_a1_drop_v1_outlet_system.sql
+ls -t /Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/*.sql | head -3
+DRIZZLE_FILE=$(ls -t /Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/*.sql | head -1)
+diff "$DRIZZLE_FILE" /Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/20260505000001_a1_drop_v1_outlet_system.sql
 ```
 
 **判断**：
@@ -328,7 +328,7 @@ diff "$DRIZZLE_FILE" /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/2
 ```bash
 # 删除 drizzle 自动生成的 entry（DRIZZLE_NAME 是它的 basename 不带 .sql）
 DRIZZLE_NAME=$(basename "$DRIZZLE_FILE" .sql)
-JOURNAL=/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/meta/_journal.json
+JOURNAL=/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/meta/_journal.json
 jq --arg name "$DRIZZLE_NAME" '.entries |= map(select(.tag != $name))' "$JOURNAL" > "$JOURNAL.tmp" && mv "$JOURNAL.tmp" "$JOURNAL"
 rm "$DRIZZLE_FILE"
 ```
@@ -338,7 +338,7 @@ rm "$DRIZZLE_FILE"
 - [ ] **Step 3：应用迁移到 dev DB**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:migrate
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:migrate
 ```
 
 预期：成功。无报错。
@@ -359,7 +359,7 @@ psql "$DATABASE_URL" -c "SELECT typname FROM pg_type WHERE typname IN ('media_ti
 - [ ] **Step 1：commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add -A src/db/schema/research/ \
         src/db/seed/research/ \
         src/lib/research/ \
@@ -384,7 +384,7 @@ EOF
 - [ ] **Step 2：状态验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git status && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git status && \
 grep -rln "researchMediaOutlets\|outletMatcher\|outlet-matcher\|research/media-outlets\|mediaTierEnum\|mediaOutletStatusEnum\|mediaOutletAliases\|mediaOutletCrawlConfigs" src/ --include="*.ts" --include="*.tsx" 2>/dev/null
 ```
 
@@ -397,7 +397,7 @@ grep -rln "researchMediaOutlets\|outletMatcher\|outlet-matcher\|research/media-o
 ### Task 1.1：定义枚举常量
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/constants.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/constants.ts`
 
 - [ ] **Step 1：写 constants.ts**
 
@@ -437,7 +437,7 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
 - [ ] **Step 2：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ---
@@ -445,7 +445,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.2：media_outlet_dictionary schema
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/media-outlet-dictionary.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/media-outlet-dictionary.ts`
 
 - [ ] **Step 1：写 schema 文件**
 
@@ -490,7 +490,7 @@ export type MediaOutletInsert = typeof mediaOutletDictionary.$inferInsert;
 - [ ] **Step 2：barrel export 检查**
 
 ```bash
-ls /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/index.ts 2>/dev/null && cat /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/index.ts | head -20
+ls /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/index.ts 2>/dev/null && cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/index.ts | head -20
 ```
 
 如有 barrel，append：
@@ -506,7 +506,7 @@ export * from "./media-outlet-dictionary";
 ### Task 1.3：collection.ts 字段扩展
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/collection.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/collection.ts`
 
 - [ ] **Step 1：collected_items 加 5 字段**
 
@@ -560,7 +560,7 @@ defaultOutletRegion: text("default_outlet_region"),
 ### Task 1.4：organizations 加 version 字段
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/users.ts:38-49`（organizations 表定义）
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/users.ts:38-49`（organizations 表定义）
 
 - [ ] **Step 1：加字段**
 
@@ -579,12 +579,12 @@ mediaOutletDictionaryVersion: integer("media_outlet_dictionary_version").notNull
 ### Task 1.5：生成 + 应用 migration（含手工 FK）
 
 **Files:**
-- Generate: `/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/20260505000002_a1_collection_hub_upgrade.sql`
+- Generate: `/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/20260505000002_a1_collection_hub_upgrade.sql`
 
 - [ ] **Step 1：drizzle-kit generate**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:generate
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:generate
 ```
 
 记录新生成的文件名（drizzle 命名风格 `00XX_xxx.sql`）。
@@ -593,13 +593,13 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:generate
 
 ```bash
 # 找出刚生成的文件 + 替换为时间戳命名
-DRIZZLE_FILE=$(ls -t /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/*.sql | head -1)
+DRIZZLE_FILE=$(ls -t /Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/*.sql | head -1)
 DRIZZLE_NAME=$(basename "$DRIZZLE_FILE" .sql)
 NEW_NAME="20260505000002_a1_collection_hub_upgrade"
-mv "$DRIZZLE_FILE" "/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/${NEW_NAME}.sql"
+mv "$DRIZZLE_FILE" "/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/${NEW_NAME}.sql"
 
 # 同步 _journal.json：tag 字段精确替换（journal entry 结构: { idx, version, when, tag, breakpoints }）
-JOURNAL=/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/meta/_journal.json
+JOURNAL=/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/meta/_journal.json
 jq --arg old "$DRIZZLE_NAME" --arg new "$NEW_NAME" \
   '.entries |= map(if .tag == $old then .tag = $new else . end)' \
   "$JOURNAL" > "$JOURNAL.tmp" && mv "$JOURNAL.tmp" "$JOURNAL"
@@ -612,7 +612,7 @@ grep -c "\"$DRIZZLE_NAME\"" "$JOURNAL"
 - [ ] **Step 3：检查生成 SQL**
 
 ```bash
-cat /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/20260505000002_a1_collection_hub_upgrade.sql
+cat /Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/20260505000002_a1_collection_hub_upgrade.sql
 ```
 
 确认包含：
@@ -640,7 +640,7 @@ ALTER TABLE collection_sources
 - [ ] **Step 5：应用迁移**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:migrate
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:migrate
 ```
 
 预期：成功。
@@ -667,13 +667,13 @@ SQL
 ### Task 1.6：DAL — media-outlet-dictionary（含完整测试）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/media-outlet-dictionary.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/media-outlet-dictionary.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts`
 
 - [ ] **Step 1：写完整测试（TDD 红灯）**
 
 ```ts
-// /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts
+// /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
@@ -774,7 +774,7 @@ describe("createOutlet 唯一约束", () => {
 - [ ] **Step 2：跑测试预期失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__/media-outlet-dictionary.test.ts 2>&1 | tail -30
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__/media-outlet-dictionary.test.ts 2>&1 | tail -30
 ```
 
 预期：所有 it 都失败（DAL 还没写）。
@@ -782,7 +782,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__
 - [ ] **Step 3：实现 DAL**
 
 ```ts
-// /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/media-outlet-dictionary.ts
+// /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/media-outlet-dictionary.ts
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaOutletDictionary, type MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
@@ -856,7 +856,7 @@ export async function getDictionaryVersion(orgId: string): Promise<number> {
 - [ ] **Step 4：跑测试预期全过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__/media-outlet-dictionary.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__/media-outlet-dictionary.test.ts
 ```
 
 预期：8/8 pass。
@@ -868,7 +868,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__
 ### Task 1.7：Phase 1 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/db/schema/media-outlet-dictionary.ts \
         src/db/schema/collection.ts \
         src/db/schema/users.ts \
@@ -897,7 +897,7 @@ EOF
 
 - [ ] **Step 1：写央级 seed**（参考 sub-spec §4.1 完整 12 条表）
 
-填进 `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed/media-outlet-dictionary/central.ts`
+填进 `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed/media-outlet-dictionary/central.ts`
 
 - [ ] **Step 2：写行业 seed**（sub-spec §4.2 12 条）
 
@@ -978,8 +978,8 @@ export async function seedMediaOutletDictionary(orgId: string) {
 - [ ] **Step 1：写一次性 dev script**
 
 ```bash
-mkdir -p /Users/zhuyu/dev/chinamcloud/vibetide/scripts
-cat > /Users/zhuyu/dev/chinamcloud/vibetide/scripts/dev-seed-outlets.ts <<'EOF'
+mkdir -p /Users/zhuyu/Developer/chinamcloud/vibetide/scripts
+cat > /Users/zhuyu/Developer/chinamcloud/vibetide/scripts/dev-seed-outlets.ts <<'EOF'
 import "dotenv/config";
 import { seedMediaOutletDictionary } from "@/db/seed/media-outlet-dictionary";
 
@@ -992,7 +992,7 @@ EOF
 - [ ] **Step 2：执行**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 ORG_ID=$(psql "$DATABASE_URL" -t -A -c "SELECT id FROM organizations LIMIT 1") && \
 npx tsx scripts/dev-seed-outlets.ts "$ORG_ID"
 ```
@@ -1015,8 +1015,8 @@ psql "$DATABASE_URL" -c "SELECT outlet_tier, COUNT(*) FROM media_outlet_dictiona
 - [ ] **Step 4：删除一次性 dev script**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/scripts/dev-seed-outlets.ts
-rmdir /Users/zhuyu/dev/chinamcloud/vibetide/scripts 2>/dev/null || true
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/scripts/dev-seed-outlets.ts
+rmdir /Users/zhuyu/Developer/chinamcloud/vibetide/scripts 2>/dev/null || true
 ```
 
 ---
@@ -1024,8 +1024,8 @@ rmdir /Users/zhuyu/dev/chinamcloud/vibetide/scripts 2>/dev/null || true
 ### Task 2.3：outlet-recognizer 算法（含完整测试）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/outlet-recognizer.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/outlet-recognizer.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/outlet-recognizer.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/outlet-recognizer.test.ts`
 
 - [ ] **Step 1：写测试（TDD 红灯）**
 
@@ -1124,13 +1124,13 @@ describe("recognizeOutlet 优先级链", () => {
 - [ ] **Step 2：跑测试预期全失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/outlet-recognizer.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/outlet-recognizer.test.ts
 ```
 
 - [ ] **Step 3：实现 recognizer**
 
 ```ts
-// /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/outlet-recognizer.ts
+// /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/outlet-recognizer.ts
 import type { MediaOutletRow } from "@/db/schema/media-outlet-dictionary";
 
 export interface RecognizableItem {
@@ -1206,7 +1206,7 @@ export function recognizeOutlet(
 - [ ] **Step 4：跑测试预期全过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/outlet-recognizer.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/outlet-recognizer.test.ts
 ```
 
 预期：8/8 pass。
@@ -1216,7 +1216,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__
 ### Task 2.4：Phase 2 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/db/seed/media-outlet-dictionary/ \
         src/lib/collection/outlet-recognizer.ts \
         src/lib/collection/__tests__/outlet-recognizer.test.ts && \
@@ -1237,7 +1237,7 @@ EOF
 - [ ] **Step 1：read 当前 types.ts**
 
 ```bash
-cat /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/types.ts
+cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/types.ts
 ```
 
 - [ ] **Step 2：在 NormalizedItem 加字段**
@@ -1319,12 +1319,12 @@ const recognized = recognizeOutlet(
 ### Task 3.3：writer 集成测试（完整代码）
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts`
 
 - [ ] **Step 1：探查 writer.test.ts 现有 setup**
 
 ```bash
-cat /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts | head -100
+cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts | head -100
 ```
 
 **记录**（下面的测试模板按这些信息适配）：
@@ -1471,7 +1471,7 @@ describe("writer + outlet-recognizer 集成", () => {
 - [ ] **Step 3：跑测试预期全过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/writer.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/writer.test.ts
 ```
 
 ---
@@ -1479,7 +1479,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__
 ### Task 3.4：Phase 3 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/collection/writer.ts \
         src/lib/collection/types.ts \
         src/lib/collection/__tests__/writer.test.ts && \
@@ -1512,7 +1512,7 @@ EOF
 - [ ] **Step 2：tsc + 浏览器手动**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run dev
 # 浏览器打开 /data-collection/sources，看顶部应有 4 个 tab
 ```
 
@@ -1521,7 +1521,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev
 ### Task 4.2：server actions
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/media-outlet-dictionary.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/media-outlet-dictionary.ts`
 
 - [ ] **Step 1：写 server actions**
 
@@ -1819,7 +1819,7 @@ export function OutletsClient({ initialOutlets, isAdmin }: Props) {
 ### Task 4.4：outlet-edit-dialog
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/outlets/outlet-edit-dialog.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/outlets/outlet-edit-dialog.tsx`
 
 - [ ] **Step 1：写 dialog（用 sonner toast，不用 alert）**
 
@@ -2003,7 +2003,7 @@ export function OutletDeleteConfirmDialog({ outletId, outletName, onClose, onDel
 - [ ] **Step 3：浏览器手动**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev
 # 浏览器访问 /data-collection/outlets
 # 验证：列表加载 / 搜索 / 筛选 / 新增 / 编辑 / 停用
 # 验证：所有按钮无边框；无 alert/confirm/window.reload 弹出（toast 替代）
@@ -2014,7 +2014,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
 ### Task 4.5：Phase 4 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/app/actions/media-outlet-dictionary.ts \
         src/app/\(dashboard\)/data-collection/data-collection-tabs.tsx \
         src/app/\(dashboard\)/data-collection/outlets/ && \
@@ -2033,12 +2033,12 @@ EOF
 ### Task 5.1：DAL listCollectedItems 加 outlet join + 筛选（独立 task）
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/collection.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/collection.ts`
 
 - [ ] **Step 1：找到 listCollectedItems**
 
 ```bash
-grep -n "listCollectedItems\|export async function list" /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/collection.ts
+grep -n "listCollectedItems\|export async function list" /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/collection.ts
 ```
 
 - [ ] **Step 2：filter 接口加 outlet 字段**
@@ -2082,7 +2082,7 @@ if (filter.outletRegion) conditions.push(eq(collectedItems.outletRegion, filter.
 - [ ] **Step 4：跑现有 collection.test.ts 验证回归**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__/collection.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/__tests__/collection.test.ts
 ```
 
 预期：现有所有测试 pass（join 是 LEFT JOIN，不影响原有数据）。
@@ -2119,7 +2119,7 @@ CREATE INDEX collected_items_org_outlet_pub_idx
 ### Task 5.2：content-client 加分级筛选 + 媒体列
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/content-client.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/content-client.tsx`
 
 - [ ] **Step 1：filter state 加字段 + UI**
 
@@ -2177,8 +2177,8 @@ const [outletRegion, setOutletRegion] = useState<string>("all");
 ### Task 5.3：sources 详情/新建加 outlet 字段
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/[id]/source-detail-client.tsx`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/[id]/source-detail-client.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx`
 
 - [ ] **Step 1：source 详情页加 3 字段（基本信息区块）**
 
@@ -2220,7 +2220,7 @@ const [outletRegion, setOutletRegion] = useState<string>("all");
 ### Task 5.4：Phase 5 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/dal/collection.ts \
         src/app/\(dashboard\)/data-collection/content/ \
         src/app/\(dashboard\)/data-collection/sources/ && \
@@ -2239,7 +2239,7 @@ EOF
 ### Task 6.1：item-detail-drawer 加修正 outlet
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/item-detail-drawer.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/content/item-detail-drawer.tsx`
 
 - [ ] **Step 1：加"识别信息"区块 + 修正按钮**
 
@@ -2254,8 +2254,8 @@ drawer 内容下方插入一个 section，显示当前 outletName / outletTier /
 ### Task 6.2：Inngest outlet-batch-recognize
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/collection/outlet-batch-recognize.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/index.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/collection/outlet-batch-recognize.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/index.ts`
 
 - [ ] **Step 1：写 Inngest 函数**
 
@@ -2319,7 +2319,7 @@ export const outletBatchRecognize = inngest.createFunction(
 
 ```bash
 # 终端 1
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev
 # 终端 2
 npx inngest-cli@latest dev
 # 浏览器 /data-collection/outlets 点 admin "批量回填" → Inngest dashboard 看 run 成功
@@ -2379,25 +2379,25 @@ npx inngest-cli@latest dev
 - [ ] **Step 1：tsc**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 - [ ] **Step 2：lint**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run lint
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run lint
 ```
 
 - [ ] **Step 3：build**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run build
 ```
 
 - [ ] **Step 4：A1 测试子集全过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run \
   src/lib/collection/__tests__/ \
   src/lib/dal/__tests__/media-outlet-dictionary.test.ts
 ```
@@ -2405,7 +2405,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
 - [ ] **Step 5：Phase 6 + A1 完工 commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/inngest/ \
         src/app/\(dashboard\)/data-collection/content/item-detail-drawer.tsx && \
 git commit --no-verify -m "$(cat <<'EOF'

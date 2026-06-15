@@ -1,5 +1,6 @@
 // src/lib/dal/research/__tests__/research-topics.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
+import { count, desc } from "drizzle-orm";
 import { listResearchTopics, getResearchTopicById } from "../research-topics";
 import { db } from "@/db";
 import { researchTopics } from "@/db/schema/research/research-topics";
@@ -11,11 +12,15 @@ beforeAll(async () => {
     ORG_ID = process.env.SEED_ORG_ID;
     return;
   }
-  // 找一个有 research_topics 的 org,而不是任意 LIMIT 1 — 避免后加的 org 抢到 LIMIT 1
-  // 却没 seed 主题导致 tests 全挂。如果一个都没有,提示跑 db:seed:research。
+  // 挑「research_topics 最多的那个 org」(即预置 16 条的 seed org),保证确定性。
+  // 任意 LIMIT 1 没有 ORDER BY — 全量并行跑时若别的测试临时往某个 org 插了少量
+  // research_topics,这个 LIMIT 1 可能抢到它,导致 >=16 / aliasCount 断言偶发失败。
+  // 如果一个都没有,提示跑 db:seed:research。
   const seeded = await db
-    .selectDistinct({ id: researchTopics.organizationId })
+    .select({ id: researchTopics.organizationId })
     .from(researchTopics)
+    .groupBy(researchTopics.organizationId)
+    .orderBy(desc(count()))
     .limit(1);
   if (seeded.length === 0) {
     throw new Error(

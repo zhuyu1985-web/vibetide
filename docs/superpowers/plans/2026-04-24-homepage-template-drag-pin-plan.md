@@ -80,7 +80,7 @@ export const workflowTemplateTabOrder = pgTable(
 
 - [ ] **Step 2: 检查 `src/db/schema/index.ts`（若存在）是否需要 re-export**
 
-Run: `grep -n workflowTemplates /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/index.ts 2>/dev/null || echo 'no index.ts re-export'`
+Run: `grep -n workflowTemplates /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/index.ts 2>/dev/null || echo 'no index.ts re-export'`
 
 如输出含 `workflowTemplates`，则在同文件追加 `export { workflowTemplateTabOrder } from "./workflows";`（或 barrel re-export 风格）；如 "no index.ts re-export" 则跳过。
 

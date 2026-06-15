@@ -96,7 +96,7 @@ git commit -m "feat(db): 新增 workflow_templates.is_featured 列 + 部分索�
 - [ ] **Step 2：运行 type check 确认 schema 自洽**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 Expected: PASS（`WorkflowTemplateRow` 通过 `InferSelectModel` 自动带上 `isFeatured: boolean` 字段，现有代码不会因新增字段爆掉）
 
@@ -897,7 +897,7 @@ Expected: PASS
 - [ ] **Step 6：grep 确认其他调用点仍可用**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && grep -rn "listTemplatesForHomepageByEmployee" --include="*.ts" --include="*.tsx"
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && grep -rn "listTemplatesForHomepageByEmployee" --include="*.ts" --include="*.tsx"
 ```
 Expected: 2-3 个调用点（`/home/page.tsx`、测试文件、自身 export），都能通过 deprecated 别名工作
 
@@ -1130,7 +1130,7 @@ git commit -m "feat(home): scenario-grid 头部加"主流场景"tab + 默认选�
 - [ ] **Step 1：应用 migration**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:push
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:push
 ```
 Expected: 看到 `ALTER TABLE workflow_templates ADD COLUMN is_featured ...` 应用成功
 
@@ -1188,7 +1188,7 @@ Expected: 返回 10 条：
 - [ ] **Step 1：启动 dev server**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev
 ```
 
 （通常跑在 http://localhost:3000）

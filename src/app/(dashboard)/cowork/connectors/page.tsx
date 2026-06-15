@@ -9,6 +9,7 @@ import {
   isSearchProviderConfigured,
 } from "@/lib/search/config";
 import { cn } from "@/lib/utils";
+import { ReturnToPreviousButton } from "@/components/shared/return-to-previous-button";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,10 @@ export default async function CoworkConnectorsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
-      <h1 className="mb-1 text-xl font-medium">连接器</h1>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-medium">连接器</h1>
+        <ReturnToPreviousButton />
+      </div>
       <p className="mb-5 text-sm text-muted-foreground">
         接入内容源、发布渠道与外部服务,供 AI 团队在任务执行中调用。
       </p>

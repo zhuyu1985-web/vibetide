@@ -1,4 +1,4 @@
-// /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts
+// /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/__tests__/media-outlet-dictionary.test.ts
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";

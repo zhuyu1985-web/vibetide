@@ -12,10 +12,10 @@
 ### A. 环境变量
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide/.worktrees/phase1-cms-adapter-mvp
-grep -c "^\s*CMS_" /Users/zhuyu/dev/chinamcloud/vibetide/.env.local
+cd /Users/zhuyu/Developer/chinamcloud/vibetide/.worktrees/phase1-cms-adapter-mvp
+grep -c "^\s*CMS_" /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local
 # 期望: >= 5 (CMS_HOST/CMS_LOGIN_CMC_ID/CMS_LOGIN_CMC_TID/CMS_TENANT_ID/CMS_USERNAME)
-grep -c "^\s*VIBETIDE_CMS_PUBLISH_ENABLED=true" /Users/zhuyu/dev/chinamcloud/vibetide/.env.local
+grep -c "^\s*VIBETIDE_CMS_PUBLISH_ENABLED=true" /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local
 # 期望: 1
 ```
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
+import { ReturnToPreviousButton } from "@/components/shared/return-to-previous-button";
 import { SkillFormDialog } from "@/components/shared/skill-form-dialog";
 import { SkillImportDialog } from "@/components/shared/skill-import-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -280,6 +281,7 @@ export function SkillsClient({
       <PageHeader
         title="技能管理"
         description="管理 AI 员工可用的技能库，添加自定义技能或查看内置技能"
+        leading={<ReturnToPreviousButton variant="default" />}
         actions={
           <div className="flex gap-2">
             {selected.size > 0 && (

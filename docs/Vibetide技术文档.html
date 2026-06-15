@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="slate">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibetide · MClaw 技术文档 · 面向研发负责人</title>
+<style>
+:root{
+  --brand:#0e7c66; --brand-strong:#0a6051; --brand-weak:#e7f3ef; --brand-weak2:#d6ebe4;
+  --accent:#12a594; --accent-weak:#e2f5f1;
+  --ink:#17211d; --ink-2:#3b4741; --muted:#71807a; --faint:#9aa8a2;
+  --line:#e5ebe7; --line-2:#d3ddd8;
+  --bg:#f7faf8; --surface:#ffffff; --surface-2:#f1f6f3; --surface-3:#eaf1ed;
+  --info:#2563eb; --info-weak:#e8effd; --warn:#b45309; --warn-weak:#fbf0e1; --danger:#b91c1c; --danger-weak:#fbe9e9;
+  --dark-bg:#0c3a31; --dark-bg2:#0f4a3e; --dark-ink:#eaf4f0; --dark-muted:#9cc3b8; --dark-brand:#5fd6bd;
+  --font-sans:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Source Han Sans SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+  --font-serif:"Source Han Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif;
+  --font-mono:"JetBrains Mono","SF Mono","Cascadia Code","Roboto Mono",Consolas,monospace;
+  --radius:14px; --radius-sm:9px; --radius-lg:22px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(16,40,33,.06),0 1px 1px rgba(16,40,33,.04);
+  --shadow:0 6px 20px -8px rgba(16,50,40,.16),0 2px 6px -2px rgba(16,50,40,.08);
+  --shadow-lg:0 20px 48px -16px rgba(13,55,44,.24),0 6px 16px -8px rgba(13,55,44,.12);
+  --maxw:1200px; --content:780px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);font-size:16.5px;line-height:1.78;font-feature-settings:"tnum" on;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+::selection{background:var(--brand-weak2);color:var(--brand-strong)}
+a{color:var(--brand);text-decoration:none}
+h1,h2,h3,h4{line-height:1.3;font-weight:700;color:var(--ink);margin:0}
+p{margin:0 0 1em}
+img{max-width:100%}
+code,kbd{font-family:var(--font-mono);font-size:.86em;background:var(--surface-3);color:var(--brand-strong);padding:1px 6px;border-radius:5px}
+.doc-header{position:sticky;top:0;z-index:50;background:rgba(247,250,248,.86);backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--line)}
+.doc-header .bar{height:54px;max-width:var(--maxw);margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:14px}
+.doc-header .mark{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px}
+.doc-header .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#0e7c66,#12a594);display:grid;place-items:center;color:#fff;font-size:14px;font-weight:800;box-shadow:var(--shadow-sm)}
+.doc-header .dtype{font-size:12.5px;color:#fff;background:var(--brand);padding:3px 10px;border-radius:var(--radius-pill);font-weight:600}
+.doc-header .spacer{flex:1}
+.doc-header .meta-min{font-size:12.5px;color:var(--muted)}
+.progress{position:absolute;left:0;bottom:-1px;height:2.5px;background:linear-gradient(90deg,var(--brand),var(--accent));width:0;transition:width .1s linear}
+.cover{position:relative;overflow:hidden;background:radial-gradient(1100px 500px at 80% -10%,#105446 0,transparent 60%),linear-gradient(135deg,var(--dark-bg) 0,var(--dark-bg2) 60%,#0a463a 100%);color:var(--dark-ink);padding:74px 28px 64px}
+.cover .inner{max-width:var(--maxw);margin:0 auto;position:relative;z-index:2}
+.cover .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:13px;letter-spacing:2.5px;color:var(--dark-brand);font-weight:600;text-transform:uppercase}
+.cover .eyebrow::before{content:"";width:30px;height:2px;background:var(--dark-brand)}
+.cover h1{font-size:46px;letter-spacing:-.5px;margin:20px 0 0;color:#fff;line-height:1.18}
+.cover h1 .sub{display:block;font-size:22px;font-weight:500;color:var(--dark-muted);margin-top:14px;letter-spacing:.5px}
+.cover .desc{max-width:700px;margin:24px 0 0;font-size:17px;color:#cfe6df;line-height:1.8}
+.cover .metarow{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:34px;padding-top:26px;border-top:1px solid rgba(255,255,255,.14)}
+.cover .metarow .mi{font-size:13.5px;color:var(--dark-muted)}
+.cover .metarow .mi b{display:block;color:#fff;font-size:15px;font-weight:600;margin-top:3px;letter-spacing:.3px}
+.cover .glow{position:absolute;border-radius:50%;filter:blur(8px);opacity:.5;z-index:1}
+.cover .g1{width:240px;height:240px;background:radial-gradient(circle,#1a7a66,transparent 70%);top:-60px;right:8%}
+.cover .g2{width:170px;height:170px;background:radial-gradient(circle,#0e8f7a,transparent 70%);bottom:-50px;right:30%}
+.doc-layout{max-width:var(--maxw);margin:0 auto;padding:0 28px;display:grid;grid-template-columns:248px minmax(0,1fr);gap:48px;align-items:start}
+.toc{position:sticky;top:74px;align-self:start;padding:30px 0 40px;max-height:calc(100vh - 80px);overflow-y:auto}
+.toc .tt{font-size:11.5px;letter-spacing:2px;color:var(--faint);text-transform:uppercase;font-weight:700;margin:0 0 12px;padding-left:12px}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+.toc li{counter-increment:toc}
+.toc a{display:block;padding:6px 12px 6px 14px;font-size:13px;color:var(--muted);border-left:2px solid transparent;line-height:1.45;transition:.18s;border-radius:0 6px 6px 0}
+.toc a::before{content:counter(toc,decimal-leading-zero);font-family:var(--font-mono);font-size:10.5px;color:var(--faint);margin-right:8px}
+.toc a:hover{color:var(--brand);background:var(--brand-weak)}
+.toc a.active{color:var(--brand-strong);border-left-color:var(--brand);background:var(--brand-weak);font-weight:600}
+.toc a.active::before{color:var(--brand)}
+.doc-main{padding:8px 0 40px;min-width:0}
+.section{padding:30px 0 14px;scroll-margin-top:72px}
+.section+.section{border-top:1px solid var(--line)}
+.section-head{margin:0 0 26px}
+.kicker{display:inline-flex;align-items:center;gap:9px;font-size:12.5px;letter-spacing:1.5px;color:var(--brand);font-weight:700;text-transform:uppercase}
+.kicker::before{content:"";width:22px;height:2px;background:var(--brand);border-radius:2px}
+.kicker.accent{color:var(--accent)}.kicker.accent::before{background:var(--accent)}
+.section h2{font-size:30px;letter-spacing:-.3px;margin:14px 0 0}
+.section .lead{font-size:18px;color:var(--ink-2);margin:14px 0 0;max-width:var(--content);line-height:1.8}
+.section h3{font-size:20px;margin:34px 0 12px;padding-left:13px;border-left:3px solid var(--brand);letter-spacing:-.2px}
+.section h4{font-size:16px;margin:22px 0 8px;color:var(--brand-strong)}
+.prose{max-width:var(--content)}
+.prose p{color:var(--ink-2)}
+.muted{color:var(--muted)}
+.grid{display:grid;gap:18px;margin:20px 0}
+.cols-2{grid-template-columns:repeat(2,1fr)}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.cols-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:760px){.cols-2,.cols-3,.cols-4{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm);transition:.2s}
+.card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.card--accent{border-top:3px solid var(--brand)}
+.card--brand{background:var(--brand-weak);border-color:var(--brand-weak2)}
+.card .cnum{font-family:var(--font-mono);font-size:13px;color:var(--accent);font-weight:700;letter-spacing:1px}
+.card h4{margin:8px 0 8px;font-size:16px;color:var(--ink)}
+.card p{font-size:14px;color:var(--ink-2);margin:0;line-height:1.7}
+.card .ic{width:42px;height:42px;border-radius:11px;background:var(--brand-weak);color:var(--brand);display:grid;place-items:center;font-size:20px;margin-bottom:13px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm)}
+.kpi .num{font-size:30px;font-weight:800;color:var(--brand-strong);letter-spacing:-.5px;line-height:1.05;font-family:var(--font-mono)}
+.kpi .num .unit{font-size:14px;font-weight:600;color:var(--accent);margin-left:3px;font-family:var(--font-sans)}
+.kpi .label{font-size:13px;color:var(--muted);margin-top:9px;line-height:1.5}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 11px;border-radius:var(--radius-pill);background:var(--surface-3);color:var(--ink-2);font-weight:500;line-height:1.6}
+.tag--accent{background:var(--accent-weak);color:#0b7a6c}
+.tag--brand{background:var(--brand-weak);color:var(--brand-strong)}
+.tag--muted{background:var(--surface-2);color:var(--muted)}
+.tag--info{background:var(--info-weak);color:var(--info)}
+.tag--warn{background:var(--warn-weak);color:var(--warn)}
+.tag--danger{background:var(--danger-weak);color:var(--danger)}
+.tagrow{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.table-wrap{overflow-x:auto;margin:20px 0;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
+table.table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--surface)}
+table.table th{background:var(--brand-weak);color:var(--brand-strong);font-weight:700;text-align:left;padding:10px 14px;border-bottom:1px solid var(--brand-weak2);white-space:nowrap;font-size:12.5px;letter-spacing:.3px}
+table.table td{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top;line-height:1.6}
+table.table tr:last-child td{border-bottom:none}
+table.table.zebra tbody tr:nth-child(odd){background:var(--surface-2)}
+table.table td.num,table.table th.num{text-align:right;font-family:var(--font-mono);font-size:12.5px}
+table.table tr:hover td{background:var(--brand-weak)}
+.table td b{color:var(--ink)}
+.table td code{font-size:12px}
+.timeline{position:relative;margin:24px 0;padding-left:28px}
+.timeline::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--brand),var(--accent))}
+.t-item{position:relative;padding:0 0 24px}
+.t-item::before{content:"";position:absolute;left:-26px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:3px solid var(--brand);box-shadow:0 0 0 3px var(--brand-weak)}
+.t-item .t-time{font-family:var(--font-mono);font-size:12.5px;color:var(--accent);font-weight:700;letter-spacing:.5px}
+.t-item h4{margin:3px 0 5px;font-size:16px;color:var(--ink)}
+.t-item p{font-size:14px;color:var(--ink-2);margin:0}
+.callout{border-radius:var(--radius);padding:16px 20px 16px 18px;margin:20px 0;border-left:4px solid var(--brand);background:var(--brand-weak);font-size:14.5px;color:var(--ink-2);line-height:1.72}
+.callout .ct{font-weight:700;color:var(--brand-strong);margin-bottom:4px;display:flex;align-items:center;gap:7px}
+.callout--accent{border-left-color:var(--accent);background:var(--accent-weak)}.callout--accent .ct{color:#0b7a6c}
+.callout--info{border-left-color:var(--info);background:var(--info-weak)}.callout--info .ct{color:var(--info)}
+.callout--warn{border-left-color:var(--warn);background:var(--warn-weak)}.callout--warn .ct{color:var(--warn)}
+.callout--danger{border-left-color:var(--danger);background:var(--danger-weak)}.callout--danger .ct{color:var(--danger)}
+.callout p:last-child{margin-bottom:0}
+.callout code{background:rgba(0,0,0,.05)}
+.list{list-style:none;margin:14px 0;padding:0}
+.list li{position:relative;padding:5px 0 5px 24px;color:var(--ink-2);font-size:14.5px;line-height:1.7}
+.list li::before{content:"";position:absolute;left:4px;top:13px;width:7px;height:7px;background:var(--brand);transform:rotate(45deg);border-radius:1px}
+.list.check li::before{content:"✓";background:none;color:var(--accent);font-weight:800;top:5px;left:2px;transform:none;font-size:14px}
+.list.num{counter-reset:nl}
+.list.num li{counter-increment:nl;padding-left:30px}
+.list.num li::before{content:counter(nl);background:var(--brand);color:#fff;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;transform:none;top:7px;left:0}
+.btn{display:inline-flex;align-items:center;gap:7px;border:none;cursor:pointer;background:var(--brand);color:#fff;font-size:14px;font-weight:600;padding:9px 18px;border-radius:var(--radius-pill);font-family:inherit;box-shadow:var(--shadow-sm);transition:.18s}
+.btn:hover{background:var(--brand-strong);transform:translateY(-1px)}
+.btn--ghost{background:var(--brand-weak);color:var(--brand-strong);box-shadow:none}
+/* 代码块（深色 · 明暗交接）*/
+pre.code{background:#0d2a24;color:#d7ece5;border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:var(--font-mono);font-size:13px;line-height:1.72;margin:18px 0;box-shadow:var(--shadow);border:1px solid #143a32}
+pre.code .c{color:#6f9b8f;font-style:italic}
+pre.code .k{color:#5fd6bd}
+pre.code .s{color:#e3b778}
+pre.code .f{color:#9ecbff}
+pre.code .p{color:#9aa8a2}
+.codecap{font-size:12px;color:var(--muted);margin:14px 0 -8px;font-family:var(--font-mono)}
+/* 分层图 */
+.arch{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin:22px 0}
+.arch .layer{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 15px;margin:9px 0;box-shadow:var(--shadow-sm)}
+.arch .layer .lh{font-size:12px;font-weight:700;color:var(--brand);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.arch .row{display:flex;flex-wrap:wrap;gap:7px}
+.arch .chip{font-size:12.5px;background:var(--brand-weak);color:var(--brand-strong);padding:5px 11px;border-radius:7px;font-weight:500}
+.arch .chip.alt{background:var(--accent-weak);color:#0b7a6c}
+.arch .chip.n{background:var(--surface-3);color:var(--ink-2)}
+.arch .vlink{text-align:center;color:var(--accent);font-size:15px;margin:1px 0}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:22px 0}
+.flow .step{flex:1;min-width:100px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 10px;text-align:center;box-shadow:var(--shadow-sm)}
+.flow .step .sn{font-size:13px;font-weight:700;color:var(--ink)}
+.flow .step .sw{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--font-mono)}
+.flow .arrow{display:flex;align-items:center;color:var(--accent);font-size:17px;padding:0 4px;font-weight:700}
+@media(max-width:760px){.flow .arrow{transform:rotate(90deg)}.flow .step{min-width:0;flex-basis:42%}}
+/* 7 层 prompt 栈 */
+.stack{margin:22px 0}
+.stack .lyr{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:var(--radius-sm);padding:11px 16px;margin:7px 0;box-shadow:var(--shadow-sm);transition:.18s}
+.stack .lyr:hover{transform:translateX(4px);box-shadow:var(--shadow)}
+.stack .lyr .ln{font-family:var(--font-mono);font-size:15px;font-weight:800;color:var(--accent);flex:none;width:30px}
+.stack .lyr .lt{font-weight:700;font-size:14.5px;color:var(--ink);flex:none;width:118px}
+.stack .lyr .ld{font-size:13px;color:var(--ink-2);min-width:0}
+@media(max-width:760px){.stack .lyr{flex-wrap:wrap}.stack .lyr .lt{width:auto}}
+.site-footer{background:var(--dark-bg);color:var(--dark-muted);margin-top:48px;padding:40px 28px}
+.site-footer .inner{max-width:var(--maxw);margin:0 auto;display:flex;flex-wrap:wrap;justify-content:space-between;gap:18px;align-items:center}
+.site-footer b{color:#fff}.site-footer .l{font-size:14px}.site-footer .r{font-size:12.5px}
+.totop{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;background:var(--brand);color:#fff;font-size:19px;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:.25s;z-index:40}
+.totop.show{opacity:1;pointer-events:auto}.totop:hover{background:var(--brand-strong);transform:translateY(-2px)}
+[data-animate]{opacity:0;transform:translateY(14px);transition:opacity .6s cubic-bezier(.2,.7,.3,1),transform .6s cubic-bezier(.2,.7,.3,1);transition-delay:calc(var(--i,0)*60ms)}
+[data-animate].in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){[data-animate]{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+.note{font-size:13px;color:var(--muted);margin:6px 0}
+.statband{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:24px 0}
+@media(max-width:760px){.statband{grid-template-columns:repeat(2,1fr)}}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0}
+@media(max-width:760px){.split{grid-template-columns:1fr}}
+.anchor-h{scroll-margin-top:72px}
+@media(max-width:980px){.doc-layout{grid-template-columns:1fr;gap:0}.toc{display:none}.cover h1{font-size:34px}.cover h1 .sub{font-size:18px}}
+@media print{.doc-header,.toc,.totop,.site-footer .r{display:none!important}body{font-size:11pt}.doc-layout{display:block;padding:0}.section{page-break-inside:avoid;border-top:1px solid #ccc}.card,.kpi,.table-wrap,pre.code{box-shadow:none;break-inside:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cover{padding:40px 28px}pre.code{background:#0d2a24!important}}
+</style>
+</head>
+<body>
+<header class="doc-header">
+  <div class="bar">
+    <span class="mark"><span class="logo">M</span>Vibe Media · MClaw</span>
+    <span class="dtype">技术文档</span>
+    <span class="spacer"></span>
+    <span class="meta-min">v1.0 · 2026-06-10 · 面向研发负责人</span>
+  </div>
+  <div class="progress" id="progress"></div>
+</header>
+
+<header class="cover">
+  <span class="glow g1"></span><span class="glow g2"></span>
+  <div class="inner">
+    <span class="eyebrow">Technical Documentation · 架构与实现</span>
+    <h1>Vibetide · MClaw 技术文档<span class="sub">架构 · 数据模型 · AI Agent · 工作流引擎 —— 面向研发负责人的实现说明</span></h1>
+    <p class="desc">本文系统梳理MClaw的技术栈、工程结构、数据模型、自建认证、AI Agent 装配与执行、工作流与定时任务引擎、Inngest 后台任务、知识库 RAG、CMS 集成层、设计系统约束与工程纪律。所有数字与结论均以当前代码库实测为准（截至 2026-06-10），并对历史文档与实现的差异作了勘误。</p>
+    <div class="metarow">
+      <div class="mi">技术栈<b>Next.js 16 · React 19 · TS5</b></div>
+      <div class="mi">数据层<b>PostgreSQL · Drizzle ORM</b></div>
+      <div class="mi">AI 推理<b>DeepSeek 主 · 智谱辅 · AI SDK v6</b></div>
+      <div class="mi">读者对象<b>研发负责人 / 架构 / 后端</b></div>
+      <div class="mi">配套文档<b>《Vibetide 产品文档》</b></div>
+    </div>
+  </div>
+</header>
+
+<div class="doc-layout">
+  <aside class="toc">
+    <p class="tt">目录</p>
+    <ol>
+      <li><a href="#overview">系统速览</a></li>
+      <li><a href="#stack">技术栈全景</a></li>
+      <li><a href="#structure">工程结构与路由</a></li>
+      <li><a href="#database">数据库层</a></li>
+      <li><a href="#auth">认证体系</a></li>
+      <li><a href="#dataflow">数据流与分层</a></li>
+      <li><a href="#agent">AI Agent 系统</a></li>
+      <li><a href="#intent">意图识别与模型路由</a></li>
+      <li><a href="#tools">Agent 工具体系</a></li>
+      <li><a href="#workflow">工作流与定时任务引擎</a></li>
+      <li><a href="#inngest">Inngest 后台任务</a></li>
+      <li><a href="#knowledge">知识库 RAG</a></li>
+      <li><a href="#cms">CMS 集成层</a></li>
+      <li><a href="#designsys">设计系统与 ESLint</a></li>
+      <li><a href="#env">环境变量</a></li>
+      <li><a href="#testing">测试 · 验证 · Git 纪律</a></li>
+      <li><a href="#debt">技术债与演进</a></li>
+    </ol>
+  </aside>
+
+  <main class="doc-main">
+
+    <section class="section anchor-h" id="overview">
+      <div class="section-head">
+        <span class="kicker">01 · 速览</span>
+        <h2>系统速览</h2>
+        <p class="lead">MClaw是一个多租户的 AI 内容生产管理平台。技术上由 Next.js 全栈 + PostgreSQL/Drizzle + 自研 Agent 引擎 + Inngest 事件驱动后台 组成。先看体量。</p>
+      </div>
+      <div class="statband">
+        <div class="kpi" data-animate style="--i:0"><div class="num">16.1.6</div><div class="label">Next.js（React 19 / TS5 strict）</div></div>
+        <div class="kpi" data-animate style="--i:1"><div class="num">134<span class="unit">表</span></div><div class="label">数据表 / 93 枚举 / 67 schema 文件</div></div>
+        <div class="kpi" data-animate style="--i:2"><div class="num">46<span class="unit">函数</span></div><div class="label">Inngest 后台任务文件</div></div>
+        <div class="kpi" data-animate style="--i:3"><div class="num">47<span class="unit">技能</span></div><div class="label">SKILL.md 技能定义</div></div>
+        <div class="kpi" data-animate style="--i:4"><div class="num">137<span class="unit">+</span></div><div class="label">测试文件（Vitest）</div></div>
+      </div>
+      <div class="callout callout--info" data-animate><div class="ct">ℹ 数据口径与勘误原则</div><p>项目根 <code>CLAUDE.md</code> 是开发导航，但部分数字已落后于代码。本文一律以源码实测为准，并在相关处标注差异（例：AI 员工 <b>12</b> 个角色而非 8、Inngest 约 <b>45+</b> 函数而非 16、schema <b>67</b> 文件 / 134 表、CMS 的 <code>ALL_APP_CHANNEL_SLUGS</code> 9-slug 机制<b>已移除</b>、<code>scenario-fallback.ts</code> 不存在）。</p></div>
+      <div class="arch" data-animate>
+        <div class="layer"><div class="lh">表现层</div><div class="row"><span class="chip">Next.js App Router</span><span class="chip">React 19 Server/Client Components</span><span class="chip">shadcn/Radix + Tailwind v4</span><span class="chip">Recharts · Framer Motion</span></div></div>
+        <div class="vlink">▼</div>
+        <div class="layer"><div class="lh">应用层</div><div class="row"><span class="chip alt">DAL 只读查询</span><span class="chip alt">Server Actions 变更</span><span class="chip alt">API Routes（17 组）</span><span class="chip alt">Agent 引擎 · 意图识别</span></div></div>
+        <div class="vlink">▼</div>
+        <div class="layer"><div class="lh">能力层</div><div class="row"><span class="chip n">Agent 装配 / 执行</span><span class="chip n">工作流 / Mission 引擎</span><span class="chip n">知识库 RAG</span><span class="chip n">CMS 集成层</span><span class="chip n">Inngest 事件驱动</span></div></div>
+        <div class="vlink">▼</div>
+        <div class="layer"><div class="lh">数据 / 外部</div><div class="row"><span class="chip">PostgreSQL（postgres-js + Drizzle）</span><span class="chip">DeepSeek / 智谱 / Jina</span><span class="chip">华栖云 CMS</span><span class="chip">Bocha / Tavily / TopHub / TikHub</span></div></div>
+      </div>
+    </section>
+
+    <section class="section anchor-h" id="stack">
+      <div class="section-head">
+        <span class="kicker">02 · 技术栈</span>
+        <h2>技术栈全景</h2>
+        <p class="lead">现代全栈 TypeScript 技术栈，版本以 <code>package.json</code> 实测（包名 <code>vibetide-temp</code> / v0.1.0 / 包管理器 <code>pnpm@9.15.0</code>）。</p>
+      </div>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>类别</th><th>关键依赖（精确版本）</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><b>框架 / 运行时</b></td><td><code>next 16.1.6</code> · <code>react 19.2.3</code> · <code>typescript ^5</code></td><td>App Router，TS strict</td></tr>
+            <tr><td><b>数据库 / ORM</b></td><td><code>drizzle-orm 0.45.1</code> · <code>drizzle-kit 0.31.9</code> · <code>postgres 3.4.8</code></td><td>postgres-js 驱动</td></tr>
+            <tr><td><b>认证 / 安全</b></td><td><code>iron-session 8.0.4</code> · <code>@node-rs/argon2 2.0.2</code> · <code>server-only</code></td><td>自建会话 + argon2id</td></tr>
+            <tr><td><b>AI / LLM</b></td><td><code>ai 6.0.116</code> · <code>@ai-sdk/openai 3.0.48</code> · <code>@ai-sdk/anthropic 3.0.58</code> · <code>zhipu-ai-provider 0.2.2</code></td><td>AI SDK v6；openai 包接入 DeepSeek</td></tr>
+            <tr><td><b>UI / 样式</b></td><td><code>radix-ui 1.4.3</code> · <code>tailwindcss ^4</code> · <code>lucide-react 0.575</code> · <code>next-themes</code> · <code>sonner</code> · <code>zustand 5</code></td><td>shadcn new-york；暗色模式</td></tr>
+            <tr><td><b>图表 / 动画</b></td><td><code>recharts 3.7.0</code> · <code>framer-motion 12.34.3</code></td><td>数据可视化 + 动效</td></tr>
+            <tr><td><b>富文本</b></td><td><code>@tiptap/* 3.20.4</code>（24 个包：table/task-list/image/highlight…）</td><td>编辑器全家桶</td></tr>
+            <tr><td><b>后台任务</b></td><td><code>inngest 3.54.1</code> · <code>cron-parser 5.5.0</code></td><td>事件驱动 + cron 校验</td></tr>
+            <tr><td><b>采集 / 文档 / 媒体</b></td><td><code>cheerio</code> · <code>docx 9.6.1</code> · <code>xlsx</code> · <code>canvas + chart.js</code>（服务端图表）· <code>d3-cloud</code>（词云）· <code>chinese-s2t</code>（简繁）· <code>@volcengine/tos-sdk</code>（火山 TOS）</td><td>抓取 / 文档 / 图像</td></tr>
+            <tr><td><b>帮助中心</b></td><td><code>next-mdx-remote-client</code> · <code>@shikijs/rehype</code> · <code>gray-matter</code> · <code>pagefind</code> · <code>fuse.js</code></td><td>MDX + 静态全文检索</td></tr>
+            <tr><td><b>校验 / 工具</b></td><td><code>zod 4.3.6</code> · <code>nanoid 5</code> · <code>date-fns 4</code> · <code>yaml</code></td><td>运行时校验</td></tr>
+            <tr><td><b>测试 / 工程化</b></td><td><code>vitest 4.1.4</code> · <code>@testing-library/react</code> · <code>husky + lint-staged</code> · <code>tsx</code></td><td>单测 + 预提交</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>npm scripts 要点</h4>
+      <ul class="list">
+        <li><code>dev</code> = <code>next dev -H 0.0.0.0</code>；<code>build</code> 串联 <code>verify-help-links → next build → build-help-search</code>，任一步失败构建即挂。</li>
+        <li><code>db:generate</code> / <code>db:migrate</code> / <code>db:push</code> / <code>db:studio</code> / <code>db:seed*</code>（Drizzle 全流程）。</li>
+        <li><code>test</code> / <code>test:watch</code> / <code>test:coverage</code>（Vitest）；<code>prepare</code> 安装 husky 钩子。</li>
+      </ul>
+    </section>
+
+    <section class="section anchor-h" id="structure">
+      <div class="section-head">
+        <span class="kicker">03 · 结构</span>
+        <h2>工程结构与路由分区</h2>
+        <p class="lead">单仓 Next.js 应用，<code>@/*</code> 映射到 <code>./src/*</code>。下面是 src 顶层与路由分区。</p>
+      </div>
+      <pre class="code"><span class="c"># src/ 顶层结构（关键数字为实测）</span>
+src/
+├── app/              <span class="c"># App Router：路由 + Server Actions + API</span>
+│   ├── landing/          <span class="c"># 公开落地页（未登录访问 /）</span>
+│   ├── (auth)/           <span class="c"># login / register（无 layout 保护）</span>
+│   ├── (dashboard)/      <span class="c"># 42 个仪表盘路由分组</span>
+│   ├── help/             <span class="c"># 独立帮助中心（公开，8 个页面）</span>
+│   ├── api/              <span class="c"># 17 个 API 路由组</span>
+│   └── actions/          <span class="c"># 63 个 "use server" 变更</span>
+├── components/       <span class="c"># ui(30) / shared(38) / charts(8) / layout</span>
+├── db/               <span class="c"># schema(67) + index 连接 + seed + cleanup</span>
+├── inngest/          <span class="c"># functions(46) 事件驱动后台</span>
+├── lib/              <span class="c"># dal(65) / agent / cms / auth / knowledge ...</span>
+├── data/             <span class="c"># 18 个 mock 数据（未迁 DAL 的页面直接 import）</span>
+├── hooks/ config/ types/ scripts/
+└── proxy.ts          <span class="c"># Next.js 16 路由拦截器（旧名 middleware）</span></pre>
+      <div class="table-wrap" data-animate>
+        <table class="table">
+          <thead><tr><th>路由分区</th><th>路径</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td>公开落地页</td><td><code>app/landing/</code></td><td>未登录访问 <code>/</code> 展示；已登录重定向 <code>/home</code></td></tr>
+            <tr><td>认证</td><td><code>app/(auth)/</code></td><td>登录 / 注册，无 layout 保护</td></tr>
+            <tr><td>仪表盘</td><td><code>app/(dashboard)/</code></td><td>42 个路由分组，layout 取用户 profile 并优雅降级</td></tr>
+            <tr><td>帮助中心</td><td><code>app/help/</code></td><td>独立 layout（不套 dashboard），公开可访问</td></tr>
+            <tr><td>API</td><td><code>app/api/</code></td><td>17 组：ai / chat / employees / missions / workflows / cms / channels / inngest …</td></tr>
+            <tr><td>Server Actions</td><td><code>app/actions/</code></td><td>63 个 <code>"use server"</code> 文件，统一经 <code>requireAuth()</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>组件组织</h4>
+      <p class="prose"><code>components/ui/</code> 是 30 个 shadcn 基础组件；<code>components/shared/</code> 是 38 个领域可复用组件（GlassCard / DataTable / PageHeader / SearchInput / DatePicker 等）；<code>components/charts/</code> 是 8 个 Recharts 封装；<code>components/layout/</code> 是 AppSidebar / Topbar。<code>cn()</code> 工具在 <code>src/lib/utils.ts</code>。</p>
+    </section>
+
+    <section class="section anchor-h" id="database">
+      <div class="section-head">
+        <span class="kicker">04 · 数据</span>
+        <h2>数据库层</h2>
+        <p class="lead">PostgreSQL + Drizzle ORM。<b>67 个</b> schema 文件、<b>134 个</b> 表、<b>93 个</b> 枚举（均实测）。所有核心表带 <code>organization_id</code> 做多租户隔离。</p>
+      </div>
+
+      <h3>核心表</h3>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>表</th><th>关键字段 / 用途</th></tr></thead>
+          <tbody>
+            <tr><td><code>organizations</code></td><td><code>id</code> · <code>name</code> · <code>slug</code>(uniq) · <code>settings</code>(jsonb) —— 多租户根</td></tr>
+            <tr><td><code>user_profiles</code></td><td><code>email</code>(uniq) · <code>password_hash</code> · <code>password_hash_algo</code> · <code>role</code> · <code>is_super_admin</code> · <code>last_login_at</code></td></tr>
+            <tr><td><code>ai_employees</code></td><td><code>slug</code> · <code>name/nickname/title</code> · <code>authority_level</code> · <code>status</code> · 绩效指标（tasksCompleted/accuracy…）</td></tr>
+            <tr><td><code>skills</code> · <code>employee_skills</code></td><td>技能定义 + 员工技能多对多绑定（含 level 熟练度）</td></tr>
+            <tr><td><code>employee_memories</code></td><td>员工记忆：<code>content</code> · <code>importance</code> · <code>confidence</code> · <code>access_count</code></td></tr>
+            <tr><td><code>missions</code></td><td><code>scenario</code>(slug) · <code>workflow_template_id</code> · <code>status</code> · <code>phase</code> · <code>team_members</code>(jsonb) · <code>source_module/entity</code> · <code>input_params</code></td></tr>
+            <tr><td><code>workflow_templates</code></td><td><code>steps</code>(jsonb) · <code>category</code> · <code>legacy_scenario_key</code> · <code>owner_employee_id</code> · <code>is_builtin</code> · <code>is_featured</code></td></tr>
+            <tr><td><code>knowledge_bases</code> + items</td><td>知识库 + 切块向量（jsonb 存 embedding）+ <code>vectorization_status</code></td></tr>
+            <tr><td><code>cms_channels/apps/catalogs/sync_logs</code></td><td>CMS 栏目映射与同步日志</td></tr>
+            <tr><td><code>cms_publications</code></td><td>发布记录与状态机</td></tr>
+            <tr><td><code>scheduled_jobs</code></td><td>统一调度表，<code>kind</code> 区分 platform / workflow_template</td></tr>
+            <tr><td><code>collected_items</code> · <code>articles</code> · <code>media_assets</code></td><td>采集内容 / 稿件 / 媒资</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">类型自动派生：<code>src/db/types.ts</code> 用 <code>InferSelectModel</code> / <code>InferInsertModel</code>；schema 入口 <code>src/db/schema/index.ts</code>。</p>
+
+      <h3>连接策略（<code>src/db/index.ts</code>）</h3>
+      <pre class="code"><span class="c">// 本地 / 远程自动识别：本地直连开 prepare 享加速；远程 pooler 关 prepare 避免 PgBouncer 协议冲突</span>
+<span class="k">const</span> isLocal = /\/\/[^/]*?(127\.0\.0\.1|localhost)/i.<span class="f">test</span>(url);
+<span class="k">const</span> client = <span class="f">postgres</span>(url, {
+  prepare: isLocal,            <span class="c">// 本地 true / 远程 false</span>
+  connect_timeout: 10, idle_timeout: 300,
+  max: 10, max_lifetime: 900,  <span class="c">// 首页一次并发 ~12 个查询</span>
+});
+<span class="c">// globalThis 单例缓存 __db_client，避免 Next.js HMR 重复建连导致连接泄漏</span></pre>
+
+      <h3>Schema 迁移纪律（强制）</h3>
+      <pre class="code"><span class="c"># 唯一标准流程——保证 schema 永远跟代码同步</span>
+<span class="c"># 1) 改 src/db/schema/*.ts</span>
+<span class="k">npm run</span> db:generate   <span class="c"># 产出 SQL + 同步 meta/_journal.json + snapshot</span>
+<span class="k">npm run</span> db:migrate    <span class="c"># 应用到当前 DATABASE_URL</span></pre>
+      <div class="split">
+        <div class="callout callout--danger" data-animate><div class="ct">⛔ 禁止</div><p>手工创建 <code>YYYYMMDD_xxx.sql</code> 日期文件（Drizzle 不追踪，迁库必漏）；绕过 Drizzle 直接 psql 改生产；手工编辑 <code>_journal.json</code>。</p></div>
+        <div class="callout callout--accent" data-animate><div class="ct">✅ 必做</div><p>一次变更 = 一次 <code>db:generate</code> + 一次 <code>db:migrate</code>；每次切换 DATABASE_URL / 迁库后立即跑 <code>bash scripts/verify-schema-sync.sh</code>（14 个 fingerprint 断言：核心表 / 字段 / 索引 / 枚举 / 废表已删）。</p></div>
+      </div>
+    </section>
+
+    <section class="section anchor-h" id="auth">
+      <div class="section-head">
+        <span class="kicker">05 · 认证</span>
+        <h2>认证体系</h2>
+        <p class="lead">完全自建，<b>不依赖 Supabase Auth / GoTrue</b>。所有认证只读写 <code>public.user_profiles</code>。ESLint 以 error 级禁止 import 任何 <code>@supabase/*</code> auth 包（ADR 决策）。</p>
+      </div>
+      <div class="table-wrap" data-animate>
+        <table class="table">
+          <thead><tr><th>模块</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><code>lib/auth/hash.ts</code></td><td>argon2id 哈希（<code>@node-rs/argon2</code>，m=19456KiB / t=2 / p=1）</td></tr>
+            <tr><td><code>lib/auth/session.ts</code></td><td>iron-session AES-256-GCM 加密 cookie <code>vibetide-session</code>，TTL 默认 604800s（7 天）</td></tr>
+            <tr><td><code>lib/auth/current-user.ts</code></td><td><code>getCurrentUser()</code>（React cache 包裹）+ <code>requireAuth()</code>（未登录 redirect /login）</td></tr>
+            <tr><td><code>proxy.ts</code></td><td>路由拦截器：<code>unsealData</code> 解密 cookie；公共路径放行；已登录访问 login 跳 /home；未登录跳 <code>/login?next=</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="code"><span class="c">// Server Actions（src/app/actions/auth.ts）</span>
+<span class="k">signIn</span>:  查 userProfiles.email → verifyPassword → 写 lastLoginAt → setSession → /home
+<span class="k">signUp</span>:  email 唯一校验 → hashPassword → INSERT userProfiles(algo='argon2id') → setSession
+<span class="k">signOut</span>: destroySession → /login
+<span class="c">// 统一错误文案「邮箱或密码错误」，不区分用户不存在 / 密码错，防枚举</span></pre>
+      <div class="callout callout--info" data-animate><div class="ct">ℹ Env 必填</div><p><code>AUTH_SESSION_SECRET</code>（≥ 32 字符，否则启动抛错）、<code>AUTH_SESSION_TTL_SECONDS</code>（默认 604800）。仅 email/password，无社交登录 / 邮件验证 / 找回密码。Supabase 仅余 Storage 用途（如研究报告桶）。</p></div>
+    </section>
+
+    <section class="section anchor-h" id="dataflow">
+      <div class="section-head">
+        <span class="kicker">06 · 数据流</span>
+        <h2>数据流与分层</h2>
+        <p class="lead">读写分离：<b>DAL</b>（65 个文件）只读、<b>Server Actions</b>（63 个）写。Server Component 默认，仅交互组件加 <code>"use client"</code>。</p>
+      </div>
+      <pre class="code">Server Page (page.tsx) ──▶ DAL (src/lib/dal/) ──▶ Drizzle ORM ──▶ PostgreSQL
+                                                          ▲
+Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revalidatePath()</pre>
+      <ul class="list">
+        <li><b>页面拆分模式：</b><code>page.tsx</code>（server，取数）→ <code>*-client.tsx</code>（client，交互），如 <code>team-hub/page.tsx → team-hub-client.tsx</code>。</li>
+        <li><b>硬约束：</b>严禁从 client 组件 import DAL（<code>src/lib/dal/</code>），否则触发构建期 DB 连接错误。</li>
+        <li><b>动态渲染：</b>渲染期查 DB 的页面须加 <code>export const dynamic = 'force-dynamic'</code>（实测 14 处），规避构建期连接超时。</li>
+        <li><b>Mock 现状：</b><code>src/data/</code> 下 18 个静态 mock，未迁 DAL 的页面直接 import，属过渡态。</li>
+      </ul>
+    </section>
+
+    <section class="section anchor-h" id="agent">
+      <div class="section-head">
+        <span class="kicker">07 · Agent</span>
+        <h2>AI Agent 系统</h2>
+        <p class="lead">系统核心。位于 <code>src/lib/agent/</code>。每次员工工作前都会「装配」成一个带人格、技能、记忆、权限的 Agent，再以分层 System Prompt 驱动 LLM 执行。</p>
+      </div>
+
+      <h3>装配流水线 <code>assembleAgent()</code></h3>
+      <ol class="list num">
+        <li><b>并行加载 4 路数据</b>（<code>Promise.all</code>）：员工 profile、该员工技能（join skills）、绑定知识库、<code>confidence&gt;0.3</code> 按 importance 取 <b>top-10</b> 记忆。</li>
+        <li><b>记忆访问统计</b> fire-and-forget：accessCount+1、更新 lastAccessedAt。</li>
+        <li><b>计算熟练度</b>：<code>avgLevel = round(Σ skill.level / 技能数)</code>，无技能默认 50。</li>
+        <li><b>加载技能内容</b>：builtin 从 <code>skills/&lt;slug&gt;/SKILL.md</code> 文件读，custom/plugin 从 DB <code>skills.content</code>。</li>
+        <li><b>按权限过滤工具</b>：observer→清空；advisor→仅 19 个只读工具；<code>skillOverrides</code>（意图驱动）→进一步收窄；有 KB 绑定且非 observer →自动追加 <code>kb_search</code>。</li>
+        <li><b>解析模型</b> + <b>构建分层 System Prompt</b>。</li>
+      </ol>
+
+      <h3>分层 System Prompt（注释称 7 层，实际 9 段）</h3>
+      <div class="stack" data-animate>
+        <div class="lyr"><span class="ln">1</span><span class="lt">身份</span><span class="ld">姓名 / 昵称 / 职位；custom 员工追加自定义工作指令</span></div>
+        <div class="lyr"><span class="ln">2</span><span class="lt">技能 + 熟练度</span><span class="ld">列出可用工具；按熟练度三档给引导（≤30 严格按步 / ≤70 适当发挥 / &gt;70 自由创新）</span></div>
+        <div class="lyr"><span class="ln">3</span><span class="lt">真实性硬约束</span><span class="ld">最高优先级：必须真调工具、严禁伪造来源/时间/数据、空结果如实说明（防幻觉合同）</span></div>
+        <div class="lyr"><span class="ln">4</span><span class="lt">技能执行指南</span><span class="ld">从 SKILL.md 抽「执行流程 + 输出规格」注入，截断 ~3000 字防膨胀</span></div>
+        <div class="lyr"><span class="ln">5</span><span class="lt">权限</span><span class="ld">声明 authorityLevel，超权限动作标「需要审批」</span></div>
+        <div class="lyr"><span class="ln">6</span><span class="lt">知识背景</span><span class="ld">注入绑定知识库的名称 + 描述</span></div>
+        <div class="lyr"><span class="ln">7</span><span class="lt">敏感话题</span><span class="ld">条件注入；涉及时需人工审核</span></div>
+        <div class="lyr"><span class="ln">8</span><span class="lt">工作风格</span><span class="ld">主动性 / 汇报频率 / 自主度% / 沟通风格 / 工作时间</span></div>
+        <div class="lyr"><span class="ln">9</span><span class="lt">记忆 + 输出</span><span class="ld">经验记忆；要求中文 Markdown、末尾附【质量自评 XX/100】+【输入参数不足】</span></div>
+      </div>
+
+      <h3>执行 <code>executeAgent()</code></h3>
+      <ul class="list">
+        <li><b>执行期才构建真实工具</b>：<code>createKnowledgeBaseTools</code> + <code>toVercelTools(...)</code>，每个工具用 <code>wrapToolExecuteWithContext</code> 注入 org/operator/mission/task 上下文。</li>
+        <li><b>注入时间基准</b>：把「当前日期」写进 prompt，防 LLM 按训练截止日误判时效、给搜索设错时间窗。</li>
+        <li><b>skillSpec 硬约束</b>：步骤绑定 SKILL.md 时，整篇 body pin 进 system prompt，强制三段式输出（执行摘要 / 执行过程 / 产出结果，各 ≥100 字）。</li>
+        <li><b>调用</b>：<code>generateText({ stopWhen: stepCountIs(20), maxOutputTokens, abortSignal: AbortSignal.timeout(3min) })</code>。</li>
+        <li><b>失败检测</b>：<code>onStepFinish</code> 扫 toolResults（AI SDK v6 用 <code>.output</code> 非 <code>.result</code>）收集 <code>success:false</code>，有失败则 override <code>status="failed"</code>（优先级高于 needs_approval）。</li>
+      </ul>
+
+      <div class="callout callout--danger" data-animate><div class="ct">🛡 防幻觉是贯穿全系统的一等设计</div><p>多处真实事故驱动（伪造 WWDC 新闻、把「3 月 20 日」当 2024 年、反爬登录页被当正文入库）。五重防线：① Prompt 真实性硬约束层；② <code>invokeToolDirectly</code> 服务端直调工具（步骤显式绑参时绕过 LLM，结果不可伪造）；③ 工具 <code>success:false</code> 检测 override 状态；④ 检索类工具缺 API key 时<b>显式 throw</b> 让步骤标 failed 而非静默编造；⑤ 执行期注入真实时间基准。</p></div>
+    </section>
+
+    <section class="section anchor-h" id="intent">
+      <div class="section-head">
+        <span class="kicker">08 · 意图</span>
+        <h2>意图识别与模型路由</h2>
+        <p class="lead">聊天中心用 AI 把用户消息解析成「该让谁、用哪些技能、按什么顺序做」；模型路由按技能类别选 provider 与温度。</p>
+      </div>
+
+      <h3>意图识别 <code>recognizeIntent()</code></h3>
+      <ul class="list">
+        <li><b>Fast-path 跳 LLM：</b>问候语正则 + 短文本阈值（≤6），直接返回 <code>general_chat</code>，confidence 0.95，省 token。</li>
+        <li><b>Prompt 构建：</b>紧凑技能目录（按 category 列）、员工目录、工作流目录、用户历史 top-5 few-shot。</li>
+        <li><b>检索类路由规则：</b>问热榜→必须 <code>trending_topics</code> 禁 <code>web_search</code>；问进展→<code>web_search</code>；问 URL 正文→<code>web_deep_read</code>；问多平台扩散→<code>trend_monitor</code>。</li>
+        <li><b>调用与兜底：</b><code>temperature 0.2 / maxOutputTokens 1024</code>，<code>Promise.race</code> 套 15 秒超时，超时回退自由聊天。</li>
+        <li><b>输出校验：</b>剥 markdown fence → JSON.parse → clamp confidence → 过滤非法 employeeSlug / skill slug → 校验 workflowId 决定 <code>executionMode: "workflow" | "skill"</code>。</li>
+      </ul>
+      <p class="note">另有 <code>intent-parser.ts</code>（旧版工作流意图解析，6 值 IntentType + 8 步默认 fallback），与聊天中心 <code>recognizeIntent</code> 是两套不同用途。</p>
+
+      <h3>模型路由 <code>model-router.ts</code></h3>
+      <pre class="code"><span class="c">// Provider: "openai"(DeepSeek) | "zhipu"</span>
+getDeepSeekClient = <span class="f">createOpenAI</span>({
+  baseURL: OPENAI_API_BASE_URL,   <span class="c">// 默认 https://api.deepseek.com/v1</span>
+  compatibility: <span class="s">"compatible"</span>,    <span class="c">// 走 /chat/completions 而非 /responses</span>
+});  <span class="c">// fetch 层包 120s 超时；OPENAI_MODEL 未配置则抛错</span>
+
+<span class="c">// 按 skill category 的温度 / maxToken 默认</span>
+CATEGORY_DEFAULTS = {
+  content_gen:   { temperature: 0.7, maxTokens: 8192 },   <span class="c">// 生成类高温</span>
+  quality_review:{ temperature: 0.2 },                     <span class="c">// 审核类低温</span>
+  data_analysis: { temperature: 0.3 }, ...
+};
+SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c">// 只产 schema，提速</span></pre>
+    </section>
+
+    <section class="section anchor-h" id="tools">
+      <div class="section-head">
+        <span class="kicker">09 · 工具</span>
+        <h2>Agent 工具体系</h2>
+        <p class="lead"><code>tool-registry.ts</code>（约 2900 行）。检索类工具<b>必须调真 API</b>——LLM 无法凭空伪造外部世界数据。</p>
+      </div>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>工具</th><th>用途</th><th>关键点</th></tr></thead>
+          <tbody>
+            <tr><td><code>web_search</code></td><td>联网搜索 + 提炼</td><td>Bocha/Tavily 主，Google/Bing RSS 回退；严格时间窗剔无日期条目</td></tr>
+            <tr><td><code>web_deep_read</code></td><td>抓单网页正文</td><td>Jina Reader 主，cheerio 回退</td></tr>
+            <tr><td><code>batch_deep_read</code></td><td>批量抓详情</td><td>反爬黑名单（知乎/微信/抖音…）+ bocha snippet 兜底</td></tr>
+            <tr><td><code>trending_topics</code></td><td>实时热榜（TopHub）</td><td>hot/platforms/search 三模式；缺 key 显式 throw</td></tr>
+            <tr><td><code>news_aggregation</code> · <code>trend_monitor</code> · <code>social_listening</code></td><td>多源新闻 / 趋势 / 社交监测</td><td>并发搜索 + 热榜</td></tr>
+            <tr><td><code>heat_scoring</code></td><td>0–100 热度分 + S/A/B/C</td><td>四维确定性公式（媒体30/社交25/跨平台20/可信25），非 LLM 估分</td></tr>
+            <tr><td><code>content_generate</code> · <code>fact_check</code></td><td>正文生成 / 事实核查</td><td>fact_check 输出 JSON {score, issues[]}</td></tr>
+            <tr><td><code>media_search</code> · <code>data_report</code></td><td>媒资检索 / 数据报告</td><td>查 media_assets 表</td></tr>
+            <tr><td><code>cms_publish</code> · <code>cms_batch_publish</code> · <code>archive_to_drafts</code></td><td>CMS 入库 / 存草稿</td><td><b>写型工具</b>，测试入口自动 dryRun=true</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>权限注入与直调</h4>
+      <ul class="list">
+        <li><code>resolveTools(skillNames)</code>：技能名→slug→命中 ALL_TOOLS 返回真实现，未命中给 placeholder。</li>
+        <li><code>toVercelTools()</code>：转 AI SDK ToolSet，合并 missionTools + kbTools，逐个包上下文注入。</li>
+        <li><code>invokeToolDirectly()</code>：步骤显式绑参时服务端直调真工具喂 LLM，<b>LLM 无法伪造</b>（带 zod 校验）。</li>
+        <li><code>WRITE_TOOL_NAMES</code> 白名单：写型工具测试时强制 dryRun 防污染。</li>
+      </ul>
+      <h4>动态工具工厂</h4>
+      <p class="prose"><code>createMissionTools</code>（协作：send_message / read_messages，leader 额外 create_task / check_progress）；<code>createKnowledgeBaseTools</code>（<code>kb_search</code>：限员工绑定 KB、只查 <code>vectorization_status='done'</code>）；<code>createXiaoyanChatTools</code>（org-scoped：research_query_builder / data_pivoter）。</p>
+    </section>
+
+    <section class="section anchor-h" id="workflow">
+      <div class="section-head">
+        <span class="kicker">10 · 工作流</span>
+        <h2>工作流与定时任务引擎</h2>
+        <p class="lead">统一场景架构（B.1）：<code>workflow_templates</code> 表是所有「场景」的<b>单一真相源</b>。首页场景网格、任务中心都调 <code>listWorkflowTemplatesByOrg</code>。</p>
+      </div>
+
+      <h3>核心 DAL（<code>lib/dal/workflow-templates.ts</code>）</h3>
+      <ul class="list">
+        <li><code>listWorkflowTemplatesByOrg</code>：org-scoped 富过滤；过滤「视觉上空」模板（steps 至少一个有效 skill）；<b>性能修复</b>——不 SELECT *、排除大 jsonb（steps 改返 stepsCount），列表查询从 14s 降到 1s。</li>
+        <li><code>seedBuiltinTemplatesForOrg</code>：幂等 upsert，两路 onConflict（按 legacy_scenario_key 或 (org,name)），冲突时保留 org admin 手设的 is_public/is_enabled。</li>
+        <li><code>getByLegacyKey</code> / <code>create</code> / <code>update</code> / <code>softDisable</code>。每 org 种子 27+ 内置模板。</li>
+      </ul>
+      <p class="prose"><b>12 个 category：</b><code>news / deep / social / advanced / livelihood / podcast / drama / daily_brief / video / analytics / distribution / custom</code>。启动 mission 时<b>双写</b> <code>scenario</code>(slug) + <code>workflowTemplateId</code>(uuid FK)；builtin 的 slug = legacy_scenario_key，custom = <code>custom_${nanoid(6)}</code>。</p>
+      <div class="callout callout--warn" data-animate><div class="ct">⚠ 勘误</div><p>CLAUDE.md 提到的 <code>src/lib/scenario-fallback.ts</code> 实际<b>不存在</b>；场景显示名 fallback 内联在 <code>leader-plan.ts</code>（模板 name 优先于 scenario slug）。</p></div>
+
+      <h3>定时任务（嫁接 scheduled_jobs · ADR-0002）</h3>
+      <p class="prose">任意模板可挂 0..N 条 cron schedule，与手动启动并存。挂在 <code>scheduled_jobs</code> 表，用 <code>kind='workflow_template'</code> 区分平台级任务。Cron 校验（<code>lib/cron.ts</code>）强制相邻执行间隔 <b>≥ 60 秒</b>（防 mission 启动风暴）。</p>
+      <pre class="code"><span class="c">// 触发链路</span>
+UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
+  → scheduledJobsRunner (每分钟 cron 扫表)
+  → 派 'scheduled-jobs/workflow-template.run' (deterministic jitter ±15s)
+  → workflowTemplateScheduledLaunch handler
+  → startMissionFromTemplateScheduled(templateId, orgId, inputs, {source:'schedule'})
+<span class="c">// source.module='schedule' + sourceEntityId=jobId → missions_source_dedup_uidx 自动去重</span></pre>
+    </section>
+
+    <section class="section anchor-h" id="inngest">
+      <div class="section-head">
+        <span class="kicker">11 · 后台</span>
+        <h2>Inngest 后台任务</h2>
+        <p class="lead">事件驱动后台引擎。<code>src/inngest/functions/</code> 下 <b>46 个</b>文件，注册约 <b>45+</b> 个函数（CLAUDE.md 写 16，已严重过时）。</p>
+      </div>
+      <div class="callout callout--accent" data-animate><div class="ct">⏰ 调度统一化</div><p>唯一硬编码 cron 是每分钟的 <code>scheduledJobsRunner</code>；绝大多数业务函数改为订阅 <code>scheduled-jobs/*.run</code> 事件，cron 表达式集中存 <code>scheduled_jobs</code> 表——改 DB / UI 即生效，无需重启。</p></div>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>模块</th><th>代表函数</th></tr></thead>
+          <tbody>
+            <tr><td><b>Mission 多智能体引擎</b></td><td><code>leader-plan</code> → <code>execute-mission-task</code> → <code>check-task-dependencies</code> → <code>leader-consolidate</code>（+ <code>handle-task-failure</code>）事件链</td></tr>
+            <tr><td><b>内容管线</b></td><td><code>hot-topic-enrichment</code> · <code>collection.*</code>（采集源 / 桥接）· <code>daily-hot-briefing-cron</code> · <code>publishing-events</code></td></tr>
+            <tr><td><b>AI 运算</b></td><td><code>learning-engine</code>（反哺记忆）· <code>research.*</code>（标注 / 研报 / 生态指数）· <code>account-analytics.*</code>（~7 个）· <code>topic-compare.*</code></td></tr>
+            <tr><td><b>监控</b></td><td><code>daily-performance-snapshot</code> · <code>employee-status-guard</code> · <code>skill-consistency-check</code>（SKILL.md ↔ DB 一致性）</td></tr>
+            <tr><td><b>知识库</b></td><td><code>knowledge-base-vectorize</code>（concurrency 2，批 50，Jina embeddings 回写）</td></tr>
+            <tr><td><b>CMS / 外发</b></td><td><code>cmsCatalogSyncDaily</code> · <code>cmsCatalogSyncOnDemand</code> · <code>cmsStatusPoll</code> · <code>cmsPublishRetry</code> · <code>ayrshareWebhookHandler</code></td></tr>
+            <tr><td><b>调度器</b></td><td><code>scheduled-jobs-runner</code>（<code>* * * * *</code>）· <code>workflow-template-scheduled-launch</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Dev 自动配置；生产需 <code>INNGEST_EVENT_KEY</code> / <code>INNGEST_SIGNING_KEY</code>。</p>
+    </section>
+
+    <section class="section anchor-h" id="knowledge">
+      <div class="section-head">
+        <span class="kicker">12 · 知识库</span>
+        <h2>知识库 RAG</h2>
+        <p class="lead"><code>src/lib/knowledge/</code>。三件套：分块 → 嵌入 → 检索。V1 务实——jsonb 存向量 + 应用层余弦，明确标注 10k chunk 后升级 pgvector 的路径。</p>
+      </div>
+      <div class="grid cols-3">
+        <div class="card card--accent" data-animate style="--i:0"><h4>① 分块 chunking.ts</h4><p>确定性策略：段落 → 句子 → 字符回退，贪心打包到 <b>500–800 字</b>，相邻 <b>50 字</b> overlap。</p></div>
+        <div class="card card--accent" data-animate style="--i:1"><h4>② 嵌入 embeddings.ts</h4><p>Jina <code>jina-embeddings-v3</code>，<b>1024 维</b>，批 100，指数退避重试；query/passage 用不同 task type。</p></div>
+        <div class="card card--accent" data-animate style="--i:2"><h4>③ 检索 retrieval.ts</h4><p><code>searchKnowledgeBases(query, kbIds, topK=5)</code>：并行生成 query 向量 + 拉候选，手写 cosine 降序取 topK。</p></div>
+      </div>
+      <ul class="list">
+        <li><b>异步向量化：</b>由 Inngest <code>knowledge-base-vectorize</code> 跑（监听 kb 文档创建 / 更新 / reindex），循环处理 <code>embedding IS NULL</code> 的 chunk。</li>
+        <li><b>Agent 集成：</b>装配期为有 KB 绑定的员工注入 <code>kb_search</code> descriptor，执行期构真实现——限员工绑定 KB、只查 <code>vectorization_status='done'</code>、未完成加 warning 跳过。</li>
+        <li><b>三种灌入：</b>手动粘贴、md/txt 上传、URL 爬取（复用 Jina Reader）。</li>
+      </ul>
+    </section>
+
+    <section class="section anchor-h" id="cms">
+      <div class="section-head">
+        <span class="kicker">13 · CMS</span>
+        <h2>CMS 集成层</h2>
+        <p class="lead"><code>src/lib/cms/</code> 是 VibeTide → 华栖云 CMS 的<b>唯一出口</b>，调用方只从 <code>@/lib/cms</code> import，禁止直接引用内部文件。</p>
+      </div>
+      <pre class="code">src/lib/cms/
+├── index.ts          <span class="c"># 统一 barrel 出口</span>
+├── client.ts         <span class="c"># CmsClient</span>
+├── api-endpoints.ts  <span class="c"># 5 接口：getChannels/getAppList/getCatalogTree/saveArticle/getArticleDetail</span>
+├── feature-flags.ts  <span class="c"># isCmsPublishEnabled / isCatalogSyncEnabled / requireCmsConfig</span>
+├── errors.ts         <span class="c"># CmsAuthError/BusinessError/NetworkError/SchemaError/ConfigError</span>
+├── status-machine.ts <span class="c"># 发布状态机</span>
+├── article-mapper/   <span class="c"># mapArticleToCms / loadMapperContext</span>
+├── catalog-sync/     <span class="c"># syncCmsCatalogs（三步栏目同步）</span>
+└── publish/          <span class="c"># publishArticleToCms</span></pre>
+
+      <div class="callout callout--warn" data-animate><div class="ct">⚠ 重要勘误：签名已演进，与 CLAUDE.md 不符</div><p>CLAUDE.md 描述的 <code>publishArticleToCms({ articleId, appChannelSlug, operatorId, triggerSource })</code> 与当前源码不符。当前实现<b>不再用 appChannelSlug</b>，改为 <code>target</code> override，缺省回退 env 默认。所谓「9 个 APP 栏目 slug（<code>ALL_APP_CHANNEL_SLUGS</code>）」在当前代码已<b>搜不到</b>，<code>app_channels</code> 表也被 verify 脚本列为「应已删」。编写正式文档以源码为准。</p></div>
+      <pre class="code"><span class="c">// 当前真实签名（publish/publish-article.ts）</span>
+<span class="k">interface</span> PublishInput {
+  articleId: string;
+  operatorId: string;
+  triggerSource: <span class="s">"manual" | "workflow" | "scheduled" | "daily_plan"</span>;
+  allowUpdate?: boolean;                          <span class="c">// 默认 true，走 CMS MODIFY</span>
+  target?: { catalogId?; appId?; siteId? };       <span class="c">// 缺省回退 env: site 81 / app 1768 / catalog 10210</span>
+}</pre>
+      <p class="prose"><b>发布 9 步：</b>flag 检查 → 加载 article+org → 状态校验（approved/publishing/published）→ 加载 MapperContext → 幂等检查 → 映射 DTO → 落 <code>cms_publications</code>(submitting) → 调 saveArticle → 更新 submitted + 触发轮询。</p>
+      <p class="prose"><b>状态机 6 态：</b><code>submitting → submitted → synced / retrying / rejected_by_cms / failed</code>（终态 synced/failed/rejected）。CMS status 映射：<code>"0"/"20"→submitted</code>、<code>"30"→synced</code>、<code>"60"→rejected_by_cms</code>。</p>
+      <div class="callout callout--info" data-animate><div class="ct">ℹ 配置与灰度</div><p>必填 env：<code>CMS_HOST</code> / <code>CMS_LOGIN_CMC_ID</code> / <code>CMS_LOGIN_CMC_TID</code> / <code>CMS_TENANT_ID</code> / <code>CMS_USERNAME</code>。Flag：<code>VIBETIDE_CMS_PUBLISH_ENABLED</code>（默认 false 逐 org 灰度）、<code>VIBETIDE_CATALOG_SYNC_ENABLED</code>（默认 true）。配置 UI 在 <code>/settings/cms-mapping</code>。</p></div>
+    </section>
+
+    <section class="section anchor-h" id="designsys">
+      <div class="section-head">
+        <span class="kicker">14 · 设计系统</span>
+        <h2>设计系统约束与 ESLint</h2>
+        <p class="lead">每一轮样式漂移都源于绕过共享原语。这套规则（含 ESLint 强制）让 UI 长期不走样。</p>
+      </div>
+      <h3>必须用共享原语，禁止手搓</h3>
+      <p class="prose">按钮→<code>&lt;Button&gt;</code>、输入→<code>&lt;Input&gt;</code>、搜索→<code>&lt;SearchInput&gt;</code>、下拉→<code>&lt;Select&gt;</code>、多行→<code>&lt;Textarea&gt;</code>、日期→<code>&lt;DatePicker&gt;</code>、Tabs→用 <code>variant</code>、表格→<code>&lt;DataTable&gt;</code>、标题→<code>&lt;PageHeader&gt;</code>、卡片→<code>&lt;GlassCard&gt;</code>。</p>
+      <ul class="list">
+        <li><b>禁止</b>在共享组件上用 <code>className</code> 覆盖颜色类（破坏 liquid-glass 风格），改用 <code>variant</code>。</li>
+        <li><b>弹层内可滚动列表</b>必须用固定高度 <code>h-X</code> 而非 <code>max-h-X</code>（避免搜索 / 切 tab / 增删时高度抖动）。</li>
+        <li><b>项目特别约定：</b>所有可点击触发事件的按钮 / 标签<b>一律不带边框</b>。</li>
+      </ul>
+      <h3>ESLint 强制（<code>eslint.config.mjs</code>）</h3>
+      <div class="table-wrap" data-animate>
+        <table class="table">
+          <thead><tr><th>规则</th><th>级别</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td><code>no-restricted-imports</code></td><td><span class="tag tag--danger">error</span></td><td>禁 import <code>@supabase/supabase-js</code> / auth-helpers / ssr（ADR 决策）</td></tr>
+            <tr><td><code>no-restricted-syntax</code></td><td><span class="tag tag--warn">warn</span></td><td>禁原生 <code>&lt;button&gt;/&lt;input&gt;/&lt;select&gt;/&lt;textarea&gt;</code>（约 350 历史违规故暂 warn，排除 ui/landing/media-assets）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">预提交：husky + lint-staged 对暂存 <code>src/**/*.{ts,tsx}</code> 跑 <code>eslint --fix</code>。</p>
+    </section>
+
+    <section class="section anchor-h" id="env">
+      <div class="section-head">
+        <span class="kicker">15 · 环境</span>
+        <h2>环境变量</h2>
+        <p class="lead">统一放 <code>.env.local</code>（非 <code>.env</code>），模板见 <code>.env.example</code>。</p>
+      </div>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>分类</th><th>关键变量</th></tr></thead>
+          <tbody>
+            <tr><td>数据库</td><td><code>DATABASE_URL</code>（Drizzle 直连，pooler / direct 两种示例）</td></tr>
+            <tr><td>AI（DeepSeek）</td><td><code>OPENAI_API_KEY</code> · <code>OPENAI_API_BASE_URL</code> · <code>OPENAI_MODEL=deepseek-chat</code></td></tr>
+            <tr><td>搜索 / 深读 / 嵌入</td><td><code>SEARCH_PROVIDER</code>(bocha/tavily) · <code>BOCHA_API_KEY</code> · <code>TAVILY_API_KEY</code> · <code>JINA_API_KEY</code> · <code>JINA_EMBEDDING_MODEL</code></td></tr>
+            <tr><td>社媒采集 / 热榜</td><td><code>TIKHUB_API_KEY</code> · <code>TRENDING_API_URL/KEY/RESPONSE_MAPPING</code></td></tr>
+            <tr><td>自建认证</td><td><code>AUTH_SESSION_SECRET</code>(≥32) · <code>AUTH_SESSION_TTL_SECONDS</code></td></tr>
+            <tr><td>CMS（华栖云）</td><td><code>CMS_HOST</code> · <code>CMS_LOGIN_CMC_ID/TID</code> · <code>CMS_TENANT_ID</code> · <code>CMS_USERNAME</code> · <code>VIBETIDE_CMS_PUBLISH_ENABLED</code></td></tr>
+            <tr><td>海外发布</td><td><code>AYRSHARE_API_KEY</code>（一接口贯通 X/IG/FB/LinkedIn/TikTok/YouTube 等）</td></tr>
+            <tr><td>Inngest</td><td><code>INNGEST_EVENT_KEY</code> · <code>INNGEST_SIGNING_KEY</code>（仅生产）</td></tr>
+            <tr><td>Supabase（仅 Storage）</td><td><code>NEXT_PUBLIC_SUPABASE_URL</code> · <code>SUPABASE_SERVICE_ROLE_KEY</code>（研究报告桶等）</td></tr>
+            <tr><td>渠道（钉钉 / 企微）</td><td>无 env，凭据 per-org 存 <code>channel_configs</code> 表，UI 在 <code>/settings/channels</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section anchor-h" id="testing">
+      <div class="section-head">
+        <span class="kicker">16 · 工程纪律</span>
+        <h2>测试 · 验证 · Git 纪律</h2>
+        <p class="lead">Vitest 单测 + 强制验证流程 + 短生命周期分支策略，保证每个 commit 都能独立构建。</p>
+      </div>
+      <h3>测试（<code>vitest.config.ts</code>）</h3>
+      <ul class="list">
+        <li>Vitest 4.1.4，<code>environment:"node"</code>、<code>globals:true</code>，testTimeout/hookTimeout 30s（集成测试打本地 Supabase）。</li>
+        <li>实测 <b>137+</b> 个测试文件，<code>__tests__</code> 遍布 dal/agent/cms/collection/research/inngest/db 约 30 处。</li>
+        <li>coverage 仅 include <code>src/lib/knowledge/**</code>（聚焦知识库）；alias <code>@→./src</code>，<code>server-only</code> 替换为空实现避免 node 环境崩。</li>
+      </ul>
+      <h3>完成功能后的强制验证</h3>
+      <ol class="list num">
+        <li><code>npx tsc --noEmit</code> —— 类型检查零错误。</li>
+        <li><code>npm run build</code> —— 生产构建通过（串 verify-help-links → next build → build-help-search）。</li>
+        <li>切换 DATABASE_URL / 迁库后立即 <code>bash scripts/verify-schema-sync.sh</code>（14 个 fingerprint）。</li>
+      </ol>
+      <h3>Git 纪律</h3>
+      <ul class="list">
+        <li>主分支 <code>main</code>；常规小改动直接落 main，并行 subagent / 大重构用 <code>claude/&lt;topic&gt;</code> 分支或 <code>.worktrees/&lt;topic&gt;</code>（已入 .gitignore）。</li>
+        <li>每个 commit 都要 <code>tsc --noEmit</code> 零错 + <code>npm run build</code> 通过；中间态必然 break 的合并成一个 commit。</li>
+        <li>不 force-push <code>main</code>；merge 回 main 用 fast-forward 或 squash。</li>
+      </ul>
+    </section>
+
+    <section class="section anchor-h" id="debt">
+      <div class="section-head">
+        <span class="kicker">17 · 演进</span>
+        <h2>技术债与演进路线</h2>
+        <p class="lead">最大的「债」是文档与代码的 drift。研发负责人接手时，请以源码为准，并推进下列收口项。</p>
+      </div>
+      <h3>CLAUDE.md ↔ 代码 drift（已实测）</h3>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>项</th><th>CLAUDE.md</th><th>代码实测</th></tr></thead>
+          <tbody>
+            <tr><td>AI 员工角色</td><td>8</td><td><b>12</b></td></tr>
+            <tr><td>Inngest 函数</td><td>16</td><td><b>46 文件 / 45+ 注册</b></td></tr>
+            <tr><td>schema 文件 / 表 / 枚举</td><td>54 / ~145 / 72</td><td><b>67 / 134 / 93</b></td></tr>
+            <tr><td>dashboard 路由组</td><td>34</td><td><b>42</b></td></tr>
+            <tr><td>API 路由组</td><td>10</td><td><b>17</b></td></tr>
+            <tr><td>SKILL.md</td><td>13</td><td><b>47</b></td></tr>
+            <tr><td>CMS 9-slug 机制</td><td>严格锁定</td><td><b>已移除（target override）</b></td></tr>
+            <tr><td><code>scenario-fallback.ts</code></td><td>存在</td><td><b>不存在</b>（内联于 leader-plan）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>统一场景架构二期（B.2）待办</h3>
+      <ul class="list">
+        <li><code>/scenarios/customize</code> 重写；<code>channels/gateway.ts</code> 改读 DB。</li>
+        <li>删除 <code>SCENARIO_CONFIG</code> / <code>ADVANCED_SCENARIO_CONFIG</code> 常量（现 @deprecated）。</li>
+        <li>DROP <code>employee_scenarios</code> 表；mission 下游消费者从 <code>scenario</code> slug 迁到 <code>workflowTemplateId</code>。</li>
+      </ul>
+      <h3>其他演进方向</h3>
+      <div class="grid cols-3">
+        <div class="card" data-animate style="--i:0"><h4>🔎 知识库升级</h4><p>chunk 数超 ~10k 时由 jsonb + 应用层余弦升级到 pgvector。</p></div>
+        <div class="card" data-animate style="--i:1"><h4>🧹 Mock 收口</h4><p>智能分析 / 资产盘活 / 节赛会展等外围模块由 mock 切真实 DAL。</p></div>
+        <div class="card" data-animate style="--i:2"><h4>🧩 垂类子模板</h4><p>短剧 / 种草 / 播客 script-heavy skill 的子模板规范填充（当前部分为 stub）。</p></div>
+      </div>
+      <div class="callout" data-animate><div class="ct">📗 配套文档</div><p>产品定位、员工产品化、功能模块、用户旅程、差异化竞争力见同目录《Vibetide 产品文档》。</p></div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="inner">
+    <div class="l">Vibe Media · MClaw —— <b>技术架构与实现说明</b><br>技术文档 v1.0 · 面向研发负责人</div>
+    <div class="r">生成日期 2026-06-10 · 数据以代码库实测为准 · 配套《Vibetide 产品文档》</div>
+  </div>
+</footer>
+<button class="totop" id="totop" aria-label="回到顶部">↑</button>
+<script>
+(function(){
+  var pb=document.getElementById('progress'),tt=document.getElementById('totop');
+  function onScroll(){var h=document.documentElement,st=h.scrollTop||document.body.scrollTop,sh=(h.scrollHeight-h.clientHeight)||1;pb.style.width=(st/sh*100)+'%';if(st>500)tt.classList.add('show');else tt.classList.remove('show')}
+  window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+  tt.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.1,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('[data-animate]').forEach(function(el){io.observe(el)});
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'))}).filter(Boolean);
+  var so=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var id=e.target.id;links.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+id)})}})},{rootMargin:'-20% 0px -70% 0px'});
+  secs.forEach(function(s){so.observe(s)});
+})();
+</script>
+</body>
+</html>

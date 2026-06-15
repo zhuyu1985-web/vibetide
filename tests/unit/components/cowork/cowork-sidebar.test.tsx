@@ -6,6 +6,8 @@ import { render, fireEvent } from "@testing-library/react";
 // 否则会把 db/auth 模块拉进 jsdom。
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/home",
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/app/actions/cowork-conversations", () => ({
   renameConversationAction: vi.fn(),

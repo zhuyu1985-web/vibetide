@@ -31,7 +31,7 @@
 - [ ] **Step 1: 跑 SQL 抽样**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 npx tsx -e "
 import { db } from './src/db';
 import { accountDailySnapshots } from './src/db/schema/account-analytics';

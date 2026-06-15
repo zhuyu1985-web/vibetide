@@ -15,48 +15,48 @@
 ### Create (新建)
 
 **Schema / DAL：**
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/reports.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/reports.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/__tests__/reports.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/reports.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/reports.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/__tests__/reports.test.ts`
 
 **Library（聚合 / 模板 / prompt / renderer / builder / storage）：**
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-aggregator.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-aggregator.test.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-template.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-template.test.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-prompts.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-prompts.test.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-html-renderer.tsx`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-word-builder.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-word-builder.test.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-excel-builder.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-excel-builder.test.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-storage.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-aggregator.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-aggregator.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-template.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-template.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-prompts.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-prompts.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-html-renderer.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-word-builder.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-word-builder.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-excel-builder.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-excel-builder.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-storage.ts`
 
 **Inngest：**
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/__tests__/report-generate.test.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/__tests__/report-generate.test.ts`
 
 **UI / Server Action：**
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/page.tsx`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/reports.ts`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/page.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/reports.ts`
 
 **Charts wrappers（缺失补建）：**
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/charts/horizontal-bar-chart-card.tsx`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/charts/line-chart-card.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/charts/horizontal-bar-chart-card.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/charts/line-chart-card.tsx`
 
 ### Modify (修改)
 
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/index.ts` — export reports schema
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/index.ts` — export `researchReportGenerate`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts` — register function in `functions[]`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` — 高级模式 ≤500 命中"生成报告"按钮入口
-- `/Users/zhuyu/dev/chinamcloud/vibetide/.env.example` — 新增 `SUPABASE_STORAGE_BUCKET_REPORTS=research-reports`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/index.ts` — export reports schema
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/index.ts` — export `researchReportGenerate`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts` — register function in `functions[]`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` — 高级模式 ≤500 命中"生成报告"按钮入口
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/.env.example` — 新增 `SUPABASE_STORAGE_BUCKET_REPORTS=research-reports`
 
 ### 任务详情页（A5 内新建，假设 A3 留下了占位）
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/page.tsx`
-- `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/task-detail-client.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/page.tsx`
+- `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/task-detail-client.tsx`
 
 > 若任务详情页已存在，仅插入"生成报告"按钮区块，不重写整页。
 
@@ -67,20 +67,20 @@
 ### Task 0.1 — 装包 + Bucket + xiaoyan 校验
 
 **Files:**
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/package.json`（npm install 自动）
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/.env.example`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/package.json`（npm install 自动）
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/.env.example`
 
 **Steps:**
 
 - [ ] **Step 0.1.1: 装 docx**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm install docx
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm install docx
   ```
   期望：`package.json` `dependencies` 出现 `"docx": "^9.x"`，无 native binding 报错。
 
 - [ ] **Step 0.1.2: docx smoke test**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && cat > /tmp/docx-smoke.mjs <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && cat > /tmp/docx-smoke.mjs <<'EOF'
   import { Document, Packer, Paragraph, HeadingLevel } from "docx";
   import { writeFileSync } from "fs";
   const doc = new Document({ sections: [{ children: [
@@ -108,7 +108,7 @@
 
 - [ ] **Step 0.1.5: 校验 xiaoyan + research_drafter 已 seed（A6 ship 后跑）**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsx -e '
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsx -e '
   import { db } from "@/db";
   import { aiEmployees, skills } from "@/db/schema";
   import { eq } from "drizzle-orm";
@@ -122,7 +122,7 @@
 
 - [ ] **Step 0.1.6: commit**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add package.json package-lock.json .env.example && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add package.json package-lock.json .env.example && git commit --no-verify -m "$(cat <<'EOF'
   chore(a5): Phase 0 — install docx + reports bucket env
 
   - npm install docx (MIT, no native bindings)
@@ -141,8 +141,8 @@
 ### Task 1.1 — researchReports schema
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/reports.ts`
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/index.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/reports.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/index.ts`
 
 **Steps:**
 
@@ -239,7 +239,7 @@
 
 - [ ] **Step 1.1.3: db push 应用**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:push
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:push
   ```
   期望 drizzle-kit 输出新建 `research_reports` 表 + 3 索引；如有 prompt 选 `Yes` 应用。
 
@@ -252,15 +252,15 @@
 
 - [ ] **Step 1.1.4: tsc 校验**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
   ```
   期望无新增类型错误。
 
 ### Task 1.2 — DAL CRUD
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/reports.ts`
-- **Test:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/__tests__/reports.test.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/reports.ts`
+- **Test:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/__tests__/reports.test.ts`
 
 **Steps:**
 
@@ -498,13 +498,13 @@
 
 - [ ] **Step 1.2.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/lib/dal/research/__tests__/reports.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/lib/dal/research/__tests__/reports.test.ts
   ```
   期望 5 pass / 0 fail。
 
 - [ ] **Step 1.2.4: commit Phase 1**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/db/schema/research/reports.ts src/db/schema/research/index.ts src/lib/dal/research/reports.ts src/lib/dal/research/__tests__/reports.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/db/schema/research/reports.ts src/db/schema/research/index.ts src/lib/dal/research/reports.ts src/lib/dal/research/__tests__/reports.test.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 1 — research_reports schema + DAL CRUD
 
   - new research_reports table (org cascade / task set null / parent self-FK cascade / generatedBy set null)
@@ -524,8 +524,8 @@
 ### Task 2.1 — 4-dim group-by SQL + 测试
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-aggregator.ts`
-- **Test:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-aggregator.test.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-aggregator.ts`
+- **Test:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-aggregator.test.ts`
 
 **Steps:**
 
@@ -809,13 +809,13 @@
 
 - [ ] **Step 2.1.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-aggregator.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-aggregator.test.ts
   ```
   期望 6 pass / 0 fail。
 
 - [ ] **Step 2.1.4: commit Phase 2**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/lib/research/report-aggregator.ts src/lib/research/__tests__/report-aggregator.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/lib/research/report-aggregator.ts src/lib/research/__tests__/report-aggregator.test.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 2 — report-aggregator 4-dim group-by
 
   - aggregateForReport(orgId, hitItemIds) → AggregatesJson
@@ -835,8 +835,8 @@
 ### Task 3.1 — report-template (数据简报插值)
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-template.ts`
-- **Test:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-template.test.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-template.ts`
+- **Test:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-template.test.ts`
 
 **Steps:**
 
@@ -952,15 +952,15 @@
 
 - [ ] **Step 3.1.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-template.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-template.test.ts
   ```
   期望 3 pass。
 
 ### Task 3.2 — report-prompts (zod schema + 降级)
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-prompts.ts`
-- **Test:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-prompts.test.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-prompts.ts`
+- **Test:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-prompts.test.ts`
 
 **Steps:**
 
@@ -1091,13 +1091,13 @@
 
 - [ ] **Step 3.2.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-template.test.ts src/lib/research/__tests__/report-prompts.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-template.test.ts src/lib/research/__tests__/report-prompts.test.ts
   ```
   期望 6 pass。
 
 - [ ] **Step 3.2.4: commit Phase 3**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/lib/research/report-template.ts src/lib/research/report-prompts.ts src/lib/research/__tests__/report-template.test.ts src/lib/research/__tests__/report-prompts.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/lib/research/report-template.ts src/lib/research/report-prompts.ts src/lib/research/__tests__/report-template.test.ts src/lib/research/__tests__/report-prompts.test.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 3 — report template + AI prompts (zod + fallback)
 
   - renderTemplateBrief: 数据简报模板插值（不依赖 AI）
@@ -1118,7 +1118,7 @@
 ### Task 4.1 — report-html-renderer
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-html-renderer.tsx`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-html-renderer.tsx`
 
 **Steps:**
 
@@ -1258,10 +1258,10 @@
 ### Task 4.2 — Inngest function 骨架 (Step 1-4 串通)
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/index.ts`
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts`
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/events.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/index.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/events.ts`
 
 **Steps:**
 
@@ -1270,10 +1270,10 @@
   > **N-2 修复**：编辑前先 Read 该文件，确定它当前用的是 union type 还是 `EventSchemas.fromUnion` 还是 `Record<string, …>` 形态——不同形态追加方式不同（追错 syntax 会导致 tsc 全栈报错）。先用 Read 工具读一遍：
   > ```bash
   > # 或在 IDE 直接打开
-  > /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/events.ts
+  > /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/events.ts
   > ```
 
-  打开 `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/events.ts`，在事件类型 union 中追加：
+  打开 `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/events.ts`，在事件类型 union 中追加：
   ```ts
   | { name: "research/report.generate"; data: { reportId: string; organizationId: string } }
   ```
@@ -1478,13 +1478,13 @@
 
 - [ ] **Step 4.2.5: tsc 校验**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
   ```
   期望无类型错误。如 `aiEmployees.organizationId` / `aiEmployees.slug` 字段不存在，请按当前 schema 修正 where 条件。
 
 - [ ] **Step 4.2.6: commit Phase 4**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/lib/research/report-html-renderer.tsx src/inngest/functions/research/report-generate.ts src/inngest/functions/research/index.ts src/inngest/functions/index.ts src/inngest/events.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/lib/research/report-html-renderer.tsx src/inngest/functions/research/report-generate.ts src/inngest/functions/research/index.ts src/inngest/functions/index.ts src/inngest/events.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 4 — Inngest 7-step pipeline 骨架 (Step 1-4 串通)
 
   - report-html-renderer.tsx: 拼 HTML（封面 + 5 章 + 附录 + chart 占位）
@@ -1507,8 +1507,8 @@
 ### Task 5.1 — 补建缺失的 Charts wrappers
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/charts/horizontal-bar-chart-card.tsx`
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/charts/line-chart-card.tsx`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/charts/horizontal-bar-chart-card.tsx`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/charts/line-chart-card.tsx`
 
 **Steps:**
 
@@ -1581,9 +1581,9 @@
 ### Task 5.2 — Report detail page (Server) + client (polling)
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/page.tsx`
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/reports.ts`（前置最小 stub，Phase 8 完整化）
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/page.tsx`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/reports.ts`（前置最小 stub，Phase 8 完整化）
 
 **Steps:**
 
@@ -1804,13 +1804,13 @@
 
 - [ ] **Step 5.2.4: tsc + dev smoke**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
   ```
   期望无类型错误。然后 `npm run dev` 启动服务，浏览器访问任一 `/research/reports/<existing-uuid>`（不存在则 404，存在则看 polling/ready 切换）。
 
 - [ ] **Step 5.2.5: commit Phase 5**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/components/charts/horizontal-bar-chart-card.tsx src/components/charts/line-chart-card.tsx src/app/\(dashboard\)/research/reports src/app/actions/research/reports.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/components/charts/horizontal-bar-chart-card.tsx src/components/charts/line-chart-card.tsx src/app/\(dashboard\)/research/reports src/app/actions/research/reports.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 5 — report detail page + missing chart wrappers
 
   - components/charts/horizontal-bar-chart-card.tsx (区县分布)
@@ -1832,7 +1832,7 @@
 ### Task 6.1 — report-storage (Supabase Storage)
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-storage.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-storage.ts`
 
 **Steps:**
 
@@ -1901,8 +1901,8 @@
 ### Task 6.2 — report-word-builder + 测试
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-word-builder.ts`
-- **Test:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-word-builder.test.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-word-builder.ts`
+- **Test:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-word-builder.test.ts`
 
 **Steps:**
 
@@ -2084,14 +2084,14 @@
 
 - [ ] **Step 6.2.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-word-builder.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-word-builder.test.ts
   ```
   期望 3 pass。
 
 ### Task 6.3 — Inngest Step 5 接入 Word
 
 **Files:**
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
 
 **Steps:**
 
@@ -2173,12 +2173,12 @@
 
 - [ ] **Step 6.3.2: tsc 校验**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
   ```
 
 - [ ] **Step 6.3.3: commit Phase 6**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/lib/research/report-storage.ts src/lib/research/report-word-builder.ts src/lib/research/__tests__/report-word-builder.test.ts src/inngest/functions/research/report-generate.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/lib/research/report-storage.ts src/lib/research/report-word-builder.ts src/lib/research/__tests__/report-word-builder.test.ts src/inngest/functions/research/report-generate.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 6 — Word builder + Supabase Storage + Inngest Step 5
 
   - lib/research/report-storage.ts: service-role REST upload + 签名 URL（24h TTL，绕过 supabase-js 依赖）
@@ -2198,8 +2198,8 @@
 ### Task 7.1 — report-excel-builder + 测试
 
 **Files:**
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/report-excel-builder.ts`
-- **Test:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/report-excel-builder.test.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/report-excel-builder.ts`
+- **Test:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/report-excel-builder.test.ts`
 
 **Steps:**
 
@@ -2323,15 +2323,15 @@
 
 - [ ] **Step 7.1.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-excel-builder.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/lib/research/__tests__/report-excel-builder.test.ts
   ```
   期望 3 pass。
 
 ### Task 7.2 — Inngest Step 6 接入 Excel + Inngest 集成测
 
 **Files:**
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/__tests__/report-generate.test.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/report-generate.ts`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/__tests__/report-generate.test.ts`
 
 **Steps:**
 
@@ -2500,13 +2500,13 @@
 
 - [ ] **Step 7.2.3: 跑测试**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test -- src/inngest/functions/research/__tests__/report-generate.test.ts
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test -- src/inngest/functions/research/__tests__/report-generate.test.ts
   ```
   期望 2 pass。
 
 - [ ] **Step 7.2.4: commit Phase 7**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/lib/research/report-excel-builder.ts src/lib/research/__tests__/report-excel-builder.test.ts src/inngest/functions/research/report-generate.ts src/inngest/functions/research/__tests__/report-generate.test.ts && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/lib/research/report-excel-builder.ts src/lib/research/__tests__/report-excel-builder.test.ts src/inngest/functions/research/report-generate.ts src/inngest/functions/research/__tests__/report-generate.test.ts && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 7 — Excel builder + Inngest Step 6 + integration test
 
   - lib/research/report-excel-builder.ts: 5 sheet（明细/分主题/分区县/分媒体层级/图表数据）
@@ -2525,7 +2525,7 @@
 ### Task 8.1 — server actions 完整化
 
 **Files:**
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/reports.ts`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/reports.ts`
 
 **Steps:**
 
@@ -2701,8 +2701,8 @@
 ### Task 8.2 — research_tasks 详情页"生成报告"按钮
 
 **Files:**
-- **Create / Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/page.tsx`
-- **Create:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/task-detail-client.tsx`
+- **Create / Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/page.tsx`
+- **Create:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/tasks/[id]/task-detail-client.tsx`
 
 **Steps:**
 
@@ -2852,8 +2852,8 @@
 ### Task 8.3 — search-workbench-client 增"生成报告"按钮
 
 **Files:**
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts`（M-7 修复：抽 helper）
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts`（M-7 修复：抽 helper）
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
 
 **Steps:**
 
@@ -2914,7 +2914,7 @@
 
 - [ ] **Step 8.3.1: 阅读现状 + 找到高级模式结果区**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && grep -n "高级\|advanced\|总数\|total" "src/app/(dashboard)/research/search-workbench-client.tsx" | head -20
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && grep -n "高级\|advanced\|总数\|total" "src/app/(dashboard)/research/search-workbench-client.tsx" | head -20
   ```
 
 - [ ] **Step 8.3.2: 在结果总数区附近插入按钮（用 fetchAllHitItemIdsForReport）**
@@ -2947,13 +2947,13 @@
 
 - [ ] **Step 8.3.3: tsc + dev smoke**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run dev
   ```
   浏览器：高级模式输条件 → 顶部"生成报告" → dialog → 跳转 /research/reports/[id] → 看 polling → ready 后 HTML 渲染。
 
 - [ ] **Step 8.3.4: commit Phase 8**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add src/app/actions/research/reports.ts "src/app/(dashboard)/research/tasks" "src/app/(dashboard)/research/search-workbench-client.tsx" && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add src/app/actions/research/reports.ts "src/app/(dashboard)/research/tasks" "src/app/(dashboard)/research/search-workbench-client.tsx" && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 8 — 双入口 UX (research_tasks + advanced search)
 
   - actions/research/reports.ts 完整化：createReportFromTask / createReportFromSearch / regenerateReport / saveAsSnapshot / getSignedUrlForReport / deleteReport
@@ -2974,8 +2974,8 @@
 ### Task 9.1 — 快照功能
 
 **Files:**
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/page.tsx`
-- **Modify:** `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/page.tsx`
+- **Modify:** `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`
 
 **Steps:**
 
@@ -3075,12 +3075,12 @@
 
 - [ ] **Step 9.1.4: tsc + dev 验证快照创建 + 跳转**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
   ```
 
 - [ ] **Step 9.1.5: commit Phase 9**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add "src/app/(dashboard)/research/reports/[id]" && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add "src/app/(dashboard)/research/reports/[id]" && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 9 — 快照 + AI fallback banner + retry UI
 
   - "另存为快照" 按钮 + dialog（snapshotName）
@@ -3105,25 +3105,25 @@
 
 - [ ] **Step 10.1.1: tsc 全量**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | tee /tmp/a5-tsc.log
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | tee /tmp/a5-tsc.log
   ```
   期望 0 error。
 
 - [ ] **Step 10.1.2: lint**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run lint 2>&1 | tee /tmp/a5-lint.log
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run lint 2>&1 | tee /tmp/a5-lint.log
   ```
   期望仅有原有 warn，无新错。
 
 - [ ] **Step 10.1.3: 全量 vitest**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm test 2>&1 | tee /tmp/a5-test.log
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm test 2>&1 | tee /tmp/a5-test.log
   ```
   期望全 pass，A5 新增 25 cases 覆盖：DAL 5 / aggregator 6 / template 3 / prompts 3 / word 3 / excel 3 / inngest 2。
 
 - [ ] **Step 10.1.4: build**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build 2>&1 | tee /tmp/a5-build.log
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run build 2>&1 | tee /tmp/a5-build.log
   ```
   期望 production build 成功。
 
@@ -3133,7 +3133,7 @@
 
 - [ ] **Step 10.2.1: dev server**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev
   ```
 
 - [ ] **Step 10.2.2: 入口 1（research_tasks → 报告）**
@@ -3176,11 +3176,11 @@
   如发现 AI 生成的 background/conclusions 出现"作为大语言模型"等元元词、感叹号、爆款词，更新 `research_drafter` skill 内容（A6 owner 协调）或在 `report-prompts.ts` user message 加显式约束。
 
 - [ ] **Step 10.3.2: 截图 + 验收记录**
-  在 `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-07-a5-report-export-design.md` 末尾加"实施记录"章节，附 3 张截图（HTML 报告 / Word 截图 / Excel 截图）+ 实施日期 + 全量测试统计。
+  在 `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-07-a5-report-export-design.md` 末尾加"实施记录"章节，附 3 张截图（HTML 报告 / Word 截图 / Excel 截图）+ 实施日期 + 全量测试统计。
 
 - [ ] **Step 10.3.3: final commit Phase 10**
   ```bash
-  cd /Users/zhuyu/dev/chinamcloud/vibetide && git add -A && git commit --no-verify -m "$(cat <<'EOF'
+  cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add -A && git commit --no-verify -m "$(cat <<'EOF'
   feat(a5): Phase 10 — 全量 tsc/lint/build/test 通过 + 浏览器验收
 
   - tsc 0 error / lint 0 new error / 25 vitest cases all pass / build 成功

@@ -8,9 +8,9 @@
 
 **Tech Stack:** Next.js 16 / TypeScript strict / Drizzle ORM 0.45 + postgres / Supabase / Inngest / Vitest / Zod / iron-session。`tikhub` 平台直连 REST（不接 MCP gateway / AI gateway）。
 
-**关联 sub-spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-05-a2-tikhub-adapter-design.md`
+**关联 sub-spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-05-a2-tikhub-adapter-design.md`
 
-**关联 main spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.2
+**关联 main spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.2
 
 **总工期：4-6 工作日**（P0 3-4d / P1 1-2d / 集成测试+UI 0.5-1d / calculate_price 校准 0.5d）
 
@@ -34,35 +34,35 @@
 
 | 文件 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/index.ts` | 主 adapter 导出（拼接 SourceAdapter 接口） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config.ts` | zod configSchema + TIKHUB_PLATFORMS const |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config-fields.ts` | UI configFields 定义 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/rate-limiter.ts` | TokenBucket 类 + 进程级单例 `tikhubRateLimiter` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/time-parser.ts` | parseWeiboTime + 各平台 publishedAt fallback |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/attachment-mapper.ts` | 5 平台 attachments 映射 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/http-client.ts` | tikhub fetch 封装（auth header + rate limiter + 5xx/429 重试 + cost 累计） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/budget.ts` | 预算估算 + 累计 + 阈值检查 + auto-disable |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/pricing.json` | 各 endpoint 单价 hardcode 表（Day 1 占位 / Day 6 实测填充） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/douyin.ts` | 抖音 endpoint + mapper |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/weibo.ts` | 微博 endpoint + mapper |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/xiaohongshu.ts` | 小红书 endpoint + mapper |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/wechat-mp.ts` | 微信公众号 endpoint + mapper |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/zhihu.ts` | 知乎 endpoint + mapper |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/<5 个 platform-search.json>` | mock 响应 fixtures |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/<5 个 *.test.ts>` | 单测：rate-limiter / time-parser / attachment-mapper / 主 adapter / 5 平台 mapper |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/collection/tikhub-budget-reset.ts` | Inngest cron 月初累计重置 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/index.ts` | 主 adapter 导出（拼接 SourceAdapter 接口） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config.ts` | zod configSchema + TIKHUB_PLATFORMS const |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config-fields.ts` | UI configFields 定义 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/rate-limiter.ts` | TokenBucket 类 + 进程级单例 `tikhubRateLimiter` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/time-parser.ts` | parseWeiboTime + 各平台 publishedAt fallback |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/attachment-mapper.ts` | 5 平台 attachments 映射 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/http-client.ts` | tikhub fetch 封装（auth header + rate limiter + 5xx/429 重试 + cost 累计） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/budget.ts` | 预算估算 + 累计 + 阈值检查 + auto-disable |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/pricing.json` | 各 endpoint 单价 hardcode 表（Day 1 占位 / Day 6 实测填充） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/douyin.ts` | 抖音 endpoint + mapper |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/weibo.ts` | 微博 endpoint + mapper |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/xiaohongshu.ts` | 小红书 endpoint + mapper |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/wechat-mp.ts` | 微信公众号 endpoint + mapper |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/zhihu.ts` | 知乎 endpoint + mapper |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/<5 个 platform-search.json>` | mock 响应 fixtures |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/<5 个 *.test.ts>` | 单测：rate-limiter / time-parser / attachment-mapper / 主 adapter / 5 平台 mapper |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/collection/tikhub-budget-reset.ts` | Inngest cron 月初累计重置 |
 
 ### 修改（6 个）
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/index.ts` | 注册 tikhubAdapter |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/types.ts` | 如需扩展 RawItem（A1 已加 contentType + attachments，确认无需进一步扩展） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/collection.ts` | collection_sources.config 加 tikhubMonthlyAccumulatedUsd 字段（jsonb 内）；如已用 jsonb config 则 schema 不动只看代码层 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx` | 加 tikhub adapter 选项 + platform 下拉 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/monitoring/monitoring-client.tsx` | 加"tikhub 月度费用"卡片 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts` | 加 tikhub 集成测试 case（attachments 入库 + outlet 识别） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts` | 注册 tikhubBudgetReset cron |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/index.ts` | 注册 tikhubAdapter |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/types.ts` | 如需扩展 RawItem（A1 已加 contentType + attachments，确认无需进一步扩展） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/collection.ts` | collection_sources.config 加 tikhubMonthlyAccumulatedUsd 字段（jsonb 内）；如已用 jsonb config 则 schema 不动只看代码层 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx` | 加 tikhub adapter 选项 + platform 下拉 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/monitoring/monitoring-client.tsx` | 加"tikhub 月度费用"卡片 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts` | 加 tikhub 集成测试 case（attachments 入库 + outlet 识别） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts` | 注册 tikhubBudgetReset cron |
 
 ---
 
@@ -75,7 +75,7 @@
 - [ ] **Step 1：自检环境**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 test -f .env.local && grep -c "^TIKHUB_API_KEY=" .env.local
 # 期望：1
 ```
@@ -83,7 +83,7 @@ test -f .env.local && grep -c "^TIKHUB_API_KEY=" .env.local
 - [ ] **Step 2：导出 key 到 shell**
 
 ```bash
-export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/dev/chinamcloud/vibetide/.env.local | cut -d= -f2-)
+export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local | cut -d= -f2-)
 echo "key length: ${#TIKHUB_API_KEY}"
 # 期望：长度 > 30
 ```
@@ -150,13 +150,13 @@ echo ""
 ### Task 1.2：types + configSchema + configFields
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config-fields.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/config-fields.ts`
 
 - [ ] **Step 1：read 现有 ConfigField type**
 
 ```bash
-grep -n "ConfigField\|configFields" /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/types.ts
+grep -n "ConfigField\|configFields" /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/types.ts
 ```
 
 记录 ConfigField 接口字段（key / label / type / required / options / help / validation）。
@@ -227,7 +227,7 @@ export const tikhubConfigFields: ConfigField[] = [
 - [ ] **Step 4：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ---
@@ -235,8 +235,8 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.3：rate-limiter + 单测（TDD）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/rate-limiter.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/rate-limiter.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/rate-limiter.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/rate-limiter.test.ts`
 
 - [ ] **Step 1：写测试**
 
@@ -284,7 +284,7 @@ describe("TokenBucket", () => {
 - [ ] **Step 2：跑测试预期失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/rate-limiter.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/rate-limiter.test.ts
 # 期望：模块 not found
 ```
 
@@ -321,7 +321,7 @@ export const tikhubRateLimiter = new TokenBucket(8, 8);
 - [ ] **Step 4：跑测试预期通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/rate-limiter.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/rate-limiter.test.ts
 # 期望：3/3 pass
 ```
 
@@ -330,8 +330,8 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/ad
 ### Task 1.4：time-parser + 完整单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/time-parser.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/time-parser.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/time-parser.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/time-parser.test.ts`
 
 - [ ] **Step 1：写测试**
 
@@ -405,7 +405,7 @@ describe("parseTimestampMs / parseTimestampSec", () => {
 - [ ] **Step 2：跑测试预期失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/time-parser.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/time-parser.test.ts
 ```
 
 - [ ] **Step 3：写实现**
@@ -453,7 +453,7 @@ export function parseTimestampSec(s: number | null | undefined): Date | undefine
 - [ ] **Step 4：跑测试预期通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/time-parser.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/time-parser.test.ts
 # 期望：11/11 pass
 ```
 
@@ -462,11 +462,11 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/ad
 ### Task 1.5：http-client + budget + pricing.json 占位 + AdapterResult 扩展
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/http-client.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/budget.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/pricing.json`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/types.ts`（AdapterResult 加 runMetadata）
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/writer.ts`（消费 runMetadata 写到 collection_runs.metadata）
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/http-client.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/budget.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/pricing.json`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/types.ts`（AdapterResult 加 runMetadata）
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/writer.ts`（消费 runMetadata 写到 collection_runs.metadata）
 
 - [ ] **Step 1：pricing.json 占位**（Day 6 实测后填）
 
@@ -572,7 +572,7 @@ export function checkBudget(currentAccumulated: number, addCost: number, monthly
 
 - [ ] **Step 4：扩展 AdapterResult + writer 写 runMetadata**
 
-修改 `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/types.ts:42-45`，给 `AdapterResult` 加可选 `runMetadata` 字段：
+修改 `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/types.ts:42-45`，给 `AdapterResult` 加可选 `runMetadata` 字段：
 
 ```ts
 export interface AdapterResult {
@@ -582,7 +582,7 @@ export interface AdapterResult {
 }
 ```
 
-修改 `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/writer.ts`：找到 `writeItems` 写入 `collection_runs.metadata` 的位置（如无则在 run insert/update 处加），把 `result.runMetadata` 合并到 metadata。模式：
+修改 `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/writer.ts`：找到 `writeItems` 写入 `collection_runs.metadata` 的位置（如无则在 run insert/update 处加），把 `result.runMetadata` 合并到 metadata。模式：
 
 ```ts
 // 在 writer 接收 AdapterResult 后：
@@ -598,7 +598,7 @@ const runMetadata: Record<string, unknown> = {
 - [ ] **Step 5：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 预期：零错（现有 5 adapter 不受影响 — runMetadata 是 optional）。
@@ -608,7 +608,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.6：Phase 1 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/collection/adapters/tikhub/ && \
 git commit --no-verify -m "$(cat <<'EOF'
 feat(a2): tikhub Adapter 基础设施 — config / rate-limiter (8 RPS) / time-parser / http-client / budget / pricing 占位
@@ -632,17 +632,17 @@ EOF
 ### Task 2.1：抖音 platform mapper + fixture + 单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/douyin.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/platforms-douyin.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/platforms/douyin.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/platforms-douyin.test.ts`
 
 - [ ] **Step 1：抓一份真实响应 fixture**
 
 ```bash
-export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/dev/chinamcloud/vibetide/.env.local | cut -d= -f2-)
+export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local | cut -d= -f2-)
 curl -sS -H "Authorization: Bearer $TIKHUB_API_KEY" \
   "https://api.tikhub.io/api/v1/douyin/web/fetch_general_search_result?keyword=%E9%95%BF%E6%B1%9F%E7%94%9F%E6%80%81&offset=0&count=10" \
-  > /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json
+  > /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json
 ```
 
 注：URL 编码"长江生态"。如真实 endpoint 路径不同（Task 1.1 探测结果），用对的路径。
@@ -691,11 +691,11 @@ describe("mapDouyinResponse", () => {
 - [ ] **Step 3：跑测试预期失败 + 看 fixture 实际结构**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/platforms-douyin.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/platforms-douyin.test.ts
 # 模块 not found
 
 # 看 fixture 真实结构再写 mapper
-head -50 /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json | python3 -m json.tool 2>/dev/null | head -60
+head -50 /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json | python3 -m json.tool 2>/dev/null | head -60
 ```
 
 - [ ] **Step 4：根据真实 fixture 结构写 douyin.ts**
@@ -784,7 +784,7 @@ export const DOUYIN_ENDPOINT = ENDPOINT;
 - [ ] **Step 5：跑测试预期通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/platforms-douyin.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/platforms-douyin.test.ts
 # 期望：5/5 pass
 ```
 
@@ -894,7 +894,7 @@ export const WEIBO_ENDPOINT = ENDPOINT;
 ### Task 2.3：Phase 2 tsc + 测试集子集回归
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 npx tsc --noEmit && \
 npx vitest run src/lib/collection/adapters/tikhub/__tests__/
 # 期望：tsc 0 错 + Phase 1+2 全部测试 pass
@@ -909,8 +909,8 @@ npx vitest run src/lib/collection/adapters/tikhub/__tests__/
 ### Task 3.1：attachment-mapper 提取（如有重复逻辑）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/attachment-mapper.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/attachment-mapper.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/attachment-mapper.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__tests__/attachment-mapper.test.ts`
 
 如 Task 2.1 / 2.2 写 mapper 时发现 attachment 构造逻辑可以复用（如"视频 + thumbnail" / "图集"模式），抽 helper。
 
@@ -938,10 +938,10 @@ export function buildImageSetAttachments(urls: string[]) { /* ... */ }
 抓 fixture（注意 noteTime 参数取"半年内"）：
 
 ```bash
-export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/dev/chinamcloud/vibetide/.env.local | cut -d= -f2-)
+export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local | cut -d= -f2-)
 curl -sS -H "Authorization: Bearer $TIKHUB_API_KEY" \
   "https://api.tikhub.io/api/v1/xiaohongshu/web/search_notes?keyword=%E9%95%BF%E6%B1%9F%E7%94%9F%E6%80%81&page=1&sort=general&noteType=_0&noteTime=%E5%8D%8A%E5%B9%B4%E5%86%85" \
-  > /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/xiaohongshu-search.json
+  > /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/xiaohongshu-search.json
 ```
 
 写测试 + mapper（按 fixture 实际结构）：
@@ -1132,7 +1132,7 @@ export const ZHIHU_ENDPOINT = ENDPOINT;
 
 ### Task 4.3：主 adapter execute
 
-**File:** Create `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/index.ts`
+**File:** Create `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/index.ts`
 
 ```ts
 import type { SourceAdapter, RawItem } from "../../types";
@@ -1306,7 +1306,7 @@ describe("tikhubAdapter.execute", () => {
 - [ ] **Step 2：跑测试预期失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/__tests__/
 ```
 
 - [ ] **Step 3：实现 + 跑测试预期通过**
@@ -1317,7 +1317,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/ad
 
 ### Task 4.4：注册 adapter
 
-**File:** Modify `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/index.ts`
+**File:** Modify `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/index.ts`
 
 ```ts
 // 现有 5 个 adapter import + register
@@ -1330,7 +1330,7 @@ export { tikhubAdapter };
 - [ ] tsc 通过 + 全套 tikhub 测试 pass
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && \
 npx vitest run src/lib/collection/adapters/tikhub/
 ```
 
@@ -1339,7 +1339,7 @@ npx vitest run src/lib/collection/adapters/tikhub/
 ### Task 4.5：Phase 2-4 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/collection/adapters/tikhub/ src/lib/collection/adapters/index.ts && \
 git commit --no-verify -m "$(cat <<'EOF'
 feat(a2): tikhub Adapter 5 平台 mapper + 主 adapter execute + 注册
@@ -1362,14 +1362,14 @@ EOF
 
 ### Task 5.1：sources/new 向导加 tikhub Adapter 选项
 
-**File:** Modify `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx`
+**File:** Modify `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx`
 
 向导现有 5 个 Adapter 选项；加第 6 个：
 
 - [ ] **Step 1：read 现有向导**
 
 ```bash
-grep -n "adapter\|tavily\|tophub\|configFields" /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/data-collection/sources/new/new-source-wizard-client.tsx | head -30
+grep -n "adapter\|tavily\|tophub\|configFields" /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/data-collection/sources/new/new-source-wizard-client.tsx | head -30
 ```
 
 - [ ] **Step 2：找到 Adapter 选项数组，加 tikhub**
@@ -1387,7 +1387,7 @@ grep -n "adapter\|tavily\|tophub\|configFields" /Users/zhuyu/dev/chinamcloud/vib
 - [ ] **Step 4：浏览器手动**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev &
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev &
 # 浏览器 /data-collection/sources/new
 # 选 tikhub adapter → platform 下拉显示 5 个 → 字段渲染正常
 ```
@@ -1396,12 +1396,12 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev &
 
 ### Task 5.2：监控面板 tikhub 月度费用卡片
 
-**File:** Modify `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/data-collection/monitoring/monitoring-client.tsx`
+**File:** Modify `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/data-collection/monitoring/monitoring-client.tsx`
 
 - [ ] **Step 1：read 现有监控页结构**
 
 ```bash
-head -150 /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/data-collection/monitoring/monitoring-client.tsx
+head -150 /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/data-collection/monitoring/monitoring-client.tsx
 ```
 
 - [ ] **Step 2：写 server query**
@@ -1445,12 +1445,12 @@ const tikhubCostQuery = await db.execute(sql`
 
 ### Task 5.3：writer.test.ts 集成测试加 tikhub case
 
-**File:** Modify `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts`
+**File:** Modify `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts`
 
 **Step 1：探查现有 writer.test.ts setup**
 
 ```bash
-head -120 /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts
+head -120 /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts
 ```
 
 记录现有命名 — writer 函数是 `writeItems(args: WriteArgs)`（不是 `writeCollectedItem`），WriteArgs 含 `runId / sourceId / organizationId / items: RawItem[] / source`，runId 通过 `makeRun(orgId, sourceId)` 创建。
@@ -1535,8 +1535,8 @@ describe("writer + tikhub adapter 集成", () => {
 ### Task 5.4：Inngest 月初累计重置 cron
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/collection/tikhub-budget-reset.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/collection/tikhub-budget-reset.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts`
 
 ```ts
 // tikhub-budget-reset.ts
@@ -1582,7 +1582,7 @@ await db.execute(sql`
 **注册到 inngest functions 数组**（精确步骤）：
 
 ```bash
-grep -n "outletBatchRecognize\|^export const functions\|^];" /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts
+grep -n "outletBatchRecognize\|^export const functions\|^];" /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts
 ```
 
 记录 `outletBatchRecognize` 的两处出现行号（import 区 + functions 数组）。在两处都加 `tikhubBudgetReset`：
@@ -1606,7 +1606,7 @@ export const functions = [
 ### Task 5.5：Phase 5 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add "src/app/(dashboard)/data-collection/sources/new/new-source-wizard-client.tsx" \
         "src/app/(dashboard)/data-collection/monitoring/" \
         "src/lib/collection/__tests__/writer.test.ts" \
@@ -1636,7 +1636,7 @@ EOF
 - [ ] **Step 1：跑 5 个 endpoint 实测**
 
 ```bash
-export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/dev/chinamcloud/vibetide/.env.local | cut -d= -f2-)
+export TIKHUB_API_KEY=$(grep "^TIKHUB_API_KEY=" /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local | cut -d= -f2-)
 # CALC_URL 用 Task 1.1 Step 5 探测的真实路径
 CALC_URL="https://api.tikhub.io/api/v1/tikhub/billing/calculate_price"  # 或正确路径
 
@@ -1665,7 +1665,7 @@ done
 - [ ] **Step 3：回归测试**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/adapters/tikhub/
 # 期望：全部 pass（pricing.json 改了不影响测试，因为测试 mock 了 fetch）
 ```
 
@@ -1683,7 +1683,7 @@ curl -sS -H "Authorization: Bearer $TIKHUB_API_KEY" \
 
 # diff 与 fixture
 diff <(python3 -c "import json; d=json.load(open('/tmp/douyin-real.json')); print(json.dumps(list(d.keys()), indent=2))") \
-     <(python3 -c "import json; d=json.load(open('/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json')); print(json.dumps(list(d.keys()), indent=2))")
+     <(python3 -c "import json; d=json.load(open('/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/adapters/tikhub/__fixtures__/douyin-search.json')); print(json.dumps(list(d.keys()), indent=2))")
 ```
 
 如响应顶层 keys 一致，fixture 仍准确。如不同（比如 API 改了响应格式），更新 fixture + 重跑测试。
@@ -1699,7 +1699,7 @@ diff <(python3 -c "import json; d=json.load(open('/tmp/douyin-real.json')); prin
 ### Task 6.3：tsc + lint + build + 最终 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 npx tsc --noEmit && \
 npm run lint 2>&1 | tail -5 && \
 npm run build 2>&1 | tail -10 && \
@@ -1709,7 +1709,7 @@ npx vitest run src/lib/collection/adapters/tikhub/ src/lib/collection/__tests__/
 期望：tsc 0 / lint pass / build pass / 测试 pass。
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/collection/adapters/tikhub/pricing.json src/lib/collection/adapters/tikhub/__fixtures__/ && \
 git commit --no-verify -m "$(cat <<'EOF'
 feat(a2): pricing.json 实测填充 + fixture 真实 API 校准 — A2 Wave 1 第二块完工

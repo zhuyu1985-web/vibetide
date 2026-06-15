@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="space">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026 融媒云事业部产品规划方案</title>
+<style>
+/* ============ 设计令牌：space 深空智核（升级版） ============ */
+:root{
+  --brand:#2347a6; --brand-2:#3b82f6; --brand-strong:#16265a; --brand-weak:#e9eefb; --brand-line:#d3def6;
+  --accent:#c2873a; --accent-2:#e0a85a; --accent-weak:#f7eeda;
+  --ink:#172036; --ink-soft:#46536f; --ink-faint:#8590a6;
+  --bg:#ffffff; --bg-soft:#f4f7fc; --bg-soft2:#eef3fb; --line:#e4e9f2; --line-soft:#eef2f8;
+  --card:#ffffff;
+  --sh1:0 1px 2px rgba(22,38,90,.05),0 2px 6px rgba(22,38,90,.05);
+  --sh2:0 6px 18px rgba(22,38,90,.09),0 14px 40px rgba(22,38,90,.08);
+  --sh3:0 18px 50px rgba(22,38,90,.16);
+  --radius:16px; --radius-sm:10px; --maxw:1100px;
+  --serif:"Songti SC","SimSun",serif;
+  --sans:"PingFang SC","HarmonyOS Sans SC","Source Han Sans SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.8;
+  font-size:16.5px;-webkit-font-smoothing:antialiased;letter-spacing:.01em}
+.container{max-width:var(--maxw);margin:0 auto;padding:0 32px}
+.section{padding:84px 0;position:relative}
+.section + .section{border-top:1px solid var(--line-soft)}
+h1,h2,h3,h4{line-height:1.3;letter-spacing:.005em;color:var(--ink);font-weight:700}
+h2{font-size:31px;margin-bottom:8px;letter-spacing:-.01em}
+h3{font-size:20px}
+h4{font-size:16.5px}
+p{max-width:74ch}
+a{color:var(--brand)}
+strong{color:var(--ink);font-weight:700}
+
+/* 眉标：编号药丸 */
+.kicker{display:inline-flex;align-items:center;gap:11px;font-size:12.5px;font-weight:700;
+  letter-spacing:.14em;color:var(--brand);margin-bottom:16px;text-transform:uppercase}
+.kicker::before{content:"";width:30px;height:3px;border-radius:3px;
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));display:inline-block}
+.kicker.accent{color:var(--accent)}
+.kicker.accent::before{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+
+/* ============ Hero ============ */
+.hero{position:relative;overflow:hidden;color:#d7e1f5;
+  background:linear-gradient(150deg,#0a1430 0%,#13245c 50%,#0a1126 100%)}
+.hero-bg{position:absolute;inset:0;pointer-events:none}
+.hero-bg::before{content:"";position:absolute;top:-25%;right:-8%;width:640px;height:640px;
+  background:radial-gradient(circle,rgba(91,140,255,.30),transparent 62%)}
+.hero-bg::after{content:"";position:absolute;bottom:-30%;left:-10%;width:560px;height:560px;
+  background:radial-gradient(circle,rgba(224,168,90,.20),transparent 62%)}
+.hero .grid-tex{position:absolute;inset:0;opacity:.5;
+  background-image:radial-gradient(rgba(255,255,255,.10) 1px,transparent 1.4px);
+  background-size:30px 30px;mask-image:linear-gradient(180deg,transparent,#000 30%,#000 70%,transparent)}
+.cover{position:relative;padding:104px 0 92px;z-index:2}
+.cover .kicker{color:#9bc0ff}.cover .kicker::before{background:linear-gradient(90deg,#9bc0ff,#e0a85a)}
+.cover h1{font-size:46px;line-height:1.24;margin:20px 0 22px;max-width:21ch;font-weight:800;color:#fff;letter-spacing:-.015em}
+.cover h1 .grad{background:linear-gradient(92deg,#ffffff 10%,#9fc1ff 55%,#e7c188 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#bcd4ff}
+.cover .subtitle{font-size:18.5px;color:#bccbe9;max-width:60ch;line-height:1.78}
+.hero-stats{display:flex;flex-wrap:wrap;gap:14px;margin:34px 0 6px}
+.hero-stats .stat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;padding:14px 22px;backdrop-filter:blur(6px);min-width:120px}
+.hero-stats .stat b{display:block;font-family:var(--serif);font-size:30px;font-weight:700;
+  color:#fff;line-height:1;letter-spacing:.01em}
+.hero-stats .stat b em{font-style:normal;color:#e0a85a;font-size:20px;margin-left:1px}
+.hero-stats .stat span{font-size:13px;color:#a9bbdd;margin-top:7px;display:block}
+.cover .meta{margin-top:30px;display:flex;flex-wrap:wrap;gap:9px 24px;font-size:13px;color:#8ea0c6}
+.cover .meta span{display:inline-flex;align-items:center;gap:7px}
+.cover .meta span::before{content:"";width:5px;height:5px;border-radius:50%;background:#e0a85a}
+.scroll-cue{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:2;
+  color:#7f93bf;font-size:20px;animation:bob 1.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
+
+/* 区块标题 */
+.section-head{margin-bottom:42px;max-width:80ch}
+.section-head .lead{font-size:18px;color:var(--ink-soft);margin-top:13px;line-height:1.78}
+
+/* 栅格 */
+.grid{display:grid;gap:22px}
+.cols-2{grid-template-columns:repeat(2,1fr)}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.cols-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:880px){.cols-2,.cols-3,.cols-4{grid-template-columns:1fr}}
+
+/* 卡片 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 24px;box-shadow:var(--sh1);transition:transform .28s cubic-bezier(.22,.61,.36,1),box-shadow .28s,border-color .28s;position:relative}
+.card:hover{transform:translateY(-5px);box-shadow:var(--sh2);border-color:var(--brand-line)}
+.card h3{margin-bottom:10px}.card h4{margin-bottom:8px}
+.card p{font-size:14.5px;color:var(--ink-soft);line-height:1.74}
+.card--accent{border-top:none}
+.card--accent::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;
+  border-radius:var(--radius) var(--radius) 0 0;background:linear-gradient(90deg,var(--brand),var(--accent))}
+.card--brand{background:linear-gradient(180deg,var(--brand-weak),#fff);border-color:var(--brand-line)}
+.card-num{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1;display:block;margin-bottom:13px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--accent)}
+.card .role{display:inline-block;font-size:12px;color:var(--accent);font-weight:700;letter-spacing:.05em;
+  margin-bottom:8px;padding:2px 0;border-bottom:2px solid var(--accent-weak)}
+
+/* KPI */
+.kpi .num{font-size:40px;font-weight:800;line-height:1;font-family:var(--serif);
+  background:linear-gradient(135deg,var(--brand-strong),var(--brand-2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--brand)}
+.kpi .num .unit{font-size:17px;font-weight:700;margin-left:3px;-webkit-text-fill-color:var(--accent);color:var(--accent)}
+.kpi .label{margin-top:11px;font-size:14px;color:var(--ink-soft)}
+.kpi .delta{font-size:12.5px;color:var(--accent);font-weight:700;margin-top:5px}
+
+/* 标签 */
+.tag{display:inline-block;font-size:12px;padding:4px 11px;border-radius:20px;
+  background:var(--brand-weak);color:var(--brand);font-weight:600;margin:4px 5px 0 0;border:1px solid var(--brand-line)}
+.tag--accent,.tag.tag--accent{background:var(--accent-weak);color:#9a661f;border-color:#ecd9b5}
+.tag--muted{background:var(--bg-soft);color:var(--ink-faint);border-color:var(--line)}
+
+/* 表格 */
+.table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;margin-top:6px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh1)}
+.table th{background:linear-gradient(180deg,var(--brand-weak),#e2e9f7);color:var(--brand-strong);font-weight:700;
+  text-align:left;padding:14px 16px;border-bottom:1px solid var(--brand-line);font-size:13.5px}
+.table td{padding:13px 16px;border-bottom:1px solid var(--line-soft);color:var(--ink-soft);vertical-align:top;line-height:1.65}
+.table tr:last-child td{border-bottom:none}
+.table .zebra tr:nth-child(even) td,.table.zebra tbody tr:nth-child(even){background:var(--bg-soft)}
+.table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.table td strong{color:var(--ink)}
+
+/* 时间轴 */
+.timeline{position:relative;margin-top:12px;padding-left:8px}
+.t-item{position:relative;padding:0 0 30px 32px;border-left:2px solid var(--line)}
+.t-item:last-child{border-left-color:transparent;padding-bottom:4px}
+.t-item::before{content:"";position:absolute;left:-8px;top:2px;width:14px;height:14px;border-radius:50%;
+  background:linear-gradient(135deg,var(--brand),var(--accent));border:3px solid var(--bg);box-shadow:0 0 0 3px var(--brand-weak)}
+.t-item .t-time{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.04em}
+.t-item h4{margin:6px 0 7px}
+.t-item p{font-size:14px;color:var(--ink-soft)}
+
+/* 强调框 */
+.callout{border-left:4px solid var(--brand);background:linear-gradient(180deg,var(--bg-soft),#fff);
+  border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  padding:20px 24px;margin:8px 0;box-shadow:var(--sh1)}
+.callout h4{margin-bottom:7px;color:var(--brand-strong)}
+.callout p{font-size:14.5px;color:var(--ink-soft)}
+.callout--accent{border-left-color:var(--accent);background:linear-gradient(180deg,var(--accent-weak),#fff)}
+.callout--accent h4{color:#8a5e22}
+
+/* 引言 */
+.quote{position:relative;padding:16px 0 6px 52px;margin:8px 0}
+.quote::before{content:"C";position:absolute;left:0;top:-10px;font-family:var(--serif);
+  font-size:72px;color:var(--accent);opacity:.45;line-height:1}
+.quote p{font-size:21px;line-height:1.7;color:var(--ink);font-weight:500;max-width:62ch}
+.quote cite{display:block;margin-top:12px;font-size:13.5px;color:var(--ink-faint);font-style:normal}
+
+/* 列表 */
+.list{list-style:none;margin:6px 0}
+.list li{position:relative;padding:5px 0 5px 24px;font-size:15px;color:var(--ink-soft);line-height:1.72}
+.list li::before{content:"";position:absolute;left:3px;top:13px;width:7px;height:7px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));transform:rotate(45deg);border-radius:1px}
+
+.divider{height:1px;background:var(--line);margin:32px 0;border:none}
+.divider--brand{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--brand),transparent);max-width:130px}
+
+/* ============ 深色出血带 ============ */
+.section--dark{background:linear-gradient(155deg,#0c1838 0%,#15265e 55%,#0b1430 100%);
+  color:#cdd7ee;position:relative;overflow:hidden;border:none}
+.section--dark + .section--dark{border-top:none}
+.section--dark::before{content:"";position:absolute;top:-35%;right:-8%;width:560px;height:560px;
+  background:radial-gradient(circle,rgba(127,176,255,.20),transparent 64%);pointer-events:none}
+.section--dark::after{content:"";position:absolute;bottom:-28%;left:-7%;width:460px;height:460px;
+  background:radial-gradient(circle,rgba(224,168,90,.15),transparent 64%);pointer-events:none}
+.section--dark>.container{position:relative;z-index:2}
+.section--dark h1,.section--dark h2,.section--dark h3,.section--dark h4{color:#f4f8ff}
+.section--dark p{color:#bdc9e7}
+.section--dark .kicker{color:#7fb0ff}.section--dark .kicker::before{background:linear-gradient(90deg,#7fb0ff,#e0a85a)}
+.section--dark .kicker.accent{color:#e6bd84}.section--dark .kicker.accent::before{background:linear-gradient(90deg,#e6bd84,#7fb0ff)}
+.section--dark .section-head .lead{color:#c5d1ef}
+.section--dark .card{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.13);box-shadow:none}
+.section--dark .card:hover{background:rgba(255,255,255,.09);border-color:rgba(127,176,255,.4);transform:translateY(-5px)}
+.section--dark .card h3,.section--dark .card h4{color:#f4f8ff}
+.section--dark .card p{color:#b7c4e3}
+.section--dark .card-num,.section--dark .kpi .num{-webkit-text-fill-color:#e6bd84;color:#e6bd84;background:none}
+.section--dark .kpi .num .unit{-webkit-text-fill-color:#7fb0ff;color:#7fb0ff}
+.section--dark .kpi .label{color:#bdc9e7}
+.section--dark .card .role{color:#7fb0ff;border-bottom-color:rgba(127,176,255,.3)}
+.section--dark .tag{background:rgba(127,176,255,.16);color:#bcd4ff;border-color:rgba(127,176,255,.25)}
+.section--dark .callout{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);border-left-color:#7fb0ff}
+.section--dark .callout h4{color:#cfe0ff}.section--dark .callout p{color:#b7c4e3}
+.section--dark .list li{color:#c5d1ef}.section--dark .list li::before{background:#e6bd84}
+.section--dark .divider{background:rgba(255,255,255,.14)}
+.section--dark .quote p{color:#eef3ff}.section--dark .quote cite{color:#9fb0d6}.section--dark .quote::before{color:#e6bd84}
+.section--dark .flow-step{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);color:#dfe8ff}
+.section--dark .flow-arrow{color:#7fb0ff}
+
+/* 流程链 */
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:16px 0}
+.flow-step{background:var(--brand-weak);border:1px solid var(--brand-line);border-radius:30px;
+  padding:8px 16px;font-size:13.5px;font-weight:600;color:var(--brand-strong)}
+.flow-arrow{color:var(--brand);font-weight:700}
+
+/* 架构层 */
+.arch-layer{border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:20px 24px;margin-bottom:14px;
+  background:linear-gradient(100deg,rgba(255,255,255,.085),rgba(255,255,255,.03));display:flex;gap:22px;align-items:flex-start;
+  transition:transform .25s,border-color .25s}
+.arch-layer:hover{transform:translateX(5px);border-color:rgba(127,176,255,.45)}
+.arch-layer .lv{font-family:var(--serif);font-size:14px;font-weight:700;color:#0b1430;letter-spacing:.06em;white-space:nowrap;
+  background:linear-gradient(135deg,#e6bd84,#d49a4e);padding:6px 12px;border-radius:8px;min-width:48px;text-align:center}
+.arch-layer h4{margin-bottom:6px}.arch-layer p{font-size:13.5px;margin:0}
+
+/* 规格卡 */
+.spec{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);box-shadow:var(--sh1);
+  margin-bottom:24px;overflow:hidden;transition:box-shadow .28s,transform .28s}
+.spec:hover{box-shadow:var(--sh2);transform:translateY(-3px)}
+.spec-head{padding:18px 24px;border-bottom:1px solid var(--line-soft);
+  background:linear-gradient(120deg,var(--brand-weak),#eef3fc 70%);display:flex;align-items:center;gap:15px;flex-wrap:wrap;position:relative}
+.spec-head::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--brand),var(--accent))}
+.spec-head .sn{font-family:var(--serif);font-size:24px;font-weight:700;line-height:1;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--accent)}
+.spec-head h3{margin:0;font-size:18.5px}
+.spec-head .kw{flex-basis:100%;margin-top:2px}.spec-head .kw .tag{margin-top:5px}
+.spec-body{padding:20px 24px}
+.spec-row{margin-bottom:15px}.spec-row:last-child{margin-bottom:0}
+.spec-label{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--brand);
+  background:var(--brand-weak);padding:3px 10px;border-radius:6px;margin-bottom:8px;border:1px solid var(--brand-line)}
+.spec-label.accent{color:#9a661f;background:var(--accent-weak);border-color:#ecd9b5}
+.spec-row p{font-size:14.5px;color:var(--ink-soft);max-width:none}
+.spec-row .list{margin:0}.spec-row .list li{padding:3px 0 3px 22px;font-size:14px}.spec-row .list li::before{top:11px}
+.spec-foot{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--line-soft);background:var(--bg-soft)}
+.spec-foot .ft{padding:14px 20px;border-right:1px solid var(--line-soft)}
+.spec-foot .ft:last-child{border-right:none}
+.spec-foot .ft b{display:block;font-size:11px;letter-spacing:.08em;margin-bottom:5px;font-weight:700}
+.spec-foot .ft.scene b{color:var(--brand)}.spec-foot .ft.pain b{color:#c0392b}.spec-foot .ft.sku b{color:#9a661f}
+.spec-foot .ft span{font-size:13.5px;color:var(--ink);line-height:1.55}
+@media(max-width:760px){.spec-foot{grid-template-columns:1fr}.spec-foot .ft{border-right:none;border-bottom:1px solid var(--line-soft)}}
+
+/* 阶段带 */
+.stage-band{display:flex;align-items:center;gap:11px;margin:34px 0 16px;font-size:16px;font-weight:700;color:var(--brand-strong)}
+.stage-band .s{font-family:var(--serif);background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;
+  width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 4px 12px rgba(35,71,166,.3)}
+.stage-band::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--brand-line),transparent)}
+
+/* 飞轮 */
+.flywheel{text-align:center;margin:8px 0 30px}
+.flywheel svg{width:100%;max-width:580px;height:auto}
+.flywheel .fw-cap{margin:6px auto 0;font-size:14px;color:#9fb0d6;max-width:64ch}
+
+/* 页脚 */
+.site-footer{background:#0b1430;color:#9fb0d6;padding:34px 0;font-size:13px}
+.site-footer .container{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+/* 动画 */
+[data-animate]{opacity:0;transform:translateY(18px);animation:rise .75s cubic-bezier(.22,.61,.36,1) forwards;animation-delay:calc(var(--i,0)*.08s)}
+@keyframes rise{to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){[data-animate],.scroll-cue{animation:none;opacity:1;transform:none}}
+
+@media print{
+  .section{padding:34px 0;break-inside:avoid}.card:hover,.spec:hover,.arch-layer:hover{transform:none}
+  .scroll-cue{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  [data-animate]{animation:none;opacity:1;transform:none}
+}
+@media(max-width:880px){
+  .cover h1{font-size:33px}h2{font-size:25px}body{font-size:15.5px}
+  .section{padding:56px 0}.cover{padding:72px 0 64px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 封面 ============ -->
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="grid-tex" aria-hidden="true"></div>
+  <div class="container cover">
+    <div class="kicker accent" data-animate>融媒云事业部 · 2026 产品规划</div>
+    <h1 data-animate style="--i:1">AI 原生 · 轻量化 · 面向互联网生产运营<br><span class="grad">媒体智能内容底座与数字员工产品规划</span></h1>
+    <p class="subtitle" data-animate style="--i:2">以媒体智能内容底座为内核，把 AI 能力封装成可独立售卖的轻量化智能单品与数字员工，帮助媒体机构与泛媒体企业，把策采编审发评里能自动化的环节交给产品、人只做拍板与终审。</p>
+    <div class="hero-stats" data-animate style="--i:3">
+      <div class="stat"><b>1</b><span>内容智能底座</span></div>
+      <div class="stat"><b>20<em>+</em></b><span>轻量化智能单品</span></div>
+      <div class="stat"><b>8</b><span>内置数字员工</span></div>
+      <div class="stat"><b>4</b><span>售卖形态</span></div>
+    </div>
+    <div class="meta" data-animate style="--i:4">
+      <span>编制：融媒云事业部</span>
+      <span>版本：V1.0（2026 全新规划版）</span>
+      <span>日期：2026-06</span>
+      <span>参考：媒体智能内容底座 / 企业数字营销底座</span>
+    </div>
+  </div>
+  <div class="scroll-cue" aria-hidden="true">▾</div>
+</header>
+
+<!-- ============ 01 战略总纲 ============ -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">01 · 战略总纲</div>
+      <h2>一条主线、三个转变、两个市场</h2>
+      <p class="lead">2026 年不再以"大平台整体交付"为唯一形态，而是把底座沉淀的 AI 能力，拆成<strong>可独立售卖、可快速落地、可订阅续费</strong>的智能单品与数字员工，既守住广电融媒主场，又向泛媒体（政企数字营销）拓展增量。</p>
+    </div>
+
+    <div class="quote" data-animate>
+      <p>把策采编审发评里能自动化的部分，交给智能单品和数字员工；人只在选题拍板和终审两处介入。</p>
+      <cite>—— 2026 融媒云产品价值主张</cite>
+    </div>
+
+    <h3 style="margin:34px 0 16px">三个转变</h3>
+    <div class="grid cols-3">
+      <div class="card card--accent" data-animate>
+        <span class="card-num">01</span>
+        <h4>从"大平台"到"单品 + 数字员工"</h4>
+        <p>把整体方案拆为 20+ 可独立售卖的轻量化智能单品和 8 个内置数字员工，降低客户决策门槛，缩短交付周期，沉淀订阅续费收入。</p>
+      </div>
+      <div class="card card--accent" data-animate style="--i:1">
+        <span class="card-num">02</span>
+        <h4>从"工具割裂"到"对话框统一入口"</h4>
+        <p>以 Media Cloud 对话框为 AI Native 统一入口，打通灵感、选题、写稿、素材、拆条、成片、审核、分发全链路，消除功能断点。</p>
+      </div>
+      <div class="card card--accent" data-animate style="--i:2">
+        <span class="card-num">03</span>
+        <h4>从"一次性交付"到"数据正向飞轮"</h4>
+        <p>策采编审发评全链路数据沉淀，回流到选题推荐、审核阈值等具体模型与动作，支持按传播效果计费（详见第 10 章）。</p>
+      </div>
+    </div>
+
+    <h3 style="margin:40px 0 16px">两个市场</h3>
+    <div class="grid cols-2">
+      <div class="card card--brand" data-animate>
+        <h4>媒体主场 — 广电 / 融媒</h4>
+        <p>存量维保运营（冀时、黄河云、稿池库等）转订阅；新媒体轻量化生产工具规模化；AIGC 工具平台（陕西广电、天府融媒、北京台稿件库）成为增长极。</p>
+        <div style="margin-top:10px"><span class="tag">基本盘续费</span><span class="tag">短视频闭环</span><span class="tag">AIGC 工具平台</span></div>
+      </div>
+      <div class="card card--brand" data-animate style="--i:1">
+        <h4>泛媒体拓展 — 政企数字营销</h4>
+        <p>把媒体内容能力镜像到企业数字营销底座，服务品牌市场部、政府宣传、连锁与出海企业，赋能品宣、宣发、引流、交易，为企业创收。</p>
+        <div style="margin-top:10px"><span class="tag--accent tag">极兔 / 双胞胎标杆</span><span class="tag--accent tag">企业数字营销底座</span></div>
+      </div>
+    </div>
+
+    <h3 style="margin:40px 0 16px">2026 规划目标值（建议）</h3>
+    <div class="grid cols-4">
+      <div class="card kpi" data-animate><div class="num">20<span class="unit">+</span></div><div class="label">轻量化智能单品 SKU</div><div class="delta">可独立售卖</div></div>
+      <div class="card kpi" data-animate style="--i:1"><div class="num">8<span class="unit">个</span></div><div class="label">内置场景数字员工</div><div class="delta">+ 三条定制维度</div></div>
+      <div class="card kpi" data-animate style="--i:2"><div class="num">60<span class="unit">%↑</span></div><div class="label">短视频生产链路提效</div><div class="delta">闭环替代手工</div></div>
+      <div class="card kpi" data-animate style="--i:3"><div class="num">20<span class="unit">%</span></div><div class="label">泛媒体（政企）新签占比</div><div class="delta">拓展增量目标</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 需求洞察 ============ -->
+<section class="section" style="background:var(--bg-soft)">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">02 · 市场与需求洞察</div>
+      <h2>来自一线的三大真实痛点 + 商机三盘结构</h2>
+      <p class="lead">规划不来自想象。以下痛点直接来自河北台、石家庄台、黑龙江台等客户的高频反馈，商机结构来自 2026 各大区 W/A 级商机（共 93 条，媒体机构 74 条）。</p>
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card" data-animate>
+        <span class="card-num">痛点 1</span>
+        <h4>工具割裂、短视频链路不闭环</h4>
+        <p>灵感池、智能稿件、智能搬运、数字分身、依案成片、智能快编各自独立，资源与流程无法互通，操作繁琐、学习成本高、整体效率低。</p>
+        <p style="margin-top:8px;color:var(--ink-faint);font-size:13px">来源：石家庄台、黑龙江台</p>
+      </div>
+      <div class="card" data-animate style="--i:1">
+        <span class="card-num">痛点 2</span>
+        <h4>事实核查 / 内容合规是高频刚需</h4>
+        <p>日均审核 300–500 篇，现用第三方秒塔，单篇核算成本 0.3–0.5 元。客户希望对接同类合规校验接口、嵌入灵感池页面，提升平台日活。</p>
+        <p style="margin-top:8px;color:var(--ink-faint);font-size:13px">来源：河北广播电视台</p>
+      </div>
+      <div class="card" data-animate style="--i:2">
+        <span class="card-num">痛点 3</span>
+        <h4>盯源被动、需自动化与热点预判</h4>
+        <p>编辑被动追热点、人工盯源耗时。客户明确提出两款数字员工：数据采集师（自动抓取实时推送）、热点分析师（预判潜在热点，从被动追到提前判）。</p>
+        <p style="margin-top:8px;color:var(--ink-faint);font-size:13px">来源：河北广播电视台</p>
+      </div>
+    </div>
+
+    <div class="callout callout--accent" data-animate style="margin-top:26px">
+      <h4>客户已经把"理想产品"描述清楚了</h4>
+      <p>石家庄台一站式诉求：实时抓取全网舆情热点素材 → 关键词 / URL 一键采集入库 → 自动去台标去角标去水印 → AI 智能拆条生成片段 → 统一界面完成"热点选题·素材抓取·智能拆条·模板匹配·数字人播报·智能包装·精细剪辑"全流程，并支持标准化模板批量出片。这正是 2026 轻量化智能单品 + 数字员工要交付的核心闭环。</p>
+    </div>
+
+    <h3 style="margin:38px 0 16px">补充痛点清单（黑龙江台 / 多台共性）</h3>
+    <ul class="list">
+      <li><strong>文稿层：</strong>现有模型偏传统图文文风，缺抖音 / 快手 / B站短视频专属口语化文案模板，需自动纠正语句与偏差信息。</li>
+      <li><strong>素材层：</strong>需全网空镜头素材检索，入库自动去水印、去标签、视频超分预处理。</li>
+      <li><strong>合规层：</strong>需视频内容事实核查、合规校验（可接入第三方接口）。</li>
+      <li><strong>封面层：</strong>需智能封面排版与模板推荐，替代人工反复调字号、行数、安全框。</li>
+      <li><strong>拆条层：</strong>系统自主根据原视频生成拆条大纲与创意建议，无需人工先出文稿再训练拆解。</li>
+      <li><strong>入口：</strong>产品向 Media Cloud 对话框入口 + 数字员工深度集成方向升级，优先跑通短视频全业务闭环。</li>
+    </ul>
+
+    <h3 style="margin:42px 0 16px">商机三盘结构（W/A 级，重点关注）</h3>
+    <table class="table zebra">
+      <thead><tr><th style="width:16%">业务盘</th><th style="width:30%">代表商机</th><th>策略含义</th></tr></thead>
+      <tbody>
+        <tr><td><strong>基本盘<br>存量维保 / 云服务</strong></td><td>冀时年服务（400万）、黄河云驻场、宁夏稿池二期（260万）、福建扩容、顺义云服务等（W/A 共 41 条）</td><td>稳住基本盘，把驻场维保 / 资源续费升级为 <strong>SaaS 订阅 + 增值单品</strong>，提高续费率与客单价。</td></tr>
+        <tr><td><strong>增长盘<br>AIGC 工具 / 连接器</strong></td><td>陕西广电 AIGC 工具平台（250万）、天府融媒工具集一期（400万）、北京台稿件库三期（260万）、爱上电视智能编播（300万）、人民日报全媒大脑</td><td>新媒体轻量化工具是核心增长极，把工具连接器 + 智能单品组合成 <strong>AIGC 工具平台</strong>规模复制。</td></tr>
+        <tr><td><strong>拓展盘<br>政企数字营销</strong></td><td>极兔快递媒资库（32万）、双胞胎集团、滴普大模型 / 算力、华北油田 V视、中国电信军号、网信办秒发系统</td><td>泛媒体新增量，用 <strong>企业数字营销底座</strong>把内容能力外溢到政企品宣 / 宣发 / 引流场景。</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 03 现状盘点与整合战略 ============ -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">03 · 现状盘点与整合战略</div>
+      <h2>三类散点资产，如何收敛成一个体系</h2>
+      <p class="lead">2026 的真问题不是"再造新产品"，而是把已有的三类形态各异的资产——早期重平台、新数字员工、新单点工具——收敛成一套可分可合的体系，既消除客户抱怨的"工具割裂"，又能按客户分层灵活售卖。</p>
+    </div>
+
+    <h3 style="margin:6px 0 16px">现状：我们手里有什么</h3>
+    <div class="grid cols-3">
+      <div class="card" data-animate>
+        <div class="role">资产 A · 早期重系统</div>
+        <h4>数智全媒平台</h4>
+        <p>覆盖策采编审发评全链路：选题策划 / 新闻舆情 / 灵感池 / 稿件管理 / 智能媒资 / 生产工具 / 发布运营 / APP·网站终端 / 数据传播分析 / 绩效管理。</p>
+        <p style="margin-top:8px;color:var(--ink-faint);font-size:13px">形态：整装、紧耦合、to-G 大平台 · 链路完整但偏重</p>
+      </div>
+      <div class="card" data-animate style="--i:1">
+        <div class="role">资产 B · 新智能体</div>
+        <h4>数字员工</h4>
+        <p>以智能体（Agent）形态独立开发的新产品，把能力组织成"会干活的角色"，可按岗位订阅、对话式调用。</p>
+        <p style="margin-top:8px;color:var(--ink-faint);font-size:13px">形态：轻、AI 原生、可独立落地</p>
+      </div>
+      <div class="card" data-animate style="--i:2">
+        <div class="role">资产 C · 新单点工具</div>
+        <h4>视频画布工具 · 视频生成工具</h4>
+        <p>单独新开发的创作类工具：画布式多 Agent 编排非编、AIGC 视频生成，是短视频量产的核心引擎。</p>
+        <p style="margin-top:8px;color:var(--ink-faint);font-size:13px">形态：轻、单点、当前游离于平台之外</p>
+      </div>
+    </div>
+
+    <div class="callout callout--accent" data-animate style="margin-top:24px">
+      <h4>整合不到位会怎样？</h4>
+      <p>三类资产如果各走各的，正好复现客户最痛的那句话——"灵感池、智能稿件、智能搬运、数字分身、依案成片、智能快编相互独立，资源与流程无法互通"。重平台卖不动小客户，新工具又难单独支撑大单，数字员工拿不到平台的资产与上下文就成了"空壳"。所以整合的本质，是让三者共享同一套数据、能力与入口。</p>
+    </div>
+
+    <h3 style="margin:38px 0 16px">整合战略：一个底座 · 一个入口 · 三种售卖形态</h3>
+    <p style="margin-bottom:18px">不是把平台推倒重做，而是把它<strong>解耦下沉</strong>——重的部分沉为底座与能力中台，轻的部分（单品、数字员工、新工具）浮到上层，用统一入口把它们重新串成闭环。一句话：<strong>平台变底座，模块变能力，能力变单品，单品组成数字员工，对话框统一入口。</strong></p>
+
+    <div class="grid cols-2">
+      <div class="card card--brand" data-animate>
+        <h4>黏合剂一 · 内容智能底座（数据 / 知识 / 模型唯一真源）</h4>
+        <p>把"智能媒资"升级为全平台唯一的资产·知识·模型底座，所有模块、新工具、数字员工都从这里取数取知识——这是消除"资源流程不互通"的根本。</p>
+      </div>
+      <div class="card card--brand" data-animate style="--i:1">
+        <h4>黏合剂二 · Media Cloud 对话框 + 数字员工编排层</h4>
+        <p>一个 AI Native 入口，把散落的工具用"对话 + 数字员工"重新编排成场景闭环；新工具（画布 / 生成）作为可被调用的创作能力（skill）接入，而非又一个孤岛。</p>
+      </div>
+    </div>
+
+    <h3 style="margin:40px 0 16px">整合五步路径（怎么落地）</h3>
+    <div class="timeline">
+      <div class="t-item" data-animate>
+        <div class="t-time">第 1 步 · 数据知识统一</div>
+        <h4>智能媒资 → 内容智能底座</h4>
+        <p>资产、标签、知识图谱、模型收敛为唯一真源，平台各模块与新工具/数字员工共用，不再各建一套。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:1">
+        <div class="t-time">第 2 步 · 能力服务化</div>
+        <h4>策采编审发评模块 → 原子能力 API</h4>
+        <p>把选题、舆情、稿件、审核、发布等模块能力 API 化、原子化，对外提供统一能力，避免新工具与数字员工重复造轮子。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:2">
+        <div class="t-time">第 3 步 · 工具能力化</div>
+        <h4>视频画布 / 视频生成 → 创作类 skill</h4>
+        <p>新单点工具封装为可被对话框与"节目创作师"数字员工调用的创作能力，既能单卖、又能被编排进闭环。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:3">
+        <div class="t-time">第 4 步 · 编排成角色</div>
+        <h4>能力 + skill → 数字员工 · 对话框入口</h4>
+        <p>用数字员工把底层能力与单品编排成"会干活的角色"，统一在 Media Cloud 对话框与 APP/网站终端中触发。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:4">
+        <div class="t-time">第 5 步 · 数据回流</div>
+        <h4>使用数据 → 沉淀回底座（飞轮）</h4>
+        <p>策采编审发评全链路使用数据回流底座，落到选题推荐、审核阈值、拆条优选等具体模型与动作（详见第 10 章）。</p>
+      </div>
+    </div>
+
+    <h3 style="margin:40px 0 16px">老平台模块"各归其层"映射</h3>
+    <table class="table zebra">
+      <thead><tr><th style="width:34%">数智全媒平台原模块</th><th style="width:22%">归位到哪一层</th><th>整合后形态</th></tr></thead>
+      <tbody>
+        <tr><td>智能媒资</td><td>L1 内容智能底座</td><td>下沉为数据/知识/模型唯一真源</td></tr>
+        <tr><td>选题策划 / 新闻舆情 / 灵感池 / 稿件管理 / 生产工具 / 发布运营</td><td>L2 能力中台 + 智能单品</td><td>能力 API 化，并拆出可独立售卖的轻单品</td></tr>
+        <tr><td>视频画布 / 视频生成（新工具）</td><td>L2 创作类单品 / skill</td><td>单卖 + 被数字员工与对话框调用</td></tr>
+        <tr><td>（新）数字员工</td><td>L3 智能体编排层</td><td>按岗位订阅的角色，串联策采编审发评</td></tr>
+        <tr><td>APP / 网站终端建设</td><td>入口层 + 大端大号传播矩阵</td><td>对话框入口 + 运营型 APP</td></tr>
+        <tr><td>数据传播分析 / 绩效管理</td><td>数据飞轮 / 评价层</td><td>效果评价 + 老板报表 + 模型反哺</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 04 总架构（深色带） ============ -->
+<section class="section section--dark">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker accent">04 · 产品总架构与整合路径</div>
+      <h2>整合后的目标形态：一个内核、两条应用线、一台飞轮</h2>
+      <p class="lead">底座沉淀资产与知识，应用线把能力拆成"智能单品 + 数字员工"对外售卖，企业数字营销底座把同一套能力镜像到政企，数据飞轮把使用数据回流到具体模型与动作。</p>
+    </div>
+
+    <div class="arch-figure" data-animate style="margin:12px 0 44px;width:min(96vw,1680px);position:relative;left:50%;transform:translateX(-50%)"><svg viewBox="0 0 1360 850" style="width:100%;height:auto;display:block" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" role="img" aria-label="2026融媒云产品总架构图"><defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#7fb0ff"/></marker></defs><rect x="36" y="28" width="960" height="66" rx="18" fill="rgba(127,176,255,.10)" stroke="rgba(127,176,255,.55)" stroke-width="1.8"/><text x="516" y="63" font-size="18.5" fill="#f4f8ff" text-anchor="middle" font-weight="700">Media Cloud 对话框 · AI Native 统一入口</text><text x="516" y="84" font-size="13" fill="#c5d1ef" text-anchor="middle" font-weight="400">一句话驱动多智能体协同 · 消除多系统切换与功能断点</text><path d="M259 100 L269 111 L279 100" fill="none" stroke="#7fb0ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M753 100 L763 111 L773 100" fill="none" stroke="#7fb0ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><rect x="36" y="128" width="466" height="304" rx="18" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.18)" stroke-width="1.6"/><text x="60" y="168" font-size="18" fill="#f4f8ff" text-anchor="start" font-weight="700">L2 · 轻量化智能单品</text><rect x="408.0" y="146" width="76.0" height="28" rx="14" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.55)" stroke-width="1"/><text x="446.0" y="165" font-size="13" fill="#e6bd84" text-anchor="middle" font-weight="700">按零件卖</text><text x="60" y="194" font-size="13" fill="#c5d1ef" text-anchor="start" font-weight="400">互联网生产运营场景 · 可独立售卖 · API 嵌入</text><rect x="53.0" y="215.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="122" y="236.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">灵感池</text><rect x="200.0" y="215.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="269" y="236.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">热点二创</text><rect x="347.0" y="215.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="416" y="236.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">智能拆条</text><rect x="53.0" y="255.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="122" y="276.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">一键成片</text><rect x="200.0" y="255.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="269" y="276.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">短视频稿件</text><rect x="347.0" y="255.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="416" y="276.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">数字人播报</text><rect x="53.0" y="295.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="122" y="316.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">竞品雷达</text><rect x="200.0" y="295.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="269" y="316.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">画布非编</text><rect x="347.0" y="295.0" width="138" height="34" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="416" y="316.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">节赛会展自动化</text><rect x="52" y="346" width="434" height="70" rx="11" fill="rgba(8,16,40,.55)" stroke="rgba(127,176,255,.42)" stroke-width="1.3" stroke-dasharray="5 3"/><text x="66" y="372" font-size="13" fill="#9bc0ff" text-anchor="start" font-weight="700">▽ 数智全媒产品平台 · 现有系统支撑（底座）</text><rect x="59.0" y="386.0" width="78" height="24" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="98" y="402.14" font-size="11.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">框架</text><rect x="145.0" y="386.0" width="78" height="24" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="184" y="402.14" font-size="11.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">CMS</text><rect x="230.0" y="386.0" width="78" height="24" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="269" y="402.14" font-size="11.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">老媒资</text><rect x="315.0" y="386.0" width="78" height="24" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="354" y="402.14" font-size="11.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">APP工厂</text><rect x="401.0" y="386.0" width="78" height="24" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="440" y="402.14" font-size="11.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">发布运营</text><rect x="530" y="128" width="466" height="304" rx="18" fill="rgba(230,189,132,.10)" stroke="rgba(230,189,132,.55)" stroke-width="1.7"/><text x="554" y="168" font-size="18" fill="#f4f8ff" text-anchor="start" font-weight="700">L3 · 数字员工智能体</text><rect x="904.0" y="146" width="76.0" height="28" rx="14" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.55)" stroke-width="1"/><text x="942.0" y="165" font-size="13" fill="#e6bd84" text-anchor="middle" font-weight="700">按岗位卖</text><text x="554" y="194" font-size="13" fill="#c5d1ef" text-anchor="start" font-weight="400">以场景为单位封装 · 多 Agent 协同自动产线</text><rect x="548.0" y="215.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="653" y="236.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">热点搬运员</text><rect x="768.0" y="215.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="873" y="236.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">新闻拆条员</text><rect x="548.0" y="255.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="653" y="276.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">大屏转小屏短视频员</text><rect x="768.0" y="255.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="873" y="276.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">综合合规审核员</text><rect x="548.0" y="295.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="653" y="316.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">选题哨兵</text><rect x="768.0" y="295.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="873" y="316.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">数字人播报员</text><rect x="548.0" y="335.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="653" y="356.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">一稿多发适配员</text><rect x="768.0" y="335.0" width="210" height="34" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="873" y="356.86" font-size="13.5" fill="#dbe7ff" text-anchor="middle" font-weight="400">海外传播员</text><rect x="548" y="388" width="430" height="30" rx="10" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.55)" stroke-width="1"/><text x="763" y="408" font-size="13" fill="#e6bd84" text-anchor="middle" font-weight="700">▸ 数字员工执行平台（编排引擎）+ 大端大号传播矩阵</text><path d="M259 440 L269 451 L279 440" fill="none" stroke="#7fb0ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M753 440 L763 451 L773 440" fill="none" stroke="#7fb0ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><rect x="36" y="468" width="960" height="140" rx="18" fill="rgba(127,176,255,.10)" stroke="rgba(127,176,255,.55)" stroke-width="1.8"/><text x="60" y="510" font-size="18.5" fill="#f4f8ff" text-anchor="start" font-weight="700">L1 · 媒体智能内容底座（内核）</text><rect x="839.0" y="486" width="141.0" height="28" rx="14" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.55)" stroke-width="1"/><text x="909.5" y="505" font-size="13" fill="#e6bd84" text-anchor="middle" font-weight="700">按能力卖 · 真源</text><rect x="53.0" y="542.0" width="162" height="44" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="134" y="569.04" font-size="14" fill="#dbe7ff" text-anchor="middle" font-weight="400">多模态汇聚</text><path d="M218 564 L240 564" stroke="#7fb0ff" stroke-width="2.2" marker-end="url(#ah)"/><rect x="244.0" y="542.0" width="162" height="44" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="325" y="569.04" font-size="14" fill="#dbe7ff" text-anchor="middle" font-weight="400">智能处理</text><path d="M409 564 L431 564" stroke="#7fb0ff" stroke-width="2.2" marker-end="url(#ah)"/><rect x="435.0" y="542.0" width="162" height="44" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="516" y="569.04" font-size="14" fill="#dbe7ff" text-anchor="middle" font-weight="400">多视角标注</text><path d="M600 564 L622 564" stroke="#7fb0ff" stroke-width="2.2" marker-end="url(#ah)"/><rect x="626.0" y="542.0" width="162" height="44" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="707" y="569.04" font-size="14" fill="#dbe7ff" text-anchor="middle" font-weight="400">媒体资产知识工程</text><path d="M791 564 L813 564" stroke="#7fb0ff" stroke-width="2.2" marker-end="url(#ah)"/><rect x="817.0" y="542.0" width="162" height="44" rx="8" fill="rgba(127,176,255,.16)" stroke="rgba(127,176,255,.34)" stroke-width="1"/><text x="898" y="569.04" font-size="14" fill="#dbe7ff" text-anchor="middle" font-weight="400">资产价值化输出</text><path d="M516 608 L516 630" stroke="#7fb0ff" stroke-width="2.2" marker-end="url(#ah)"/><text x="530" y="626" font-size="12" fill="#c5d1ef" text-anchor="start" font-weight="400">模型支撑</text><rect x="36" y="632" width="960" height="82" rx="18" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.18)" stroke-width="1.6"/><text x="60" y="672" font-size="18" fill="#f4f8ff" text-anchor="start" font-weight="700">L0 · 传媒大模型 · 智能基座</text><text x="60" y="698" font-size="13.5" fill="#c5d1ef" text-anchor="start" font-weight="400">FASM 融合大模型 · 风格模型 · 专家模型 · 多租户 · 智能体引擎 · 人机协同</text><rect x="36" y="738" width="960" height="80" rx="18" fill="rgba(230,189,132,.10)" stroke="rgba(230,189,132,.55)" stroke-width="1.6"/><path d="M94 780 m -19 0 a19 19 0 1 1 6 14" fill="none" stroke="#e6bd84" stroke-width="2.7" stroke-linecap="round"/><path d="M80 791 l0 11 l11 -1" fill="none" stroke="#e6bd84" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><text x="146" y="775" font-size="16.5" fill="#f4f8ff" text-anchor="start" font-weight="700">贯穿 · 数据驱动正向飞轮</text><text x="146" y="799" font-size="13" fill="#f4f8ff" text-anchor="start" font-weight="400">策采编审发评全链路数据 → 选题自驱 · 审核自决策 · 模型自进化　|　标杆：北京台热点选题宣发闭环 · 优质内容海外二创闭环</text><rect x="1024" y="128" width="300" height="690" rx="18" fill="rgba(230,189,132,.10)" stroke="rgba(230,189,132,.55)" stroke-width="1.7"/><text x="1174" y="170" font-size="16.5" fill="#f4f8ff" text-anchor="middle" font-weight="700">横切 · 企业数字营销底座</text><text x="1174" y="194" font-size="12.5" fill="#c5d1ef" text-anchor="middle" font-weight="400">第二曲线 · 镜像 L0–L3 到政企</text><rect x="1044.0" y="229.0" width="260" height="46" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="1174" y="256.68" font-size="13" fill="#dbe7ff" text-anchor="middle" font-weight="400">内容采集（创意 / 执法记录仪）</text><rect x="1044.0" y="333.0" width="260" height="46" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="1174" y="360.68" font-size="13" fill="#dbe7ff" text-anchor="middle" font-weight="400">品牌调性处理</text><rect x="1044.0" y="437.0" width="260" height="46" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="1174" y="464.68" font-size="13" fill="#dbe7ff" text-anchor="middle" font-weight="400">企微钉飞协作</text><rect x="1044.0" y="541.0" width="260" height="46" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="1174" y="568.68" font-size="13" fill="#dbe7ff" text-anchor="middle" font-weight="400">多平台分发</text><rect x="1044.0" y="645.0" width="260" height="46" rx="8" fill="rgba(230,189,132,.15)" stroke="rgba(230,189,132,.34)" stroke-width="1"/><text x="1174" y="672.68" font-size="13" fill="#dbe7ff" text-anchor="middle" font-weight="400">数字营销百宝箱</text><text x="1174" y="790" font-size="13.5" fill="#e6bd84" text-anchor="middle" font-weight="700">向泛媒体市场拓展</text><path d="M1016 468 L1022 468 L1022 714 L1016 714" fill="none" stroke="rgba(230,189,132,.55)" stroke-width="1.5"/></svg><div style="text-align:center;font-size:14px;color:#9fb0d6;margin-top:16px">图 4-1 · 2026 融媒云产品总架构：一个内核（L0–L1 底座）· 两条应用线（L2 单品 / L3 数字员工）· 一个统一入口 · 一台数据飞轮 · 一条第二曲线</div></div>
+
+
+    <div class="arch-layer" data-animate>
+      <div class="lv">入口</div>
+      <div><h4>Media Cloud 对话框 · AI Native 统一入口</h4><p>一句话驱动多智能体协同，消除多系统切换与功能断点，是所有单品与数字员工的统一交互层。</p></div>
+    </div>
+    <div class="arch-layer" data-animate style="--i:1">
+      <div class="lv">L3</div>
+      <div><h4>数字员工智能体应用 + 大端大号传播矩阵</h4><p>以场景为单位封装的数字员工，多 Agent 协同自动产线；传播矩阵把内容铺到微信 / 微博 / 抖音等互联网渠道与自有大端大号。</p></div>
+    </div>
+    <div class="arch-layer" data-animate style="--i:2">
+      <div class="lv">L2</div>
+      <div><h4>轻量化智能单品（互联网生产运营场景）</h4><p>灵感池、热点二创、智能拆条、一键成片、短视频稿件、数字人播报、竞品雷达、画布非编、节赛会展自动化——以「数智全媒产品平台」（框架 / CMS / 老媒资 / APP 工厂 / 发布运营）为现有系统底座，封装成可独立售卖的工具集。</p></div>
+    </div>
+    <div class="arch-layer" data-animate style="--i:3">
+      <div class="lv">L1</div>
+      <div><h4>媒体智能内容底座（内核）</h4><p>多模态汇聚 → 智能处理 → 多视角标注 → 媒体资产知识工程 → 资产价值化输出，让沉睡资产变成可理解、可调用的智能资产。</p></div>
+    </div>
+    <div class="arch-layer" data-animate style="--i:4">
+      <div class="lv">L0</div>
+      <div><h4>传媒大模型 · 智能基座</h4><p>FASM 融合大模型 + 风格模型 + 专家模型 + 多租户 + 智能体引擎 + 人机协同，为生产提供贴合本机构风格、听得懂媒体语义的模型支撑。</p></div>
+    </div>
+
+    <div class="divider" style="margin:28px 0"></div>
+    <div class="grid cols-2">
+      <div class="callout" data-animate><h4>横切 · 企业数字营销底座</h4><p>把 L1–L3 能力镜像到政企：内容采集（含创意工具 / 执法记录仪对接）、品牌调性处理、企微钉飞协作、多平台分发、数字营销百宝箱，向泛媒体市场拓展。</p></div>
+      <div class="callout" data-animate style="--i:1"><h4>贯穿 · 数据驱动正向飞轮</h4><p>策采编审发评全链路数据沉淀 → 选题推荐自驱动、审核阈值自决策 → 模型自进化。标杆：北京台热点选题宣发闭环、优质内容海外二创闭环。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 媒体智能内容底座 ============ -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">05 · 媒体智能内容底座（内核）</div>
+      <h2>把分散资产做成可检索、可调用的内容真源</h2>
+      <p class="lead">正如 AI 基座为应用提供模型与数据支撑，内容底座为媒体智能化提供"资产 → 知识"支撑。它是所有智能单品与数字员工的数据与知识根基。<br>代表案例：北京台统一内容库、河北台统一内容库、湖北长江云、宁夏黄河云、福建海峡云。</p>
+    </div>
+
+    <p style="margin-bottom:22px"><strong>底座怎么规划：</strong>按"汇聚 → 处理 → 标注 → 知识 → 价值 → 模型"六层递进，让资源从"能存"逐步升级为"可理解、可调用、可变现"，并向上为所有智能单品与数字员工提供统一的数据、知识与模型支撑。下表每个模块均给出能力定位、案例亮点与对应的场景·痛点·单品。</p>
+
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">①</span><h3>多模态汇聚（多类型数据文件管理）</h3>
+        <div class="kw"><span class="tag">流矩阵汇聚</span><span class="tag">多品牌多协议兼容</span><span class="tag">统一内容库</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">定位</span><p>底座的"资源入口"。视频 / 图片 / 音频 / 文档统一上传存储，多品牌多协议兼容。</p></div>
+        <div class="spec-row"><span class="spec-label">阐述</span><p>很多台多年积累的录播、文稿散落在不同平台、格式各异、难以查找，成了"沉睡资产"。统一接入各类内容流，解决多品牌多协议兼容问题，把离散资源汇成单一内容库真源。</p></div>
+        <div class="spec-row"><span class="spec-label accent">案例成果 / 业务亮点</span>
+          <ul class="list"><li>电视台统一内容库：北京电视台统一内容库、河北电视台统一内容库</li><li>省级融媒平台：湖北长江云、宁夏黄河云、福建海峡云</li></ul></div>
+        <div class="spec-row"><span class="spec-label">举例</span><p>某台原本素材分散在录播、采编、网盘多套系统，汇聚入库后形成全台唯一内容真源，后续标注、检索、生产都基于它。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>新建 / 整合统一内容库</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>资源散落、格式各异、难检索</span></div>
+        <div class="ft sku"><b>对应单品</b><span>智能媒资 · 内容汇聚</span></div>
+      </div>
+    </div>
+
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">②</span><h3>多模态内容处理</h3>
+        <div class="kw"><span class="tag">解析</span><span class="tag">转码</span><span class="tag">清洗去重去劣</span><span class="tag">画质提质</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">定位</span><p>资源的"预处理车间"。入库即完成解析、格式转化、清洗与提质。</p></div>
+        <div class="spec-row"><span class="spec-label">阐述</span><p>对多模态内容解析、格式转化、清洗（去重去劣）、画质提质，让资源从"能存"升级为"能用"，从"文件名可见"升级为"内容可理解"。</p></div>
+        <div class="spec-row"><span class="spec-label accent">案例成果 / 业务亮点</span>
+          <ul class="list"><li>视音频转码、媒体处理调度模块、媒体处理监控模块</li><li>视频超分提质，老素材重新可用于新媒体二创</li></ul></div>
+        <div class="spec-row"><span class="spec-label">举例</span><p>历史标清素材经自动超分提质后达到新媒体可用画质，沉睡老素材重新进入生产链路。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>素材入库 / 老素材活化</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>格式杂、画质差、不可直接用</span></div>
+        <div class="ft sku"><b>对应单品</b><span>转码提质 / 媒体处理调度</span></div>
+      </div>
+    </div>
+
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">③</span><h3>多视角媒体资产标注</h3>
+        <div class="kw"><span class="tag">AI 多维理解</span><span class="tag">人机协同标注</span><span class="tag">人脸·OCR·ASR·场景·物体</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">定位</span><p>让内容"可理解"的标注中枢。</p></div>
+        <div class="spec-row"><span class="spec-label">阐述</span><p>由理解内容的智能体先通过 ASR、图像识别、语言模型把视频完整文本化、情景化；专业标注智能体再按不同行业、不同栏目的上百个维度自动精细标注，并自动关联相关内容。</p></div>
+        <div class="spec-row"><span class="spec-label accent">案例成果 / 业务亮点</span>
+          <ul class="list"><li>提供人脸识别、OCR 文字识别、ASR 语音识别、场景分析、物体检测等自动处理</li><li>"理解内容 → 专业标注"双智能体协同，机器"看懂"视频的内容、结构与价值</li></ul></div>
+        <div class="spec-row"><span class="spec-label">举例</span><p>一段新闻视频入库后自动生成结构化文本与上百维标签，编辑无需逐帧看片即可定位所需片段。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>内容理解 / 检索准备</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>标注靠人工、效率低、维度浅</span></div>
+        <div class="ft sku"><b>对应单品</b><span>智能标签服务</span></div>
+      </div>
+    </div>
+
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">④</span><h3>媒体资产知识工程</h3>
+        <div class="kw"><span class="tag">资产→知识</span><span class="tag">知识图谱</span><span class="tag">精确到秒挂载</span><span class="tag">支撑栏目智能体</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">定位</span><p>全台级的"知识全景图"，是智能体的上下文来源。</p></div>
+        <div class="spec-row"><span class="spec-label">阐述</span><p>资产 → 知识 AI 自动梳理，将几十万、上百万条内容拆解定义，把视频片段精确到秒挂载到知识节点，形成动态更新、覆盖垂类行业的知识图谱与全领域台内资源图谱，支撑 AIGC 意图理解与栏目智能体。</p></div>
+        <div class="spec-row"><span class="spec-label accent">案例成果 / 业务亮点</span>
+          <ul class="list"><li>频道 / 栏目定制 Agent：经济财经、民生都市、三农、军事、教育少儿等各有专属知识库</li><li>针对中超、苏超等热门事件，自动创建适配脚本、关联素材库相关素材、智能问答</li></ul></div>
+        <div class="spec-row"><span class="spec-label">举例</span><p>少儿频道的 Agent 内置"教育性"内容基因，产出内容不再"千台一面"；问它一个选题，它能调出图谱上挂载的相关历史片段。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>栏目知识库 / 智能问答</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>资产不可计算、智能体没上下文</span></div>
+        <div class="ft sku"><b>对应单品</b><span>知识工程 / 栏目 Agent</span></div>
+      </div>
+    </div>
+
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">⑤</span><h3>媒体资产价值化输出</h3>
+        <div class="kw"><span class="tag">意图检索</span><span class="tag">主题资料包</span><span class="tag">以案成片</span><span class="tag">数字资产交易</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">定位</span><p>资产的"变现出口"，把知识化资产转成生产力与收益。</p></div>
+        <div class="spec-row"><span class="spec-label">阐述</span><p>素材价值输出：按使用者意图检索并返回素材、按主题自动汇聚资料包；节目价值输出：以案成片、按选题 AI 提供素材、按热点匹配素材；资产价值输出：作为语料库、作为可交易数字资产。</p></div>
+        <div class="spec-row"><span class="spec-label accent">案例成果 / 业务亮点</span>
+          <ul class="list"><li>跨模态检索：基础检索 / 标签检索 / 图搜检索 / 多模态检索</li><li>智能标题、智能摘要、智能专题，主题资料包一键汇聚</li></ul></div>
+        <div class="spec-row"><span class="spec-label">举例</span><p>编辑用一句话意图检索拿到所需素材，并按当天选题自动汇成一个资料包，直接进入成片单品。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>找素材 / 做选题 / 资产交易</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>检索难、素材利用率低、资产不变现</span></div>
+        <div class="ft sku"><b>对应单品</b><span>跨模态检索 / 主题资料包</span></div>
+      </div>
+    </div>
+
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">⑥</span><h3>传媒大模型</h3>
+        <div class="kw"><span class="tag">FASM 融合大模型</span><span class="tag">风格模型</span><span class="tag">专家模型</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">定位</span><p>底座的模型层：让 AI 输出贴合本机构风格、听得懂媒体语义，可管控、可运营。</p></div>
+        <div class="spec-row"><span class="spec-label">阐述</span><p>为什么不用通用大模型？因为通用模型"懂语言"但"不懂媒体业务"。风格模型基于机构存量稿件训练，形成该台特有内容风格；专家模型基于存量数据训练，更能理解多模态语义——让 AI 能力随媒体业务流转，而非孤立存在。</p></div>
+        <div class="spec-row"><span class="spec-label accent">案例成果 / 业务亮点</span>
+          <ul class="list"><li>风格模型：基于存量稿件专业语料训练，形成机构特有风格</li><li>专家模型：基于存量数据训练，理解多模态内容语义，形成垂类专家模型</li></ul></div>
+        <div class="spec-row"><span class="spec-label">举例</span><p>用某台历史稿件训练后，AI 写出来的稿子就是"这家台的味道"，不再是通用 AI 的"塑料腔"。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>风格化生产 / 语义理解</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>通用模型不懂业务、风格千篇一律</span></div>
+        <div class="ft sku"><b>对应单品</b><span>风格模型 / 专家模型</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 轻量化智能单品 ============ -->
+<section class="section" style="background:var(--bg-soft)">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker accent">06 · 轻量化智能单品（2026 核心新增）</div>
+      <h2>面向互联网生产运营的智能单品矩阵</h2>
+      <p class="lead">把底座能力拆成可独立售卖、即开即用的轻工具，统一在 Media Cloud 对话框中编排，跑通短视频全业务闭环。以下按"策采编审发评"生产环节，逐单品给出案例场景、业务亮点与场景·痛点·买点。</p>
+    </div>
+
+    <p style="margin-bottom:8px"><strong>怎么规划：</strong>单品不是散点堆砌，而是沿"策 → 采 → 编 → 审 → 发 → 评"生产链路各就各位，每一环都有可独立售卖的轻单品，又能在 Media Cloud 对话框中被串成闭环。下面按生产环节给出每个场景该用什么单品、解决什么痛点。</p>
+
+    <!-- 策 -->
+    <div class="stage-band"><span class="s">策</span>选题策划 · 新闻舆情</div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>AI 灵感池（热点发现 + 合规校验入口）</h3>
+        <div class="kw"><span class="tag">30+ 平台分钟级扫描</span><span class="tag">三级分级</span><span class="tag">合规校验嵌入</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>编辑早上打开电脑，不知道今天该追什么、从什么角度切。灵感池覆盖微博 / 微信 / 抖音 / 快手 / B站 / 小红书等 30+ 平台分钟级扫描，按传播速度 / 情绪强度 / 本地相关性自动分"必追 / 建议 / 观望"三级，并把合规校验接口直接嵌入页面。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>某明星官宣离婚上热搜，灵感池同步推送：竞品响应状态（谁已发、谁准备中）、建议选题角度（快讯 / 粉丝反应 / 法律解读 / 过往回顾）、可用素材（媒资库历史采访片段自动调取待用）。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>每日选题 / 突发响应</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>被动追热点、盯源累、合规靠第三方来回切</span></div>
+        <div class="ft sku"><b>为什么买</b><span>舆情资产转生产力；合规成本对标秒塔 0.3–0.5 元/篇可降，提升平台日活</span></div>
+      </div>
+    </div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>AI 竞品雷达（同题对标 + 漏题筛查）</h3>
+        <div class="kw"><span class="tag">爆款基因四维拆解</span><span class="tag">漏题秒级预警</span><span class="tag">快速响应包</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>同一热点，自动做"全网横向复盘"——不是比阅读量，而是拆解叙事角度、画面精细度、互动策略、发布时机四个维度，告诉你"为什么别人比我火"。同时实时监控对标媒体名单，对方发了我方未覆盖的重大资讯即秒级预警。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>选取"某地高考状元采访"热点，系统自动调取全网 20+ 主流媒体相关报道，生成对标分析报告与爆款基因拆解、改进建议；漏题时自动给出快速响应包（建议角度 + 可用素材 + 参考框架）。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>选题研判 / 防漏题</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>不知为何别人更火、漏掉重大选题</span></div>
+        <div class="ft sku"><b>为什么买</b><span>提升报道差异化与首发覆盖率</span></div>
+      </div>
+    </div>
+
+    <!-- 采 -->
+    <div class="stage-band"><span class="s">采</span>素材采集 · 智能媒资</div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>热点二创 · 热点素材采集与二创备料</h3>
+        <div class="kw"><span class="tag">关键词/URL 一键采集</span><span class="tag">去台标去角标去水印</span><span class="tag">空镜检索</span><span class="tag">视频超分</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>看到一条热点想立刻拿到可用素材二创。关键词或主流平台 URL 一键采集视频 / 图片自动入库，入库自动去台标、去角标、去水印、视频超分预处理，并支持全网空镜头检索。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>石家庄台明确诉求：实时抓取全网舆情热点素材，通过关键词或 URL 一键采集入库并自动预处理，保障素材合规可用——本单品正是这条诉求的落地件。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>热点素材采集 / 二创备料</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>找素材慢、带水印不合规、空镜难找</span></div>
+        <div class="ft sku"><b>为什么买</b><span>"找—洗—入库"从半天到分钟级，产出即合规，喂给拆条/成片</span></div>
+      </div>
+    </div>
+
+    <!-- 编 -->
+    <div class="stage-band"><span class="s">编</span>智能生产 · 生产工具</div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>智能拆条</h3>
+        <div class="kw"><span class="tag">自动拆条大纲</span><span class="tag">创意建议</span><span class="tag">直播拆条</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>一场直播 / 一档大屏节目结束，需要快速切出多条短视频。系统自主根据原视频生成拆条大纲与创意建议，支持视频 / 音频直播拆条，自动产出优质片段。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>黑龙江台诉求：系统自主根据原视频生成拆条大纲与创意建议，无需人工先出文稿再训练拆解——直接对接一键成片，是短视频量产的关键提效点。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>直播 / 长内容转短视频</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>需先出文稿再拆解、链路长依赖人</span></div>
+        <div class="ft sku"><b>为什么买</b><span>无文稿即可拆条，广播级长内容快速转短视频原料</span></div>
+      </div>
+    </div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>一键成片 · 视频生成工具</h3>
+        <div class="kw"><span class="tag">选题→成片一站式</span><span class="tag">数字人播报</span><span class="tag">模板批量出片</span><span class="tag">大屏转小屏</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>选题确定后，统一界面完成"热点选题 → 脚本 → 素材匹配 → 数字人播报 → 智能包装 → 精细剪辑"，支持标准化模板批量出片，大屏内容无损降维转小屏。这就是新开发的<strong>视频生成工具</strong>的产品归位。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>石家庄台一站式诉求的核心成片环节：依托标准化短视频模板快速批量出片，把分散工具拼成一条流水线。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>短视频量产 / 大屏转小屏</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>选题/脚本/素材/数字人/剪辑割裂、反复导入导出</span></div>
+        <div class="ft sku"><b>为什么买</b><span>短视频链路提效目标 60%+，降编辑操作成本</span></div>
+      </div>
+    </div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>视频画布工具 · 精品 AIGC 生产</h3>
+        <div class="kw"><span class="tag">多 Agent 画布编排</span><span class="tag">输出 EDL</span><span class="tag">一键上快编/剪映/PR</span><span class="tag">爆款模板</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>精品内容（视频 / 音频 / 图文）生产，以画布逻辑构建新一代非编工具，输出 EDL 一键上快编 / 剪映 / PR / EDIUS，沉淀并复用爆款模板。这是新开发的<strong>视频画布工具</strong>的产品归位。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>既可单独订阅，又作为创作类 skill 被"节目创作师"数字员工与对话框调用——单卖与编排两不误。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>精品内容 / 多 Agent 编排生产</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>精品生产门槛高、工具不互通</span></div>
+        <div class="ft sku"><b>为什么买</b><span>画布即生产，EDL 无缝对接现有非编生态</span></div>
+      </div>
+    </div>
+
+    <h4 style="margin:22px 0 12px;color:var(--ink-soft)">"编"环节其余轻单品（按需补点）</h4>
+    <table class="table zebra">
+      <thead><tr><th style="width:22%">单品</th><th style="width:40%">核心能力</th><th>解决场景 / 痛点</th></tr></thead>
+      <tbody>
+        <tr><td><strong>短视频智能稿件</strong></td><td>抖快 B 口语化文风模板、智能编辑器多智能体集成、自动纠错与偏差信息修正</td><td>传统图文文风不适配短视频</td></tr>
+        <tr><td><strong>节赛会展自动化生产</strong></td><td>节日拆条批量出片、会议发言人集锦、颁奖瞬间 + 人脸识别、新品亮相图卡与参数提取</td><td>大型节赛会展黄金窗口、热点稍纵即逝</td></tr>
+      </tbody>
+    </table>
+
+    <!-- 审 -->
+    <div class="stage-band"><span class="s">审</span>内容审核 · 合规</div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>内容合规校验 · 事实核查</h3>
+        <div class="kw"><span class="tag">事实性核查</span><span class="tag">合规校验</span><span class="tag">可接第三方接口</span><span class="tag">视频内容核查</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>河北台经济视频编辑团队现阶段最高频刚需——日均审核文章 300–500 篇，现用第三方秒塔，单篇核算成本 0.3–0.5 元。诉求是对接同类合规校验接口、嵌入灵感池页面，提升平台日常使用率。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>合规校验接口直接嵌入灵感池与生产链路；视频内容也支持事实核查与合规校验。既可作单品，也封装为"内容合规审核员"数字员工按量计费。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>发稿前合规 / 视频审核</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>人工审校量大、第三方工具割裂</span></div>
+        <div class="ft sku"><b>为什么买</b><span>对标秒塔降本、嵌入生产链路提升日活</span></div>
+      </div>
+    </div>
+
+    <!-- 发 -->
+    <div class="stage-band"><span class="s">发</span>发布运营 · 大端大号</div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>数字人 · 播客播报 + 运营型旗舰 APP</h3>
+        <div class="kw"><span class="tag">高保真数字人主播</span><span class="tag">全天候自动播报</span><span class="tag">多渠道分发</span><span class="tag">自动化栏目运营</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>基于舆情热点自动生成播报稿、关联库内视频、生产字幕、关联数字人配音成片，可配置 / 可编辑 / 可溯源 / 可微调；AI 数字人主播 + 热点聚合实现全自动全天候播报；运营型 APP 做稿件 AI 解读、互动问答与自动化栏目运营。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>把内容从电视端铺到微信 / 微博 / 抖音等互联网渠道；CMS 智能稿件生成 + 多渠道审核 + 微信审核插件串成一条发布流水线。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>常态化播报 / 多端分发 / APP 运营</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>播报与运营人力重、更新慢</span></div>
+        <div class="ft sku"><b>为什么买</b><span>常态化自动播报 + 多端分发，省常态运营人力</span></div>
+      </div>
+    </div>
+
+    <!-- 评 -->
+    <div class="stage-band"><span class="s">评</span>数据评价 · 传播分析</div>
+    <div class="spec" data-animate>
+      <div class="spec-head"><span class="sn">★</span><h3>数据传播分析 · AI 爆品分析</h3>
+        <div class="kw"><span class="tag">传播效能打分</span><span class="tag">爆款基因学习</span><span class="tag">为效果付费</span><span class="tag">老板报表</span></div></div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-label">案例场景</span><p>对稿件与短视频传播效能打分，学习竞品爆款（如本周竞品爆款 Top3 及其爆款因素），指导提升爆款率，为效果付费；数据回流反哺选题推送与团队考核。</p></div>
+        <div class="spec-row"><span class="spec-label accent">业务亮点 / 举例</span><p>发—评 AI 闭环：让传播数据反哺内容、反馈团队、优化机制；老板评价报表自动发布。</p></div>
+      </div>
+      <div class="spec-foot">
+        <div class="ft scene"><b>业务场景</b><span>效果评估 / 绩效考核 / 爆款复盘</span></div>
+        <div class="ft pain"><b>解决痛点</b><span>不知为何爆 / 不爆，考核缺数据</span></div>
+        <div class="ft sku"><b>为什么买</b><span>按传播效果付费，数据回流改进推荐</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 数字员工 ============ -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">07 · 数字员工智能体应用（2026 核心新增）</div>
+      <h2>卖两样：数字员工执行平台 + 场景化角色</h2>
+      <p class="lead">数字员工不是又一类产品，而是把底座能力与单品按一个<strong>具体生产场景</strong>封装成"能自动干活的角色"。纳入数字员工的场景有一条硬标准：<strong>AI 能自动化完成生产、或只需人核查结果（大量 AI 生产 + 人工辅助）；仍大量靠人操作的场景，留在数智全媒平台功能里迭代，不进数字员工。</strong></p>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card card--brand" data-animate>
+        <h4>① 数字员工执行平台（客户买的"底盘"）</h4>
+        <p>智能体引擎 + 任务编排 + Media Cloud 对话框 / 钉钉企微入口 + 单品与 skill 调用 + 计费与运行可观测。所有数字员工都跑在这个平台上，客户先有平台、再装员工。</p>
+      </div>
+      <div class="card card--brand" data-animate style="--i:1">
+        <h4>② 场景化角色（客户买的"活儿"）</h4>
+        <p>平台上按场景实例化的角色：开箱即用的<strong>内置场景员工</strong>，以及结合频道知识库 / 渠道规范<strong>定制的专属员工</strong>。计费 = 内置场景包月 + 订阅场景。</p>
+      </div>
+    </div>
+
+    <h3 style="margin:38px 0 14px">内置场景数字员工（开箱即用，按内置场景收费）</h3>
+    <p style="margin-bottom:14px">每个员工对应一个逻辑独立、能 AI 自动跑的具体场景，"买了怎么用"统一为：对话框 / 钉钉触发 → AI 自动产出 → 落工作台 → 人核查微调。</p>
+    <table class="table zebra">
+      <thead><tr><th style="width:15%">数字员工</th><th style="width:39%">输入 → AI 自动逻辑</th><th style="width:27%">产出与去向</th><th>谁用 / 人只做</th></tr></thead>
+      <tbody>
+        <tr><td><strong>热点搬运<br>短视频员</strong></td><td>热点榜 / URL → 搬运源视频 + 按热点匹配素材库素材 + 套模板拼接 + 去台标角标水印 + 配标题封面</td><td>多条短视频 → 待审发布到指定号</td><td>新媒体编辑 / 终审发布</td></tr>
+        <tr><td><strong>新闻拆条<br>短视频员</strong></td><td>一整档新闻（如新闻联播 / 本地新闻）→ ASR + 画面识别按条目切分 + 逐条成片 + 标题 / 封面 / 字幕</td><td>一档 → N 条小节目 → 待审分发</td><td>拆条 / 新媒体 / 终审</td></tr>
+        <tr><td><strong>大屏转小屏<br>短视频员</strong></td><td>横屏大屏节目（专题片 / 晚会）→ 识别主体重构竖屏构图 + 重剪节奏 + 加竖屏字幕（非简单裁剪）</td><td>竖屏短视频 → 待审</td><td>新媒体 / 微调</td></tr>
+        <tr><td><strong>综合<br>合规审核员</strong></td><td>文 / 视频稿 → 事实核查 + 敏感词 / 导向 / 合规校验（可接第三方接口）</td><td>风险点 + 修改建议 → 回审核台</td><td>审核 / 编辑 · 看结果定夺</td></tr>
+        <tr><td><strong>选题哨兵</strong></td><td>30+ 平台 → 7×24 盯源 + 预判热点 + 生成选题线索卡（摘要 / 三级分级 / 建议角度 / 可用素材 / 竞品角度 / 时效）</td><td>选题线索卡 → 推进「选题策划」选题池、灵感池、选题会工具页（可采纳 / 延后 / 忽略，采纳转选题任务）</td><td>编导 / 值班编辑 · 选题会拍板</td></tr>
+        <tr><td><strong>数字人<br>播报员</strong></td><td>热点 / 通稿 → 自动播报稿 + 数字人成片 + 定时发布</td><td>数字人播报视频 → 指定号常态化播报</td><td>运营 / 把关</td></tr>
+        <tr><td><strong>一稿多发<br>适配员</strong></td><td>一条母稿 / 母视频 → 按平台清单各生成专属版本（画幅 / 时长 / 文案 / 标题 / 标签 / 封面 + 账号调性匹配）</td><td>微信 / 微博 / 抖音 / 快手 / 视频号 / B站 / 小红书 / 头条 / 自有 APP 各版本 → 待审一键分发</td><td>运营 / 终审</td></tr>
+        <tr><td><strong>海外<br>传播员</strong></td><td>国内优质内容 → 二创 + 多语言适配 + 海外渠道分发 + 互动监测</td><td>海外版本 + 回流选题 → 国传渠道、回流选题池</td><td>国传团队 / 文化口径核查</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:38px 0 14px">场景化定制数字员工（沿维度实例化，按订阅场景收费）</h3>
+    <div class="grid cols-3">
+      <div class="card card--accent" data-animate>
+        <h4>频道知识库维度</h4>
+        <p>综合合规审核员 × 少儿 / 经济 / 民生 / 军事频道知识库 → 该频道专属审核员（少儿内容标准更严、经济重数据准确）；选题哨兵 × 频道 → 经济选题哨兵等。</p>
+      </div>
+      <div class="card card--accent" data-animate style="--i:1">
+        <h4>渠道规范维度</h4>
+        <p>合规审核员 × 微信 / 微博 / APP 版面样式规范 → 渠道版面合规审核员，校验标题字数、封面安全框、排版样式、合规水印。</p>
+      </div>
+      <div class="card card--accent" data-animate style="--i:2">
+        <h4>内容形态维度</h4>
+        <p>短视频员 × 节赛会展 / 图文 → 赛事集锦员、图文转视频员等，按客户实际内容类型实例化。</p>
+      </div>
+    </div>
+
+    <div class="callout" data-animate style="margin-top:24px">
+      <h4>多员工接力：一条任务自动跑完</h4>
+      <p>在对话框里，多个员工可在一个任务中接力：选题哨兵供题 → 热点搬运短视频员出片 → 综合合规审核员校验 → 一稿多发适配员分发。人只在选题拍板与终审两处介入。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 产品形态与售卖矩阵 ============ -->
+<section class="section section--dark">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker accent">08 · 产品形态与售卖矩阵</div>
+      <h2>三种售卖形态：买能力 / 买零件 / 买一个岗位的活儿</h2>
+      <p class="lead">用两个黏合剂把存量与新品收敛成三种形态：黏合剂一（内容智能底座）从<strong>能力</strong>上黏合，黏合剂二（对话框 + 数字员工编排）从<strong>场景</strong>上黏合。原"场景套件"并入数字员工售卖，不再单列。</p>
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card" data-animate>
+        <span class="card-num">形态一</span>
+        <h4>平台 / 底座（买能力真源）</h4>
+        <p>对应黏合剂一。完整数智全媒平台 / 内容智能底座，数据·知识·模型的底层真源。</p>
+        <div style="margin-top:10px"><span class="tag">新建 / 大型融媒</span></div>
+        <p style="margin-top:8px;font-size:13px;color:var(--ink-faint)">陕西广电、市级融媒、爱上电视</p>
+      </div>
+      <div class="card" data-animate style="--i:1">
+        <span class="card-num">形态二</span>
+        <h4>智能单品（买零件）</h4>
+        <p>能力的最小可售单元：灵感池 / 搬运 / 拆条 / 画布 / 生成等单独订阅，API 可嵌入客户已有系统。</p>
+        <div style="margin-top:10px"><span class="tag">已有系统、补能力</span></div>
+        <p style="margin-top:8px;font-size:13px;color:var(--ink-faint)">宁波台搬运 / 快编 / 校对</p>
+      </div>
+      <div class="card" data-animate style="--i:2">
+        <span class="card-num">形态三</span>
+        <h4>数字员工（买一个岗位的活儿）</h4>
+        <p>对应黏合剂二。数字员工执行平台 + 内置场景 + 定制场景，把一个岗位的生产场景自动干掉。原"场景套件"并入此处。</p>
+        <div style="margin-top:10px"><span class="tag">高频刚需、要自动化</span></div>
+        <p style="margin-top:8px;font-size:13px;color:var(--ink-faint)">河北台合规、石家庄短视频量产</p>
+      </div>
+    </div>
+
+    <div class="callout" data-animate style="margin-top:26px">
+      <h4>三种形态是"升降通道"，不是三套产品</h4>
+      <p>客户可从一个单品或一个数字员工低门槛进入，用顺手了再加购、再上平台；平台客户也能反向加购单品与员工。底座同源、能力同源，升级即开通、不重复实施。</p>
+    </div>
+
+    <h3 style="margin:40px 0 16px">需求 → 形态应对矩阵</h3>
+    <table class="table zebra">
+      <thead><tr><th style="width:26%">客户处境 / 典型需求</th><th style="width:22%">推荐售卖形态</th><th>应对要点</th></tr></thead>
+      <tbody>
+        <tr><td>已有系统，只缺某项能力（黑龙江缺短视频）</td><td><strong>智能单品 / 数字员工</strong></td><td>API 嵌入客户已有系统，免重复建设，按需补点</td></tr>
+        <tr><td>高频重复、要直接降本（河北台合规审核）</td><td><strong>数字员工（内置 + 定制场景）</strong></td><td>对标秒塔 0.3–0.5 元/篇做降本账，落地最快、最易验证 ROI</td></tr>
+        <tr><td>要一站式全自动短视频闭环（石家庄）</td><td><strong>数字员工（短视频量产系列）</strong></td><td>热点搬运 / 新闻拆条 / 大屏转小屏等员工 + 对话框编排成一条线</td></tr>
+        <tr><td>新建 / 大型融媒整体建设（陕西广电、天府融媒）</td><td><strong>平台 / 底座 + AIGC 工具平台</strong></td><td>平台打底 + 工具集规模复制，工具连接器对接已有生态</td></tr>
+        <tr><td>运营增长导向（邯郸大号短视频矩阵）</td><td><strong>数字员工（数字人播报 + 一稿多发）</strong></td><td>自动化生产与分发用员工，社群 / 评论等重人工运营留数智全媒平台</td></tr>
+        <tr><td>政企品宣 / 宣发（极兔、油田、网信办）</td><td><strong>企业数字营销底座</strong></td><td>平台能力镜像换业务语义，落到品宣 / 宣发 / 引流 / 交易（详见第 9 章）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 09 企业数字营销底座 ============ -->
+<section class="section" style="background:var(--bg-soft)">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker accent">09 · 企业数字营销底座（泛媒体拓展）</div>
+      <h2>把媒体内容能力，镜像成企业的"数字营销车间"</h2>
+      <p class="lead">事业部向泛媒体业务市场拓展的主方向。同一套"资产 → 知识 → AIGC → 分发"能力，换一组业务语义，即可服务品牌市场部、政府宣传、连锁与出海企业。<br>代表案例：双胞胎集团企业内容管理平台、极兔快递创意内容库。</p>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card" data-animate>
+        <h4>数字营销基座</h4>
+        <ul class="list" style="margin-top:6px">
+          <li><strong>智能采集：</strong>通用内容 + 创意内容（Adobe / Figma 深度集成）+ 特殊内容（执法记录仪 / 监控 / 采编系统对接）</li>
+          <li><strong>智能处理：</strong>理解品牌调性与内容风格，自动评估素材与品牌规范一致性</li>
+          <li><strong>智能标注 + 检索：</strong>标签层 + 知识层，意图检索、按营销主题自动汇聚资料包</li>
+          <li><strong>协作管理：</strong>权限 / 版本 / 审批，集成企业微信、钉钉、飞书</li>
+          <li><strong>价值应用：</strong>一键分发微信 / 微博 / 抖音 / 小红书，对接 CRM / CDP / 电商；企业知识库 AI 问答；可交易数字资产</li>
+        </ul>
+      </div>
+      <div class="card" data-animate style="--i:1">
+        <h4>AIGC 数字营销中心</h4>
+        <ul class="list" style="margin-top:6px">
+          <li><strong>策略营销引擎：</strong>定义数字员工（热点发现 / 营销对标 / 内容编辑 / 发布推广 / 数据分析），自动产线</li>
+          <li><strong>AI 竞品雷达：</strong>企业舆情、竞品情报、同选题对标、写作灵感</li>
+          <li><strong>AI 灵感写作：</strong>热点报题、角度推荐、企业风格写稿</li>
+          <li><strong>数字营销百宝箱：</strong>AI 轻工具（剪辑 / 格式转换 / 尺寸适配 / 水印 / GIF / 海报 / 文生图视频）、出海工具（多语言字幕 / 海外电商风格视频）、数字人（播客 / 虚拟直播带货）、创意工具、传播效能评估</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" data-animate style="margin-top:24px">
+      <h4>为什么企业要买？</h4>
+      <p>AI 赋能企业数字化营销全场景：员工培训、品宣管理、对外宣发 / 推广、在线引流、在线交易——直接指向"为企业创收"。极兔快递用创意内容库实现全球分支机构市场宣发材料的统一收集与统一下发；双胞胎集团实现总部与数百家分厂宣传 / 培训资料的汇聚与管理。这是把"内容成本中心"转为"营销增长引擎"。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 数据飞轮（深色带） ============ -->
+<section class="section section--dark">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker accent">10 · 数据驱动正向飞轮</div>
+      <h2>回流数据 → 改进的具体动作 → 落地价值</h2>
+      <p class="lead">飞轮不讲虚的：把每个生产环节产生的数据，落到它具体改进了哪个模型 / 动作、带来什么可衡量结果。下表是五条可落地的数据闭环，北京台两个标杆场景是其中的完整实例。</p>
+    </div>
+
+        <div class="flywheel" data-animate>
+      <svg viewBox="0 0 600 400" role="img" aria-label="数据驱动正向飞轮">
+        <defs>
+          <marker id="ah" markerWidth="10" markerHeight="10" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#7fb0ff"/>
+          </marker>
+          <marker id="ah2" markerWidth="10" markerHeight="10" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#e6bd84"/>
+          </marker>
+        </defs>
+        <path d="M300,60 A140,140 0 0 1 300,340" fill="none" stroke="#7fb0ff" stroke-width="2.4" stroke-dasharray="2 8" stroke-linecap="round" marker-end="url(#ah)" opacity=".85"/>
+        <path d="M300,340 A140,140 0 0 1 300,60" fill="none" stroke="#e6bd84" stroke-width="2.4" stroke-dasharray="2 8" stroke-linecap="round" marker-end="url(#ah2)" opacity=".85"/>
+        <circle cx="300" cy="200" r="62" fill="rgba(127,176,255,.10)" stroke="#e6bd84" stroke-width="1.4"/>
+        <text x="300" y="193" text-anchor="middle" fill="#f4f8ff" font-size="19" font-weight="700">数据飞轮</text>
+        <text x="300" y="217" text-anchor="middle" fill="#e6bd84" font-size="13">数据闭环</text>
+        <g font-size="13.5" font-weight="600" fill="#eef3ff" text-anchor="middle">
+          <g><circle cx="300" cy="60" r="42" fill="#15265e" stroke="#7fb0ff" stroke-width="1.4"/><text x="300" y="56">感知</text><text x="300" y="73">热点</text></g>
+          <g><circle cx="421" cy="130" r="42" fill="#15265e" stroke="#7fb0ff" stroke-width="1.4"/><text x="421" y="126">选题</text><text x="421" y="143">决策</text></g>
+          <g><circle cx="421" cy="270" r="42" fill="#15265e" stroke="#7fb0ff" stroke-width="1.4"/><text x="421" y="266">内容</text><text x="421" y="283">生产</text></g>
+          <g><circle cx="300" cy="340" r="42" fill="#15265e" stroke="#7fb0ff" stroke-width="1.4"/><text x="300" y="336">多端</text><text x="300" y="353">分发</text></g>
+          <g><circle cx="179" cy="270" r="42" fill="#15265e" stroke="#e6bd84" stroke-width="1.4"/><text x="179" y="266">监测</text><text x="179" y="283">评价</text></g>
+          <g><circle cx="179" cy="130" r="42" fill="#15265e" stroke="#e6bd84" stroke-width="1.4"/><text x="179" y="126">数据</text><text x="179" y="143">回流</text></g>
+        </g>
+      </svg>
+      <p class="fw-cap">感知热点 → 选题决策 → 内容生产 → 多端分发 → 监测评价 → 数据回流</p>
+    </div>
+
+    <table class="table zebra" data-animate>
+      <thead><tr><th style="width:24%">回流数据</th><th style="width:38%">改进的具体动作</th><th>落地价值</th></tr></thead>
+      <tbody>
+        <tr><td>稿件 / 视频实际传播效果（打开、完播、互动）</td><td>灵感池选题推荐：实际跑出来的角度 / 题材，下次优先推</td><td>选题命中率↑，减少无效选题</td></tr>
+        <tr><td>人工复核中被推翻的审核样本</td><td>合规模型阈值与规则校准</td><td>漏报 / 误报↓，人工复核量↓</td></tr>
+        <tr><td>拆条片段的采用 / 弃用记录</td><td>拆条大纲与片段优选模型</td><td>成片采用率↑，返工↓</td></tr>
+        <tr><td>一稿多发各平台版本的表现</td><td>各平台 / 账号调性适配模型</td><td>适配版本表现↑，少靠人改版</td></tr>
+        <tr><td>海外各渠道互动数据</td><td>反哺国内选题池的高潜话题</td><td>海外二创选题更准</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:40px 0 16px">两个完整实例（北京台）</h3>
+    <div class="grid cols-2">
+      <div class="card" data-animate>
+        <div class="role">标杆场景一</div>
+        <h3>热点选题宣发闭环</h3>
+        <div class="flow">
+          <span class="flow-step">全网热点感知</span><span class="flow-arrow">→</span>
+          <span class="flow-step">策略 Agent 推送舆情包</span><span class="flow-arrow">→</span>
+          <span class="flow-step">选题会一键决策</span><span class="flow-arrow">→</span>
+          <span class="flow-step">历史素材辅助</span><span class="flow-arrow">→</span>
+          <span class="flow-step">稿件生产</span><span class="flow-arrow">→</span>
+          <span class="flow-step">传播评价</span><span class="flow-arrow">→</span>
+          <span class="flow-step">反哺推送策略</span>
+        </div>
+        <p style="margin-top:8px"><strong>目标用户：</strong>编导（核心）、值班编辑（协同）、台领导（管理）。</p>
+        <p><strong>预期效果：</strong>打通舆情数据与选题决策的数据断点，让数据中台的舆情资产真正转化为编导生产力；通过历史素材复用与竞品角度参考，避免"千稿一面"。</p>
+      </div>
+      <div class="card" data-animate style="--i:1">
+        <div class="role">标杆场景二</div>
+        <h3>优质内容海外二创闭环</h3>
+        <div class="flow">
+          <span class="flow-step">成品稿件智能分析</span><span class="flow-arrow">→</span>
+          <span class="flow-step">账号调性匹配</span><span class="flow-arrow">→</span>
+          <span class="flow-step">多渠道适配版本</span><span class="flow-arrow">→</span>
+          <span class="flow-step">一键分发</span><span class="flow-arrow">→</span>
+          <span class="flow-step">传播监测</span><span class="flow-arrow">→</span>
+          <span class="flow-step">用户互动回流选题池</span>
+        </div>
+        <p style="margin-top:8px"><strong>目标用户：</strong>国际传播团队（核心）、国内新闻中心（协同）。</p>
+        <p><strong>预期效果：</strong>构建"国内生产、海外适配"新范式，建立跨文化智能适配能力，打通"海外反馈—国内策源"双向循环，持续挖掘全球传播潜力选题。</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 11 路线图 ============ -->
+<section class="section" style="background:var(--bg-soft)">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker accent">11 · 2026 路线图与优先级</div>
+      <h2>结合商机迫切度的四季度节奏</h2>
+      <p class="lead">以"先跑通标杆闭环、再规模化复制"为原则，优先满足河北 / 石家庄 / 黑龙江台已明确的短视频闭环与合规刚需，再扩展到 AIGC 工具平台与政企数字营销。</p>
+    </div>
+    <div class="timeline">
+      <div class="t-item" data-animate>
+        <div class="t-time">Q1 · 已启动（夯实）</div>
+        <h4>产品清单定稿 + 短视频闭环 MVP + 综合合规审核员</h4>
+        <p>泛媒体售卖产品清单 V1.0 定稿与限价；在石家庄台、黑龙江台跑通短视频量产员工（热点搬运 / 新闻拆条）MVP；为河北台上线综合合规审核员（接第三方接口、嵌入灵感池）。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:1">
+        <div class="t-time">Q2 · 商品化</div>
+        <h4>数字员工执行平台 + 内置员工上架 + 单品 SKU 化</h4>
+        <p>上线数字员工执行平台与对话框入口；选题哨兵、短视频量产系列、综合合规审核员等内置员工上架（按内置场景收费）；轻量化单品完成 SKU 化与定价。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:2">
+        <div class="t-time">Q3 · 规模化</div>
+        <h4>AIGC 工具平台规模复制 + 定制员工 + 数据闭环</h4>
+        <p>把工具集打包为 AIGC 工具平台，规模化交付陕西广电、天府融媒、北京台稿件库三期、爱上电视；开放频道 / 渠道维度的定制员工（订阅场景）；落地北京台两个数据闭环实例。</p>
+      </div>
+      <div class="t-item" data-animate style="--i:3">
+        <div class="t-time">Q4 · 拓展</div>
+        <h4>企业数字营销底座产品化 + 政企拓展</h4>
+        <p>以极兔 / 双胞胎为标杆完成企业数字营销底座产品化，向政企（华北油田、网信办、电信等）拓展；跑通五条数据回流闭环，沉淀效果付费模式。</p>
+      </div>
+    </div>
+
+    <div class="callout callout--accent" data-animate style="margin-top:30px">
+      <h4>落地抓手</h4>
+      <p>产品收敛为三层：内容智能底座（能力真源）+ 智能单品（按环节卖能力）+ 数字员工（按场景卖自动化的活儿）；售卖收敛为三种形态，按客户处境匹配。先在河北 / 石家庄 / 黑龙江台跑通合规与短视频量产，再规模复制到 AIGC 工具平台与政企数字营销。</p>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <span>融媒云事业部 · 2026 产品规划方案 V1.0</span>
+    <span>内部规划材料 · 2026-06</span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -8,6 +8,9 @@
  * 不在此暴露。
  */
 import { revalidatePath } from "next/cache";
+import { eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { conversationMessages } from "@/db/schema/conversations";
 import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
@@ -21,6 +24,8 @@ import type {
   Conversation,
   ConversationMessage,
 } from "@/db/schema/conversations";
+
+export type MessageFeedback = "like" | "dislike" | null;
 
 type FieldErrors = Record<string, string>;
 type ActionResult<T = void> =
@@ -198,4 +203,39 @@ export async function appendMissionCardMessageAction(
   });
   revalidatePath(`/cowork/${conversationId}`);
   return { ok: true, data: message };
+}
+
+/**
+ * 回答的「喜欢 / 不喜欢」反馈,存进消息的 meta.feedback(再点一次同值 = 取消)。
+ * 校验消息所属会话归当前用户;不 revalidate —— 前端乐观切换视觉态即可,持久化
+ * 供下次加载读取。
+ */
+export async function setMessageFeedbackAction(
+  messageId: string,
+  value: MessageFeedback,
+): Promise<ActionResult> {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false, errors: { _global: "用户未关联组织" } };
+
+  const [msg] = await db
+    .select({ conversationId: conversationMessages.conversationId })
+    .from(conversationMessages)
+    .where(eq(conversationMessages.id, messageId))
+    .limit(1);
+  if (!msg) return { ok: false, errors: { _global: "消息不存在" } };
+
+  const convo = await getConversationById(orgId, user.id, msg.conversationId);
+  if (!convo) return { ok: false, errors: { _global: "无权访问该消息" } };
+
+  await db
+    .update(conversationMessages)
+    .set({
+      meta: sql`coalesce(${conversationMessages.meta}, '{}'::jsonb) || ${JSON.stringify(
+        { feedback: value },
+      )}::jsonb`,
+    })
+    .where(eq(conversationMessages.id, messageId));
+
+  return { ok: true };
 }

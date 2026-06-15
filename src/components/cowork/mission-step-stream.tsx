@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   CheckCircle2,
   Loader2,
@@ -11,8 +12,15 @@ import {
 import { useTypewriter } from "@/lib/hooks/use-typewriter";
 import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import { useMissionLive } from "@/lib/cowork/use-mission-live";
+import { MessageActions } from "@/components/cowork/message-actions";
+import { ArtifactList } from "@/components/cowork/artifact-card";
+import {
+  normalizeArtifactSources,
+  type ArtifactPreviewItem,
+} from "@/lib/cowork/artifact-preview";
 import { cn } from "@/lib/utils";
 import type { MissionTask } from "@/lib/types";
+import type { MessageFeedback } from "@/app/actions/cowork-conversations";
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 
@@ -62,7 +70,25 @@ function stepSummary(task: MissionTask): string {
  * 执行中转圈、完成打勾并**流式打字**展示该步核心概要;mission 终态时追加一条
  * 「交付结果 / 执行失败」气泡。右侧面板只做步骤清单打勾,详细输出在此呈现。
  */
-export function MissionStepStream({ missionId }: { missionId: string }) {
+export function MissionStepStream({
+  missionId,
+  missionCardMessageId,
+  initialFeedback = null,
+  onRegenerate,
+  selectedArtifactId = null,
+  onArtifactSelect,
+  artifactOverrides,
+}: {
+  missionId: string;
+  /** 反馈持久化挂在承载该 mission 的 mission_card 消息上 */
+  missionCardMessageId?: string;
+  initialFeedback?: MessageFeedback;
+  /** 重新生成 = 重发任务原指令 */
+  onRegenerate?: (text: string) => void;
+  selectedArtifactId?: string | null;
+  onArtifactSelect?: (artifact: ArtifactPreviewItem) => void;
+  artifactOverrides?: Record<string, ArtifactPreviewItem>;
+}) {
   const { mission } = useMissionLive(missionId);
   if (!mission) return null;
 
@@ -80,11 +106,43 @@ export function MissionStepStream({ missionId }: { missionId: string }) {
 
   const fo = readFinalOutput(mission.finalOutput);
   const deliverable = fo ? deliverableText(fo) : "";
+  const artifacts = normalizeArtifactSources({
+    missionId: mission.id,
+    tasks: mission.tasks,
+    finalOutput: mission.finalOutput,
+    persistedArtifacts: mission.artifacts,
+  });
+  const inlineArtifactText = artifacts
+    .filter((artifact) => artifact.kind === "short_text")
+    .map((artifact) => artifact.content.trim())
+    .filter(Boolean)
+    .join("\n\n");
+  const previewArtifacts = artifacts.filter(
+    (artifact) => artifact.kind !== "short_text",
+  ).map((artifact) => artifactOverrides?.[artifact.id] ?? artifact);
+  const resultMarkdown =
+    previewArtifacts.length > 0
+      ? inlineArtifactText || fo?.summary?.trim() || "已生成以下产物，请逐项预览确认。"
+      : deliverable;
   const failureMsg =
     fo?.message?.trim() || (isFailed ? fo?.summary?.trim() : "") || "";
   const failureReasons = isFailed
     ? (fo?.failureReasons ?? []).filter((r) => typeof r === "string" && r.trim())
     : [];
+
+  // 回答操作工具栏(复制/重新生成/喜欢/不喜欢/分享);重新生成 = 重发任务原指令
+  const regenText = mission.userInstruction?.trim() || "";
+  const buildActions = (copyText: string): ReactNode => (
+    <MessageActions
+      text={copyText}
+      messageId={missionCardMessageId}
+      initialFeedback={initialFeedback}
+      onRegenerate={
+        onRegenerate && regenText ? () => onRegenerate(regenText) : undefined
+      }
+      className="mt-2"
+    />
+  );
 
   return (
     <div className="mt-2 space-y-2">
@@ -111,10 +169,27 @@ export function MissionStepStream({ missionId }: { missionId: string }) {
             title="执行失败"
             body={failureMsg || "任务未能完成"}
             reasons={failureReasons}
+            actions={buildActions(
+              [failureMsg, ...failureReasons].filter(Boolean).join("\n"),
+            )}
           />
         ) : deliverable ? (
-          <ResultBubble tone="ok" title="交付结果" markdown={deliverable} />
+          <ResultBubble
+            tone="ok"
+            title="交付结果"
+            markdown={resultMarkdown}
+            actions={buildActions(deliverable)}
+          />
         ) : null)}
+      {isTerminal && !isFailed && onArtifactSelect && previewArtifacts.length > 0 && (
+        <div className="ml-9">
+          <ArtifactList
+            artifacts={previewArtifacts}
+            selectedArtifactId={selectedArtifactId}
+            onSelect={onArtifactSelect}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -193,12 +268,14 @@ function ResultBubble({
   body,
   markdown,
   reasons = [],
+  actions,
 }: {
   tone: "ok" | "fail";
   title: string;
   body?: string;
   markdown?: string;
   reasons?: string[];
+  actions?: ReactNode;
 }) {
   const Icon = tone === "ok" ? PackageCheck : AlertCircle;
   return (
@@ -245,6 +322,7 @@ function ResultBubble({
             ))}
           </ul>
         )}
+        {actions}
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Check,
   Loader2,
@@ -13,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMissionLive } from "@/lib/cowork/use-mission-live";
+import { appendReturnTo } from "@/lib/navigation-return";
 import type { MissionTask } from "@/lib/types";
 
 /**
@@ -30,6 +33,12 @@ export function CoworkMissionPanel({
   onClose?: () => void;
 }) {
   const { mission, loading } = useMissionLive(missionId);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentHref = useMemo(() => {
+    const qs = searchParams.toString();
+    return `${pathname}${qs ? `?${qs}` : ""}`;
+  }, [pathname, searchParams]);
 
   if (!missionId) {
     return (
@@ -132,7 +141,7 @@ export function CoworkMissionPanel({
           {mission && (
             <div className="border-t border-border px-2.5 py-2">
               <Link
-                href={`/missions/${mission.id}`}
+                href={appendReturnTo(`/missions/${mission.id}`, currentHref)}
                 className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <ExternalLink className="size-3 flex-none" /> 查看完整执行详情

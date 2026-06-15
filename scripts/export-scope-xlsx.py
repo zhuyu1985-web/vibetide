@@ -18,7 +18,7 @@ JSON_SCOPE = "/tmp/ranking-v5-2025-scope.json"
 JSON_SCOPE_DEF = "/tmp/media-scope-final.json"
 JSON_DRYRUN = "/tmp/coverage-dryrun.json"
 JSON_ACT = "/tmp/activities-2025.json"
-OUT_PATH = "/Users/zhuyu/dev/chinamcloud/vibetide/docs/ranking-v5-2025-scope.xlsx"
+OUT_PATH = "/Users/zhuyu/Developer/chinamcloud/vibetide/docs/ranking-v5-2025-scope.xlsx"
 
 with open(JSON_SCOPE) as f: data = json.load(f)
 with open(JSON_SCOPE_DEF) as f: scope_def = json.load(f)

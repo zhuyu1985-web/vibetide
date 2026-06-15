@@ -18,12 +18,12 @@
 
 **Step 1: Verify DATABASE_URL is configured**
 
-Run: `grep DATABASE_URL /Users/zhuyu/dev/chinamcloud/vibetide/.env.local | head -1`
+Run: `grep DATABASE_URL /Users/zhuyu/Developer/chinamcloud/vibetide/.env.local | head -1`
 Expected: A line like `DATABASE_URL=postgresql://...` (not a placeholder)
 
 **Step 2: Push schema to create all 14 tables**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:push`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:push`
 Expected: Output showing tables created (organizations, user_profiles, ai_employees, skills, employee_skills, teams, team_members, workflow_templates, workflow_instances, workflow_steps, team_messages, tasks, knowledge_bases, employee_knowledge_bases) plus enum types. No errors.
 
 **Step 3: Commit**
@@ -39,7 +39,7 @@ No files changed — schema push is a runtime operation against the DB.
 
 **Step 1: Run the seed script**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:seed`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:seed`
 Expected output (approximate):
 ```
 Seeding database...
@@ -75,7 +75,7 @@ Seed complete!
 
 **Step 2: Verify in Drizzle Studio (optional)**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:studio`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:studio`
 Expected: Opens browser with database viewer showing populated tables.
 
 ---
@@ -121,13 +121,13 @@ Key changes:
 
 **Step 2: Type check**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 git add src/app/\(dashboard\)/team-hub/page.tsx
 git commit -m "feat: wire team-hub page to real Supabase database via DAL"
 ```
@@ -173,13 +173,13 @@ Key changes:
 
 **Step 2: Type check**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 git add src/app/\(dashboard\)/employee/\[id\]/page.tsx
 git commit -m "feat: wire employee profile page to real Supabase database via DAL"
 ```
@@ -220,13 +220,13 @@ Key changes:
 
 **Step 2: Type check**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 git add src/app/\(dashboard\)/team-builder/page.tsx
 git commit -m "feat: wire team-builder page to real Supabase database via DAL"
 ```
@@ -547,7 +547,7 @@ CREATE POLICY "Users can manage employee_knowledge_bases in their organization"
 
 Since we use `db:push` for schema (not `db:migrate`), apply this SQL directly:
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsx -e "
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsx -e "
 import 'dotenv/config';
 import postgres from 'postgres';
 import { readFileSync } from 'fs';
@@ -563,7 +563,7 @@ Expected: `RLS policies applied successfully`
 **Step 3: Commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 git add supabase/migrations/0001_rls_policies.sql
 git commit -m "feat: add organization-scoped RLS policies for all tables"
 ```
@@ -577,12 +577,12 @@ git commit -m "feat: add organization-scoped RLS policies for all tables"
 
 **Step 1: Type check the full project**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit`
 Expected: No errors
 
 **Step 2: Start dev server**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev`
 Expected: Starts without errors on localhost:3000
 
 **Step 3: Verify team-hub page loads with DB data**

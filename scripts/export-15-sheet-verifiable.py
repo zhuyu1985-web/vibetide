@@ -24,7 +24,7 @@ from openpyxl.utils import get_column_letter
 JSON_FULL = "/tmp/ranking-v5-2025-full.json"
 JSON_ACT = "/tmp/activities-2025.json"
 JSON_AUDIT = "/tmp/audit-meta.json"
-OUT_PATH = "/Users/zhuyu/dev/chinamcloud/vibetide/docs/ranking-v5-2025-verifiable.xlsx"
+OUT_PATH = "/Users/zhuyu/Developer/chinamcloud/vibetide/docs/ranking-v5-2025-verifiable.xlsx"
 
 with open(JSON_FULL) as f:
     data = json.load(f)

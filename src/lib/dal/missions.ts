@@ -3,6 +3,7 @@ import {
   missions,
   missionTasks,
   missionMessages,
+  missionArtifacts,
   aiEmployees,
   workflowTemplates,
 } from "@/db/schema";
@@ -14,14 +15,14 @@ import type {
   MissionWithDetails,
   MissionTaskStatus,
   AIEmployee,
+  MissionArtifact,
 } from "@/lib/types";
 import type { WorkflowTemplateRow } from "@/db/types";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import type { EmployeeId } from "@/lib/constants";
 import { resolveMissionScenarioLabel } from "@/lib/mission-scenario-label";
 
 function rowToEmployee(row: typeof aiEmployees.$inferSelect): AIEmployee {
   const slug = row.slug as EmployeeId;
-  const meta = EMPLOYEE_META[slug];
   return {
     id: slug,
     dbId: row.id,
@@ -81,7 +82,7 @@ export async function getMissionById(
 ): Promise<MissionWithDetails | null> {
   // Run ALL 4 queries in parallel — mission + tasks + messages + all org employees
   // This is 1 network round-trip instead of 2-3 sequential ones.
-  const [missionRow, taskRows, msgRows, allEmpRows] = await Promise.all([
+  const [missionRow, taskRows, msgRows, artifactRows, allEmpRows] = await Promise.all([
     // Phase 4A: load linked workflow_template so we can resolve scenarioLabel server-side
     db.query.missions.findFirst({
       where: eq(missions.id, missionId),
@@ -117,6 +118,11 @@ export async function getMissionById(
       createdAt: missionTasks.createdAt,
     }).from(missionTasks).where(eq(missionTasks.missionId, missionId)).orderBy(asc(missionTasks.priority)),
     db.select().from(missionMessages).where(eq(missionMessages.missionId, missionId)).orderBy(asc(missionMessages.createdAt)),
+    db
+      .select()
+      .from(missionArtifacts)
+      .where(eq(missionArtifacts.missionId, missionId))
+      .orderBy(asc(missionArtifacts.createdAt)),
     // Load all employees for this mission's org (small table, avoids extra round-trips)
     db.query.missions.findFirst({ where: eq(missions.id, missionId), columns: { organizationId: true } })
       .then((m) => m ? db.select().from(aiEmployees).where(eq(aiEmployees.organizationId, m.organizationId)) : []),
@@ -172,6 +178,20 @@ export async function getMissionById(
     createdAt: m.createdAt.toISOString(),
   }));
 
+  const artifacts: MissionArtifact[] = artifactRows.map((a) => ({
+    id: a.id,
+    missionId: a.missionId,
+    taskId: a.taskId,
+    producedBy: a.producedBy,
+    type: a.type,
+    title: a.title,
+    content: a.content,
+    fileUrl: a.fileUrl,
+    metadata: a.metadata ?? {},
+    version: a.version,
+    createdAt: a.createdAt.toISOString(),
+  }));
+
   const teamMemberIds = (row.teamMembers as string[]) ?? [];
   const team = teamMemberIds
     .map((id) => empMap.get(id))
@@ -209,7 +229,7 @@ export async function getMissionById(
     completedAt: row.completedAt?.toISOString() ?? null,
     tasks,
     messages,
-    artifacts: [],
+    artifacts,
     leader: empMap.get(row.leaderEmployeeId)!,
     team,
     scenarioLabel: scInfo.label,

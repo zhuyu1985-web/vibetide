@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useTransition, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import * as LucideIcons from "lucide-react";
 import {
   CheckCircle,
@@ -11,7 +10,6 @@ import {
   XCircle,
   Clock,
   Crown,
-  ArrowLeft,
   Ban,
   Eye,
   MessageSquare,
@@ -39,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/shared/glass-card";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
+import { ReturnToPreviousButton } from "@/components/shared/return-to-previous-button";
 import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -370,11 +369,10 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
       {/* ═══ Header Bar ═══ */}
       <GlassCard padding="sm" className="!py-4 !px-5">
         <div className="flex items-center gap-4">
-          <Link href="/missions" prefetch={true}
-            className="inline-flex items-center justify-center size-9 shrink-0 -ml-1 relative z-10 rounded-md hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 transition-colors"
-          >
-            <ArrowLeft size={18} />
-          </Link>
+          <ReturnToPreviousButton
+            fallbackHref="/missions"
+            className="relative z-10 -ml-1 h-9 shrink-0"
+          />
 
           <div className="flex-1 flex items-center gap-3 min-w-0">
             {isActive ? (
@@ -659,7 +657,7 @@ export function MissionConsoleClient({ mission }: { mission: MissionWithDetails 
                       </h2>
                       {mission.scenario === "深度追踪" ? (
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                          这是 Leader 对整个任务的二次概述。完整稿件请到上方"多维度草稿对比"卡片查看 / 入库。
+                          这是 Leader 对整个任务的二次概述。完整稿件请到上方「多维度草稿对比」卡片查看 / 入库。
                         </p>
                       ) : (
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
@@ -1202,6 +1200,7 @@ function EmployeeChip({ meta }: { meta: EmployeeMeta | null }) {
 // ---------------------------------------------------------------------------
 
 function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
+  const [renderedAt] = useState(() => Date.now());
   // 从 lucide-react 动态解析 icon 名（mission.scenarioIcon 可能为 null）
   const ScenarioIcon = mission.scenarioIcon
     ? ((LucideIcons as unknown as Record<string, LucideIcon | undefined>)[
@@ -1215,7 +1214,7 @@ function ScenarioInfoCard({ mission }: { mission: MissionWithDetails }) {
 
   const elapsedMs = mission.completedAt
     ? new Date(mission.completedAt).getTime() - new Date(mission.createdAt).getTime()
-    : Date.now() - new Date(mission.createdAt).getTime();
+    : renderedAt - new Date(mission.createdAt).getTime();
   const elapsedMins = Math.max(1, Math.round(elapsedMs / 60000));
 
   const phaseLabels: Record<string, string> = {

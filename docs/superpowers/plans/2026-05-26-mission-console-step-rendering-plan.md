@@ -49,8 +49,8 @@
 ### Task A.1.1: 新建 `llm-skill-dispatch.ts` + 单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/llm-skill-dispatch.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/__tests__/llm-skill-dispatch.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/llm-skill-dispatch.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/__tests__/llm-skill-dispatch.test.ts`
 
 - [ ] **Step 1: topic-classifier.ts 加 title/summary echo + ClassifiedItem alias**
 
@@ -197,7 +197,7 @@ describe("invokeLLMSkillDirectly cross_language_rewrite", () => {
 
 - [ ] **Step 3: 运行测试，确认失败**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests__/llm-skill-dispatch.test.ts`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests__/llm-skill-dispatch.test.ts`
 Expected: FAIL — `llm-skill-dispatch.ts` 不存在
 
 - [ ] **Step 4: 实现 dispatch**
@@ -306,7 +306,7 @@ export async function invokeLLMSkillDirectly(
 
 - [ ] **Step 5: 测试 PASS + tsc**
 
-Run: `cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests__/llm-skill-dispatch.test.ts && npx tsc --noEmit 2>&1 | grep -v "compute-ranking-scope" | head -5`
+Run: `cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests__/llm-skill-dispatch.test.ts && npx tsc --noEmit 2>&1 | grep -v "compute-ranking-scope" | head -5`
 Expected: 4 PASS, 0 tsc errors
 
 - [ ] **Step 6: Commit**
@@ -338,8 +338,8 @@ Pre-commit hook will run vitest全量.
 ### Task A.1.2: mission-executor 扩展支持 LLM-skill 预执行 + `{{stepN.field}}` 模板
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/mission-executor.ts` (around lines 670-820, 750-763 mustache renderer, 885-946 short-circuit)
-- Test: 追加 `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/__tests__/mission-executor-short-circuit.test.ts` (新建)
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/mission-executor.ts` (around lines 670-820, 750-763 mustache renderer, 885-946 short-circuit)
+- Test: 追加 `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/__tests__/mission-executor-short-circuit.test.ts` (新建)
 
 - [ ] **Step 1: 写测试 (failing) — `renderStepParameters` 模板扩展**
 
@@ -611,7 +611,7 @@ EOF
 ### Task A.1.3: hot_topics_overseas_en seed 加 paramConfig
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed-builtin-workflows.ts` (around line 2257-2272)
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed-builtin-workflows.ts` (around line 2257-2272)
 
 - [ ] **Step 1: 改 seed**
 
@@ -686,10 +686,10 @@ EOF
 ### Task A.2: 4 个 SKILL.md 加「步骤边界」段
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/trending_topics/SKILL.md`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/topic-classifier/SKILL.md`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/cross-language-rewrite/SKILL.md`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/archive-to-drafts/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/trending_topics/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/topic-classifier/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/cross-language-rewrite/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/archive-to-drafts/SKILL.md`
 
 - [ ] **Step 1: 给 trending_topics 加段**
 
@@ -803,9 +803,9 @@ npm run build
 ### Task B.1: TrendingTopicsRenderer
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/trending-topics-renderer.tsx`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/fallback-renderer.tsx`
-- Test: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/trending-topics-renderer.test.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/trending-topics-renderer.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/fallback-renderer.tsx`
+- Test: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/trending-topics-renderer.test.tsx`
 
 - [ ] **Step 1: 写 fallback-renderer (供所有 step renderer 共用 fallback)**
 
@@ -1048,8 +1048,8 @@ EOF
 ### Task B.2: TopicClassifierRenderer
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/topic-classifier-renderer.tsx`
-- Test: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/topic-classifier-renderer.test.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/topic-classifier-renderer.tsx`
+- Test: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/topic-classifier-renderer.test.tsx`
 
 - [ ] **Step 1: 写测试**
 
@@ -1219,8 +1219,8 @@ EOF
 ### Task B.3: CrossLanguageRewriteRenderer
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/cross-language-rewrite-renderer.tsx`
-- Test: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/cross-language-rewrite-renderer.test.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/cross-language-rewrite-renderer.tsx`
+- Test: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/cross-language-rewrite-renderer.test.tsx`
 
 - [ ] **Step 1: 写测试**
 
@@ -1376,9 +1376,9 @@ EOF
 ### Task B.4: ArchiveToDraftsRenderer (从 inline 抽出)
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/archive-to-drafts-renderer.tsx`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/missions/[id]/mission-console-client.tsx` (删除 inline 块 + 替换为 import)
-- Test: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/archive-to-drafts-renderer.test.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/archive-to-drafts-renderer.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/missions/[id]/mission-console-client.tsx` (删除 inline 块 + 替换为 import)
+- Test: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/missions/step-renderers/__tests__/archive-to-drafts-renderer.test.tsx`
 
 - [ ] **Step 1: 抽出组件**
 
@@ -1557,7 +1557,7 @@ EOF
 ### Task B.5: TaskDetailSheet 加 dispatch switch
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/missions/[id]/mission-console-client.tsx` (TaskDetailSheet body)
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/missions/[id]/mission-console-client.tsx` (TaskDetailSheet body)
 
 - [ ] **Step 1: 把 B.4 留下的单 if 改成 switch dispatch**
 

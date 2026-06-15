@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -33,6 +33,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { cn } from "@/lib/utils";
+import {
+  appendReturnTo,
+  consumeCustomizeReturn,
+  markCustomizeReturn,
+} from "@/lib/navigation-return";
 import {
   renameConversationAction,
   pinConversationAction,
@@ -82,6 +87,8 @@ export function CoworkSidebar({
   activeId: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -92,8 +99,18 @@ export function CoworkSidebar({
   // groupBy 从 localStorage 恢复(默认 none;挂载后再读,避免 SSR 水合不一致)。
   useEffect(() => {
     const saved = localStorage.getItem(GROUPBY_STORAGE_KEY);
-    if (saved === "date" || saved === "project") setGroupBy(saved);
+    if (saved === "date" || saved === "project") {
+      window.setTimeout(() => setGroupBy(saved), 0);
+    }
   }, []);
+
+  // 从 SKILLS / 连接器 / 个人插件返回时,恢复"定制"展开状态。
+  useEffect(() => {
+    if (consumeCustomizeReturn(sessionStorage)) {
+      window.setTimeout(() => setCustomizeOpen(true), 0);
+    }
+  }, []);
+
   function changeGroupBy(g: GroupBy) {
     setGroupBy(g);
     try {
@@ -161,6 +178,10 @@ export function CoworkSidebar({
   }, [conversations, query, groupBy, projects]);
 
   const totalConversations = groups.reduce((n, g) => n + g.items.length, 0);
+  const currentHref = useMemo(() => {
+    const qs = searchParams.toString();
+    return `${pathname}${qs ? `?${qs}` : ""}`;
+  }, [pathname, searchParams]);
 
   // 删除/归档当前正在看的会话后,跳到下一条;无则回 /home
   function jumpAfterRemoval(removedId: string) {
@@ -252,9 +273,24 @@ export function CoworkSidebar({
         </Button>
         {customizeOpen && (
           <div className="ml-3 border-l border-border/60 pl-1.5">
-            <CustomizeLink href="/skills" icon={Sparkles} label="SKILLS" />
-            <CustomizeLink href="/cowork/connectors" icon={Plug} label="连接器" />
-            <CustomizeLink href="/cowork/plugins" icon={Puzzle} label="个人插件" />
+            <CustomizeLink
+              href="/skills"
+              returnTo={currentHref}
+              icon={Sparkles}
+              label="SKILLS"
+            />
+            <CustomizeLink
+              href="/cowork/connectors"
+              returnTo={currentHref}
+              icon={Plug}
+              label="连接器"
+            />
+            <CustomizeLink
+              href="/cowork/plugins"
+              returnTo={currentHref}
+              icon={Puzzle}
+              label="个人插件"
+            />
           </div>
         )}
 
@@ -470,16 +506,19 @@ function ConversationRow({
 
 function CustomizeLink({
   href,
+  returnTo,
   icon: Icon,
   label,
 }: {
   href: string;
+  returnTo: string;
   icon: typeof Plug;
   label: string;
 }) {
   return (
     <Link
-      href={href}
+      href={appendReturnTo(href, returnTo)}
+      onClick={() => markCustomizeReturn(sessionStorage)}
       className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground/75 transition-colors hover:bg-muted"
     >
       <Icon className="size-3.5 flex-none opacity-70" />

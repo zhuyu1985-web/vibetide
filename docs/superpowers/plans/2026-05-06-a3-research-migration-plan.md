@@ -8,9 +8,9 @@
 
 **Tech Stack:** Next.js 16 App Router / TypeScript strict / Drizzle ORM / Supabase / Inngest / vitest。
 
-**关联 sub-spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-06-a3-research-migration-design.md`
+**关联 sub-spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-06-a3-research-migration-design.md`
 
-**关联 main spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.4
+**关联 main spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.4
 
 **总工期：3.5-4.5 工作日**（5 phase）
 
@@ -34,97 +34,97 @@
 
 | 文件 | 理由 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/news-articles.ts` | DROP `research_news_articles` + `research_news_article_topic_hits` 两表 schema |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/news-articles.ts` | DROP `research_news_articles` + `research_news_article_topic_hits` 两表 schema |
 
 ### Phase 1 修改
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/enums.ts` | DROP `newsSourceChannelEnum`（无引用）；保留 `topicMatchTypeEnum` + `researchEmbeddingStatusEnum` + `researchDedupLevelEnum` + `researchTaskStatusEnum` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/index.ts` | barrel 删 export news-articles |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/research-topics.ts` | 删除对 newsArticles 的反向 relations 引用（如有） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/research-tasks.ts` | 删 firstSeenResearchTaskId 反向 relations 引用（如有） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/enums.ts` | DROP `newsSourceChannelEnum`（无引用）；保留 `topicMatchTypeEnum` + `researchEmbeddingStatusEnum` + `researchDedupLevelEnum` + `researchTaskStatusEnum` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/index.ts` | barrel 删 export news-articles |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/research-topics.ts` | 删除对 newsArticles 的反向 relations 引用（如有） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/research-tasks.ts` | 删 firstSeenResearchTaskId 反向 relations 引用（如有） |
 
 ### Phase 1 新建
 
 | 文件 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/annotations.ts` | research_collected_item_topics + research_collected_item_districts 两张 annotation 表 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/2026050700000X_a3_research_migration.sql` | DROP 2 老表 + DROP enum + CREATE 2 annotation 表 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/annotations.ts` | research_collected_item_topics + research_collected_item_districts 两张 annotation 表 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/2026050700000X_a3_research_migration.sql` | DROP 2 老表 + DROP enum + CREATE 2 annotation 表 |
 
 ### Phase 2 删除
 
 | 文件 |
 |---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/article-ingest.ts`（A1 Phase 0 stub，A3 整体删） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/article-ingest.ts`（A1 Phase 0 stub，A3 整体删） |
 
 ### Phase 2 修改
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts` | 移除对 newsArticles 引用，改为关联 collected_items + annotation |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/article-search.ts` → 重命名为 `collected-item-search.ts` 或重写 | server action 改为调新 DAL |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/research-tasks.ts` | 同上 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts` | 移除对 newsArticles 引用，改为关联 collected_items + annotation |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/article-search.ts` → 重命名为 `collected-item-search.ts` 或重写 | server action 改为调新 DAL |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/research-tasks.ts` | 同上 |
 
 ### Phase 2 新建
 
 | 文件 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts` | searchCollectedItemsForResearch + advancedSearch / leftJoin annotation 表 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/__tests__/collected-item-search.test.ts` | DAL 单测 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts` | searchCollectedItemsForResearch + advancedSearch / leftJoin annotation 表 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/__tests__/collected-item-search.test.ts` | DAL 单测 |
 
 ### Phase 3 新建
 
 | 文件 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/topic-matcher.ts` | matchTopicsForItem(text, topics) → MatchResult[] |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/district-matcher.ts` | matchDistrictsForItem(text, districts, variants) → DistrictMatchResult[] + DISTRICT_VARIANTS dict |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/topic-matcher.test.ts` | matcher 单测 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/district-matcher.test.ts` | matcher 单测 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/annotate-collected-item.ts` | 订阅 collection/item.created 事件 → 命中 → 写 annotation 表 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/backfill-annotate.ts` | 一次性 Inngest（手工触发）→ 批量扫历史 collected_items 跑 annotate |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/topic-matcher.ts` | matchTopicsForItem(text, topics) → MatchResult[] |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/district-matcher.ts` | matchDistrictsForItem(text, districts, variants) → DistrictMatchResult[] + DISTRICT_VARIANTS dict |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/topic-matcher.test.ts` | matcher 单测 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/district-matcher.test.ts` | matcher 单测 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/annotate-collected-item.ts` | 订阅 collection/item.created 事件 → 命中 → 写 annotation 表 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/backfill-annotate.ts` | 一次性 Inngest（手工触发）→ 批量扫历史 collected_items 跑 annotate |
 
 ### Phase 3 修改
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/events.ts` | 注册 `research/backfill-annotate.requested` 事件类型 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts` | 注册 annotateCollectedItem + backfillAnnotate 两函数 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/events.ts` | 注册 `research/backfill-annotate.requested` 事件类型 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts` | 注册 annotateCollectedItem + backfillAnnotate 两函数 |
 
 ### Phase 4 修改
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx` | 解 Phase 0 stub，重接 collected_items（按 outlet_tier / topic / district 聚合） + 同步注释 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | 重启用 outlet 字段筛选 + topic/district annotation 检索 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/*` | 评估保留/简化（detail page + new page），改为"检索快照"语义 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx` | 解 Phase 0 stub，重接 collected_items（按 outlet_tier / topic / district 聚合） + 同步注释 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | 重启用 outlet 字段筛选 + topic/district annotation 检索 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/*` | 评估保留/简化（detail page + new page），改为"检索快照"语义 |
 
 ### Phase 5 删除
 
 | 文件 |
 |---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/tavily-crawl.ts` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/manual-url-ingest.ts` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/article-content-fetch.ts` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/task-start.ts`（重写或删；详 §Phase 4-5）|
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/tavily-crawl.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/manual-url-ingest.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/article-content-fetch.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/task-start.ts`（重写或删；详 §Phase 4-5）|
 
 ### Phase 5 修改
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts` | 注销已删除函数（去掉 import + functions 数组中条目） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts` | 增 1 集成测试：writer 入库后 annotate Inngest 自动触发 + annotation 表写入 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts` | 注销已删除函数（去掉 import + functions 数组中条目） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts` | 增 1 集成测试：writer 入库后 annotate Inngest 自动触发 + annotation 表写入 |
 
 ### 保留（不动）
 
 | 文件 |
 |---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/bridge-backfill.ts`（独立链路，sub-spec §6 已确认保留） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/research-tasks.ts`（保留 + 简化语义，schema 不动） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/research-topics.ts` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/cq-districts.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/bridge-backfill.ts`（独立链路，sub-spec §6 已确认保留） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/research-tasks.ts`（保留 + 简化语义，schema 不动） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/research-topics.ts` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/cq-districts.ts` |
 
 ---
 
@@ -133,7 +133,7 @@
 ### Task 1.1：新建 annotation schema
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/annotations.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/annotations.ts`
 
 - [ ] **Step 1：写 schema 文件**
 
@@ -194,7 +194,7 @@ export type ResearchCollectedItemDistrictRow = typeof researchCollectedItemDistr
 
 - [ ] **Step 2：barrel export 追加**
 
-修改 `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/index.ts` 追加：
+修改 `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/index.ts` 追加：
 
 ```ts
 export * from "./annotations";
@@ -203,7 +203,7 @@ export * from "./annotations";
 - [ ] **Step 3：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ---
@@ -211,18 +211,18 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.2：删 research_news_articles schema 文件
 
 **Files:**
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/news-articles.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/news-articles.ts`
 
 - [ ] **Step 1：删除文件**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/news-articles.ts
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/news-articles.ts
 ```
 
 - [ ] **Step 2：清理 barrel index.ts**
 
 ```bash
-grep -n "news-articles" /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/index.ts
+grep -n "news-articles" /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/index.ts
 ```
 
 如有 `export * from "./news-articles"` 删除该行。
@@ -230,7 +230,7 @@ grep -n "news-articles" /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/rese
 - [ ] **Step 3：清理 enums.ts**
 
 ```bash
-grep -n "newsSourceChannelEnum\|sourceChannelEnum" /Users/zhuyu/dev/chinamcloud/vibetide/src/db/schema/research/enums.ts
+grep -n "newsSourceChannelEnum\|sourceChannelEnum" /Users/zhuyu/Developer/chinamcloud/vibetide/src/db/schema/research/enums.ts
 ```
 
 `newsSourceChannelEnum` 是 research_news_articles.source_channel 字段用的 enum。删除（A3 cleanup 后无引用）。其他 4 个 enum 保留：`topicMatchTypeEnum` / `researchEmbeddingStatusEnum` / `researchDedupLevelEnum` / `researchTaskStatusEnum`。
@@ -238,7 +238,7 @@ grep -n "newsSourceChannelEnum\|sourceChannelEnum" /Users/zhuyu/dev/chinamcloud/
 - [ ] **Step 4：tsc 看错误增量**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | grep -E "Cannot find|has no exported member" | head -30
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | grep -E "Cannot find|has no exported member" | head -30
 ```
 
 预期：会有大量 import 错误（DAL / actions / inngest 仍引用 newsArticles / newsArticleTopicHits / newsSourceChannelEnum）。这是 Phase 1 中间态，下一个 Task 1.3 stub 化让 build 通过。
@@ -250,16 +250,16 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | grep -E "Can
 **目标：** Phase 2-5 才会真正改 DAL / inngest，但 Phase 1 末尾 tsc 必须 0 错。这一步只 stub 化引用，不动业务逻辑。
 
 **Files:**
-- Modify (stub): `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts`
-- Modify (stub): `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts`
-- Modify (stub): `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/article-search.ts`
-- Modify (stub): `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/research-tasks.ts`
+- Modify (stub): `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts`
+- Modify (stub): `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts`
+- Modify (stub): `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/article-search.ts`
+- Modify (stub): `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/research-tasks.ts`
 - Modify (stub): 现有 inngest functions（如 task-start.ts 仍引 newsArticles）
 
 - [ ] **Step 1：grep 所有 newsArticles / newsArticleTopicHits 引用**
 
 ```bash
-grep -rln "newsArticles\|newsArticleTopicHits\|newsSourceChannelEnum" /Users/zhuyu/dev/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
+grep -rln "newsArticles\|newsArticleTopicHits\|newsSourceChannelEnum" /Users/zhuyu/Developer/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
 ```
 
 - [ ] **Step 2：每处引用 stub 化**
@@ -276,13 +276,13 @@ grep -rln "newsArticles\|newsArticleTopicHits\|newsSourceChannelEnum" /Users/zhu
 - [ ] **Step 3：tsc 0 错**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 - [ ] **Step 4：build 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build 2>&1 | tail -10
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run build 2>&1 | tail -10
 ```
 
 ---
@@ -290,7 +290,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build 2>&1 | tail -10
 ### Task 1.4：生成 + 应用 migration
 
 **Files:**
-- Generate: `/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/2026050X000001_a3_research_migration.sql`
+- Generate: `/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/2026050X000001_a3_research_migration.sql`
 
 - [ ] **Step 0：探查实际表名 + enum 名（学 A1 经验）**
 
@@ -303,7 +303,7 @@ psql "$DATABASE_URL" -c "SELECT typname FROM pg_type WHERE typname LIKE '%resear
 - [ ] **Step 1：drizzle-kit generate**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:generate
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:generate
 # 或 pnpm db:generate
 ```
 
@@ -312,12 +312,12 @@ drizzle-kit 会自动生成 DROP table + CREATE table SQL。
 - [ ] **Step 2：rename 时间戳格式 + 同步 journal**
 
 ```bash
-DRIZZLE_FILE=$(ls -t /Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/*.sql | head -1)
+DRIZZLE_FILE=$(ls -t /Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/*.sql | head -1)
 DRIZZLE_NAME=$(basename "$DRIZZLE_FILE" .sql)
 NEW_NAME="20260507000001_a3_research_migration"
-mv "$DRIZZLE_FILE" "/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/${NEW_NAME}.sql"
+mv "$DRIZZLE_FILE" "/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/${NEW_NAME}.sql"
 
-JOURNAL=/Users/zhuyu/dev/chinamcloud/vibetide/supabase/migrations/meta/_journal.json
+JOURNAL=/Users/zhuyu/Developer/chinamcloud/vibetide/supabase/migrations/meta/_journal.json
 jq --arg old "$DRIZZLE_NAME" --arg new "$NEW_NAME" \
   '.entries |= map(if .tag == $old then .tag = $new else . end)' \
   "$JOURNAL" > "$JOURNAL.tmp" && mv "$JOURNAL.tmp" "$JOURNAL"
@@ -342,7 +342,7 @@ DROP TYPE IF EXISTS research_news_source_channel CASCADE;
 - [ ] **Step 4：应用 migration**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:migrate
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:migrate
 ```
 
 如果 db:migrate 失败（同 A1 历史 tracking 问题），用 psql 直接应用 + 手工插入跟踪记录。
@@ -363,7 +363,7 @@ psql "$DATABASE_URL" -c "SELECT typname FROM pg_type WHERE typname = 'research_n
 ### Task 1.5：Phase 1 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/db/schema/research/ \
         src/lib/dal/research/ \
         src/app/actions/research/ \
@@ -393,8 +393,8 @@ EOF
 ### Task 2.1：写 collected-item-search DAL（TDD）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/__tests__/collected-item-search.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/__tests__/collected-item-search.test.ts`
 
 - [ ] **Step 1：写测试（TDD 红灯）**
 
@@ -490,7 +490,7 @@ describe("searchCollectedItemsForResearch", () => {
 - [ ] **Step 2：跑测试预期失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/collected-item-search.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/collected-item-search.test.ts
 ```
 
 - [ ] **Step 3：实现 DAL**
@@ -594,7 +594,7 @@ export async function searchCollectedItemsForResearch(
 - [ ] **Step 4：跑测试预期通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/collected-item-search.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/collected-item-search.test.ts
 # 期望 5/5 pass
 ```
 
@@ -603,13 +603,13 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/research/
 ### Task 2.2：删 news-article-search.ts + research-tasks DAL 修复
 
 **Files:**
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts`
 
 - [ ] **Step 1：grep 确认 news-article-search 引用**
 
 ```bash
-grep -rln "from.*news-article-search\|searchNewsArticles\|advancedSearchNewsArticles" /Users/zhuyu/dev/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
+grep -rln "from.*news-article-search\|searchNewsArticles\|advancedSearchNewsArticles" /Users/zhuyu/Developer/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
 ```
 
 - [ ] **Step 2：替换调用方**
@@ -619,13 +619,13 @@ grep -rln "from.*news-article-search\|searchNewsArticles\|advancedSearchNewsArti
 - [ ] **Step 3：删 news-article-search.ts**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/news-article-search.ts
 ```
 
 - [ ] **Step 4：修复 research-tasks.ts**
 
 ```bash
-grep -n "newsArticles\|newsArticleTopicHits" /Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts
+grep -n "newsArticles\|newsArticleTopicHits" /Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/research-tasks.ts
 ```
 
 把对 newsArticles 的引用改为 collected_items + annotation。如复杂建议保持 task 概念不变（v1 spec 简化语义），只改 schema 引用。
@@ -633,7 +633,7 @@ grep -n "newsArticles\|newsArticleTopicHits" /Users/zhuyu/dev/chinamcloud/vibeti
 - [ ] **Step 5：tsc + build 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run build 2>&1 | tail -5
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run build 2>&1 | tail -5
 ```
 
 ---
@@ -641,14 +641,14 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run build 2>
 ### Task 2.3：server actions 重写
 
 **Files:**
-- Modify or rename: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/article-search.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/research-tasks.ts`
+- Modify or rename: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/article-search.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/research-tasks.ts`
 
 - [ ] **Step 1：article-search.ts 改名 + 重写**
 
 ```bash
-mv /Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/article-search.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts
+mv /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/article-search.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts
 ```
 
 重写 server action：
@@ -675,7 +675,7 @@ export async function searchResearchItems(filter: CollectedItemSearchFilter, pag
 - [ ] **Step 3：grep 调用方更新**
 
 ```bash
-grep -rln "from.*actions/research/article-search\|searchArticles\b" /Users/zhuyu/dev/chinamcloud/vibetide/src/app --include="*.ts" --include="*.tsx"
+grep -rln "from.*actions/research/article-search\|searchArticles\b" /Users/zhuyu/Developer/chinamcloud/vibetide/src/app --include="*.ts" --include="*.tsx"
 ```
 
 UI 文件（research/page.tsx / search-workbench-client.tsx）调用旧 action 的地方改为新 action（Phase 4 才完整改 UI；本 step 只是把 import path 修对让 build 通过）。
@@ -687,7 +687,7 @@ UI 文件（research/page.tsx / search-workbench-client.tsx）调用旧 action �
 ### Task 2.4：Phase 2 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/dal/research/ \
         src/app/actions/research/ \
         src/lib/research/article-ingest.ts && \
@@ -716,8 +716,8 @@ EOF
 ### Task 3.1：topic-matcher 算法 + 单测（TDD）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/topic-matcher.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/topic-matcher.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/topic-matcher.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/topic-matcher.test.ts`
 
 **Schema 真实情况**（reviewer 确认）：
 - `researchTopics` 表只有 `name` 字段，没有 commonName / approximateNames
@@ -828,7 +828,7 @@ export function matchTopicsForItem(
 - [ ] **Step 3：跑测试预期通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/research/__tests__/topic-matcher.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/research/__tests__/topic-matcher.test.ts
 # 期望 6/6 pass
 ```
 
@@ -837,8 +837,8 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/research/__te
 ### Task 3.2：district-matcher 算法 + 单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/district-matcher.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/__tests__/district-matcher.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/district-matcher.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/__tests__/district-matcher.test.ts`
 
 - [ ] **Step 1：写测试**
 
@@ -971,9 +971,9 @@ export const _DISTRICT_VARIANTS_FOR_TEST = DISTRICT_VARIANTS;
 ### Task 3.3：annotate-collected-item Inngest 函数
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/annotate-collected-item.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/events.ts`（注册新事件类型如 `research/backfill-annotate.requested`）
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts`（注册）
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/annotate-collected-item.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/events.ts`（注册新事件类型如 `research/backfill-annotate.requested`）
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts`（注册）
 
 - [ ] **Step 1：写 annotate-collected-item.ts**
 
@@ -1076,7 +1076,7 @@ export const annotateCollectedItem = inngest.createFunction(
 - [ ] **Step 2：注册事件类型**
 
 ```bash
-grep -n "research/backfill" /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/events.ts
+grep -n "research/backfill" /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/events.ts
 ```
 
 如未注册，加：
@@ -1090,7 +1090,7 @@ grep -n "research/backfill" /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/ev
 - [ ] **Step 3：注册函数到 functions/index.ts**
 
 ```bash
-grep -n "annotateCollectedItem\|outletBatchRecognize\|^export const functions\|^];" /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts
+grep -n "annotateCollectedItem\|outletBatchRecognize\|^export const functions\|^];" /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts
 ```
 
 加 import + 注册到 functions 数组（紧邻 outletBatchRecognize）。
@@ -1102,7 +1102,7 @@ grep -n "annotateCollectedItem\|outletBatchRecognize\|^export const functions\|^
 ### Task 3.4：backfill-annotate Inngest 函数
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/backfill-annotate.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/backfill-annotate.ts`
 
 - [ ] **Step 1：写函数**
 
@@ -1225,7 +1225,7 @@ export const backfillAnnotate = inngest.createFunction(
 ### Task 3.5：Phase 3 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/lib/research/topic-matcher.ts \
         src/lib/research/district-matcher.ts \
         src/lib/research/__tests__/ \
@@ -1256,12 +1256,12 @@ EOF
 ### Task 4.1：research/page.tsx 解 stub
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx`
 
 - [ ] **Step 1：read 现有 page.tsx**
 
 ```bash
-cat /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/page.tsx
+cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/page.tsx
 ```
 
 - [ ] **Step 2：改造 page.tsx**
@@ -1274,7 +1274,7 @@ cat /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/page.ts
 - [ ] **Step 3：tsc + 浏览器手动**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev &
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run dev &
 # 浏览器访问 /research，应能正常加载（即使数据空也不报错）
 ```
 
@@ -1283,7 +1283,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev &
 ### Task 4.2：search-workbench-client 解 stub
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
 
 - [ ] **Step 1：read 现有结构**
 
@@ -1300,9 +1300,9 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev &
 ### Task 4.3：research/admin/tasks 评估 + 改造
 
 **Files:**
-- Possibly modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/page.tsx`
-- Possibly modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/new/page.tsx`
-- Possibly modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/[id]/page.tsx`
+- Possibly modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/page.tsx`
+- Possibly modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/new/page.tsx`
+- Possibly modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/admin/tasks/[id]/page.tsx`
 
 - [ ] **Step 1：评估 research_tasks 概念是否保留**
 
@@ -1321,7 +1321,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run dev &
 ### Task 4.4：Phase 4 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add "src/app/(dashboard)/research/" && \
 git commit --no-verify -m "$(cat <<'EOF'
 feat(a3): Phase 4 — UI 解 6 处 Phase 0 stub
@@ -1344,25 +1344,25 @@ EOF
 ### Task 5.1：删除 4 个 research 自采 inngest 函数
 
 **Files:**
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/tavily-crawl.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/manual-url-ingest.ts`
-- Delete: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/article-content-fetch.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts`（去除 4 个函数的 import + 注册）
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/tavily-crawl.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/manual-url-ingest.ts`
+- Delete: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/article-content-fetch.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts`（去除 4 个函数的 import + 注册）
 
 - [ ] **Step 1：删除 4 个文件**
 
 ```bash
-rm /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/tavily-crawl.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/manual-url-ingest.ts \
-   /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/research/article-content-fetch.ts
+rm /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/tavily-crawl.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/whitelist-crawl.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/manual-url-ingest.ts \
+   /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/research/article-content-fetch.ts
 ```
 
 - [ ] **Step 2：清理 functions/index.ts 注册**
 
 ```bash
-grep -n "tavily-crawl\|whitelist-crawl\|manual-url-ingest\|article-content-fetch\|tavilyCrawl\|whitelistCrawl\|manualUrlIngest\|articleContentFetch" /Users/zhuyu/dev/chinamcloud/vibetide/src/inngest/functions/index.ts
+grep -n "tavily-crawl\|whitelist-crawl\|manual-url-ingest\|article-content-fetch\|tavilyCrawl\|whitelistCrawl\|manualUrlIngest\|articleContentFetch" /Users/zhuyu/Developer/chinamcloud/vibetide/src/inngest/functions/index.ts
 ```
 
 去除 import 和 functions 数组中条目。
@@ -1372,20 +1372,20 @@ grep -n "tavily-crawl\|whitelist-crawl\|manual-url-ingest\|article-content-fetch
 如果 task-start.ts 不再被任何 cron / event 触发，删除。如果仍被研究任务页面手工触发，重写为只更新 task status + 触发 backfill-annotate。
 
 ```bash
-grep -rln "task-start\|taskStart\|research/task" /Users/zhuyu/dev/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
+grep -rln "task-start\|taskStart\|research/task" /Users/zhuyu/Developer/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
 ```
 
 - [ ] **Step 4：tsc + build 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run build 2>&1 | tail -5
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run build 2>&1 | tail -5
 ```
 
 ---
 
 ### Task 5.2：writer 集成测试
 
-**File:** Modify `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts`
+**File:** Modify `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/collection/__tests__/writer.test.ts`
 
 - [ ] **Step 1：加 1 集成 case**
 
@@ -1427,7 +1427,7 @@ describe("writer + a3 annotate 集成", () => {
 - [ ] **Step 2：跑测试通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/writer.test.ts 2>&1 | tail -10
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/collection/__tests__/writer.test.ts 2>&1 | tail -10
 ```
 
 ---
@@ -1437,25 +1437,25 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/collection/__
 - [ ] **Step 1：tsc**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 - [ ] **Step 2：lint**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run lint 2>&1 | tail -5
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run lint 2>&1 | tail -5
 ```
 
 - [ ] **Step 3：build**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build 2>&1 | tail -10
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run build 2>&1 | tail -10
 ```
 
 - [ ] **Step 4：A3 测试集子集**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run \
   src/lib/dal/research/__tests__/collected-item-search.test.ts \
   src/lib/research/__tests__/ \
   src/lib/collection/__tests__/writer.test.ts 2>&1 | tail -10
@@ -1466,14 +1466,14 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
 - [ ] **Step 5：grep 旧引用清理验证**
 
 ```bash
-grep -rln "newsArticles\|newsArticleTopicHits\|newsSourceChannelEnum\|searchNewsArticles\|article-ingest" /Users/zhuyu/dev/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
+grep -rln "newsArticles\|newsArticleTopicHits\|newsSourceChannelEnum\|searchNewsArticles\|article-ingest" /Users/zhuyu/Developer/chinamcloud/vibetide/src --include="*.ts" --include="*.tsx" 2>/dev/null
 # 期望：0 hits
 ```
 
 - [ ] **Step 6：A3 final commit**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add src/inngest/functions/research/ \
         src/inngest/functions/index.ts \
         src/lib/collection/__tests__/writer.test.ts && \

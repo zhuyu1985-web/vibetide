@@ -91,7 +91,7 @@ git commit -m "docs(skills/p1): <name> MD standardized to baoyu-skills format (<
 - [ ] **Step 1.1：创建目录 + 3 个 stub 文件**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide/.worktrees/phase1-cms-adapter-mvp
+cd /Users/zhuyu/Developer/chinamcloud/vibetide/.worktrees/phase1-cms-adapter-mvp
 mkdir -p src/lib/agent/skills
 ```
 
@@ -410,7 +410,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 15.1：行数批量检查**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide/.worktrees/phase1-cms-adapter-mvp
+cd /Users/zhuyu/Developer/chinamcloud/vibetide/.worktrees/phase1-cms-adapter-mvp
 for s in cms_publish cms_catalog_sync aigc_script_push script_generate duanju_script zhongcao_script tandian_script podcast_script zongyi_highlight content_generate headline_generate summary_generate style_rewrite; do
   lines=$(wc -l < skills/$s/SKILL.md)
   printf "%-22s %s\n" "$s" "$lines"

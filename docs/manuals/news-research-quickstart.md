@@ -109,7 +109,7 @@ vibetide 的所有"采集 / 报告生成 / 自动打标"都是**异步任务**�
 
 ```bash
 # 终端 1：Next.js dev
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 pnpm run dev
 # → http://localhost:3000
 

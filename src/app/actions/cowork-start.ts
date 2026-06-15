@@ -93,6 +93,7 @@ export async function startCoworkScenario(
       template.name,
       validated.cleaned,
       template.promptTemplate,
+      (template.inputFields ?? []) as InputFieldDef[],
     ),
     kind: "text",
   });

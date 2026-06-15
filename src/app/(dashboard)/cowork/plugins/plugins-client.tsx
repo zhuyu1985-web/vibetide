@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Puzzle, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReturnToPreviousButton } from "@/components/shared/return-to-previous-button";
 import { SkillImportDialog } from "@/components/shared/skill-import-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteSkill } from "@/app/actions/skills";
@@ -28,13 +29,16 @@ export function PluginsClient({ skills }: { skills: SkillWithBindCount[] }) {
     <div className="mx-auto max-w-3xl px-6 py-6">
       <div className="mb-1 flex items-center justify-between">
         <h1 className="text-xl font-medium">个人插件</h1>
-        <Button
-          variant="secondary"
-          className="gap-1.5"
-          onClick={() => setImportOpen(true)}
-        >
-          <Upload className="size-4" /> 上传插件
-        </Button>
+        <div className="flex items-center gap-2">
+          <ReturnToPreviousButton />
+          <Button
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="size-4" /> 上传插件
+          </Button>
+        </div>
       </div>
       <p className="mb-5 text-sm text-muted-foreground">
         上传 SKILL.md / .zip 技能包,变成 AI 团队可调用的自定义技能(个人插件)。

@@ -1,10 +1,12 @@
 "use client";
 
-import { useReducer } from "react";
+import { useReducer, useState } from "react";
 import { CoworkSidebar } from "@/components/cowork/cowork-sidebar";
 import { ConversationThread } from "@/components/cowork/conversation-thread";
 import { MissionDrawer } from "@/components/cowork/mission-drawer";
+import { ArtifactPreviewWorkspace } from "@/components/cowork/artifact-preview-workspace";
 import { missionDrawerReducer } from "@/lib/cowork/mission-drawer-state";
+import type { ArtifactPreviewItem } from "@/lib/cowork/artifact-preview";
 import type {
   Conversation,
   ConversationMessage,
@@ -32,6 +34,11 @@ export function CoworkClient({ conversations, projects, active }: Props) {
     missionId: initialMissionId,
     open: initialMissionId != null,
   });
+  const [selectedArtifact, setSelectedArtifact] =
+    useState<ArtifactPreviewItem | null>(null);
+  const [artifactOverrides, setArtifactOverrides] = useState<
+    Record<string, ArtifactPreviewItem>
+  >({});
 
   return (
     <div className="flex h-full overflow-hidden rounded-xl border border-border/60">
@@ -40,22 +47,50 @@ export function CoworkClient({ conversations, projects, active }: Props) {
         projects={projects}
         activeId={active?.conversation.id ?? null}
       />
-      <ConversationThread
-        active={active}
-        focusedMissionId={drawer.open ? drawer.missionId : null}
-        onMissionFocus={(missionId) => dispatch({ type: "focus", missionId })}
-        onSendStart={() => dispatch({ type: "pending" })}
-        onSendSettled={(missionId) =>
-          dispatch(
-            missionId ? { type: "focus", missionId } : { type: "close" },
-          )
-        }
-      />
-      <MissionDrawer
-        missionId={drawer.missionId}
-        open={drawer.open}
-        onClose={() => dispatch({ type: "close" })}
-      />
+      <div className="flex min-w-0 flex-1">
+        <ConversationThread
+          active={active}
+          focusedMissionId={drawer.open ? drawer.missionId : null}
+          selectedArtifactId={selectedArtifact?.id ?? null}
+          artifactOverrides={artifactOverrides}
+          onMissionFocus={(missionId) => {
+            setSelectedArtifact(null);
+            dispatch({ type: "focus", missionId });
+          }}
+          onArtifactSelect={(artifact) => {
+            setSelectedArtifact(artifact);
+            dispatch({ type: "focus", missionId: artifact.missionId });
+          }}
+          onSendStart={() => {
+            setSelectedArtifact(null);
+            dispatch({ type: "pending" });
+          }}
+          onSendSettled={(missionId) =>
+            dispatch(
+              missionId ? { type: "focus", missionId } : { type: "close" },
+            )
+          }
+        />
+        {selectedArtifact ? (
+          <ArtifactPreviewWorkspace
+            artifact={selectedArtifact}
+            onClose={() => setSelectedArtifact(null)}
+            onSaved={(artifact) => {
+              setSelectedArtifact(artifact);
+              setArtifactOverrides((prev) => ({
+                ...prev,
+                [artifact.id]: artifact,
+              }));
+            }}
+          />
+        ) : (
+          <MissionDrawer
+            missionId={drawer.missionId}
+            open={drawer.open}
+            onClose={() => dispatch({ type: "close" })}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -16,29 +16,29 @@
 
 | 路径 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/skills/report_drafter/SKILL.md` | baoyu 标准 SKILL.md（180-320 行）：身份 / 输入输出 / 学术风格约束 / 学术段落输出模板，A5 Inngest job 通过 `loadSkillContent("report_drafter")` 拿全文注入 system prompt |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/skills/research_query_builder/SKILL.md` | baoyu 标准：身份 / 口语→`AdvancedSearchCondition[]` JSON 协议 / 区县 + 主题字典使用规则 / 5 operator 语义 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/skills/data_pivoter/SKILL.md` | baoyu 标准：身份 / 5 维度 / chart 选型规则 / `pivot_config` 输出协议 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/research-query-builder.ts` | zod schema + tool execute（字典注入 + assembleAgent + generateText/Output.object） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/data-pivoter.ts` | zod schema + tool execute（含 `computePivotPreview`） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/mention-switch.ts` | `detectMentionSwitch(message)` util，从 EMPLOYEE_META 派生 slug 列表生成 regex |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/chat/tool-action-card.tsx` | quick-action 卡片（`research_query_builder` / `data_pivoter` 两种 render，全部 `variant="ghost"` 无边框） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/chat/employee-mention-picker.tsx` | chat input `@` 触发 popover，列出 9 位员工头像 + nickname |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/__tests__/research-query-builder.test.ts` | 4 case：正常 / district 找不到 / topic 找不到 / >10 conditions 抛 zod error |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/__tests__/data-pivoter.test.ts` | 3 case：基础 / 含 filter / 无 current_report_id |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/__tests__/mention-switch.test.ts` | 3 case：合法 `@xiaolei` / 非法 `@unknown` / 无 `@` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/report_drafter/SKILL.md` | baoyu 标准 SKILL.md（180-320 行）：身份 / 输入输出 / 学术风格约束 / 学术段落输出模板，A5 Inngest job 通过 `loadSkillContent("report_drafter")` 拿全文注入 system prompt |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/research_query_builder/SKILL.md` | baoyu 标准：身份 / 口语→`AdvancedSearchCondition[]` JSON 协议 / 区县 + 主题字典使用规则 / 5 operator 语义 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/data_pivoter/SKILL.md` | baoyu 标准：身份 / 5 维度 / chart 选型规则 / `pivot_config` 输出协议 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/research-query-builder.ts` | zod schema + tool execute（字典注入 + assembleAgent + generateText/Output.object） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/data-pivoter.ts` | zod schema + tool execute（含 `computePivotPreview`） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/mention-switch.ts` | `detectMentionSwitch(message)` util，从 EMPLOYEE_META 派生 slug 列表生成 regex |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/chat/tool-action-card.tsx` | quick-action 卡片（`research_query_builder` / `data_pivoter` 两种 render，全部 `variant="ghost"` 无边框） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/chat/employee-mention-picker.tsx` | chat input `@` 触发 popover，列出 9 位员工头像 + nickname |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/__tests__/research-query-builder.test.ts` | 4 case：正常 / district 找不到 / topic 找不到 / >10 conditions 抛 zod error |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/__tests__/data-pivoter.test.ts` | 3 case：基础 / 含 filter / 无 current_report_id |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/__tests__/mention-switch.test.ts` | 3 case：合法 `@xiaolei` / 非法 `@unknown` / 无 `@` |
 
 ### 修改（7 个）
 
 | 路径 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/constants.ts` | `EmployeeId` union 加 `xiaoyan`；`EMPLOYEE_META.xiaoyan` 加 entry（`BookOpen` / `#4f46e5`）；`EMPLOYEE_SHORT_DESC.xiaoyan` 加；`EMPLOYEE_CORE_SKILLS.xiaoyan` 加 `["report_drafter", "research_query_builder", "data_pivoter"]`；`BUILTIN_SKILL_NAMES` 加 3 个 slug→中文名 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed.ts` | `employeesData` 加 xiaoyan row（`roleType: "research_analyst"` / `authorityLevel: "assistant"` / `workPreferences: { autonomyLevel: 60, communicationStyle: "formal_academic", ... }`） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/tool-registry.ts` | 新增 `createResearchQueryBuilderTool` + `createDataPivoterTool` 注入到 `ALL_TOOLS` map（与现有 builtin tool 同构）；`resolveTools` 不变 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/api/chat/stream/route.ts` | 入口加 `detectMentionSwitch` 预处理：切换 `employeeSlug` → 重新查 `aiEmployees` → 改写 `messages[last].content` → `send("system", { switched_to: ... })` 单独 SSE event |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | useEffect 读 `searchParams.get("apply_query_builder")` → JSON.parse → `setMode("advanced")` + `setConditions` + `setSidebarFilter` + 自动触发 `handleAdvancedSearch` |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`（A5 已建则改，未建则 A5 落盘后再补） | useEffect 读 `searchParams.get("apply_pivot")` → 解析 pivot_config + chart_type → 渲染"自定义透视" section |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/__tests__/seed-employees.test.ts`（无则新建）+ `src/lib/__tests__/employee-meta.test.ts`（无则新建） | 新增/扩 1+1=2 case：xiaoyan core skill 绑定 / EMPLOYEE_META 三处一致 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/constants.ts` | `EmployeeId` union 加 `xiaoyan`；`EMPLOYEE_META.xiaoyan` 加 entry（`BookOpen` / `#4f46e5`）；`EMPLOYEE_SHORT_DESC.xiaoyan` 加；`EMPLOYEE_CORE_SKILLS.xiaoyan` 加 `["report_drafter", "research_query_builder", "data_pivoter"]`；`BUILTIN_SKILL_NAMES` 加 3 个 slug→中文名 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed.ts` | `employeesData` 加 xiaoyan row（`roleType: "research_analyst"` / `authorityLevel: "assistant"` / `workPreferences: { autonomyLevel: 60, communicationStyle: "formal_academic", ... }`） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/tool-registry.ts` | 新增 `createResearchQueryBuilderTool` + `createDataPivoterTool` 注入到 `ALL_TOOLS` map（与现有 builtin tool 同构）；`resolveTools` 不变 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/api/chat/stream/route.ts` | 入口加 `detectMentionSwitch` 预处理：切换 `employeeSlug` → 重新查 `aiEmployees` → 改写 `messages[last].content` → `send("system", { switched_to: ... })` 单独 SSE event |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | useEffect 读 `searchParams.get("apply_query_builder")` → JSON.parse → `setMode("advanced")` + `setConditions` + `setSidebarFilter` + 自动触发 `handleAdvancedSearch` |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`（A5 已建则改，未建则 A5 落盘后再补） | useEffect 读 `searchParams.get("apply_pivot")` → 解析 pivot_config + chart_type → 渲染"自定义透视" section |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/__tests__/seed-employees.test.ts`（无则新建）+ `src/lib/__tests__/employee-meta.test.ts`（无则新建） | 新增/扩 1+1=2 case：xiaoyan core skill 绑定 / EMPLOYEE_META 三处一致 |
 
 ---
 
@@ -47,7 +47,7 @@
 ### Task 1.1: `EMPLOYEE_META` + `EMPLOYEE_CORE_SKILLS` + `BUILTIN_SKILL_NAMES` 注册
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/constants.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/constants.ts`
 
 - [ ] **Step 1: lucide-react import 加 `BookOpen`**
 
@@ -161,7 +161,7 @@ export const BUILTIN_SKILL_NAMES: Record<string, string> = {
 - [ ] **Step 7: 跑 tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 预期：0 errors。`EMPLOYEE_META`/`EMPLOYEE_SHORT_DESC` 都是 `Record<EmployeeId, ...>` 形式，TS 编译器会卡漏掉的 key。
@@ -169,7 +169,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.2: `seed.ts` 加 xiaoyan employee row
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/seed.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/seed.ts`
 
 - [ ] **Step 1: `employeesData` 数组在 xiaoshu 之后、leader 之前插入**
 
@@ -229,7 +229,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 - [ ] **Step 3: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 预期：0 errors。
@@ -237,9 +237,9 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.3: 创建 3 个 stub SKILL.md（最小 frontmatter）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/report_drafter/SKILL.md`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/research_query_builder/SKILL.md`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/data_pivoter/SKILL.md`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/report_drafter/SKILL.md`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/research_query_builder/SKILL.md`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/data_pivoter/SKILL.md`
 
 - [ ] **Step 1: `skills/report_drafter/SKILL.md`（stub）**
 
@@ -345,7 +345,7 @@ Phase 4 填充完整 baoyu 10-12 章 body。
 - [ ] **Step 5: 跑 seed 并 grep 输出**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:seed 2>&1 | tee /tmp/seed-a6.log
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:seed 2>&1 | tee /tmp/seed-a6.log
 grep -E "(report_drafter|research_query_builder|data_pivoter|xiaoyan)" /tmp/seed-a6.log
 ```
 
@@ -356,15 +356,15 @@ grep -E "(report_drafter|research_query_builder|data_pivoter|xiaoyan)" /tmp/seed
 
 如果上面 grep 输出为空 / 显示 `0 new builtin skills`，先 sanity check：
 ```bash
-ls /Users/zhuyu/dev/chinamcloud/vibetide/skills/ | grep -E "(report_drafter|research_query_builder|data_pivoter)"
+ls /Users/zhuyu/Developer/chinamcloud/vibetide/skills/ | grep -E "(report_drafter|research_query_builder|data_pivoter)"
 ```
 应列出 3 个目录；如果缺，补 SKILL.md；如果 3 个都在但 seed 未 insert，回头检查 frontmatter `category` 是否合法（必须是 `SkillCategory` 联合类型之一）。
 
 ### Task 1.4: 写 EMPLOYEE_META 一致性测试 + xiaoyan core skill 绑定测试
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/__tests__/employee-meta.test.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/db/__tests__/seed-employees.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/__tests__/employee-meta.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/db/__tests__/seed-employees.test.ts`
 
 - [ ] **Step 1: `src/lib/__tests__/employee-meta.test.ts`**
 
@@ -433,7 +433,7 @@ describe("xiaoyan employee seed", () => {
 - [ ] **Step 3: 跑测试**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/__tests__/employee-meta.test.ts src/db/__tests__/seed-employees.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/__tests__/employee-meta.test.ts src/db/__tests__/seed-employees.test.ts
 ```
 
 预期：2 passed。
@@ -443,7 +443,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/__tests__/emp
 - [ ] **Step 1: 启动 dev server**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev
 ```
 
 - [ ] **Step 2: 浏览器访问 `http://localhost:3000/employees`**
@@ -455,7 +455,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
 - [ ] **Step 1: stage + commit + push**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git add \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add \
   src/lib/constants.ts \
   src/db/seed.ts \
   skills/report_drafter/SKILL.md \
@@ -486,7 +486,7 @@ EOF
 ### Task 2.1: 把 `report_drafter` SKILL.md body 填到 baoyu 标准 180-320 行
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/report_drafter/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/report_drafter/SKILL.md`
 
 - [ ] **Step 1: 在 frontmatter `---` 之后追加完整 body**
 
@@ -604,7 +604,7 @@ A：不能。本 skill 只输出研究发现；对策建议属于扩展研究范
 - [ ] **Step 2: 验证 SKILL.md 行数 180-320**
 
 ```bash
-wc -l /Users/zhuyu/dev/chinamcloud/vibetide/skills/report_drafter/SKILL.md
+wc -l /Users/zhuyu/Developer/chinamcloud/vibetide/skills/report_drafter/SKILL.md
 ```
 
 预期：行数在 180-320 之间。如果不到 180，按 baoyu 标准补齐（多写几个示例段落 / Q&A）。如果超过 320，精简示例。
@@ -617,7 +617,7 @@ wc -l /Users/zhuyu/dev/chinamcloud/vibetide/skills/report_drafter/SKILL.md
 - [ ] **Step 1: 重新跑 seed 让 skills 表 description 字段更新**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run db:seed
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run db:seed
 ```
 
 `seed.ts` 第 199-216 行 update 路径会刷新 description（content 字段在 SKILL.md 里，运行时通过 `loadSkillContent("report_drafter")` 拿）。
@@ -653,7 +653,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 ```
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsx /tmp/verify-xiaoyan-prompt.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsx /tmp/verify-xiaoyan-prompt.ts
 ```
 
 预期：systemPrompt length > 5000；含 "学术中性"; 含 "background 模板"。
@@ -671,7 +671,7 @@ rm /tmp/verify-xiaoyan-prompt.ts
 - [ ] **Step 1: 跑 tsc / lint / build**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run lint && npm run build
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run lint && npm run build
 ```
 
 预期：3 项全过。
@@ -681,7 +681,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run lint && 
 - [ ] **Step 1: commit + push**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git add skills/report_drafter/SKILL.md && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add skills/report_drafter/SKILL.md && \
 git commit --no-verify -m "$(cat <<'EOF'
 feat(a6): report_drafter SKILL.md 完整 baoyu 内容 + A5 调用打通 — Phase 2
 
@@ -703,7 +703,7 @@ EOF
 ### Task 3.1: 写完整 SKILL.md body
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/research_query_builder/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/research_query_builder/SKILL.md`
 
 - [ ] **Step 1: frontmatter 之后追加完整 baoyu 10-12 章 body**
 
@@ -841,7 +841,7 @@ A：默认 publishedAt between [今日-7, 今日] + reasoning 说明假设。
 ### Task 3.2: 实现 `research-query-builder.ts` tool
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/research-query-builder.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/research-query-builder.ts`
 
 - [ ] **Step 1: 写文件**
 
@@ -995,7 +995,7 @@ export function createResearchQueryBuilderTool(orgId: string) {
 - [ ] **Step 3: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 预期：0 errors。
@@ -1003,7 +1003,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 3.3: 注册到 `tool-registry.ts:ALL_TOOLS`
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/tool-registry.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/tool-registry.ts`
 
 - [ ] **Step 1: 在文件顶部 import block 后追加 import**
 
@@ -1084,7 +1084,7 @@ for (const toolName of agent.tools.map((t) => t.name)) {
 - [ ] **Step 4: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 预期：0 errors。
@@ -1092,7 +1092,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 3.4: 写 4 case 单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/__tests__/research-query-builder.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/__tests__/research-query-builder.test.ts`
 
 - [ ] **Step 1: mock generateText / DAL，写 4 case**
 
@@ -1268,7 +1268,7 @@ describe("research_query_builder tool", () => {
 - [ ] **Step 2: 跑测试**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/skills/__tests__/research-query-builder.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/agent/skills/__tests__/research-query-builder.test.ts
 ```
 
 预期：4 passed。
@@ -1276,8 +1276,8 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/skills/
 ### Task 3.5: ToolActionCard chat 渲染 + A4 deeplink hydrate
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/chat/tool-action-card.tsx`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/chat/tool-action-card.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
 
 - [ ] **Step 1: `tool-action-card.tsx`**
 
@@ -1428,7 +1428,7 @@ useEffect(() => {
 - [ ] **Step 3: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ### Task 3.6: Phase 3 commit
@@ -1436,7 +1436,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 - [ ] **Step 1: commit + push**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git add \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add \
   skills/research_query_builder/SKILL.md \
   src/lib/agent/skills/research-query-builder.ts \
   src/lib/agent/tool-registry.ts \
@@ -1469,7 +1469,7 @@ EOF
 ### Task 4.1: 写完整 SKILL.md body
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/skills/data_pivoter/SKILL.md`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/skills/data_pivoter/SKILL.md`
 
 - [ ] **Step 1: frontmatter 之后追加 baoyu 10-12 章 body**
 
@@ -1602,7 +1602,7 @@ A：tool execute 内部 timeout=2s；超时则降级返回不带 preview 的输�
 ### Task 4.2: 实现 `data-pivoter.ts` tool（含 `computePivotPreview`）
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/data-pivoter.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/data-pivoter.ts`
 
 - [ ] **Step 1: 写文件**
 
@@ -1785,7 +1785,7 @@ export function createDataPivoterTool(orgId: string) {
 - [ ] **Step 2: 验证 schema 表名**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && grep -n "researchReports\|research_reports" src/db/schema/index.ts | head -3
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && grep -n "researchReports\|research_reports" src/db/schema/index.ts | head -3
 ```
 
 如果 `researchReports` 表名不同（A5 实施时可能叫别的），改 import；本 plan 的 `computePivotPreview` 只用 `articles`，所以 `researchReports` import 可删（保留只是占位）。简化：只 import `articles`。
@@ -1799,13 +1799,13 @@ import { aiEmployees, articles } from "@/db/schema";
 - [ ] **Step 3: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ### Task 4.3: 写 3 case 单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/skills/__tests__/data-pivoter.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/skills/__tests__/data-pivoter.test.ts`
 
 - [ ] **Step 1: 写测试文件**
 
@@ -1943,7 +1943,7 @@ describe("data_pivoter tool", () => {
 - [ ] **Step 2: 跑测试**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/skills/__tests__/data-pivoter.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/agent/skills/__tests__/data-pivoter.test.ts
 ```
 
 预期：3 passed。
@@ -1951,12 +1951,12 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/skills/
 ### Task 4.4: 报告页 deeplink hydrate（A5 已建则改，未建则 stub）
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`（A5 已建则改；未建则把 hydrate 逻辑写成 TODO 注释）
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/reports/[id]/report-client.tsx`（A5 已建则改；未建则把 hydrate 逻辑写成 TODO 注释）
 
 - [ ] **Step 1: 检查文件是否存在**
 
 ```bash
-ls /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/reports/\[id\]/report-client.tsx 2>&1 || echo "FILE NOT EXISTS, A5 还未落盘"
+ls /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/reports/\[id\]/report-client.tsx 2>&1 || echo "FILE NOT EXISTS, A5 还未落盘"
 ```
 
 - [ ] **Step 2: 若文件存在，加 useEffect**
@@ -1993,7 +1993,7 @@ useEffect(() => {
 - [ ] **Step 1: 全套验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run lint && npm run build
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit && npm run lint && npm run build
 ```
 
 预期：3 项全过。
@@ -2003,7 +2003,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit && npm run lint && 
 - [ ] **Step 1: commit + push**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git add \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add \
   skills/data_pivoter/SKILL.md \
   src/lib/agent/skills/data-pivoter.ts \
   src/lib/agent/skills/__tests__/data-pivoter.test.ts && \
@@ -2031,8 +2031,8 @@ EOF
 ### Task 5.1: `mention-switch.ts` util + 单测
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/mention-switch.ts`
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/agent/__tests__/mention-switch.test.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/mention-switch.ts`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/agent/__tests__/mention-switch.test.ts`
 
 - [ ] **Step 1: 写 util**
 
@@ -2097,7 +2097,7 @@ describe("detectMentionSwitch", () => {
 - [ ] **Step 3: 跑测试**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests__/mention-switch.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests__/mention-switch.test.ts
 ```
 
 预期：3 passed。
@@ -2105,7 +2105,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/agent/__tests
 ### Task 5.2: `chat/stream/route.ts` 接入 detectMentionSwitch
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/api/chat/stream/route.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/api/chat/stream/route.ts`
 
 - [ ] **Step 1: import + 入口预处理（顺序非常关键）**
 
@@ -2186,13 +2186,13 @@ import { detectMentionSwitch } from "@/lib/agent/mention-switch";
 - [ ] **Step 3: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ### Task 5.3: `employee-mention-picker.tsx` 组件
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/components/chat/employee-mention-picker.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/components/chat/employee-mention-picker.tsx`
 
 - [ ] **Step 1: 写组件**
 
@@ -2287,7 +2287,7 @@ export function EmployeeMentionPicker({ value, onSelect, onClose }: EmployeeMent
 - [ ] **Step 2: tsc 验证**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 注：组件创建 + tsc 通过即可；本 plan 不强制把它接入到所有 chat input — 由具体 chat 页面（chat-launcher / chat-center）实施时按需接入。后续 PR 可加。
@@ -2297,7 +2297,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 - [ ] **Step 1: tsc + lint + build + 全套单测**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
   npx tsc --noEmit && \
   npm run lint && \
   npm run build && \
@@ -2314,7 +2314,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && \
 - [ ] **Step 2: 浏览器手动验收**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run dev
 ```
 
 打开 `http://localhost:3000`：
@@ -2329,7 +2329,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run dev
 - [ ] **Step 1: commit + push**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git add \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git add \
   src/lib/agent/mention-switch.ts \
   src/lib/agent/__tests__/mention-switch.test.ts \
   src/app/api/chat/stream/route.ts \

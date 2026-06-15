@@ -2,6 +2,7 @@ import { getUnreadCount } from "@/lib/dal/notifications";
 import { getCurrentUserProfile } from "@/lib/dal/auth";
 import { PermissionProvider } from "@/components/providers/permission-provider";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { AnimationPauseGuard } from "@/components/shared/animation-pause-guard";
 import { Toaster } from "sonner";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ export default async function DashboardLayout({
 
   return (
     <PermissionProvider permissions={permissions} isSuperAdmin={superAdmin}>
+      <AnimationPauseGuard />
       <DashboardShell
         userName={displayName}
         unreadCount={unreadCount}

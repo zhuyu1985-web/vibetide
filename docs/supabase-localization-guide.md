@@ -10,7 +10,7 @@
 
 项目原来使用 Supabase Cloud（`urccnaegmhvztpidezmt.supabase.co`）提供的云端数据库和认证服务。为了降低成本和提升数据安全性，决定将 Supabase 完整本地化部署。
 
-本地 Supabase 通过 Docker Compose 部署在 `/Users/zhuyu/dev/sup-vibetide/`，数据库和业务数据已同步到本地，但**用户认证体系无法使用**——登录失败且无明确错误提示。
+本地 Supabase 通过 Docker Compose 部署在 `/Users/zhuyu/Developer/sup-vibetide/`，数据库和业务数据已同步到本地，但**用户认证体系无法使用**——登录失败且无明确错误提示。
 
 ---
 
@@ -219,7 +219,7 @@ ERROR: EVAL expects an expression as argument
 **修复**：绕过 Supavisor，让 PostgreSQL 直接暴露端口。修改 docker-compose.yml：
 
 ```yaml
-# /Users/zhuyu/dev/sup-vibetide/docker-compose.yml
+# /Users/zhuyu/Developer/sup-vibetide/docker-compose.yml
 db:
   container_name: supabase-db
   image: supabase/postgres:15.8.1.085
@@ -232,7 +232,7 @@ db:
 
 ```bash
 # 重建 DB 容器
-cd /Users/zhuyu/dev/sup-vibetide && docker compose up -d db
+cd /Users/zhuyu/Developer/sup-vibetide && docker compose up -d db
 
 # 容器重建后需要再次修复密码（因为角色密码存储在 PGDATA 中，但可能需要重置）
 docker exec supabase-db psql -U supabase_admin -d postgres \

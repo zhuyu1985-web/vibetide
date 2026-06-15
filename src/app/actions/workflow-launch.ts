@@ -181,6 +181,7 @@ async function _insertMissionRow(
     template.name,
     cleaned,
     template.promptTemplate,
+    (template.inputFields ?? []) as InputFieldDef[],
   );
 
   // Spec §3.3: `scenario` stays as a denormalized label cache so downstream

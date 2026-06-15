@@ -33,7 +33,7 @@ pnpm add chartjs-node-canvas chart.js canvas
 
 ```
 $ npx tsx scripts/spike-chart-font.ts
-✓ 字体已注册: /Users/zhuyu/dev/chinamcloud/vibetide/public/fonts/NotoSansSC-Regular.otf
+✓ 字体已注册: /Users/zhuyu/Developer/chinamcloud/vibetide/public/fonts/NotoSansSC-Regular.otf
 ✓ 已生成 /tmp/spike-chart-font-output.png (36701 bytes, 290 ms, 1920x1024)
 ```
 

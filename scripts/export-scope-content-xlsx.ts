@@ -16,7 +16,7 @@ loadEnv();
 import { readFileSync, writeFileSync } from "node:fs";
 
 const SCOPE_PATH = "/tmp/media-scope-final.json";
-const OUT_PATH = "/Users/zhuyu/dev/chinamcloud/vibetide/docs/scope-content-2025.xlsx";
+const OUT_PATH = "/Users/zhuyu/Developer/chinamcloud/vibetide/docs/scope-content-2025.xlsx";
 
 type Unit = {
   id: string; name: string; tier: string;

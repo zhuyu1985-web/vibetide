@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 import { Mic, Paperclip, ArrowUp, Route, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
-import { ParticleBackground } from "@/components/shared/particle-background";
+import { AuroraBackground } from "@/components/shared/aurora-background";
+import { GeminiRing } from "@/components/shared/gemini-ring";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
@@ -71,10 +72,7 @@ export function HomeWorkspaceClient({
       />
 
       <div className="relative flex-1 overflow-y-auto scrollbar-thin">
-        <ParticleBackground
-          particleCount={60}
-          className="pointer-events-none fixed inset-0 z-0 opacity-20 dark:opacity-50"
-        />
+        <AuroraBackground className="pointer-events-none fixed inset-0 z-0" />
 
         <div className="relative z-10 mx-auto max-w-4xl px-6 pb-12">
           <HeroSection />
@@ -82,6 +80,7 @@ export function HomeWorkspaceClient({
           {/* 居中输入框 */}
           <div className="mx-auto mt-2 max-w-[760px]">
             <div className="gemini-border rounded-2xl bg-white transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
+              <GeminiRing />
               <div className="px-5 pb-2 pt-4">
                 <textarea
                   ref={textareaRef}

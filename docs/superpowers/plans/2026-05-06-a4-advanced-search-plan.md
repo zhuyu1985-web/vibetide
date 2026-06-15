@@ -8,9 +8,9 @@
 
 **Tech Stack:** Next.js 16 App Router / TypeScript strict / Drizzle ORM / shadcn Select / DateRangePicker / DataTable / vitest。
 
-**关联 sub-spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-06-a4-advanced-search-design.md`
+**关联 sub-spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-06-a4-advanced-search-design.md`
 
-**关联 main spec:** `/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.5
+**关联 main spec:** `/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.5
 
 **总工期：3.5-4 工作日**（4 phase）
 
@@ -34,20 +34,20 @@
 
 | 文件 | 责任 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/__tests__/advanced-search.test.ts` | DAL 单测 21 case |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-search-builder.tsx` | client 组件：动态行 + 字段/操作符/值条件渲染 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-filters-sidebar.tsx` | client 组件：5 项全局过滤 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/keyword-highlight.tsx` | 客户端 helper：关键词高亮 React 组件 |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-mode-types.ts` | 共享类型：AdvancedSearchCondition / SidebarFilter |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/__tests__/advanced-search.test.ts` | DAL 单测 21 case |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-search-builder.tsx` | client 组件：动态行 + 字段/操作符/值条件渲染 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-filters-sidebar.tsx` | client 组件：5 项全局过滤 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/keyword-highlight.tsx` | 客户端 helper：关键词高亮 React 组件 |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-mode-types.ts` | 共享类型：AdvancedSearchCondition / SidebarFilter |
 
 ### 修改（4 个）
 
 | 文件 | 改动 |
 |---|---|
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts` | 加 `advancedSearchCollectedItems` 函数（drizzle and/or 嵌套实现） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts` | re-export 新 11 字段 `AdvancedSearchField` 取代旧 8 字段；同步重写 `advancedSearchArticles` switch 字段名；加 `searchAdvanced` server action（直接透传 sidebarFilter 给 DAL，无线性化） |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | 加"简单/高级"模式切换；高级模式 mount AdvancedSearchBuilder + AdvancedFiltersSidebar |
-| `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx` | 加载 outlets + districts + topics + regions（distinct 查询）+ platforms（distinct）传给 client |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts` | 加 `advancedSearchCollectedItems` 函数（drizzle and/or 嵌套实现） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts` | re-export 新 11 字段 `AdvancedSearchField` 取代旧 8 字段；同步重写 `advancedSearchArticles` switch 字段名；加 `searchAdvanced` server action（直接透传 sidebarFilter 给 DAL，无线性化） |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx` | 加"简单/高级"模式切换；高级模式 mount AdvancedSearchBuilder + AdvancedFiltersSidebar |
+| `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx` | 加载 outlets + districts + topics + regions（distinct 查询）+ platforms（distinct）传给 client |
 
 ---
 
@@ -56,8 +56,8 @@
 ### Task 1.1：扩展 search-mode-types + AdvancedSearchField
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-mode-types.ts`
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts`（扩 type）
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-mode-types.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts`（扩 type）
 
 - [ ] **Step 1：创建 search-mode-types.ts**
 
@@ -119,7 +119,7 @@ export const OPERATOR_LABELS: Record<AdvancedSearchOperator, string> = {
 - [ ] **Step 2：迁移 actions/research/collected-item-search.ts 旧 type + 旧 advancedSearchArticles**
 
 ```bash
-grep -n "AdvancedSearchField\|AdvancedSearchOperator\|SearchCondition" /Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts
+grep -n "AdvancedSearchField\|AdvancedSearchOperator\|SearchCondition" /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts
 ```
 
 **注意**：现有文件中 `AdvancedSearchField` 是 8 字段（含 `keyword`/`tier`/`channel`），且 `advancedSearchArticles`（行 101-148）的 switch 用了这些旧字段名。**简单 re-export 会让 switch 编译失败**。改用以下两步：
@@ -177,7 +177,7 @@ for (const cond of params.conditions) {
 - [ ] **Step 3：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | head -20
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | head -20
 ```
 
 期望：0 错。如 search-workbench-client.tsx 还在传旧字段名（`keyword`/`tier`/`channel`），编译会报 `Type '"keyword"' is not assignable to AdvancedSearchField`。这种情况下：把 client 中传的旧字段名改成新字段名（`title`/`outletTier`/`platform`），保持 Phase 1 commit 自洽 build 通过。
@@ -187,8 +187,8 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit 2>&1 | head -20
 ### Task 1.2：DAL `advancedSearchCollectedItems` + TDD 测试
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts`（追加新函数）
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/dal/research/__tests__/advanced-search.test.ts`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/collected-item-search.ts`（追加新函数）
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/dal/research/__tests__/advanced-search.test.ts`
 
 - [ ] **Step 1：写测试（TDD 红灯）**
 
@@ -433,7 +433,7 @@ describe("advancedSearchCollectedItems — 边界 + 安全", () => {
 - [ ] **Step 2：跑测试预期失败**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/advanced-search.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/advanced-search.test.ts
 ```
 
 - [ ] **Step 3：实现 `advancedSearchCollectedItems`**
@@ -587,7 +587,7 @@ function buildSingleCondition(c: AdvancedSearchCondition): SQL {
 - [ ] **Step 4：跑测试预期通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/advanced-search.test.ts
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run src/lib/dal/research/__tests__/advanced-search.test.ts
 # 期望 21/21 pass
 ```
 
@@ -596,7 +596,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run src/lib/dal/research/
 - [ ] **Step 5：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 ---
@@ -604,7 +604,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 1.3：Phase 1 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add "src/app/(dashboard)/research/search-mode-types.ts" \
         src/app/actions/research/collected-item-search.ts \
         src/lib/dal/research/collected-item-search.ts \
@@ -631,7 +631,7 @@ EOF
 ### Task 2.1：advanced-search-builder.tsx
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-search-builder.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-search-builder.tsx`
 
 - [ ] **Step 1：写组件（client component）**
 
@@ -855,7 +855,7 @@ function ValueInput({ row, options, onValueChange, onRangeChange }: {
 - [ ] **Step 2：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 如 DateRangePicker 接口不匹配，看 `src/components/shared/date-picker.tsx` 实际签名调整。
@@ -865,7 +865,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
 ### Task 2.2：keyword-highlight helper
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/lib/research/keyword-highlight.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/lib/research/keyword-highlight.tsx`
 
 - [ ] **Step 1：写 helper**
 
@@ -904,7 +904,7 @@ export function highlightKeyword(text: string, keyword: string | undefined): Rea
 ### Task 2.3：Phase 2 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add "src/app/(dashboard)/research/advanced-search-builder.tsx" \
         src/lib/research/keyword-highlight.tsx && \
 git commit --no-verify -m "$(cat <<'EOF'
@@ -929,7 +929,7 @@ EOF
 ### Task 3.1：advanced-filters-sidebar.tsx
 
 **Files:**
-- Create: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-filters-sidebar.tsx`
+- Create: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/advanced-filters-sidebar.tsx`
 
 - [ ] **Step 1：写组件**
 
@@ -1067,7 +1067,7 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
 ### Task 3.2：searchAdvanced server action 真正实现
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts`（追加新 action）
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/actions/research/collected-item-search.ts`（追加新 action）
 
 - [ ] **Step 1：加 searchAdvanced action（直接传 sidebarFilter，不线性化）**
 
@@ -1113,12 +1113,12 @@ export async function searchAdvanced(payload: {
 ### Task 3.3：page.tsx 加载 BuilderOptions 数据
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/page.tsx`
 
 - [ ] **Step 1：read 现有 page.tsx**
 
 ```bash
-cat /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/page.tsx
+cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/page.tsx
 ```
 
 - [ ] **Step 2：加 distinct outletRegion + platform 查询**
@@ -1178,12 +1178,12 @@ return <SearchWorkbenchClient builderOptions={builderOptions} {...其它 prop} /
 ### Task 3.4：search-workbench-client.tsx 集成模式切换
 
 **Files:**
-- Modify: `/Users/zhuyu/dev/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
+- Modify: `/Users/zhuyu/Developer/chinamcloud/vibetide/src/app/(dashboard)/research/search-workbench-client.tsx`
 
 - [ ] **Step 1：read 现有结构**
 
 ```bash
-head -100 /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/research/search-workbench-client.tsx
+head -100 /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/research/search-workbench-client.tsx
 ```
 
 - [ ] **Step 2：加模式切换 state + UI**
@@ -1288,7 +1288,7 @@ export function SearchWorkbenchClient(props: Props) {
 - [ ] **Step 3：tsc 通过**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 - [ ] **Step 4：浏览器手动验证**
@@ -1309,7 +1309,7 @@ npm run dev
 ### Task 3.5：Phase 3 commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && \
 git add "src/app/(dashboard)/research/" \
         src/app/actions/research/collected-item-search.ts && \
 git commit --no-verify -m "$(cat <<'EOF'
@@ -1336,25 +1336,25 @@ EOF
 - [ ] **Step 1：tsc**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx tsc --noEmit
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx tsc --noEmit
 ```
 
 - [ ] **Step 2：lint（仅本 phase 修改文件）**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run lint 2>&1 | tail -10
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run lint 2>&1 | tail -10
 ```
 
 - [ ] **Step 3：build**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npm run build 2>&1 | tail -10
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npm run build 2>&1 | tail -10
 ```
 
 - [ ] **Step 4：A4 测试集子集**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run \
   src/lib/dal/research/__tests__/advanced-search.test.ts 2>&1 | tail -10
 # 期望 21/21 pass
 ```
@@ -1362,7 +1362,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
 - [ ] **Step 5：collected-item-search.test.ts 回归（A3 已有）**
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && npx vitest run \
   src/lib/dal/research/__tests__/collected-item-search.test.ts 2>&1 | tail -10
 # 期望 5/5 仍 pass
 ```
@@ -1394,7 +1394,7 @@ cd /Users/zhuyu/dev/chinamcloud/vibetide && npx vitest run \
 ### Task 4.3：final commit
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide && git status
+cd /Users/zhuyu/Developer/chinamcloud/vibetide && git status
 # 如有遗漏 commit 文件 (如 minor lint 修复)，stage + commit；否则跳过
 ```
 

@@ -3,8 +3,8 @@
 - **版本**：v1.0
 - **日期**：2026-05-05
 - **作者**：Zhuyu（产品） + Claude（技术方案）
-- **关联 main spec**：`/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.2
-- **关联 plan v2**（main spec 的 plan）：`/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/plans/2026-05-05-a1-collection-hub-upgrade-plan.md` 的 A2 Recommendations
+- **关联 main spec**：`/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.2
+- **关联 plan v2**（main spec 的 plan）：`/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/plans/2026-05-05-a1-collection-hub-upgrade-plan.md` 的 A2 Recommendations
 - **状态**：Brainstorming 完成，待 implementation plan
 - **工期估算**：4-6 天（P0 3-4d / P1 1-2d / 测试 + commit 0.5-1d / calculate_price 校准 0.5d）
 

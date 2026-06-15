@@ -4,40 +4,13 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home,
-  Bot,
-  Workflow,
-  ListTodo,
-  SearchX,
-  PenLine,
-  FolderOpen,
-  BarChart3,
   MoreHorizontal,
   Settings,
   Bell,
-  Lightbulb,
-  PenTool,
-  Gem,
-  Film,
-  FileStack,
-  Radio,
-  CalendarDays,
-  Package,
-  FileText,
-  Brain as BrainIcon,
-  BookMarked,
-  Star,
-  TrendingUp,
-  Award,
   Building2,
   Users,
   Shield,
-  CheckSquare,
-  ShieldCheck,
   ChevronDown,
-  Wrench,
-  Compass,
-  Database,
   Clock,
   type LucideIcon,
 } from "lucide-react";
@@ -54,6 +27,13 @@ import {
 import { MountGate } from "@/components/shared/mount-gate";
 import { cn } from "@/lib/utils";
 import { MENU_PERMISSION_MAP } from "@/lib/rbac-constants";
+import {
+  DASHBOARD_MORE_ITEMS,
+  DASHBOARD_NAV_ITEMS,
+  DASHBOARD_SHOW_MORE_ENTRY,
+  type DashboardNavItem,
+  type DashboardSubItem,
+} from "@/lib/dashboard-navigation";
 
 /* ─── Optical size compensation ─────────────────────────────
    Lucide icons all use a 24×24 viewBox, but the drawn content
@@ -92,77 +72,7 @@ function useHoverPopover(delayClose = 120) {
 
 /* ─── Types ─── */
 
-interface SubItem { label: string; href: string; icon: LucideIcon; matchPrefixes?: string[] }
-interface NavItem extends SubItem { children?: SubItem[] }
-
-/* ─── Navigation Data ─── */
-
-const NAV_ITEMS: NavItem[] = [
-  { label: "首页", href: "/home", icon: Home },
-  {
-    label: "智能体", href: "#agents", icon: Bot,
-    children: [
-      { label: "AI 员工", href: "/ai-employees", icon: Users },
-      { label: "技能管理", href: "/skills", icon: Wrench },
-    ],
-  },
-  { label: "工作流", href: "/workflows", icon: Workflow },
-  { label: "任务", href: "/missions", icon: ListTodo },
-  { label: "审核", href: "/audit-center", icon: ShieldCheck },
-  { label: "渠道", href: "/settings/channels", icon: Radio },
-  {
-    label: "采集", href: "#data-collection", icon: Database,
-    children: [
-      { label: "内容池", href: "/data-collection/content", icon: FolderOpen },
-      { label: "主题监测", href: "/data-collection/topics", icon: BookMarked },
-      { label: "采集配置", href: "/data-collection/sources",
-        matchPrefixes: ["/data-collection/sources", "/data-collection/outlets"], icon: Wrench },
-      { label: "研究报告", href: "/data-collection/reports", icon: FileText },
-      { label: "监控面板", href: "/data-collection/monitoring", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "创作", href: "#creation", icon: PenLine,
-    children: [
-      { label: "热点发现", href: "/inspiration", icon: Lightbulb },
-      { label: "同题对比", href: "/topic-compare", icon: Compass },
-      { label: "漏题筛查", href: "/missing-topics", icon: SearchX },
-      { label: "账号分析", href: "/account-analytics", icon: TrendingUp },
-      { label: "超级创作", href: "/super-creation", icon: PenTool },
-      { label: "精品聚合", href: "/premium-content", icon: Gem },
-      { label: "短视频工厂", href: "/video-batch", icon: Film },
-      { label: "生产模板", href: "/production-templates", icon: FileStack },
-      { label: "全渠道发布", href: "/publishing", icon: Radio },
-      { label: "节赛会展", href: "/event-auto", icon: CalendarDays },
-    ],
-  },
-  {
-    label: "内容", href: "#content", icon: FolderOpen,
-    children: [
-      { label: "媒资管理", href: "/media-assets", icon: Package },
-      { label: "稿件管理", href: "/articles", icon: FileText },
-      { label: "智能分析", href: "/asset-intelligence", icon: BrainIcon },
-      { label: "知识库", href: "/knowledge-bases", icon: BookMarked },
-      { label: "智能推荐", href: "/asset-revive", icon: Star },
-      { label: "案例库", href: "/case-library", icon: Award },
-    ],
-  },
-  {
-    label: "数据", href: "#analytics", icon: BarChart3,
-    children: [
-      { label: "数据看板", href: "/analytics", icon: TrendingUp },
-      { label: "效果激励", href: "/leaderboard", icon: Award },
-      { label: "精品提升率", href: "/content-excellence", icon: Star },
-    ],
-  },
-];
-
-const MORE_ITEMS: SubItem[] = [
-  { label: "频道顾问", href: "/channel-advisor", icon: BrainIcon },
-  { label: "批量审核", href: "/batch-review", icon: CheckSquare },
-];
-
-const ADMIN_ITEMS: SubItem[] = [
+const ADMIN_ITEMS: DashboardSubItem[] = [
   { label: "用户管理", href: "/admin/users", icon: Users },
   { label: "角色权限", href: "/admin/roles", icon: Shield },
   { label: "组织管理", href: "/admin/organizations", icon: Building2 },
@@ -176,7 +86,7 @@ function isHrefActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function hasActiveChild(pathname: string, children?: SubItem[]) {
+function hasActiveChild(pathname: string, children?: DashboardSubItem[]) {
   return children?.some((c) =>
     c.matchPrefixes
       ? c.matchPrefixes.some((p) => isHrefActive(pathname, p))
@@ -186,7 +96,7 @@ function hasActiveChild(pathname: string, children?: SubItem[]) {
 
 /* ─── Popover sub-menu (collapsed mode only) ─── */
 
-function SubMenuList({ items, pathname }: { items: SubItem[]; pathname: string }) {
+function SubMenuList({ items, pathname }: { items: DashboardSubItem[]; pathname: string }) {
   return (
     <div className="space-y-0.5">
       {items.map((child) => {
@@ -256,7 +166,7 @@ function SettingsButton({ pathname, expanded }: { pathname: string; expanded: bo
 /* ─── "More" button (hover popover when collapsed, click when expanded) ─── */
 
 function MoreButton({ items, pathname, expanded }: {
-  items: SubItem[]; pathname: string; expanded: boolean;
+  items: DashboardSubItem[]; pathname: string; expanded: boolean;
 }) {
   const { open, setOpen, openNow, closeSoon } = useHoverPopover();
 
@@ -292,7 +202,13 @@ function MoreButton({ items, pathname, expanded }: {
           onMouseLeave={expanded ? undefined : closeSoon}
           className="w-48 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-xl p-1.5 shadow-[0_8px_32px_-8px_rgba(30,58,138,0.18),0_24px_64px_-24px_rgba(30,58,138,0.22)]"
         >
-          <SubMenuList items={items} pathname={pathname} />
+          {items.length > 0 ? (
+            <SubMenuList items={items} pathname={pathname} />
+          ) : (
+            <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+              暂无更多菜单
+            </p>
+          )}
         </PopoverContent>
       </Popover>
     </MountGate>
@@ -302,9 +218,9 @@ function MoreButton({ items, pathname, expanded }: {
 /* ─── Hover-triggered collapsed nav group (icon + flyout submenu) ─── */
 
 function HoverNavGroup({ item, active, subItems, pathname, Icon }: {
-  item: NavItem;
+  item: DashboardNavItem;
   active: boolean;
-  subItems: SubItem[];
+  subItems: DashboardSubItem[];
   pathname: string;
   Icon: LucideIcon;
 }) {
@@ -388,7 +304,7 @@ function NavLink({ href, icon: Icon, label, active, expanded }: {
 /* ─── Unified Nav Group (collapsed=popover, expanded=inline children) ─── */
 
 function NavGroup({ item, pathname, canSeeItem, expanded }: {
-  item: NavItem; pathname: string; canSeeItem: (h: string) => boolean; expanded: boolean;
+  item: DashboardNavItem; pathname: string; canSeeItem: (h: string) => boolean; expanded: boolean;
 }) {
   const children = item.children?.filter((c) => canSeeItem(c.href)) ?? [];
   const Icon = item.icon;
@@ -475,12 +391,12 @@ export function AppSidebar({
     return !perm || permissions.includes(perm);
   }
 
-  const visibleNav = NAV_ITEMS.filter((item) => {
+  const visibleNav = DASHBOARD_NAV_ITEMS.filter((item) => {
     if (item.children) return item.children.some((c) => canSeeItem(c.href));
     return canSeeItem(item.href);
   });
 
-  const visibleMore = MORE_ITEMS.filter((i) => canSeeItem(i.href));
+  const visibleMore = DASHBOARD_MORE_ITEMS.filter((i) => canSeeItem(i.href));
 
   return (
     <div className={cn(
@@ -554,7 +470,7 @@ export function AppSidebar({
             )
           )}
           {/* More */}
-          {visibleMore.length > 0 && (
+          {(DASHBOARD_SHOW_MORE_ENTRY || visibleMore.length > 0) && (
             <MoreButton items={visibleMore} pathname={pathname} expanded={expanded} />
           )}
         </nav>

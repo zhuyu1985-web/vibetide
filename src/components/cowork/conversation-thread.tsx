@@ -19,12 +19,22 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { GeminiRing } from "@/components/shared/gemini-ring";
 import { MissionStepStream } from "@/components/cowork/mission-step-stream";
+import { MessageActions } from "@/components/cowork/message-actions";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
+import type { MessageFeedback } from "@/app/actions/cowork-conversations";
+import type { ArtifactPreviewItem } from "@/lib/cowork/artifact-preview";
 import type {
   Conversation,
   ConversationMessage,
 } from "@/db/schema/conversations";
+
+/** 从消息 meta 里安全取出反馈值 */
+function feedbackOf(message: ConversationMessage): MessageFeedback {
+  const f = (message.meta as { feedback?: unknown } | null)?.feedback;
+  return f === "like" || f === "dislike" ? f : null;
+}
 
 interface Props {
   active: { conversation: Conversation; messages: ConversationMessage[] } | null;
@@ -35,6 +45,9 @@ interface Props {
   onSendStart?: () => void;
   /** 结果回来 → 有 mission 则加载,无则关抽屉 */
   onSendSettled?: (missionId: string | null) => void;
+  selectedArtifactId?: string | null;
+  onArtifactSelect?: (artifact: ArtifactPreviewItem) => void;
+  artifactOverrides?: Record<string, ArtifactPreviewItem>;
 }
 
 export function ConversationThread({
@@ -43,6 +56,9 @@ export function ConversationThread({
   onMissionFocus,
   onSendStart,
   onSendSettled,
+  selectedArtifactId = null,
+  onArtifactSelect,
+  artifactOverrides,
 }: Props) {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -66,6 +82,18 @@ export function ConversationThread({
     onSendStart?.(); // 乐观打开右侧执行面板(loading)
     startTransition(async () => {
       const res = await submitCoworkMessage(conversationId, text);
+      onSendSettled?.(res.ok && res.kind === "mission" ? res.missionId : null);
+      router.refresh();
+    });
+  }
+
+  // 重新生成:重发指定文本(文本回答=上一条用户消息;交付结果=任务原指令)。
+  function regenerate(text: string) {
+    const t = text.trim();
+    if (!t || !active || pending) return;
+    onSendStart?.();
+    startTransition(async () => {
+      const res = await submitCoworkMessage(active.conversation.id, t);
       onSendSettled?.(res.ok && res.kind === "mission" ? res.missionId : null);
       router.refresh();
     });
@@ -109,14 +137,31 @@ export function ConversationThread({
           </div>
         ) : (
           <div className="mx-auto max-w-3xl space-y-5 px-4 py-6">
-            {active.messages.map((m) => (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                focused={m.missionId != null && m.missionId === focusedMissionId}
-                onMissionFocus={onMissionFocus}
-              />
-            ))}
+            {active.messages.map((m, i) => {
+              // 该助手回答对应的"上一条用户消息"(供「重新生成」重发)
+              let precedingUserText: string | null = null;
+              for (let j = i - 1; j >= 0; j--) {
+                if (active.messages[j].role === "user") {
+                  precedingUserText = active.messages[j].content;
+                  break;
+                }
+              }
+              return (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  focused={
+                    m.missionId != null && m.missionId === focusedMissionId
+                  }
+                  onMissionFocus={onMissionFocus}
+                  onRegenerate={regenerate}
+                  precedingUserText={precedingUserText}
+                  selectedArtifactId={selectedArtifactId}
+                  onArtifactSelect={onArtifactSelect}
+                  artifactOverrides={artifactOverrides}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -125,6 +170,7 @@ export function ConversationThread({
       <div className="px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
           <div className="gemini-border rounded-2xl bg-card transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
+            <GeminiRing />
             <div className="px-4 pb-1.5 pt-3">
               {/* 容器即输入框,故用裸 textarea(透明无边框、JS 自动撑高),与落地页同款 */}
               <textarea
@@ -202,10 +248,20 @@ function MessageBubble({
   message,
   focused,
   onMissionFocus,
+  onRegenerate,
+  precedingUserText,
+  selectedArtifactId,
+  onArtifactSelect,
+  artifactOverrides,
 }: {
   message: ConversationMessage;
   focused: boolean;
   onMissionFocus: (missionId: string) => void;
+  onRegenerate: (text: string) => void;
+  precedingUserText: string | null;
+  selectedArtifactId: string | null;
+  onArtifactSelect?: (artifact: ArtifactPreviewItem) => void;
+  artifactOverrides?: Record<string, ArtifactPreviewItem>;
 }) {
   if (message.role === "user") {
     return (
@@ -245,18 +301,35 @@ function MessageBubble({
             </div>
           </button>
         </div>
-        {/* 步骤流式输出到对话框(核心概要逐条打字 + 终态交付/失败) */}
-        <MissionStepStream missionId={missionId} />
+        {/* 步骤流式输出到对话框 + 终态交付/失败气泡(自带操作工具栏) */}
+        <MissionStepStream
+          missionId={missionId}
+          missionCardMessageId={message.id}
+          initialFeedback={feedbackOf(message)}
+          onRegenerate={onRegenerate}
+          selectedArtifactId={selectedArtifactId}
+          onArtifactSelect={onArtifactSelect}
+          artifactOverrides={artifactOverrides}
+        />
       </div>
     );
   }
 
-  // assistant text
+  // assistant text —— hover 时在气泡下方露出操作工具栏
   return (
-    <div className="flex justify-start">
+    <div className="group flex flex-col items-start gap-1">
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
         {message.content}
       </div>
+      <MessageActions
+        text={message.content}
+        messageId={message.id}
+        initialFeedback={feedbackOf(message)}
+        onRegenerate={
+          precedingUserText ? () => onRegenerate(precedingUserText) : undefined
+        }
+        className="pl-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+      />
     </div>
   );
 }

@@ -22,28 +22,29 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { MountGate } from "@/components/shared/mount-gate";
 
 const pageTitles: Record<string, string> = {
-  "/missions": "任务中心",
-  "/channel-advisor": "频道顾问",
+  "/home": "首页",
+  "/ai-employees": "AI员工",
+  "/workflows": "工作流",
+  "/missions": "任务",
   "/inspiration": "热点发现",
   "/topic-compare": "同题对比",
   "/missing-topics": "漏题筛查",
-  "/topic-compare/accounts": "我方账号",
-  "/benchmark-accounts": "对标账号库",
-  "/super-creation": "超级创作",
-  "/premium-content": "精品聚合",
-  "/video-batch": "短视频工厂",
-  "/event-auto": "节赛会展",
-  "/publishing": "全渠道发布",
-  "/analytics": "数据分析",
-  "/employee-marketplace": "AI员工市场",
-  // 智能媒资
-  "/asset-intelligence": "媒资智能理解",
-  "/channel-knowledge": "频道知识库",
-  "/asset-revive": "资产盘活中心",
-  // legacy
+  "/account-analytics": "账号分析",
+  "/case-library": "优秀案例",
+  "/articles": "稿件库",
+  "/media-assets": "素材库",
+  "/audit-center": "审核",
+  "/settings/channels": "渠道",
+  "/data-collection/content": "内容池",
+  "/data-collection/topics": "主体监测",
+  "/data-collection/sources": "采集配置",
+  "/data-collection/reports": "研究报告",
+  "/data-collection/monitoring": "监控面板",
+  "/analytics": "数据",
+  "/skills": "SKILLS",
+  "/cowork/connectors": "连接器",
+  "/cowork/plugins": "个人插件",
   "/hot-topics": "热点看板",
-  "/creation": "创作中心",
-  "/competitive": "竞品对标",
   // 系统管理
   "/admin/organizations": "组织管理",
   "/admin/users": "用户管理",
@@ -51,22 +52,28 @@ const pageTitles: Record<string, string> = {
 };
 
 const pageGroups: Record<string, string> = {
-  "/missions": "工作空间",
-  "/channel-advisor": "工作空间",
-  "/employee-marketplace": "工作空间",
-  "/inspiration": "创作者中心",
-  "/topic-compare": "创作者中心",
-  "/missing-topics": "创作者中心",
-  "/benchmark-accounts": "创作者中心",
-  "/super-creation": "创作者中心",
-  "/premium-content": "创作者中心",
-  "/video-batch": "创作者中心",
-  "/event-auto": "创作者中心",
-  "/asset-intelligence": "智能媒资",
-  "/channel-knowledge": "智能媒资",
-  "/asset-revive": "智能媒资",
-  "/publishing": "运营分析",
-  "/analytics": "运营分析",
+  "/home": "对话",
+  "/ai-employees": "智能体",
+  "/workflows": "智能体",
+  "/missions": "智能体",
+  "/inspiration": "应用",
+  "/topic-compare": "应用",
+  "/missing-topics": "应用",
+  "/account-analytics": "应用",
+  "/case-library": "应用",
+  "/articles": "内容",
+  "/media-assets": "内容",
+  "/audit-center": "审核",
+  "/settings/channels": "渠道",
+  "/data-collection/content": "采集",
+  "/data-collection/topics": "采集",
+  "/data-collection/sources": "采集",
+  "/data-collection/reports": "采集",
+  "/data-collection/monitoring": "采集",
+  "/analytics": "数据",
+  "/skills": "定制",
+  "/cowork/connectors": "定制",
+  "/cowork/plugins": "定制",
   "/admin/organizations": "系统管理",
   "/admin/users": "系统管理",
   "/admin/roles": "系统管理",
@@ -86,16 +93,18 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
     <header
       className="h-14 border-b border-[var(--glass-border)] flex items-center px-4 gap-4 sticky top-0 z-30"
       style={{
+        // 顶栏全宽贴在动画粒子画布上,blur 每帧随画布重算;20→14 明显降 GPU,
+        // 玻璃观感几乎无损。其余 .glass-* 大半径模糊也已在 globals.css 同步下调。
         background: 'var(--glass-panel-bg)',
-        backdropFilter: 'blur(20px) saturate(130%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(130%)',
+        backdropFilter: 'blur(14px) saturate(130%)',
+        WebkitBackdropFilter: 'blur(14px) saturate(130%)',
       }}
     >
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink
-              href="/missions"
+              href="/home"
               className="text-muted-foreground text-sm"
             >
               Vibe Media

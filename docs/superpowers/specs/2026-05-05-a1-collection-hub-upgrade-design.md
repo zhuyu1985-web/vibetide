@@ -3,7 +3,7 @@
 - **版本**：v1.0
 - **日期**：2026-05-05
 - **作者**：Zhuyu（产品） + Claude（技术方案）
-- **关联 main spec**：`/Users/zhuyu/dev/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.1
+- **关联 main spec**：`/Users/zhuyu/Developer/chinamcloud/vibetide/docs/superpowers/specs/2026-05-04-news-research-overhaul-design.md` §4.1
 - **状态**：Brainstorming 完成，待 plan
 - **工期估算**：5-7 天（含 Path C 清理 + Day 0 数据调研 + reviewer 工期校准）
 

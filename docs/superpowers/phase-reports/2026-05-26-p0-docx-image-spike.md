@@ -13,7 +13,7 @@
 
 ```
 $ npx tsx scripts/spike-docx-image.ts
-✓ 已生成 1x1 PNG 占位: /Users/zhuyu/dev/chinamcloud/vibetide/docs/scope-content-sample.png
+✓ 已生成 1x1 PNG 占位: /Users/zhuyu/Developer/chinamcloud/vibetide/docs/scope-content-sample.png
 ✓ 已生成 /tmp/spike-docx-image-output.docx, 大小 9584 bytes
   请用 Word/WPS 打开验证图片是否能正常显示
 ```

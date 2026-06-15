@@ -1871,7 +1871,7 @@ EOF
 
 - [ ] **Step 1: 阅读现有 meta-header.tsx 结构**
 
-Run: `cat /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/articles/\[id\]/features/reader/meta-header.tsx | head -120`
+Run: `cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/articles/\[id\]/features/reader/meta-header.tsx | head -120`
 确认 article prop 的结构（应包含 sourceUrl 字段）。
 
 - [ ] **Step 2: 在元信息条加 SourceUrlPill**
@@ -1919,7 +1919,7 @@ EOF
 
 - [ ] **Step 1: 阅读现有 translate-overlay.tsx 结构**
 
-Run: `cat /Users/zhuyu/dev/chinamcloud/vibetide/src/app/\(dashboard\)/articles/\[id\]/features/translate/translate-overlay.tsx | head -120`
+Run: `cat /Users/zhuyu/Developer/chinamcloud/vibetide/src/app/\(dashboard\)/articles/\[id\]/features/translate/translate-overlay.tsx | head -120`
 找到 overlay header 区域（应有标题如"翻译对照"）。
 
 - [ ] **Step 2: 在 overlay header 加 SourceUrlPill compact 变体**

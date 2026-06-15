@@ -12,6 +12,9 @@
  */
 import { revalidatePath } from "next/cache";
 import { generateText } from "ai";
+import { and, eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { missionArtifacts } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
@@ -27,6 +30,10 @@ export type CoworkSubmitResult =
   | { ok: false; error: string }
   | { ok: true; kind: "mission"; missionId: string; intentSummary: string }
   | { ok: true; kind: "chat"; reply: string };
+
+export type SaveCoworkArtifactDraftResult =
+  | { ok: true; artifactId: string; version: number }
+  | { ok: false; error: string };
 
 export async function submitCoworkMessage(
   conversationId: string,
@@ -128,4 +135,58 @@ export async function getCoworkMissionDetail(missionId: string) {
   const mission = await getMissionById(missionId);
   if (!mission || mission.organizationId !== orgId) return null;
   return mission;
+}
+
+export async function saveCoworkArtifactDraft(input: {
+  missionId: string;
+  artifactId: string;
+  content: string;
+}): Promise<SaveCoworkArtifactDraftResult> {
+  await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false, error: "用户未关联组织" };
+  if (!input.missionId || !input.artifactId) {
+    return { ok: false, error: "缺少产物信息" };
+  }
+  if (typeof input.content !== "string") {
+    return { ok: false, error: "稿件内容无效" };
+  }
+
+  const mission = await getMissionById(input.missionId);
+  if (!mission || mission.organizationId !== orgId) {
+    return { ok: false, error: "任务不存在或无权访问" };
+  }
+
+  const artifact = mission.artifacts.find((a) => a.id === input.artifactId);
+  if (!artifact) return { ok: false, error: "产物不存在或尚未持久化" };
+  if (!["article_draft", "draft", "report", "text"].includes(artifact.type)) {
+    return { ok: false, error: "该产物类型暂不支持编辑保存" };
+  }
+
+  const editedAt = new Date().toISOString();
+  const nextMetadata = {
+    ...(artifact.metadata ?? {}),
+    edited: true,
+    editedAt,
+  };
+
+  const [updated] = await db
+    .update(missionArtifacts)
+    .set({
+      content: input.content,
+      metadata: nextMetadata,
+      version: sql`${missionArtifacts.version} + 1`,
+    })
+    .where(
+      and(
+        eq(missionArtifacts.id, input.artifactId),
+        eq(missionArtifacts.missionId, input.missionId),
+      ),
+    )
+    .returning({ id: missionArtifacts.id, version: missionArtifacts.version });
+
+  if (!updated) return { ok: false, error: "产物保存失败" };
+  revalidatePath("/cowork");
+  revalidatePath(`/missions/${input.missionId}`);
+  return { ok: true, artifactId: updated.id, version: updated.version };
 }

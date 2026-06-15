@@ -190,6 +190,48 @@ describe("startMissionFromTemplate — source link & race handling", () => {
     expect(clearUpdate, "should clear stale source link before retry").toBeDefined();
   });
 
+  it("renders userInstruction with option labels and drops empty-field fragments", async () => {
+    findFirstTemplateMock.mockResolvedValueOnce({
+      id: "tpl1",
+      name: "AI 早晚报(成都)",
+      inputFields: [
+        {
+          name: "city",
+          label: "城市",
+          type: "select",
+          options: ["成都", "重庆"],
+        },
+        {
+          name: "edition",
+          label: "时段",
+          type: "select",
+          options: [
+            { value: "morning", label: "早报" },
+            { value: "evening", label: "晚报" },
+          ],
+        },
+        { name: "brief_date", label: "汇编日期", type: "date" },
+        {
+          name: "section_scope",
+          label: "板块范围",
+          type: "multiselect",
+          options: [{ value: "policy", label: "政务要闻" }],
+        },
+      ],
+      defaultTeam: [],
+      promptTemplate:
+        "为 {{city}} 汇编 {{brief_date}} 的{{edition}},聚焦 {{section_scope}}。",
+    });
+    insertReturningQueue.push(() => Promise.resolve([{ id: "m-label" }]));
+
+    await startMissionFromTemplate("tpl1", {
+      city: "成都",
+      edition: "morning",
+    });
+
+    expect(insertCalls[0].values.userInstruction).toBe("为 成都 汇编的早报。");
+  });
+
   it("falls back to template.name when titleOverride is omitted", async () => {
     insertReturningQueue.push(() => Promise.resolve([{ id: "m2" }]));
 

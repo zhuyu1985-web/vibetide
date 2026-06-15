@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
@@ -43,6 +43,11 @@ export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
   activeEmployee,
   onEmployeeClick,
 }: EmployeeQuickPanelProps) {
+  // 头像默认静止,仅悬停(或激活)时跑动画 —— 8 个头像 × 多个内部 SVG infinite
+  // 动画常驻是 /home 前台 GPU/CPU 的一块。静止态对页面"观感"几乎无损,
+  // 鼠标移上去才"活过来",反而是更聚焦的交互。
+  const [hoveredId, setHoveredId] = useState<EmployeeId | null>(null);
+
   return (
     <div className="w-full">
       {/* Section header */}
@@ -75,12 +80,15 @@ export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
         {DISPLAY_EMPLOYEES.map((id) => {
           const emp = EMPLOYEE_META[id];
           const isActive = activeEmployee === id;
+          const isLive = hoveredId === id || isActive;
 
           return (
             <motion.button
               key={id}
               variants={cardVariants}
               onClick={() => onEmployeeClick(id)}
+              onHoverStart={() => setHoveredId(id)}
+              onHoverEnd={() => setHoveredId((prev) => (prev === id ? null : prev))}
               whileHover={{ y: -1 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
@@ -91,7 +99,13 @@ export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
                   : "bg-transparent hover:bg-muted/50"
               )}
             >
-              <EmployeeAvatar employeeId={id} size="lg" animated />
+              {/* isLive 时跑完整动画;否则 avatar-static 冻结内部 SVG infinite 动画 */}
+              <EmployeeAvatar
+                employeeId={id}
+                size="lg"
+                animated={isLive}
+                className={isLive ? undefined : "avatar-static"}
+              />
               <span
                 className={cn(
                   "text-[11px] text-center leading-tight",

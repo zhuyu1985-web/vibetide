@@ -21,7 +21,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 JSON_PATH = "/tmp/ranking-v5-2025-from-db.json"
-OUT_PATH = "/Users/zhuyu/dev/chinamcloud/vibetide/docs/ranking-v5-2025.xlsx"
+OUT_PATH = "/Users/zhuyu/Developer/chinamcloud/vibetide/docs/ranking-v5-2025.xlsx"
 
 with open(JSON_PATH) as f:
     data = json.load(f)

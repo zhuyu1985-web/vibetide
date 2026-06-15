@@ -1202,7 +1202,7 @@ npm run dev
 如果是 worktree：
 
 ```bash
-cd /Users/zhuyu/dev/chinamcloud/vibetide
+cd /Users/zhuyu/Developer/chinamcloud/vibetide
 git checkout main
 git merge --ff-only <worktree-branch-name>
 git worktree remove .worktrees/<topic>
