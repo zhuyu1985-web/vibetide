@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMissionLive } from "@/lib/cowork/use-mission-live";
 import { appendReturnTo } from "@/lib/navigation-return";
+import { CRAFT_META, BUILTIN_SKILL_NAMES, type CraftType } from "@/lib/constants";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import type { MissionTask } from "@/lib/types";
 
 /**
@@ -121,7 +123,16 @@ export function CoworkMissionPanel({
                     <div className="truncate text-[12.5px] font-medium leading-snug text-foreground">
                       {t.title}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1.5">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      {/* 工种头像 + 徽章:体现"哪个工种做了这一步"(看得见的团队协作)。
+                          头像用 employee slug —— 工种实例继承旧员工 SVG,历史任务用本人头像。 */}
+                      {t.assignedEmployee && (
+                        <EmployeeAvatar
+                          employeeId={t.assignedEmployee.id}
+                          size="xs"
+                        />
+                      )}
+                      <CraftBadge roleType={t.assignedEmployee?.roleType} />
                       <span className="truncate text-[11px] text-muted-foreground">
                         {/* assignedEmployee 由 DAL 按全 org 员工表解析,覆盖
                             leader 伪任务(leader 不在 mission.teamMembers 里) */}
@@ -131,6 +142,8 @@ export function CoworkMissionPanel({
                       </span>
                       <ArtifactBadge task={t} />
                     </div>
+                    {/* 用了什么技能/工具(来自 outputData.usedSkills/usedTools,无则不渲染) */}
+                    <SkillToolChips task={t} />
                   </div>
                 </div>
               ))
@@ -195,6 +208,57 @@ function StepStatusIcon({
     <span className="mt-0.5 flex size-5 flex-none items-center justify-center rounded-full border border-border bg-muted text-[10px] font-medium text-muted-foreground">
       {stepNo}
     </span>
+  );
+}
+
+/**
+ * 工种徽章 —— 把 assignedEmployee.roleType(工种 slug)映射成中文工种名 + 配色,
+ * 让用户看清"这一步由哪个工种做"。历史/旧员工 roleType 不在 CRAFT_META 时不渲染。
+ */
+function CraftBadge({ roleType }: { roleType?: string }) {
+  if (!roleType || !(roleType in CRAFT_META)) return null;
+  const meta = CRAFT_META[roleType as CraftType];
+  return (
+    <span
+      className="flex-none rounded px-1 py-px text-[10px] font-medium"
+      style={{ color: meta.color, backgroundColor: meta.bgColor }}
+    >
+      {meta.name}
+    </span>
+  );
+}
+
+/**
+ * "用了什么技能/工具" chips —— 来自执行期回写的 outputData.usedSkills(专业技能,
+ * 实心)/ usedTools(通用工具,描边)。无数据则不渲染(优雅降级)。
+ */
+function SkillToolChips({ task }: { task: MissionTask }) {
+  const od = task.outputData as
+    | { usedSkills?: string[]; usedTools?: string[] }
+    | null;
+  const skills = Array.isArray(od?.usedSkills) ? od.usedSkills : [];
+  const tools = Array.isArray(od?.usedTools) ? od.usedTools : [];
+  if (skills.length === 0 && tools.length === 0) return null;
+  const label = (slug: string) => BUILTIN_SKILL_NAMES[slug] ?? slug;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {skills.map((s) => (
+        <span
+          key={`s-${s}`}
+          className="rounded bg-primary/10 px-1 py-px text-[10px] text-primary"
+        >
+          {label(s)}
+        </span>
+      ))}
+      {tools.map((t) => (
+        <span
+          key={`t-${t}`}
+          className="rounded border border-border px-1 py-px text-[10px] text-muted-foreground"
+        >
+          {label(t)}
+        </span>
+      ))}
+    </div>
   );
 }
 

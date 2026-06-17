@@ -33,6 +33,12 @@ export const skillTypeEnum = pgEnum("skill_type", [
   "plugin",
 ]);
 
+// 四层重构 (2026-06):区分"通用工具"与"专业技能"。
+// tool  — 通用能力,所有 agent 无条件可调(写工具仍受 authority 门控),不归属工种。
+// skill — 岗位强相关的专业能力,必须经 employee_skills 绑定到某工种才能被该工种 agent 调用(硬边界)。
+// 单一真相源在 src/lib/agent/tool-kinds.ts;本字段由 migration-craft-001 按该清单回填。
+export const skillKindEnum = pgEnum("skill_kind", ["tool", "skill"]);
+
 // Mission system enums (multi-agent collaboration)
 export const missionStatusEnum = pgEnum("mission_status", [
   "queued",

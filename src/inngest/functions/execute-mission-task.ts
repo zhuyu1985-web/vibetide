@@ -16,6 +16,8 @@ import {
   loadEmployeeMessages,
   checkTokenBudget,
 } from "@/lib/mission-core";
+import { shouldForceInjectWorkflowTool } from "@/lib/mission-executor";
+import { loadSkillContent } from "@/lib/skill-loader";
 import { loadScenarioLabel } from "@/lib/mission-scenario-label";
 import { recordSkillUsageInternal } from "@/app/actions/skills";
 
@@ -214,6 +216,30 @@ export const executeMissionTask = inngest.createFunction(
 
         const agent = await assembleAgent(task.assignedEmployeeId);
 
+        // 与 executeMissionDirect (mission-executor.ts:1090-1113) 对齐:Inngest 主链路
+        // 也必须加载步骤 SKILL.md 并 pin 成 skillSpec,且对工具型技能强制注入真实工具。
+        // 否则生产后台链路会产出"XX结果"这类一句话占位文本(内联链路因已加载 SKILL.md 正常)。
+        // assignedRole 存的是 skillSlug(mission-executor.ts:257),loadSkillContent 直接吃。
+        const skillBody = task.assignedRole
+          ? loadSkillContent(task.assignedRole)
+          : null;
+
+        const workflowToolSlug = task.assignedRole;
+        if (
+          workflowToolSlug &&
+          shouldForceInjectWorkflowTool(workflowToolSlug) &&
+          !agent.tools.some((t) => t.name === workflowToolSlug)
+        ) {
+          agent.tools = [
+            ...agent.tools,
+            {
+              name: workflowToolSlug,
+              description: `工作流指定的执行技能：${task.title}`,
+              parameters: {},
+            },
+          ];
+        }
+
         // Create mission collaboration tools
         const mTools = createMissionTools({
           missionId,
@@ -243,6 +269,8 @@ export const executeMissionTask = inngest.createFunction(
             topicTitle: mission.title,
             previousSteps,
             userInstructions,
+            skillSpec: skillBody ?? undefined,
+            skillSlug: task.assignedRole ?? undefined,
           },
           undefined,
           mTools,

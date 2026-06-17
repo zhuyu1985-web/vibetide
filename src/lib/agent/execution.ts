@@ -250,6 +250,9 @@ export async function executeAgent(
   // —— parseStepOutput 只看三段式结构, 检测不到失败。
   const toolFailures: Array<{ toolName: string; code: string; message: string }> = [];
   const successfulToolOutputs: Array<Record<string, unknown>> = [];
+  // 四层重构:记录本步骤实际调用过的工具名,连同 skillSlug 写回 outputData,
+  // 供执行面板渲染"用了什么技能/工具"chip。
+  const invokedToolNames = new Set<string>();
 
   // 应用 skill-level override（如 layout_design 降 maxTokens 提速）
   const effectiveModelConfig = applySkillOverride(agent.modelConfig, input.skillSlug);
@@ -319,6 +322,9 @@ ${input.skillSpec}
     onStepFinish: ({ toolCalls, toolResults }) => {
       if (toolCalls && toolCalls.length > 0) {
         toolCallCount += toolCalls.length;
+        for (const tc of toolCalls as Array<{ toolName?: string }>) {
+          if (tc.toolName) invokedToolNames.add(tc.toolName);
+        }
         onProgress?.({
           percent: Math.min(30 + toolCallCount * 10, 80),
           message: `已执行 ${toolCallCount} 个工具调用...`,
@@ -373,6 +379,8 @@ ${input.skillSpec}
     "status",
     "errorMessage",
     "errorCode",
+    "usedSkills",
+    "usedTools",
   ]);
   for (const toolOutput of successfulToolOutputs) {
     for (const [key, value] of Object.entries(toolOutput)) {
@@ -381,6 +389,10 @@ ${input.skillSpec}
       }
     }
   }
+
+  // 四层重构:回写本步骤实际用到的技能 + 工具(供执行面板 chip)。
+  if (input.skillSlug) output.usedSkills = [input.skillSlug];
+  if (invokedToolNames.size > 0) output.usedTools = [...invokedToolNames];
 
   if (input.skillSlug === "content_generate") {
     const article = buildArticleDraftFromGeneratedText(

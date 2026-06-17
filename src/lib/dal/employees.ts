@@ -9,8 +9,11 @@ export async function getEmployees(): Promise<AIEmployee[]> {
   const t0 = Date.now();
   const orgId = await getCurrentUserOrg();
   const t1 = Date.now();
+  // 四层重构:隐藏的 legacy 员工(被工种实例取代)不进花名册。
   const rows = await db.query.aiEmployees.findMany({
-    ...(orgId ? { where: eq(aiEmployees.organizationId, orgId) } : {}),
+    where: orgId
+      ? and(eq(aiEmployees.organizationId, orgId), eq(aiEmployees.hidden, 0))
+      : eq(aiEmployees.hidden, 0),
     orderBy: (emp, { asc }) => [asc(emp.createdAt)],
   });
   const t2 = Date.now();
@@ -62,6 +65,7 @@ export async function getEmployees(): Promise<AIEmployee[]> {
       nickname: emp.nickname,
       title: emp.title,
       motto: emp.motto || "",
+      roleType: emp.roleType,
       status: emp.status,
       currentTask: emp.currentTask || undefined,
       isPreset: emp.isPreset === 1,

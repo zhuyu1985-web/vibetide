@@ -18,6 +18,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import type { StepOutput } from "@/lib/agent";
 import type { EmployeeId } from "@/lib/constants";
+import { compatibleRolesFor } from "@/lib/agent/tool-kinds";
 
 // ---------------------------------------------------------------------------
 // Types used across call-sites
@@ -30,6 +31,12 @@ export interface EmployeeWithSkills {
   title: string;
   nickname: string;
   skills: string[];
+  /** 四层重构:工种(craft)slug = ai_employees.roleType。用于"技能→工种"确定性派单。 */
+  roleType?: string;
+  /** 1 = 工种默认实例(派单优先);0 = 客户配置实例。 */
+  isPreset?: number;
+  /** 绑定技能的 slug 列表(与 skills 名称一一对应),用于按 slug 匹配 requiredSkill。 */
+  skillSlugs?: string[];
 }
 
 export interface ParsedTaskDef {
@@ -56,7 +63,10 @@ export async function loadAvailableEmployees(
       name: aiEmployees.name,
       title: aiEmployees.title,
       nickname: aiEmployees.nickname,
+      roleType: aiEmployees.roleType,
+      isPreset: aiEmployees.isPreset,
       skillName: skills.name,
+      skillSlug: skills.slug,
     })
     .from(aiEmployees)
     .leftJoin(employeeSkills, eq(employeeSkills.employeeId, aiEmployees.id))
@@ -64,7 +74,10 @@ export async function loadAvailableEmployees(
     .where(
       and(
         eq(aiEmployees.organizationId, organizationId),
-        eq(aiEmployees.disabled, 0)
+        eq(aiEmployees.disabled, 0),
+        // 四层重构:隐藏的 legacy 员工不参与派单(迁移后旧 8+ 员工置 hidden=1,
+        // 仅保留供 mission 历史显示)。hidden 列默认 0,迁移前此过滤为 no-op。
+        eq(aiEmployees.hidden, 0)
       )
     );
 
@@ -73,11 +86,24 @@ export async function loadAvailableEmployees(
   for (const row of rows) {
     let emp = empMap.get(row.id);
     if (!emp) {
-      emp = { id: row.id, slug: row.slug, name: row.name, title: row.title, nickname: row.nickname, skills: [] };
+      emp = {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        title: row.title,
+        nickname: row.nickname,
+        roleType: row.roleType,
+        isPreset: row.isPreset,
+        skills: [],
+        skillSlugs: [],
+      };
       empMap.set(row.id, emp);
     }
     if (row.skillName) {
       emp.skills.push(row.skillName);
+    }
+    if (row.skillSlug) {
+      emp.skillSlugs!.push(row.skillSlug);
     }
   }
 
@@ -97,6 +123,10 @@ export async function loadAvailableEmployees(
 //
 // Resolution order:
 //   1) Explicit `step.config.employeeSlug` / `step.employeeSlug`
+//   1.5) 四层重构:确定性"技能→工种"派单 —— step 声明的 requiredSkill/skillSlug 经
+//        compatibleRoles(SKILL_OWNER)解析出工种集,在 org 员工里按 roleType 匹配工种实例
+//        (优先 defaultTeam 内 > isPreset=1 默认实例 > 第一个)。仅当员工带 roleType 时生效,
+//        因此迁移前(旧员工无新工种 roleType)自动跳过、退回旧逻辑,向后兼容。
 //   2) Within `defaultTeam`, the member whose skills include `step.config.skillName`
 //   3) Within `defaultTeam`, round-robin by step order
 //   4) `null` (caller decides whether to fall back to leader)
@@ -106,16 +136,51 @@ export function pickEmployeeForStep(
   step: {
     order?: number;
     employeeSlug?: string;
-    config?: { employeeSlug?: string; skillName?: string; skillSlug?: string };
+    config?: {
+      employeeSlug?: string;
+      skillName?: string;
+      skillSlug?: string;
+      requiredSkill?: string;
+      requiredCraft?: string;
+    };
   },
   defaultTeamSlugs: string[],
   employees: EmployeeWithSkills[],
+  /** slug → 工种 slug 列表;不传则回退到静态 compatibleRolesFor(覆盖全部 builtin 技能)。 */
+  skillCraftMap?: Map<string, string[]>,
 ): EmployeeWithSkills | null {
   // 1) Explicit assignment wins.
   const explicit = step.config?.employeeSlug ?? step.employeeSlug;
   if (explicit) {
     const e = employees.find((x) => x.slug === explicit);
     if (e) return e;
+  }
+
+  // 1.5) 确定性技能→工种派单。
+  const requiredSkill = step.config?.requiredSkill ?? step.config?.skillSlug;
+  if (requiredSkill) {
+    const craftSet = step.config?.requiredCraft
+      ? [step.config.requiredCraft]
+      : skillCraftMap?.get(requiredSkill) ?? compatibleRolesFor(requiredSkill);
+    if (craftSet.length > 0) {
+      const candidates = employees.filter(
+        (e) => e.roleType && craftSet.includes(e.roleType),
+      );
+      if (candidates.length > 0) {
+        // defaultTeam 内的候选优先(场景显式班子);否则全体候选。
+        const inTeam = candidates.filter((e) => defaultTeamSlugs.includes(e.slug));
+        const pool = inTeam.length > 0 ? inTeam : candidates;
+        // 同池内:按 craftSet 顺序(core 主人 index 最小→优先),同工种再优先 isPreset=1。
+        pool.sort((a, b) => {
+          const ia = craftSet.indexOf(a.roleType!);
+          const ib = craftSet.indexOf(b.roleType!);
+          if (ia !== ib) return ia - ib;
+          return (b.isPreset ?? 0) - (a.isPreset ?? 0);
+        });
+        return pool[0];
+      }
+      // craftSet 有但本 org 无对应工种实例 → 落到旧逻辑兜底(迁移前/数据缺失场景)。
+    }
   }
 
   // 2/3) Restrict candidate pool to defaultTeam members. If the template did

@@ -1,9 +1,8 @@
 "use client";
 
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { type EmployeeId } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { User } from "lucide-react";
-import { EMPLOYEE_AVATAR_MAP } from "./employee-svg-avatars";
+import { resolveEmployeeVisual } from "./employee-visual";
 
 const MICRO_ANIMATION: Record<string, string> = {
   xiaolei: "animate-radar-pulse",
@@ -48,12 +47,10 @@ export function EmployeeAvatar({
   className,
   animated = false,
 }: EmployeeAvatarProps) {
-  const meta = EMPLOYEE_META[employeeId as EmployeeId];
-  const Icon = meta?.icon ?? User;
-  const color = meta?.color ?? "#6b7280";
-  const bgColor = meta?.bgColor ?? "rgba(107,114,128,0.12)";
+  // 工种/员工视觉走单一真相源:工种实例继承被取代旧员工的 SVG 头像(见 employee-visual)。
+  const { avatarSlug, SvgAvatar, Icon, color, bgColor } =
+    resolveEmployeeVisual(employeeId);
   const s = sizeMap[size];
-  const SvgAvatar = EMPLOYEE_AVATAR_MAP[employeeId as EmployeeId];
   // 小尺寸(xs/sm)默认静态 — 它们出现在 TemplateCard 团队成员等密集场景,
   // 35+ 个 × 5 个 SVG 内部 infinite 动画是 home 页 CPU 大头。32px 看不到细节。
   // animated=true 时显式覆盖,强制激活动画。
@@ -76,13 +73,13 @@ export function EmployeeAvatar({
           <Icon size={s.icon} style={{ color }} strokeWidth={2} />
         )}
       </div>
-      {animated && MICRO_ANIMATION[employeeId as string] && (
+      {animated && MICRO_ANIMATION[avatarSlug as string] && (
         <span
           className={cn(
             "absolute inset-[-3px] rounded-full opacity-40",
-            MICRO_ANIMATION[employeeId as string]
+            MICRO_ANIMATION[avatarSlug as string]
           )}
-          style={{ borderColor: meta.color, borderWidth: 2, borderStyle: "solid" }}
+          style={{ borderColor: color, borderWidth: 2, borderStyle: "solid" }}
         />
       )}
       {showStatus && status && (

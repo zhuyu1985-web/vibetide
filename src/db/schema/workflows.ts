@@ -32,6 +32,17 @@ export interface WorkflowStepDef {
     skillSlug?: string;
     skillName?: string;
     skillCategory?: string;
+    /**
+     * 四层重构 (2026-06):步骤声明"需要哪个技能",派单据此按 skill.compatibleRoles
+     * 解析出工种并确定性匹配员工实例(取代 employeeSlug 指定人)。语义等同 skillSlug,
+     * 优先读 requiredSkill,回退 skillSlug。
+     */
+    requiredSkill?: string;
+    /**
+     * 当某技能被多个工种共享时,显式指定派给哪个工种(craft slug,见 CRAFT_META)。
+     * 留空则由派单逻辑按默认班子/熟练度/领域 tie-break。
+     */
+    requiredCraft?: string;
     outputAction?: string;
     parameters: Record<string, any>;
     description?: string;

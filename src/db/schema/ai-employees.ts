@@ -68,8 +68,28 @@ export const aiEmployees = pgTable("ai_employees", {
   avgResponseTime: text("avg_response_time").notNull().default("0s"),
   satisfaction: real("satisfaction").notNull().default(0),
 
+  // 四层重构 (2026-06):"工种=模板、员工=实例"。
+  // roleType 承载工种(craft)slug;instanceConfig 承载在工种模板之上叠加的三维修饰里
+  // 无法用现有表表达的部分(领域标签 / 媒体形态 / 平台规格)。
+  // - 领域:主载体是 employee_knowledge_bases(绑库);domainTags 补充注入 prompt。
+  // - 层级:authorityLevel 字段。
+  // - 形态:mediaForm + platformSpecs。
+  // assembly 读出 → 透传 AgentExecutionInput.domainContext / platformSpec → prompt 层。
+  instanceConfig: jsonb("instance_config")
+    .$type<{
+      domainTags?: string[];
+      mediaForm?: "news" | "newmedia" | "convergence";
+      platformSpecs?: {
+        channels?: string[];
+        formatRules?: Record<string, unknown>;
+      };
+    }>()
+    .default({}),
+
   // Metadata
   isPreset: integer("is_preset").notNull().default(1), // 1 = built-in, 0 = custom
+  // 1 = 隐藏(旧 legacy 员工迁移后不进新花名册,仅保留供 mission 历史显示);0 = 正常
+  hidden: integer("hidden").notNull().default(0),
   disabled: integer("disabled").notNull().default(0), // 1 = disabled, 0 = active
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

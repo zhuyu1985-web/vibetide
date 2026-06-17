@@ -38,7 +38,7 @@ import { GlassCard } from "@/components/shared/glass-card";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { ReturnToPreviousButton } from "@/components/shared/return-to-previous-button";
-import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
+import { resolveEmployeeVisual } from "@/components/shared/employee-visual";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -839,11 +839,11 @@ function PhaseBar({ status, phase }: { status: string; phase?: string }) {
 function TeamMemberCard({ employee, isLeader = false, currentTask, allTasksDone = false }: {
   employee: AIEmployee; isLeader?: boolean; currentTask?: MissionTask; allTasksDone?: boolean;
 }) {
-  const meta = EMPLOYEE_META[employee.id as EmployeeId];
-  if (!meta) return null;
-
-  const Icon = meta.icon;
-  const SvgAvatar = EMPLOYEE_AVATAR_MAP[employee.id as EmployeeId];
+  // craft-aware:工种实例继承被取代旧员工的 SVG 头像(见 employee-visual),不再 return null。
+  const { SvgAvatar, Icon, color, bgColor, nickname } = resolveEmployeeVisual(
+    employee.id,
+  );
+  const displayNickname = nickname ?? employee.nickname;
   const hasTask = !!currentTask;
 
   return (
@@ -851,20 +851,20 @@ function TeamMemberCard({ employee, isLeader = false, currentTask, allTasksDone 
       <div className="flex items-center gap-2.5">
         <div
           className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0"
-          style={SvgAvatar ? undefined : { backgroundColor: meta.bgColor }}
+          style={SvgAvatar ? undefined : { backgroundColor: bgColor }}
         >
           {SvgAvatar ? (
             <SvgAvatar className="w-full h-full" />
           ) : (
-            <Icon size={17} style={{ color: meta.color }} />
+            <Icon size={17} style={{ color }} />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold" style={{ color: meta.color }}>{meta.nickname}</span>
+            <span className="text-sm font-semibold" style={{ color }}>{displayNickname}</span>
             {isLeader && <Badge className="text-[10px] px-1.5 py-0 h-4 font-bold bg-rose-500/20 text-rose-400">Leader</Badge>}
           </div>
-          <p className="text-xs text-muted-foreground truncate">{meta.title}</p>
+          <p className="text-xs text-muted-foreground truncate">{employee.title}</p>
         </div>
         {hasTask ? (
           <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">

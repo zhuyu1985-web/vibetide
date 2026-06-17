@@ -11,7 +11,7 @@ import {
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
-import { skillCategoryEnum, skillTypeEnum, skillBindingTypeEnum, learningSourceEnum } from "./enums";
+import { skillCategoryEnum, skillTypeEnum, skillKindEnum, skillBindingTypeEnum, learningSourceEnum } from "./enums";
 
 export const skills = pgTable("skills", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -21,6 +21,9 @@ export const skills = pgTable("skills", {
   slug: text("slug"), // e.g. "web_search"; nullable for legacy custom skills
   category: skillCategoryEnum("category").notNull(),
   type: skillTypeEnum("type").notNull().default("builtin"),
+  // 四层重构 (2026-06):tool=通用工具(人人可调) / skill=专业技能(必须挂工种)。
+  // 默认 'skill',由 migration-craft-001 按 tool-kinds.ts 单一清单回填为 'tool' 的那部分。
+  kind: skillKindEnum("kind").notNull().default("skill"),
   version: text("version").notNull().default("1.0"),
   description: text("description").notNull(),
   content: text("content").default(""),

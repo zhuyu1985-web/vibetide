@@ -11,6 +11,8 @@ export interface AIEmployee {
   nickname: string;
   title: string;
   motto: string;
+  /** 四层重构:工种(craft)slug = ai_employees.roleType,用于工种徽章/分组/派单显示。 */
+  roleType?: string;
   status: EmployeeStatus;
   currentTask?: string;
   skills: Skill[];

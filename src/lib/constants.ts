@@ -11,6 +11,10 @@ import {
   Crown,
   FileSearch,
   BookOpen,
+  Newspaper,
+  MessageSquareQuote,
+  ShieldCheck,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 
@@ -561,6 +565,188 @@ export const EMPLOYEE_CORE_SKILLS: Record<string, string[]> = {
     "web_deep_read",
     "web_search",
   ],
+};
+
+// ---------------------------------------------------------------------------
+// 四层重构 (2026-06):工种(craft)= 能力模板。员工 = 工种的配置实例。
+// ---------------------------------------------------------------------------
+// "工种"对标真实媒体岗位,是跨"中心/领域"复用的工种(craft);员工 = 工种 +
+// 领域知识库 + 额外技能 + 层级(authority) + 平台规格 配出来的具体岗位实例。
+// 载体:ai_employees.roleType 存工种 slug;CRAFT_META 约束取值 + 提供模板元数据。
+// 物理岗(摄像/摄影/导播/灯光/音频)不进体系。
+
+export type CraftType =
+  | "director" // 编导/策划
+  | "reporter" // 记者
+  | "editor" // 编辑
+  | "commentator" // 评论员
+  | "post_production" // 后期剪辑
+  | "reviewer" // 审核
+  | "operator" // 新媒体运营
+  | "anchor" // 播报主持
+  | "analyst" // 数据分析
+  | "producer"; // 制片人/总编(编排器)
+
+export interface CraftMeta {
+  id: CraftType;
+  name: string; // 工种中文名
+  description: string; // 一句话职责边界
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  /** 该工种默认权限档:决定能否定稿/发布(层级维度的默认值) */
+  defaultAuthority: "observer" | "advisor" | "executor" | "coordinator";
+  /** 默认产出形态 */
+  defaultOutput: string;
+}
+
+export const CRAFT_META: Record<CraftType, CraftMeta> = {
+  director: {
+    id: "director",
+    name: "编导/策划",
+    description: "定选题角度与镜头叙事,不负责定稿发布",
+    icon: Lightbulb,
+    color: "#8b5cf6",
+    bgColor: "rgba(139,92,246,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "选题方案 / 分镜脚本",
+  },
+  reporter: {
+    id: "reporter",
+    name: "记者",
+    description: "采写一手稿件,提供事实素材,不拍板审核",
+    icon: Newspaper,
+    color: "#f59e0b",
+    bgColor: "rgba(245,158,11,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "稿件正文",
+  },
+  editor: {
+    id: "editor",
+    name: "编辑",
+    description: "加工润色定形,不做最终合规审核",
+    icon: PenTool,
+    color: "#3b82f6",
+    bgColor: "rgba(59,130,246,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "成稿 / 标题 / 摘要",
+  },
+  commentator: {
+    id: "commentator",
+    name: "评论员",
+    description: "输出观点与深度研判,不负责采集与发布",
+    icon: MessageSquareQuote,
+    color: "#4f46e5",
+    bgColor: "rgba(79,70,229,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "评论 / 深度研报",
+  },
+  post_production: {
+    id: "post_production",
+    name: "后期剪辑",
+    description: "视听成品化方案,不写文字内容",
+    icon: Film,
+    color: "#ef4444",
+    bgColor: "rgba(239,68,68,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "剪辑/音频/封面/排版方案",
+  },
+  reviewer: {
+    id: "reviewer",
+    name: "审核",
+    description: "把关事实质量合规,拥有驳回权",
+    icon: ShieldCheck,
+    color: "#6366f1",
+    bgColor: "rgba(99,102,241,0.12)",
+    defaultAuthority: "executor",
+    defaultOutput: "审核结论(过/驳回)",
+  },
+  operator: {
+    id: "operator",
+    name: "新媒体运营",
+    description: "平台适配与分发策略,发布动作受 authority 控",
+    icon: Radio,
+    color: "#14b8a6",
+    bgColor: "rgba(20,184,166,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "多平台适配稿 / 分发方案",
+  },
+  anchor: {
+    id: "anchor",
+    name: "播报主持",
+    description: "口语化播报脚本,不做文字深加工",
+    icon: Mic,
+    color: "#ec4899",
+    bgColor: "rgba(236,72,153,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "播报 / 口播脚本",
+  },
+  analyst: {
+    id: "analyst",
+    name: "数据分析",
+    description: "效果洞察与复盘,不参与内容生产",
+    icon: BarChart3,
+    color: "#f97316",
+    bgColor: "rgba(249,115,22,0.12)",
+    defaultAuthority: "advisor",
+    defaultOutput: "数据报告 / 复盘",
+  },
+  producer: {
+    id: "producer",
+    name: "制片人/总编",
+    description: "拆解任务按技能→工种派单并终审拍板",
+    icon: Crown,
+    color: "#e11d48",
+    bgColor: "rgba(225,29,72,0.12)",
+    defaultAuthority: "coordinator",
+    defaultOutput: "任务编排 / 终审定稿",
+  },
+};
+
+export const ORDERED_CRAFTS = [
+  "director",
+  "reporter",
+  "editor",
+  "commentator",
+  "post_production",
+  "reviewer",
+  "operator",
+  "anchor",
+  "analyst",
+  "producer",
+] as const satisfies readonly CraftType[];
+
+// 工种默认绑定的"核心技能"(core,不可解绑)。= tool-kinds.ts SKILL_OWNER 表的反查。
+// migration-craft-001 据此为每 org 的工种默认实例写 employee_skills(bindingType='core')。
+// 注:仅当该 skill slug 在 DB 中实际存在时才绑定,不存在的(如 channel_rewrite /
+// cross_language_rewrite 视 seed 而定)由迁移脚本跳过并记日志。
+export const CRAFT_CORE_SKILLS: Record<CraftType, string[]> = {
+  director: ["angle_design", "script_generate", "duanju_script", "zongyi_highlight"],
+  reporter: ["content_generate"],
+  editor: ["headline_generate", "summary_generate", "style_rewrite", "cross_language_rewrite"],
+  commentator: ["report_drafter"],
+  post_production: ["video_edit_plan", "audio_plan", "thumbnail_generate", "layout_design"],
+  reviewer: ["quality_review", "compliance_check", "fact_check"],
+  operator: ["channel_rewrite", "tandian_script", "zhongcao_script", "aigc_script_push", "publish_strategy"],
+  anchor: ["podcast_script"],
+  analyst: ["data_report"],
+  producer: ["task_planning"],
+};
+
+// 头像移植:旧员工被工种实例取代(已 hidden),但其精致 SVG 头像移植到对应工种,
+// 让新团队继承熟悉的形象。EmployeeAvatar 据此把工种 slug 解析到旧头像;未列出的
+// 工种(anchor)回退用 CRAFT_META 的图标。头像是代码级 SVG,与 DB 行存废无关。
+export const CRAFT_AVATAR_SOURCE: Partial<Record<CraftType, EmployeeId>> = {
+  director: "xiaoce", // 选题策划师(灯泡)
+  reporter: "xiaolei", // 热点分析师(雷达)
+  editor: "xiaowen", // 内容创作师(笔)
+  // commentator / anchor 用专属新拟人头像(EMPLOYEE_AVATAR_MAP 里按工种 slug 注册),
+  // 不映射到旧员工,故不在此列。
+  post_production: "xiaojian", // 视频制片人(胶片)
+  reviewer: "xiaoshen", // 质量审核官(放大镜)
+  operator: "xiaofa", // 渠道运营师(信号)
+  analyst: "xiaoshu", // 数据分析师(图表)
+  producer: "leader", // 任务总监(皇冠)
 };
 
 // Read-only tool names for advisor authority level

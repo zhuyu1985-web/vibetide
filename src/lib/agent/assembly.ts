@@ -13,7 +13,11 @@ import type { SkillCategory } from "@/lib/types";
 import { loadSkillContent, getBuiltinSkillNameToSlug } from "@/lib/skill-loader";
 import { buildSystemPrompt } from "./prompt-templates";
 import { resolveModelConfig } from "./model-router";
-import { resolveTools } from "./tool-registry";
+import { resolveTools, isToolRegistered } from "./tool-registry";
+import {
+  UNIVERSAL_READ_TOOL_SLUGS,
+  UNIVERSAL_WRITE_TOOL_SLUGS,
+} from "./tool-kinds";
 import type { AssembledAgent, ModelConfig } from "./types";
 
 /**
@@ -148,6 +152,27 @@ export async function assembleAgent(
     tools = resolvedTools.filter((tool) => readOnlyToolNames.has(tool.name));
   }
 
+  // 四层重构:通用工具(tool-kinds.ts)对所有非 observer agent【无条件可用】,不依赖
+  // employee_skills 绑定 —— 这是"工具人人可调、专业技能必须挂工种"硬边界的工具侧实现。
+  // 否则只绑了 content_generate 的"记者"工种实例就拿不到 web_search,无法采集。
+  // 写工具仍受 authority 门控(仅 executor/coordinator 注入);只注入有真实实现的工具
+  // (isToolRegistered 过滤掉 kb_search 等动态工具,后者由下方 KB 绑定逻辑单独处理)。
+  // 放在 skillOverrides 过滤之前,使 intent 限定(如 xiaoyan 研究三件套)仍能收窄工具集。
+  if (employee.authorityLevel !== "observer") {
+    const present = new Set(tools.map((t) => t.name));
+    const universalSlugs = [
+      ...UNIVERSAL_READ_TOOL_SLUGS,
+      ...(employee.authorityLevel === "executor" ||
+      employee.authorityLevel === "coordinator"
+        ? UNIVERSAL_WRITE_TOOL_SLUGS
+        : []),
+    ].filter((slug) => isToolRegistered(slug));
+    const universalTools = resolveTools(universalSlugs).filter(
+      (t) => !present.has(t.name),
+    );
+    tools = [...tools, ...universalTools];
+  }
+
   // Intent-based skill override: restrict tools to the specified set
   if (context?.skillOverrides && context.skillOverrides.length > 0) {
     const overrideSet = new Set(context.skillOverrides);
@@ -182,6 +207,14 @@ export async function assembleAgent(
   // 5. Resolve model
   const modelConfig = resolveModelConfig(skillCategories, modelOverride);
 
+  // 四层重构:工种 + 三修饰维度(领域/形态)。roleType=工种;instanceConfig 承载
+  // 领域标签/媒体形态/平台规格,注入系统提示让产物按这些维度差异化(层级=authorityLevel)。
+  const instanceConfig = (employee.instanceConfig ?? {}) as {
+    domainTags?: string[];
+    mediaForm?: string;
+    platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
+  };
+
   // 6. Build the assembled agent (system prompt built inside)
   const agent: AssembledAgent = {
     employeeId,
@@ -202,6 +235,10 @@ export async function assembleAgent(
     skillContents: Object.keys(skillContents).length > 0 ? skillContents : undefined,
     pluginConfigs: pluginConfigs.size > 0 ? pluginConfigs : undefined,
     knowledgeBaseIds: empKBs.length > 0 ? empKBs.map((kb) => kb.kbId) : undefined,
+    craftType: employee.roleType || undefined,
+    domainTags: instanceConfig.domainTags,
+    mediaForm: instanceConfig.mediaForm,
+    platformSpecs: instanceConfig.platformSpecs,
   };
 
   // Build system prompt with full agent context

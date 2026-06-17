@@ -1,5 +1,3 @@
-import type { EmployeeId } from "@/lib/constants";
-
 type AvatarProps = { className?: string };
 
 // Shared face: larger, centered low so there's room for hair/hats on top.
@@ -413,7 +411,77 @@ export function LeaderAvatar({ className }: AvatarProps) {
   );
 }
 
-export const EMPLOYEE_AVATAR_MAP: Partial<Record<EmployeeId, (props: AvatarProps) => React.JSX.Element>> = {
+// ---- 评论员 — 中分发 + 漂浮评论气泡(观点输出) ----
+export function CommentatorAvatar({ className }: AvatarProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="cm-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#eef2ff" />
+          <stop offset="100%" stopColor="#a5b4fc" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="16" fill="url(#cm-bg)" />
+      {/* floating comment bubble with dots */}
+      <g className="avatar-anim-float" style={{ transformOrigin: "50px 13px" }}>
+        <rect x="41" y="6" width="20" height="13" rx="4" fill="#fff" stroke="#4f46e5" strokeWidth="1.2" />
+        <path d="M46 19 l-3 4.5 l6.5 -3.2 Z" fill="#fff" stroke="#4f46e5" strokeWidth="1.2" strokeLinejoin="round" />
+        <circle cx="47" cy="12.5" r="1.4" fill="#4f46e5" />
+        <circle cx="51" cy="12.5" r="1.4" fill="#6366f1" />
+        <circle cx="55" cy="12.5" r="1.4" fill="#818cf8" />
+      </g>
+      {/* small idea dots top-left */}
+      <g className="avatar-anim-shimmer avatar-delay-2">
+        <circle cx="10" cy="18" r="1.3" fill="#818cf8" />
+        <circle cx="15" cy="13" r="1" fill="#a5b4fc" />
+      </g>
+      <FaceBase fill="#eef2ff" stroke="#4f46e5" />
+      {/* center-parted neat hair */}
+      <path d="M17 33 Q17 21 32 19 Q47 21 47 33 L47 27 Q40 23 33 24 L33 19 L31 19 L31 24 Q24 23 17 27 Z" fill="#3730a3" />
+      <path d="M17 28 Q24 23 31 24 Q30 27 19 30 Z" fill="#312e81" />
+      <path d="M47 28 Q40 23 33 24 Q34 27 45 30 Z" fill="#312e81" />
+    </svg>
+  );
+}
+
+// ---- 播报主持 — 利落侧分发 + 手持话筒 + LIVE 角标 ----
+export function AnchorAvatar({ className }: AvatarProps) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="an-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fdf2f8" />
+          <stop offset="100%" stopColor="#f9a8d4" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="16" fill="url(#an-bg)" />
+      {/* sound waves from the mic (left) */}
+      <g className="avatar-anim-wave" style={{ transformOrigin: "16px 52px" }}>
+        <path d="M16 49 Q12 52 16 55" fill="none" stroke="#ec4899" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M13 47 Q7 52 13 57" fill="none" stroke="#ec4899" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+      </g>
+      {/* LIVE badge top-right */}
+      <g className="avatar-anim-pulse" style={{ transformOrigin: "52px 12px" }}>
+        <rect x="44" y="8" width="16" height="7.5" rx="3.75" fill="#ec4899" />
+        <circle cx="48" cy="11.75" r="1.4" fill="#fff" />
+        <text x="54" y="14.2" fontSize="4.4" fill="#fff" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">LIVE</text>
+      </g>
+      <FaceBase fill="#fdf2f8" stroke="#ec4899" />
+      {/* side-swept anchor hair */}
+      <path d="M17 33 Q16 20 32 19 Q48 20 47 33 L47 26 Q44 20 34 21 Q22 19 18 30 Z" fill="#9d174d" />
+      <path d="M18 30 Q30 22 46 26 L46 29 Q32 23 18 29 Z" fill="#831843" />
+      {/* handheld microphone at chin */}
+      <g className="avatar-anim-pulse" style={{ transformOrigin: "32px 57px" }}>
+        <rect x="29" y="49" width="6" height="9.5" rx="3" fill="#be185d" />
+        <rect x="30.2" y="50" width="3.6" height="4" rx="1.8" fill="#f9a8d4" opacity="0.85" />
+        <line x1="32" y1="58.5" x2="32" y2="62" stroke="#831843" strokeWidth="2.2" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+// 头像键含旧员工 slug 与新工种 slug(commentator/anchor 用专属新拟人头像);故放宽到 string。
+export const EMPLOYEE_AVATAR_MAP: Partial<Record<string, (props: AvatarProps) => React.JSX.Element>> = {
   xiaolei: XiaoleiAvatar,
   xiaoce: XiaoceAvatar,
   xiaozi: XiaoziAvatar,
@@ -424,4 +492,7 @@ export const EMPLOYEE_AVATAR_MAP: Partial<Record<EmployeeId, (props: AvatarProps
   xiaoshu: XiaoshuAvatar,
   xiaotan: XiaotanAvatar,
   leader: LeaderAvatar,
+  // 工种专属拟人头像(评论员 / 播报主持)
+  commentator: CommentatorAvatar,
+  anchor: AnchorAvatar,
 };

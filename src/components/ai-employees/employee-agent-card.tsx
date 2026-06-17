@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import type { AIEmployee } from "@/lib/types";
 import type { HotTask } from "@/lib/employee-tasks";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Plus, UserCog } from "lucide-react";
-import { EMPLOYEE_AVATAR_MAP } from "@/components/shared/employee-svg-avatars";
+import { ArrowUpRight, Plus } from "lucide-react";
+import { resolveEmployeeVisual } from "@/components/shared/employee-visual";
 import { GlassCard } from "@/components/shared/glass-card";
 
 const STATUS_CONFIG = {
@@ -31,17 +30,18 @@ export function EmployeeAgentCard({
 }: EmployeeAgentCardProps) {
   const router = useRouter();
   const [hoveredTask, setHoveredTask] = useState<number | null>(null);
-  const meta = EMPLOYEE_META[employee.id as EmployeeId] as typeof EMPLOYEE_META[EmployeeId] | undefined;
+  // 头像/视觉走单一真相源(工种实例继承被取代旧员工的 SVG 头像,见 employee-visual)。
+  const visual = resolveEmployeeVisual(employee.id);
   const statusCfg = STATUS_CONFIG[employee.status];
-  const Icon = meta?.icon ?? UserCog;
-  const SvgAvatar = EMPLOYEE_AVATAR_MAP[employee.id as EmployeeId];
+  const Icon = visual.Icon;
+  const SvgAvatar = visual.SvgAvatar;
   const isWorking = employee.status === "working";
 
-  const iconBg = meta?.bgColor ?? "rgba(107,114,128,0.15)";
-  const iconColor = meta?.color ?? "#6b7280";
-  const nickname = meta?.nickname ?? employee.nickname;
-  const name = meta?.name ?? employee.name;
-  const description = meta?.description ?? employee.title;
+  const iconBg = visual.bgColor;
+  const iconColor = visual.color;
+  const nickname = visual.nickname ?? employee.nickname;
+  const name = visual.name ?? employee.name;
+  const description = visual.description ?? employee.title;
 
   return (
     <GlassCard

@@ -75,6 +75,16 @@ export interface AssembledAgent {
    * When non-empty, the kb_search tool is auto-injected at execution time.
    */
   knowledgeBaseIds?: string[];
+
+  // ── 四层重构:工种 + 三修饰维度,注入系统提示让产物真正按工种/领域/形态/层级变化 ──
+  /** 工种(craft)slug = ai_employees.roleType,用于身份层显式标注工种。 */
+  craftType?: string;
+  /** 领域标签(时政/财经/法治…),来自 instanceConfig.domainTags → 领域层(改"内容/术语/口径")。 */
+  domainTags?: string[];
+  /** 媒体形态(news/newmedia/convergence),来自 instanceConfig.mediaForm → 形态层。 */
+  mediaForm?: string;
+  /** 平台规格,来自 instanceConfig.platformSpecs → 形态层(改"形式/语态/平台")。 */
+  platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +128,9 @@ export interface StepOutput {
    */
   errorMessage?: string;
   errorCode?: string;
+  /** 四层重构:本步骤实际"用了什么"——供执行面板渲染工种/技能/工具 chip。 */
+  usedSkills?: string[];
+  usedTools?: string[];
   // 工具/LLM-skill 真实结果直出场景（mission-executor 短路分支）会把
   // invocation.result 的结构化字段（topics / results / articles 等）spread 进
   // outputData，让下游步骤的 {{stepN.field}} 模板能引用。Index signature 让

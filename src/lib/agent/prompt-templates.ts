@@ -1,4 +1,5 @@
 import type { AssembledAgent, StepOutput } from "./types";
+import { CRAFT_META, type CraftType } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
 // Step-specific instructions
@@ -91,10 +92,17 @@ const STEP_INSTRUCTIONS: Record<string, string> = {
 export function buildSystemPrompt(agent: AssembledAgent): string {
   const layers: string[] = [];
 
-  // Layer 1: Identity
+  // Layer 1: Identity（含工种 craft 标注 + 职责边界）
   const customInstructions = agent.workPreferences?.customInstructions;
+  const craftMeta =
+    agent.craftType && agent.craftType in CRAFT_META
+      ? CRAFT_META[agent.craftType as CraftType]
+      : null;
+  const craftLine = craftMeta
+    ? `\n你的工种是「${craftMeta.name}」——${craftMeta.description}。请只做本工种范围内的工作,跨工种的事交给对应工种。`
+    : "";
   const identityLayer = `# 身份
-你是「${agent.name}」（昵称：${agent.nickname}），职位：${agent.title}。
+你是「${agent.name}」（昵称：${agent.nickname}），职位：${agent.title}。${craftLine}
 你是 Vibetide 内容生产团队的 AI 数字员工。${customInstructions ? `\n\n## 自定义工作指令\n${customInstructions}` : ""}`;
   layers.push(identityLayer);
 
@@ -155,16 +163,56 @@ ${toolList}${proficiencyGuidance}`);
     }
   }
 
-  // Layer 3: Authority constraints
-  layers.push(`# 权限
+  // Layer 3: Authority constraints（层级维度 —— 主动约束"能否定稿/发布",而非被动说明）
+  const authorityRules: Record<string, string> = {
+    observer:
+      "- 你是观察/咨询角色：只能检索、分析、给建议；禁止任何写操作、定稿与发布。\n- 所有产出都标注为「建议」，由人或上级工种执行。",
+    advisor:
+      "- 你可以检索、分析、起草本职产出；但【不可定稿、不可发布】。\n- 最终产物须交「审核」工种或人工审批后才能进入下一环节。",
+    executor:
+      "- 你可以执行并定稿本职范围内的产出。\n- 对外发布 / 入库 / 不可逆的高风险操作仍需按规则审批。",
+    coordinator:
+      "- 你可以拆解任务、跨工种派单、统筹并对最终交付物终审定稿。\n- 越权或跨领域操作需说明依据。",
+  };
+  layers.push(`# 权限与层级
 你的权限等级为「${agent.authorityLevel}」。
-- 请在你的权限范围内完成工作
-- 对于超出权限的操作，标记为"需要审批"并说明原因`);
+${authorityRules[agent.authorityLevel] ?? "- 请在你的权限范围内完成工作，超出权限的操作标记为「需要审批」并说明原因。"}`);
 
   // Layer 4: Knowledge context
   if (agent.knowledgeContext) {
     layers.push(`# 知识背景
 ${agent.knowledgeContext}`);
+  }
+
+  // Layer 4.5: 领域专精（领域维度 —— 改变产物的内容/术语/口径）
+  if (agent.domainTags && agent.domainTags.length > 0) {
+    layers.push(`# 领域专精
+你专注于以下领域：${agent.domainTags.join("、")}。
+- 使用该领域的专业术语与表达习惯，不说外行话。
+- 遵循该领域的报道口径与禁忌（如财经不作投资建议、时政遵守称谓与排序规范）。
+- 优先引用该领域的权威来源与你绑定知识库中的事实。`);
+  }
+
+  // Layer 4.6: 媒体形态与平台规格（形态维度 —— 改变产物的形式/语态/平台）
+  const formChannels = agent.platformSpecs?.channels ?? [];
+  if (agent.mediaForm || formChannels.length > 0) {
+    const formLabels: Record<string, string> = {
+      news: "新闻（规范书面语，导语+主体+结语）",
+      newmedia: "新媒体（口语化、短、带 hook，配话题标签与封面文案）",
+      convergence: "融媒体（同一内容按各平台规格出多版）",
+    };
+    const parts: string[] = [];
+    if (agent.mediaForm) {
+      parts.push(
+        `- 媒体形态：${formLabels[agent.mediaForm] ?? agent.mediaForm}。按该形态的语态与篇幅产出。`,
+      );
+    }
+    if (formChannels.length > 0) {
+      parts.push(
+        `- 目标平台：${formChannels.join("、")}。产出须符合各平台的画幅/时长/字数/标签规格。`,
+      );
+    }
+    layers.push(`# 媒体形态与平台规格\n${parts.join("\n")}`);
   }
 
   // Layer 3.5: Sensitive topic guardrails
