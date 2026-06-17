@@ -15,6 +15,19 @@ const STATUS_CONFIG = {
   reviewing: { label: "审核中", dotColor: "bg-amber-400", textColor: "text-amber-400/80" },
 };
 
+// 三维徽章标签(层级 / 媒体形态)。领域直接显示 domainTags。
+const CARD_AUTHORITY_LABEL: Record<string, string> = {
+  observer: "观察",
+  advisor: "建议",
+  executor: "执行",
+  coordinator: "统筹",
+};
+const CARD_MEDIA_LABEL: Record<string, string> = {
+  news: "新闻",
+  newmedia: "新媒体",
+  convergence: "融媒体",
+};
+
 interface EmployeeAgentCardProps {
   employee: AIEmployee;
   hotTasks: HotTask[];
@@ -103,6 +116,30 @@ export function EmployeeAgentCard({
       <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2">
         {description}
       </p>
+
+      {/* 三维徽章:领域(domainTags) / 媒体形态 / 层级(authority) */}
+      <div className="mt-2 flex flex-wrap gap-1">
+        {(employee.instanceConfig?.domainTags ?? []).slice(0, 3).map((t) => (
+          <span
+            key={t}
+            className="rounded bg-indigo-500/10 px-1.5 py-px text-[10px] text-indigo-600 dark:text-indigo-400"
+          >
+            {t}
+          </span>
+        ))}
+        {employee.instanceConfig?.mediaForm && (
+          <span className="rounded bg-teal-500/10 px-1.5 py-px text-[10px] text-teal-600 dark:text-teal-400">
+            {CARD_MEDIA_LABEL[employee.instanceConfig.mediaForm] ??
+              employee.instanceConfig.mediaForm}
+          </span>
+        )}
+        {employee.authorityLevel && (
+          <span className="rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-700 dark:text-amber-400">
+            {CARD_AUTHORITY_LABEL[employee.authorityLevel] ??
+              employee.authorityLevel}
+          </span>
+        )}
+      </div>
 
       {/* Hot Tasks — compact, inline */}
       {hotTasks.length > 0 && (

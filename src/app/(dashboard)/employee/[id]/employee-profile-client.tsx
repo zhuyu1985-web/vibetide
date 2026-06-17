@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import {
   Settings,
+  Globe,
   BookOpen,
   Sliders,
   Shield,
@@ -66,6 +67,7 @@ import {
   updateAuthorityLevel,
   updateAutoActions,
   updateEmployeeProfile,
+  updateEmployeeInstanceConfig,
 } from "@/app/actions/employees";
 import { previewSystemPrompt } from "@/app/actions/employee-advanced";
 import { triggerLearningFromFeedback } from "@/app/actions/learning";
@@ -146,6 +148,17 @@ interface EmployeeProfileClientProps {
   canManage?: boolean;
 }
 
+// 四层重构:常见领域标签预设(领域维度);媒体形态选项(形态维度)。
+const PRESET_DOMAINS = [
+  "时政", "财经", "社会", "民生", "法治", "文体",
+  "科技", "国际", "娱乐", "教育", "健康", "军事",
+];
+const MEDIA_FORM_OPTIONS: { value: string; label: string }[] = [
+  { value: "news", label: "新闻 · 规范书面语" },
+  { value: "newmedia", label: "新媒体 · 口语化/短/带标签" },
+  { value: "convergence", label: "融媒体 · 多平台适配" },
+];
+
 export function EmployeeProfileClient({
   employee,
   availableSkills,
@@ -196,6 +209,20 @@ export function EmployeeProfileClient({
   const [newAutoAction, setNewAutoAction] = useState("");
   const [newApprovalAction, setNewApprovalAction] = useState("");
 
+  // 四层重构:领域 / 媒体形态(instanceConfig)配置态
+  const [domainTags, setDomainTags] = useState<string[]>(
+    employee.instanceConfig?.domainTags ?? [],
+  );
+  const [newDomainTag, setNewDomainTag] = useState("");
+  const [mediaForm, setMediaForm] = useState<string>(
+    employee.instanceConfig?.mediaForm ?? "",
+  );
+  const [platformChannels, setPlatformChannels] = useState<string[]>(
+    employee.instanceConfig?.platformSpecs?.channels ?? [],
+  );
+  const [newChannel, setNewChannel] = useState("");
+  const [instanceSaving, setInstanceSaving] = useState(false);
+
   const handleUnbindSkill = async (skillId: string) => {
     setUnbindingSkill(skillId);
     try {
@@ -242,6 +269,27 @@ export function EmployeeProfileClient({
       console.error("Failed to save preferences:", err);
     } finally {
       setPrefsSaving(false);
+    }
+  };
+
+  const handleSaveInstanceConfig = async () => {
+    setInstanceSaving(true);
+    try {
+      await updateEmployeeInstanceConfig(employee.dbId, {
+        domainTags,
+        mediaForm: (mediaForm || undefined) as
+          | "news"
+          | "newmedia"
+          | "convergence"
+          | undefined,
+        platformSpecs:
+          platformChannels.length > 0 ? { channels: platformChannels } : undefined,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to save instance config:", err);
+    } finally {
+      setInstanceSaving(false);
     }
   };
 
@@ -406,6 +454,10 @@ export function EmployeeProfileClient({
           <TabsTrigger value="permissions" className="text-xs gap-1">
             <Shield size={14} />
             权限设置
+          </TabsTrigger>
+          <TabsTrigger value="instance" className="text-xs gap-1">
+            <Globe size={14} />
+            领域·形态
           </TabsTrigger>
           <TabsTrigger value="performance" className="text-xs gap-1">
             <TrendingUp size={14} />
@@ -1031,6 +1083,148 @@ export function EmployeeProfileClient({
         </TabsContent>
 
         {/* Performance Tab */}
+        {/* Domain / Media-form Tab(领域 · 媒体形态)*/}
+        <TabsContent value="instance">
+          <div className="space-y-4">
+            {/* 领域专精 */}
+            <GlassCard>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">
+                领域专精
+              </h3>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">
+                决定产物的内容 / 术语 / 口径。例:「财经」→ 用对营收同比、毛利率,守「不作投资建议」红线;「时政」→ 守称谓与排序规范。配合「知识库」绑定效果更佳。
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {domainTags.map((t) => (
+                  <Badge key={t} variant="secondary" className="text-xs pr-1 gap-1">
+                    {t}
+                    <button
+                      className="ml-1 hover:text-red-500"
+                      onClick={() => setDomainTags(domainTags.filter((x) => x !== t))}
+                    >
+                      <X size={10} />
+                    </button>
+                  </Badge>
+                ))}
+                {domainTags.length === 0 && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    未设置领域(按通用处理)
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {PRESET_DOMAINS.filter((d) => !domainTags.includes(d)).map((d) => (
+                  <Button
+                    key={d}
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs"
+                    onClick={() => setDomainTags([...domainTags, d])}
+                  >
+                    + {d}
+                  </Button>
+                ))}
+              </div>
+              <Input
+                placeholder="自定义领域标签…回车添加"
+                value={newDomainTag}
+                onChange={(e) => setNewDomainTag(e.target.value)}
+                className="h-8 text-xs glass-input max-w-xs"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newDomainTag.trim()) {
+                    const v = newDomainTag.trim();
+                    if (!domainTags.includes(v)) setDomainTags([...domainTags, v]);
+                    setNewDomainTag("");
+                  }
+                }}
+              />
+            </GlassCard>
+
+            {/* 媒体形态 + 平台规格 */}
+            <GlassCard>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">
+                媒体形态
+              </h3>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">
+                决定产物的形式 / 语态 / 平台。新闻=规范书面;新媒体=口语短、带话题标签;融媒体=同一内容按各平台出多版。
+              </p>
+              <Select
+                value={mediaForm || "none"}
+                onValueChange={(v) => setMediaForm(v === "none" ? "" : v)}
+              >
+                <SelectTrigger className="glass-input max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">不限(通用)</SelectItem>
+                  {MEDIA_FORM_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-4">
+                <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                  目标平台 / 渠道(可选)
+                </p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {platformChannels.map((c) => (
+                    <Badge key={c} variant="secondary" className="text-xs pr-1 gap-1">
+                      {c}
+                      <button
+                        className="ml-1 hover:text-red-500"
+                        onClick={() =>
+                          setPlatformChannels(platformChannels.filter((x) => x !== c))
+                        }
+                      >
+                        <X size={10} />
+                      </button>
+                    </Badge>
+                  ))}
+                  {platformChannels.length === 0 && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      未指定
+                    </span>
+                  )}
+                </div>
+                <Input
+                  placeholder="如 抖音 / 微信 / 视频号…回车添加"
+                  value={newChannel}
+                  onChange={(e) => setNewChannel(e.target.value)}
+                  className="h-8 text-xs glass-input max-w-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newChannel.trim()) {
+                      const v = newChannel.trim();
+                      if (!platformChannels.includes(v))
+                        setPlatformChannels([...platformChannels, v]);
+                      setNewChannel("");
+                    }
+                  }}
+                />
+              </div>
+            </GlassCard>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleSaveInstanceConfig}
+                disabled={instanceSaving}
+                className="gap-1.5"
+              >
+                {instanceSaving ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                保存领域 / 形态
+              </Button>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                层级(能否定稿/发布)在「权限设置」配置;领域内容来源在「知识库」绑定。
+              </p>
+            </div>
+          </div>
+        </TabsContent>
+
         <TabsContent value="performance">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <StatCard

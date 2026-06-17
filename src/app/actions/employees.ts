@@ -199,6 +199,36 @@ export async function updateWorkPreferences(
   revalidatePath("/employee");
 }
 
+/**
+ * 四层重构:写工种实例的「领域 / 媒体形态」配置(instanceConfig)。
+ * 领域 = domainTags(+ 知识库绑定),媒体形态 = mediaForm + platformSpecs。
+ * assembleAgent 读取后注入 prompt 的「领域专精 / 媒体形态」层,使产物按这两维差异化。
+ * 层级维度走 updateAuthorityLevel(authorityLevel)。
+ */
+export async function updateEmployeeInstanceConfig(
+  employeeId: string,
+  config: {
+    domainTags?: string[];
+    mediaForm?: "news" | "newmedia" | "convergence";
+    platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
+  }
+) {
+  await requireAuth();
+  await requireOwnedEmployee(employeeId);
+
+  await db
+    .update(aiEmployees)
+    .set({ instanceConfig: config, updatedAt: new Date() })
+    .where(eq(aiEmployees.id, employeeId));
+
+  import("@/app/actions/employee-advanced")
+    .then((m) =>
+      m.saveEmployeeConfigVersion(employeeId, ["instanceConfig"], "领域/形态配置更新"),
+    )
+    .catch(() => {});
+  revalidatePath("/employee");
+}
+
 export async function updateAuthorityLevel(
   employeeId: string,
   level: "observer" | "advisor" | "executor" | "coordinator"

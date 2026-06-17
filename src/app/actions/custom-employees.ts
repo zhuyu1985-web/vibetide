@@ -5,11 +5,13 @@ import {
   aiEmployees,
   employeeSkills,
   employeeKnowledgeBases,
+  skills,
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { CRAFT_CORE_SKILLS, type CraftType } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
 // Auth helpers
@@ -42,13 +44,20 @@ async function assertCustomEmployeeOwnership(orgId: string, employeeId: string) 
 // ---------------------------------------------------------------------------
 
 export async function createCustomEmployee(input: {
-  baseTemplateSlug: string;
+  baseTemplateSlug: string; // 工种 craft slug(roleType),如 reporter / editor
   name: string;
   description: string;
   instructions?: string;
   skillIds?: string[];
   knowledgeBaseIds?: string[];
   visibility?: "private" | "org";
+  // 四层重构:层级(authority)+ 领域/形态(instanceConfig)
+  authorityLevel?: "observer" | "advisor" | "executor" | "coordinator";
+  instanceConfig?: {
+    domainTags?: string[];
+    mediaForm?: "news" | "newmedia" | "convergence";
+    platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
+  };
 }) {
   const { organizationId } = await requireOrg();
 
@@ -81,7 +90,8 @@ export async function createCustomEmployee(input: {
       title: trimmedName,
       motto: input.description?.trim() || null,
       roleType: input.baseTemplateSlug,
-      authorityLevel: "executor",
+      authorityLevel: input.authorityLevel ?? "executor",
+      instanceConfig: input.instanceConfig ?? {},
       status: "idle",
       isPreset: 0,
       workPreferences: workPreferences as typeof aiEmployees.$inferInsert.workPreferences,
@@ -99,6 +109,37 @@ export async function createCustomEmployee(input: {
         learningSource: "assigned" as const,
       })),
     );
+  }
+
+  // 四层重构:按工种自动绑定核心技能(slug→id),保证实例具备该工种能力。
+  // 客户端无法可靠地把 core skill slug 映射到 skillId(Skill 类型不带 slug),故服务端解析。
+  const coreSlugs = CRAFT_CORE_SKILLS[input.baseTemplateSlug as CraftType];
+  if (coreSlugs && coreSlugs.length > 0) {
+    const coreRows = await db
+      .select({ id: skills.id })
+      .from(skills)
+      .where(
+        and(
+          eq(skills.organizationId, organizationId),
+          inArray(skills.slug, coreSlugs),
+        ),
+      );
+    if (coreRows.length > 0) {
+      await db
+        .insert(employeeSkills)
+        .values(
+          coreRows.map((r) => ({
+            employeeId: created.id,
+            skillId: r.id,
+            level: 80,
+            bindingType: "core" as const,
+            learningSource: "assigned" as const,
+          })),
+        )
+        .onConflictDoNothing({
+          target: [employeeSkills.employeeId, employeeSkills.skillId],
+        });
+    }
   }
 
   // Bind knowledge bases

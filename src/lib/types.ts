@@ -13,6 +13,9 @@ export interface AIEmployee {
   motto: string;
   /** 四层重构:工种(craft)slug = ai_employees.roleType,用于工种徽章/分组/派单显示。 */
   roleType?: string;
+  /** 层级(authority)+ 领域/形态(instanceConfig):花名册卡片三维徽章用。 */
+  authorityLevel?: AuthorityLevel;
+  instanceConfig?: EmployeeInstanceConfig | null;
   status: EmployeeStatus;
   currentTask?: string;
   skills: Skill[];
@@ -463,10 +466,18 @@ export type LearnedPatterns = Record<
   }
 >;
 
+/** 工种实例的三维修饰配置(领域/媒体形态/平台规格);层级由 authorityLevel 承载。 */
+export interface EmployeeInstanceConfig {
+  domainTags?: string[];
+  mediaForm?: "news" | "newmedia" | "convergence";
+  platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
+}
+
 export interface EmployeeFullProfile extends AIEmployee {
   dbId: string;
   roleType: string;
   authorityLevel: AuthorityLevel;
+  instanceConfig: EmployeeInstanceConfig | null;
   autoActions: string[];
   needApprovalActions: string[];
   workPreferences: WorkPreferences | null;

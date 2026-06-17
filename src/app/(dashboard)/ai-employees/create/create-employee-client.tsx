@@ -3,9 +3,9 @@
 import { useState, useMemo, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  EMPLOYEE_META,
-  EMPLOYEE_CORE_SKILLS,
-  type EmployeeId,
+  CRAFT_META,
+  ORDERED_CRAFTS,
+  type CraftType,
 } from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { createCustomEmployee } from "@/app/actions/custom-employees";
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types & constants
 // ---------------------------------------------------------------------------
 
 interface CreateEmployeeClientProps {
@@ -31,20 +31,34 @@ interface CreateEmployeeClientProps {
   knowledgeBases: KnowledgeBaseInfo[];
 }
 
-// 8 base templates (exclude advisor & leader)
-const BASE_TEMPLATE_IDS: EmployeeId[] = [
-  "xiaolei",
-  "xiaoce",
-  "xiaozi",
-  "xiaowen",
-  "xiaojian",
-  "xiaoshen",
-  "xiaofa",
-  "xiaoshu",
+// 9 个内容工种作为基础模板(编排器 producer 是幕后总编,不在此创建实例)。
+const TEMPLATE_CRAFTS: CraftType[] = ORDERED_CRAFTS.filter(
+  (c) => c !== "producer",
+);
+
+// 领域(领域维度)预设标签 + 媒体形态(形态维度)+ 层级(authority)。
+const PRESET_DOMAINS = [
+  "时政", "财经", "社会", "民生", "法治", "文体",
+  "科技", "国际", "娱乐", "教育", "健康", "军事",
+];
+const MEDIA_FORMS: { value: "news" | "newmedia" | "convergence"; label: string }[] = [
+  { value: "news", label: "新闻 · 规范书面" },
+  { value: "newmedia", label: "新媒体 · 口语短" },
+  { value: "convergence", label: "融媒体 · 多平台" },
+];
+const AUTHORITY_OPTIONS: {
+  value: "observer" | "advisor" | "executor" | "coordinator";
+  label: string;
+  desc: string;
+}[] = [
+  { value: "observer", label: "观察", desc: "只读 / 仅建议" },
+  { value: "advisor", label: "建议", desc: "可起草,不可定稿" },
+  { value: "executor", label: "执行", desc: "可定稿 / 发布" },
+  { value: "coordinator", label: "统筹", desc: "可派单 / 终审" },
 ];
 
 const STEPS = [
-  { label: "基础信息", icon: BookOpen },
+  { label: "工种与定位", icon: BookOpen },
   { label: "能力配置", icon: Wrench },
   { label: "预览发布", icon: Eye },
 ] as const;
@@ -62,7 +76,6 @@ function StepIndicator({ current }: { current: number }) {
         const active = i === current;
         return (
           <div key={step.label} className="flex items-center">
-            {/* dot / circle */}
             <div className="flex flex-col items-center gap-1.5">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
@@ -73,11 +86,7 @@ function StepIndicator({ current }: { current: number }) {
                       : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-300 dark:text-white/25"
                 }`}
               >
-                {done ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Icon className="w-4 h-4" />
-                )}
+                {done ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
               </div>
               <span
                 className={`text-xs font-medium transition-colors ${
@@ -89,7 +98,6 @@ function StepIndicator({ current }: { current: number }) {
                 {step.label}
               </span>
             </div>
-            {/* line between dots */}
             {i < STEPS.length - 1 && (
               <div
                 className={`w-16 h-[2px] mx-3 mb-5 rounded-full transition-colors ${
@@ -117,171 +125,135 @@ export function CreateEmployeeClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // Wizard state
   const [step, setStep] = useState(0);
 
-  // Step 1 state
-  const [selectedTemplate, setSelectedTemplate] = useState<EmployeeId | null>(
-    null,
-  );
+  // Step 1 — 工种与定位
+  const [selectedCraft, setSelectedCraft] = useState<CraftType | null>(null);
   const [customName, setCustomName] = useState("");
   const [customDesc, setCustomDesc] = useState("");
+  const [domainTags, setDomainTags] = useState<string[]>([]);
+  const [newDomainTag, setNewDomainTag] = useState("");
+  const [mediaForm, setMediaForm] = useState<
+    "news" | "newmedia" | "convergence" | ""
+  >("");
+  const [authority, setAuthority] = useState<
+    "observer" | "advisor" | "executor" | "coordinator"
+  >("advisor");
 
-  // Step 2 state
+  // Step 2 — 能力配置
   const [instructions, setInstructions] = useState("");
   const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(
     new Set(),
   );
   const [selectedKBIds, setSelectedKBIds] = useState<Set<string>>(new Set());
 
-  // Step 3 state
+  // Step 3 — 发布
   const [visibility, setVisibility] = useState<"org" | "private">("org");
   const [error, setError] = useState<string | null>(null);
 
-  // ── Derived: core skill slugs for selected template ──
-  const templateCoreSkillSlugs = useMemo(() => {
-    if (!selectedTemplate) return new Set<string>();
-    return new Set(EMPLOYEE_CORE_SKILLS[selectedTemplate] || []);
-  }, [selectedTemplate]);
+  // 选工种:预填指令 + 默认层级(核心技能由服务端按工种自动绑定,无需客户端预选)。
+  const handleCraftSelect = useCallback((craft: CraftType) => {
+    setSelectedCraft(craft);
+    const meta = CRAFT_META[craft];
+    setInstructions(`你是一位${meta.name}。${meta.description}。请按以下规则工作:`);
+    setAuthority(meta.defaultAuthority);
+  }, []);
 
-  // Map skill slugs to actual DB skill IDs
-  const slugToSkillId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of skills) {
-      // Skills may not have a slug field in the Skill type, use name as fallback
-      // The name in BUILTIN_SKILL_NAMES is the Chinese display name,
-      // but EMPLOYEE_CORE_SKILLS uses slug-like keys (e.g. "web_search").
-      // The skills DAL returns id, name, category etc. The slug is in the DB
-      // but not exposed in the Skill type. We can match by iterating.
-      // For now, we'll match by checking if the skill ID or name matches.
-      map.set(s.name, s.id);
-    }
-    return map;
-  }, [skills]);
-
-  // ── When template changes, pre-select core skills ──
-  const handleTemplateSelect = useCallback(
-    (templateId: EmployeeId) => {
-      setSelectedTemplate(templateId);
-      const meta = EMPLOYEE_META[templateId];
-
-      // Pre-fill instructions
-      setInstructions(
-        `你是一位${meta.name}，擅长${meta.description}。请按照以下规则工作：`,
-      );
-
-      // Pre-select core skills for this template
-      const coreSlugs = EMPLOYEE_CORE_SKILLS[templateId] || [];
-      const preSelected = new Set<string>();
-      for (const slug of coreSlugs) {
-        // Try to find matching skill by checking if any skill name/id relates
-        for (const s of skills) {
-          if (s.id === slug || s.name === slug) {
-            preSelected.add(s.id);
-          }
-        }
-      }
-      setSelectedSkillIds(preSelected);
-    },
-    [skills],
-  );
-
-  // ── Skill toggle ──
   const toggleSkill = useCallback((skillId: string) => {
     setSelectedSkillIds((prev) => {
       const next = new Set(prev);
-      if (next.has(skillId)) {
-        next.delete(skillId);
-      } else {
-        next.add(skillId);
-      }
+      if (next.has(skillId)) next.delete(skillId);
+      else next.add(skillId);
       return next;
     });
   }, []);
 
-  // ── KB toggle ──
   const toggleKB = useCallback((kbId: string) => {
     setSelectedKBIds((prev) => {
       const next = new Set(prev);
-      if (next.has(kbId)) {
-        next.delete(kbId);
-      } else {
-        next.add(kbId);
-      }
+      if (next.has(kbId)) next.delete(kbId);
+      else next.add(kbId);
       return next;
     });
   }, []);
 
-  // ── Navigation validation ──
   const canGoNext = useMemo(() => {
-    if (step === 0) return selectedTemplate !== null && customName.trim() !== "";
-    if (step === 1) return true; // instructions optional
+    if (step === 0) return selectedCraft !== null && customName.trim() !== "";
     return true;
-  }, [step, selectedTemplate, customName]);
+  }, [step, selectedCraft, customName]);
 
-  // ── Submit ──
   const handlePublish = useCallback(() => {
-    if (!selectedTemplate || !customName.trim()) return;
+    if (!selectedCraft || !customName.trim()) return;
     setError(null);
-
     startTransition(async () => {
       try {
         await createCustomEmployee({
-          baseTemplateSlug: selectedTemplate,
+          baseTemplateSlug: selectedCraft,
           name: customName.trim(),
           description: customDesc.trim(),
           instructions: instructions.trim() || undefined,
           skillIds: Array.from(selectedSkillIds),
           knowledgeBaseIds: Array.from(selectedKBIds),
           visibility,
+          authorityLevel: authority,
+          instanceConfig: {
+            domainTags,
+            mediaForm: mediaForm || undefined,
+            platformSpecs: undefined,
+          },
         });
         router.push("/ai-employees");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "创建失败，请重试");
+        setError(e instanceof Error ? e.message : "创建失败,请重试");
       }
     });
   }, [
-    selectedTemplate,
+    selectedCraft,
     customName,
     customDesc,
     instructions,
     selectedSkillIds,
     selectedKBIds,
     visibility,
+    authority,
+    domainTags,
+    mediaForm,
     router,
     startTransition,
   ]);
 
-  // ── Template meta for preview ──
-  const templateMeta = selectedTemplate
-    ? EMPLOYEE_META[selectedTemplate]
-    : null;
+  const craftMeta = selectedCraft ? CRAFT_META[selectedCraft] : null;
 
   return (
     <div className="max-w-[800px] mx-auto px-4 py-6">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90 mb-1">
-          创建自定义员工
+          创建工种实例
         </h1>
         <p className="text-sm text-gray-400 dark:text-white/40">
-          基于预设角色模板，创建属于你的 AI 数字员工
+          选一个工种(如「记者」),配上领域 / 媒体形态 / 层级,生成一个具体岗位(如「财经记者」)
         </p>
       </div>
 
-      {/* Step Indicator */}
       <StepIndicator current={step} />
 
-      {/* Step Content */}
       <div className="min-h-[400px]">
         {step === 0 && (
-          <Step1BaseInfo
-            selectedTemplate={selectedTemplate}
-            onSelectTemplate={handleTemplateSelect}
+          <Step1Positioning
+            selectedCraft={selectedCraft}
+            onSelectCraft={handleCraftSelect}
             customName={customName}
             onNameChange={setCustomName}
             customDesc={customDesc}
             onDescChange={setCustomDesc}
+            domainTags={domainTags}
+            onDomainTagsChange={setDomainTags}
+            newDomainTag={newDomainTag}
+            onNewDomainTagChange={setNewDomainTag}
+            mediaForm={mediaForm}
+            onMediaFormChange={setMediaForm}
+            authority={authority}
+            onAuthorityChange={setAuthority}
           />
         )}
         {step === 1 && (
@@ -298,11 +270,13 @@ export function CreateEmployeeClient({
         )}
         {step === 2 && (
           <Step3Preview
-            templateMeta={templateMeta}
-            selectedTemplate={selectedTemplate}
+            craftMeta={craftMeta}
+            selectedCraft={selectedCraft}
             customName={customName}
             customDesc={customDesc}
-            instructions={instructions}
+            domainTags={domainTags}
+            mediaForm={mediaForm}
+            authority={authority}
             selectedSkillCount={selectedSkillIds.size}
             selectedKBCount={selectedKBIds.size}
             visibility={visibility}
@@ -312,15 +286,11 @@ export function CreateEmployeeClient({
         )}
       </div>
 
-      {/* Navigation */}
       <div className="flex items-center justify-between mt-8 pt-6 border-t border-black/[0.06] dark:border-white/[0.06]">
         <button
           onClick={() => {
-            if (step === 0) {
-              router.push("/ai-employees");
-            } else {
-              setStep((s) => s - 1);
-            }
+            if (step === 0) router.push("/ai-employees");
+            else setStep((s) => s - 1);
           }}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-sm text-gray-600 dark:text-white/60 hover:bg-black/[0.07] dark:hover:bg-white/[0.1] transition-all cursor-pointer border-0"
         >
@@ -366,46 +336,67 @@ export function CreateEmployeeClient({
 }
 
 // ---------------------------------------------------------------------------
-// Step 1: 基础信息
+// Step 1: 工种与定位(工种 + 命名 + 领域/形态/层级三维)
 // ---------------------------------------------------------------------------
 
-function Step1BaseInfo({
-  selectedTemplate,
-  onSelectTemplate,
+function Step1Positioning({
+  selectedCraft,
+  onSelectCraft,
   customName,
   onNameChange,
   customDesc,
   onDescChange,
+  domainTags,
+  onDomainTagsChange,
+  newDomainTag,
+  onNewDomainTagChange,
+  mediaForm,
+  onMediaFormChange,
+  authority,
+  onAuthorityChange,
 }: {
-  selectedTemplate: EmployeeId | null;
-  onSelectTemplate: (id: EmployeeId) => void;
+  selectedCraft: CraftType | null;
+  onSelectCraft: (c: CraftType) => void;
   customName: string;
   onNameChange: (v: string) => void;
   customDesc: string;
   onDescChange: (v: string) => void;
+  domainTags: string[];
+  onDomainTagsChange: (v: string[]) => void;
+  newDomainTag: string;
+  onNewDomainTagChange: (v: string) => void;
+  mediaForm: "news" | "newmedia" | "convergence" | "";
+  onMediaFormChange: (v: "news" | "newmedia" | "convergence" | "") => void;
+  authority: "observer" | "advisor" | "executor" | "coordinator";
+  onAuthorityChange: (
+    v: "observer" | "advisor" | "executor" | "coordinator",
+  ) => void;
 }) {
+  const inputCls =
+    "w-full px-4 py-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-blue-500/40 transition-colors";
+  const labelCls =
+    "block text-sm font-medium text-gray-700 dark:text-white/70 mb-3";
+
   return (
     <div className="space-y-8">
-      {/* Template grid */}
+      {/* 工种 grid */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-white/70 mb-3">
-          选择基础角色模板
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {BASE_TEMPLATE_IDS.map((id) => {
-            const meta = EMPLOYEE_META[id];
-            const selected = selectedTemplate === id;
+        <label className={labelCls}>选择工种</label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {TEMPLATE_CRAFTS.map((craft) => {
+            const meta = CRAFT_META[craft];
+            const selected = selectedCraft === craft;
             return (
               <button
-                key={id}
-                onClick={() => onSelectTemplate(id)}
+                key={craft}
+                onClick={() => onSelectCraft(craft)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all cursor-pointer border-0 ${
                   selected
                     ? "bg-blue-500/10 ring-2 ring-blue-500/30"
                     : "bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
                 }`}
               >
-                <EmployeeAvatar employeeId={id} size="lg" />
+                <EmployeeAvatar employeeId={craft} size="lg" />
                 <span
                   className={`text-sm font-medium ${
                     selected
@@ -413,7 +404,7 @@ function Step1BaseInfo({
                       : "text-gray-700 dark:text-white/70"
                   }`}
                 >
-                  {meta.title}
+                  {meta.name}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-white/35 text-center leading-tight line-clamp-2">
                   {meta.description}
@@ -424,22 +415,20 @@ function Step1BaseInfo({
         </div>
       </div>
 
-      {/* Name */}
+      {/* 命名 */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-white/70 mb-2">
-          自定义名称 <span className="text-red-400">*</span>
+          岗位名称 <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
           value={customName}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="为你的 AI 员工取个名字"
+          placeholder="如「财经记者」「时政记者」"
           maxLength={50}
-          className="w-full px-4 py-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-blue-500/40 transition-colors"
+          className={inputCls}
         />
       </div>
-
-      {/* Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-white/70 mb-2">
           一句话描述
@@ -448,17 +437,133 @@ function Step1BaseInfo({
           type="text"
           value={customDesc}
           onChange={(e) => onDescChange(e.target.value)}
-          placeholder="简要描述员工的核心职能（可选）"
+          placeholder="简要描述该岗位的核心职能(可选)"
           maxLength={100}
-          className="w-full px-4 py-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-blue-500/40 transition-colors"
+          className={inputCls}
         />
+      </div>
+
+      {/* 领域(领域维度)*/}
+      <div>
+        <label className={labelCls}>
+          领域专精
+          <span className="ml-2 text-xs text-gray-400 dark:text-white/30 font-normal">
+            决定内容 / 术语 / 口径(配合知识库)
+          </span>
+        </label>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {PRESET_DOMAINS.map((d) => {
+            const on = domainTags.includes(d);
+            return (
+              <button
+                key={d}
+                onClick={() =>
+                  onDomainTagsChange(
+                    on ? domainTags.filter((x) => x !== d) : [...domainTags, d],
+                  )
+                }
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
+                  on
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                    : "bg-black/[0.03] dark:bg-white/[0.05] text-gray-500 dark:text-white/45 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
+                }`}
+              >
+                {on && <Check className="w-3 h-3" />}
+                {d}
+              </button>
+            );
+          })}
+        </div>
+        <input
+          type="text"
+          value={newDomainTag}
+          onChange={(e) => onNewDomainTagChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && newDomainTag.trim()) {
+              const v = newDomainTag.trim();
+              if (!domainTags.includes(v)) onDomainTagsChange([...domainTags, v]);
+              onNewDomainTagChange("");
+            }
+          }}
+          placeholder="自定义领域…回车添加"
+          className={inputCls + " max-w-xs"}
+        />
+      </div>
+
+      {/* 媒体形态(形态维度)*/}
+      <div>
+        <label className={labelCls}>
+          媒体形态
+          <span className="ml-2 text-xs text-gray-400 dark:text-white/30 font-normal">
+            决定形式 / 语态 / 平台
+          </span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {[{ value: "" as const, label: "不限 · 通用" }, ...MEDIA_FORMS].map(
+            (f) => {
+              const on = mediaForm === f.value;
+              return (
+                <button
+                  key={f.value || "none"}
+                  onClick={() => onMediaFormChange(f.value)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border-0 ${
+                    on
+                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20"
+                      : "bg-black/[0.03] dark:bg-white/[0.04] text-gray-600 dark:text-white/55 hover:bg-black/[0.06] dark:hover:bg-white/[0.07]"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            },
+          )}
+        </div>
+      </div>
+
+      {/* 层级(authority 维度)*/}
+      <div>
+        <label className={labelCls}>
+          层级权限
+          <span className="ml-2 text-xs text-gray-400 dark:text-white/30 font-normal">
+            决定能否定稿 / 发布
+          </span>
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {AUTHORITY_OPTIONS.map((opt) => {
+            const on = authority === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onAuthorityChange(opt.value)}
+                className={`p-3 rounded-xl text-left transition-all cursor-pointer border-0 ${
+                  on
+                    ? "bg-blue-500/10 ring-2 ring-blue-500/30"
+                    : "bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.07]"
+                }`}
+              >
+                <p
+                  className={`text-sm font-medium ${
+                    on
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-gray-700 dark:text-white/70"
+                  }`}
+                >
+                  {opt.label}
+                </p>
+                <p className="text-[10px] text-gray-400 dark:text-white/35 mt-0.5">
+                  {opt.desc}
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Step 2: 能力配置
+// Step 2: 能力配置(指令 + 技能 + 知识库)
 // ---------------------------------------------------------------------------
 
 function Step2Skills({
@@ -480,7 +585,6 @@ function Step2Skills({
   selectedKBIds: Set<string>;
   onToggleKB: (id: string) => void;
 }) {
-  // Group skills by category
   const groupedSkills = useMemo(() => {
     const map = new Map<string, Skill[]>();
     for (const s of skills) {
@@ -501,7 +605,6 @@ function Step2Skills({
 
   return (
     <div className="space-y-8">
-      {/* Instructions */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-white/70 mb-2">
           指令设定
@@ -510,20 +613,18 @@ function Step2Skills({
           value={instructions}
           onChange={(e) => onInstructionsChange(e.target.value)}
           rows={4}
-          placeholder="设定员工的工作指令和行为规则..."
+          placeholder="设定岗位的工作指令和行为规则..."
           className="w-full px-4 py-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-800 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 outline-none focus:border-blue-500/40 transition-colors resize-none"
         />
       </div>
 
-      {/* Skills */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-white/70 mb-3">
-          技能选择
+          附加技能
           <span className="ml-2 text-xs text-gray-400 dark:text-white/30 font-normal">
-            已选 {selectedSkillIds.size} 项
+            工种核心技能会自动绑定;这里选额外技能,已选 {selectedSkillIds.size} 项
           </span>
         </label>
-
         {skills.length > 0 ? (
           <div className="space-y-4">
             {Array.from(groupedSkills.entries()).map(
@@ -557,22 +658,18 @@ function Step2Skills({
             )}
           </div>
         ) : (
-          <p className="text-sm text-gray-300 dark:text-white/25">
-            暂无可用技能
-          </p>
+          <p className="text-sm text-gray-300 dark:text-white/25">暂无可用技能</p>
         )}
       </div>
 
-      {/* Knowledge Bases */}
       <div>
         <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-white/70 mb-3">
           <Database className="w-4 h-4" />
           知识库绑定
           <span className="text-xs text-gray-400 dark:text-white/30 font-normal">
-            （可选）
+            (领域内容来源,可选)
           </span>
         </label>
-
         {knowledgeBases.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {knowledgeBases.map((kb) => {
@@ -620,9 +717,7 @@ function Step2Skills({
             })}
           </div>
         ) : (
-          <p className="text-sm text-gray-300 dark:text-white/25">
-            暂无可用知识库
-          </p>
+          <p className="text-sm text-gray-300 dark:text-white/25">暂无可用知识库</p>
         )}
       </div>
     </div>
@@ -634,39 +729,47 @@ function Step2Skills({
 // ---------------------------------------------------------------------------
 
 function Step3Preview({
-  templateMeta,
-  selectedTemplate,
+  craftMeta,
+  selectedCraft,
   customName,
   customDesc,
-  instructions,
+  domainTags,
+  mediaForm,
+  authority,
   selectedSkillCount,
   selectedKBCount,
   visibility,
   onVisibilityChange,
   error,
 }: {
-  templateMeta: (typeof EMPLOYEE_META)[EmployeeId] | null;
-  selectedTemplate: EmployeeId | null;
+  craftMeta: (typeof CRAFT_META)[CraftType] | null;
+  selectedCraft: CraftType | null;
   customName: string;
   customDesc: string;
-  instructions: string;
+  domainTags: string[];
+  mediaForm: "news" | "newmedia" | "convergence" | "";
+  authority: "observer" | "advisor" | "executor" | "coordinator";
   selectedSkillCount: number;
   selectedKBCount: number;
   visibility: "org" | "private";
   onVisibilityChange: (v: "org" | "private") => void;
   error: string | null;
 }) {
+  const mediaFormLabel =
+    MEDIA_FORMS.find((f) => f.value === mediaForm)?.label ?? "不限";
+  const authorityLabel =
+    AUTHORITY_OPTIONS.find((a) => a.value === authority)?.label ?? authority;
+
   return (
     <div className="space-y-8">
-      {/* Preview Card */}
       <div className="rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] p-6">
         <div className="flex items-start gap-4 mb-6">
-          {selectedTemplate && (
-            <EmployeeAvatar employeeId={selectedTemplate} size="xl" />
+          {selectedCraft && (
+            <EmployeeAvatar employeeId={selectedCraft} size="xl" />
           )}
           <div className="min-w-0 flex-1">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white/90 mb-1">
-              {customName || "未命名员工"}
+              {customName || "未命名岗位"}
             </h3>
             {customDesc && (
               <p className="text-sm text-gray-500 dark:text-white/50 mb-2">
@@ -676,55 +779,59 @@ function Step3Preview({
             <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-white/30">
               <span
                 className="inline-block w-2 h-2 rounded-full"
-                style={{ backgroundColor: templateMeta?.color ?? "#6b7280" }}
+                style={{ backgroundColor: craftMeta?.color ?? "#6b7280" }}
               />
-              基于{templateMeta?.title ?? "未知"}模板
+              工种:{craftMeta?.name ?? "未知"}
             </div>
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* 三维定位概览 */}
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3">
+            <div className="text-xs text-gray-400 dark:text-white/30 mb-1">
+              领域
+            </div>
+            <div className="text-sm font-medium text-gray-800 dark:text-white/80 line-clamp-1">
+              {domainTags.length > 0 ? domainTags.join("、") : "通用"}
+            </div>
+          </div>
+          <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3">
+            <div className="text-xs text-gray-400 dark:text-white/30 mb-1">
+              媒体形态
+            </div>
+            <div className="text-sm font-medium text-gray-800 dark:text-white/80 line-clamp-1">
+              {mediaFormLabel}
+            </div>
+          </div>
+          <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3">
+            <div className="text-xs text-gray-400 dark:text-white/30 mb-1">
+              层级
+            </div>
+            <div className="text-sm font-medium text-gray-800 dark:text-white/80 line-clamp-1">
+              {authorityLabel}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3 text-center">
             <div className="text-lg font-semibold text-gray-800 dark:text-white/80">
               {selectedSkillCount}
             </div>
             <div className="text-xs text-gray-400 dark:text-white/30">
-              已选技能
+              附加技能(核心自动绑定)
             </div>
           </div>
           <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3 text-center">
             <div className="text-lg font-semibold text-gray-800 dark:text-white/80">
               {selectedKBCount}
             </div>
-            <div className="text-xs text-gray-400 dark:text-white/30">
-              知识库
-            </div>
-          </div>
-          <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3 text-center">
-            <div className="text-lg font-semibold text-gray-800 dark:text-white/80">
-              {instructions.trim().length > 0 ? "已设" : "默认"}
-            </div>
-            <div className="text-xs text-gray-400 dark:text-white/30">
-              指令
-            </div>
+            <div className="text-xs text-gray-400 dark:text-white/30">知识库</div>
           </div>
         </div>
-
-        {/* Instructions preview */}
-        {instructions.trim() && (
-          <div className="mt-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02]">
-            <div className="text-xs text-gray-400 dark:text-white/30 mb-1">
-              工作指令
-            </div>
-            <p className="text-sm text-gray-600 dark:text-white/55 line-clamp-3 whitespace-pre-wrap">
-              {instructions}
-            </p>
-          </div>
-        )}
       </div>
 
-      {/* Visibility */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-white/70 mb-3">
           可见性
@@ -775,7 +882,6 @@ function Step3Preview({
         </div>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="p-3 rounded-xl bg-red-500/10 text-sm text-red-600 dark:text-red-400">
           {error}
