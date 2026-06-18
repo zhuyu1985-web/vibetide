@@ -184,8 +184,10 @@ ${authorityRules[agent.authorityLevel] ?? "- 请在你的权限范围内完成�
 ${agent.knowledgeContext}`);
   }
 
-  // Layer 4.5: 领域专精（领域维度 —— 改变产物的内容/术语/口径）
-  if (agent.domainTags && agent.domainTags.length > 0) {
+  // Layer 4.5: 领域专精（领域维度）。口径包优先：有 domainGuidance 用专属口径，否则回退通用模板。
+  if (agent.domainGuidance) {
+    layers.push(`# 领域专精\n${agent.domainGuidance}`);
+  } else if (agent.domainTags && agent.domainTags.length > 0) {
     layers.push(`# 领域专精
 你专注于以下领域：${agent.domainTags.join("、")}。
 - 使用该领域的专业术语与表达习惯，不说外行话。
