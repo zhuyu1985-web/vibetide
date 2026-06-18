@@ -241,7 +241,10 @@ export async function executeAgent(
     agent.pluginConfigs,
     missionTools,
     kbTools,
-    context,
+    {
+      ...context,
+      authorityDomains: agent.domainAuthoritySources,
+    },
   );
 
   let toolCallCount = 0;

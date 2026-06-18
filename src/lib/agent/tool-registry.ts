@@ -423,8 +423,10 @@ function createToolDefinitions(): ToolSet {
           .enum(["general", "news", "finance"])
           .optional()
           .describe("搜索类型（仅 Tavily 通道生效）"),
+        includeDomains: z.array(z.string()).optional()
+          .describe("白名单域名（领域权威源）；与默认源合并，优先返回这些域名的结果"),
       }),
-      execute: async ({ query, timeRange, sources, maxResults = 8, topic }) => {
+      execute: async ({ query, timeRange, sources, maxResults = 8, topic, includeDomains }) => {
         const trimmedQuery = query.trim();
         if (!trimmedQuery) {
           return {
@@ -457,7 +459,10 @@ function createToolDefinitions(): ToolSet {
               timeRange,
               maxResults: limitedResults,
               topic,
-              includeDomains: DEFAULT_INCLUDE_DOMAINS,
+              includeDomains: Array.from(new Set([
+                ...DEFAULT_INCLUDE_DOMAINS,
+                ...(includeDomains ?? []),
+              ])),
               excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
             });
             fetchedItems = searchResult.items;
@@ -2786,7 +2791,7 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
 ): T {
   if (
     !context ||
-    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId)
+    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId && !context.authorityDomains?.length)
   ) {
     return toolDef;
   }
@@ -2807,6 +2812,9 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
       }
       if (context.taskId && merged.taskId === undefined) {
         merged.taskId = context.taskId;
+      }
+      if (context.authorityDomains?.length && merged.includeDomains === undefined) {
+        merged.includeDomains = context.authorityDomains;
       }
       return (orig as (a: Record<string, unknown>, ...r: unknown[]) => unknown)(
         merged,
