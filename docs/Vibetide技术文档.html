@@ -144,6 +144,13 @@ pre.code .s{color:#e3b778}
 pre.code .f{color:#9ecbff}
 pre.code .p{color:#9aa8a2}
 .codecap{font-size:12px;color:var(--muted);margin:14px 0 -8px;font-family:var(--font-mono)}
+/* 内联 SVG 图容器（架构 / 四层关系 / 多智能体时序 / 业务数据流 四图共用） */
+.svgfig{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 14px;margin:22px 0;overflow-x:auto}
+.svgfig svg{height:auto;display:block;margin:0 auto}
+.svgfig .cap{font-size:12.5px;color:var(--muted);margin-top:12px;line-height:1.65}
+.svgfig .lgd{display:flex;flex-wrap:wrap;gap:7px 18px;margin-top:11px;font-size:12px;color:var(--ink-2)}
+.svgfig .lgd span{display:inline-flex;align-items:center;gap:6px}
+.svgfig .lgd i{width:22px;height:0;border-top-width:2px;border-top-style:solid;display:inline-block}
 /* 分层图 */
 .arch{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin:22px 0}
 .arch .layer{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 15px;margin:9px 0;box-shadow:var(--shadow-sm)}
@@ -222,9 +229,12 @@ pre.code .p{color:#9aa8a2}
       <li><a href="#database">数据库层</a></li>
       <li><a href="#auth">认证体系</a></li>
       <li><a href="#dataflow">数据流与分层</a></li>
+      <li><a href="#craft-model">数字员工四层模型</a></li>
       <li><a href="#agent">AI Agent 系统</a></li>
       <li><a href="#intent">意图识别与模型路由</a></li>
+      <li><a href="#bizflow">业务数据流</a></li>
       <li><a href="#tools">Agent 工具体系</a></li>
+      <li><a href="#exec-cli">执行模型 · CLI 与 MCP</a></li>
       <li><a href="#workflow">工作流与定时任务引擎</a></li>
       <li><a href="#inngest">Inngest 后台任务</a></li>
       <li><a href="#knowledge">知识库 RAG</a></li>
@@ -252,6 +262,7 @@ pre.code .p{color:#9aa8a2}
         <div class="kpi" data-animate style="--i:4"><div class="num">137<span class="unit">+</span></div><div class="label">测试文件（Vitest）</div></div>
       </div>
       <div class="callout callout--info" data-animate><div class="ct">ℹ 数据口径与勘误原则</div><p>项目根 <code>CLAUDE.md</code> 是开发导航，但部分数字已落后于代码。本文一律以源码实测为准，并在相关处标注差异（例：AI 员工 <b>12</b> 个角色而非 8、Inngest 约 <b>45+</b> 函数而非 16、schema <b>67</b> 文件 / 134 表、CMS 的 <code>ALL_APP_CHANNEL_SLUGS</code> 9-slug 机制<b>已移除</b>、<code>scenario-fallback.ts</code> 不存在）。</p></div>
+      <h3>逻辑分层（快览）</h3>
       <div class="arch" data-animate>
         <div class="layer"><div class="lh">表现层</div><div class="row"><span class="chip">Next.js App Router</span><span class="chip">React 19 Server/Client Components</span><span class="chip">shadcn/Radix + Tailwind v4</span><span class="chip">Recharts · Framer Motion</span></div></div>
         <div class="vlink">▼</div>
@@ -260,6 +271,101 @@ pre.code .p{color:#9aa8a2}
         <div class="layer"><div class="lh">能力层</div><div class="row"><span class="chip n">Agent 装配 / 执行</span><span class="chip n">工作流 / Mission 引擎</span><span class="chip n">知识库 RAG</span><span class="chip n">CMS 集成层</span><span class="chip n">Inngest 事件驱动</span></div></div>
         <div class="vlink">▼</div>
         <div class="layer"><div class="lh">数据 / 外部</div><div class="row"><span class="chip">PostgreSQL（postgres-js + Drizzle）</span><span class="chip">DeepSeek / 智谱 / Jina</span><span class="chip">华栖云 CMS</span><span class="chip">Bocha / Tavily / TopHub / TikHub</span></div></div>
+      </div>
+      <h3>功能模块全景</h3>
+      <p class="prose muted" style="margin:-2px 0 0">把系统<b>所有功能模块</b>按职责落到 6 层：最上层<b>智能对话 / 场景启动</b>触达用户；中段<b>智能应用模块</b>（灵感池 / 同题漏题 / 热点采集 / 数据分析…）与<b>智能体编排</b>、<b>能力层</b>（技能 / 工具·MCP 网关 / 工作流 / 知识库 / 员工记忆）协同；底层是<b>大模型</b>与<b>数据 / 外部生态</b>。</p>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 742" style="width:100%;min-width:720px" role="img" aria-label="系统全景架构图">
+        <style>
+          .a1 text{font-family:var(--font-sans);text-anchor:middle}
+          .a1 .band{fill:var(--surface);stroke:var(--line);stroke-width:1}
+          .a1 .sep{stroke:var(--line-2);stroke-width:1}
+          .a1 .lname{font-weight:700;font-size:13px;fill:var(--brand-strong)}
+          .a1 .lsub{font-weight:400;font-size:8.5px;fill:var(--faint);letter-spacing:.5px}
+          .a1 .cb{fill:var(--brand-weak);stroke:var(--brand-weak2);stroke-width:1}
+          .a1 .ca{fill:var(--accent-weak);stroke:#c4e8e0;stroke-width:1}
+          .a1 .cn{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+          .a1 .cgate{fill:var(--brand-weak);stroke:var(--info);stroke-width:1.5;stroke-dasharray:4 3}
+          .a1 .m{font-weight:600;font-size:11.5px;fill:var(--ink)}
+          .a1 .s{font-weight:400;font-size:9px;fill:var(--muted)}
+          .a1 .arr{stroke:var(--accent);stroke-width:1.6;fill:none}
+          .a1 .mcpbox{fill:var(--info-weak);stroke:var(--info);stroke-width:1.3;stroke-dasharray:5 4}
+          .a1 .mcparr{stroke:var(--info);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+          .a1 .mcpt{font-weight:700;font-size:10.5px;fill:var(--info)}
+          .a1 .mcps{font-weight:400;font-size:8.5px;fill:var(--info)}
+        </style>
+        <defs>
+          <marker id="a1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+          <marker id="a1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--info)"/></marker>
+        </defs>
+        <g class="a1">
+          <!-- L1 用户交互 -->
+          <rect class="band" x="14" y="12" width="932" height="104" rx="10"/>
+          <line class="sep" x1="146" y1="22" x2="146" y2="106"/>
+          <text class="lname" x="80" y="60">用户交互</text><text class="lsub" x="80" y="76">INTERFACE</text>
+          <rect class="cb" x="162" y="41" width="168" height="46" rx="8"/><text class="m" x="246" y="61">智能对话 cowork</text><text class="s" x="246" y="76">单窗口 · 意图路由</text>
+          <rect class="cb" x="342" y="41" width="126" height="46" rx="8"/><text class="m" x="405" y="61">场景一键启动</text><text class="s" x="405" y="76">workflow 模板</text>
+          <rect class="cb" x="480" y="41" width="110" height="46" rx="8"/><text class="m" x="535" y="61">首页工作台</text><text class="s" x="535" y="76">home</text>
+          <rect class="cn" x="602" y="41" width="330" height="46" rx="8"/><text class="m" x="767" y="61">42 个仪表盘模块</text><text class="s" x="767" y="76">内容 · 员工 · 分析 · 协作 · 知识 · 运营</text>
+          <path class="arr" d="M550 116 L550 132" marker-end="url(#a1a)"/>
+          <!-- L2 智能应用 -->
+          <rect class="band" x="14" y="134" width="932" height="104" rx="10"/>
+          <line class="sep" x1="146" y1="144" x2="146" y2="228"/>
+          <text class="lname" x="80" y="182">智能应用</text><text class="lsub" x="80" y="198">APPLICATIONS</text>
+          <rect class="ca" x="162" y="163" width="104" height="46" rx="8"/><text class="m" x="214" y="183">灵感池</text><text class="s" x="214" y="198">节赛会展</text>
+          <rect class="ca" x="273" y="163" width="104" height="46" rx="8"/><text class="m" x="325" y="183">同题漏题</text><text class="s" x="325" y="198">topic_compare</text>
+          <rect class="ca" x="384" y="163" width="104" height="46" rx="8"/><text class="m" x="436" y="183">热点采集</text><text class="s" x="436" y="198">hot-topic</text>
+          <rect class="ca" x="495" y="163" width="104" height="46" rx="8"/><text class="m" x="547" y="183">数据分析</text><text class="s" x="547" y="198">analytics</text>
+          <rect class="ca" x="606" y="163" width="104" height="46" rx="8"/><text class="m" x="658" y="183">内容审核</text><text class="s" x="658" y="198">excellence</text>
+          <rect class="ca" x="717" y="163" width="104" height="46" rx="8"/><text class="m" x="769" y="183">发布分发</text><text class="s" x="769" y="198">publishing</text>
+          <rect class="ca" x="828" y="163" width="104" height="46" rx="8"/><text class="m" x="880" y="183">研究报告</text><text class="s" x="880" y="198">research</text>
+          <path class="arr" d="M550 238 L550 254" marker-end="url(#a1a)"/>
+          <!-- L3 智能体编排 -->
+          <rect class="band" x="14" y="256" width="932" height="104" rx="10"/>
+          <line class="sep" x1="146" y1="266" x2="146" y2="350"/>
+          <text class="lname" x="80" y="304">智能体编排</text><text class="lsub" x="80" y="320">ORCHESTRATION</text>
+          <rect class="cn" x="162" y="285" width="176" height="46" rx="8"/><text class="m" x="250" y="305">意图识别</text><text class="s" x="250" y="320">recognizeIntent</text>
+          <rect class="cn" x="350" y="285" width="176" height="46" rx="8"/><text class="m" x="438" y="305">Agent 装配</text><text class="s" x="438" y="320">assembleAgent</text>
+          <rect class="cb" x="538" y="285" width="232" height="46" rx="8"/><text class="m" x="654" y="305">Mission 多智能体引擎</text><text class="s" x="654" y="320">leader → execute → consolidate</text>
+          <rect class="cn" x="782" y="285" width="150" height="46" rx="8"/><text class="m" x="857" y="305">工种场景智能体</text><text class="s" x="857" y="320">10 工种</text>
+          <path class="arr" d="M550 360 L550 376" marker-end="url(#a1a)"/>
+          <!-- L4 能力层 -->
+          <rect class="band" x="14" y="378" width="932" height="104" rx="10"/>
+          <line class="sep" x1="146" y1="388" x2="146" y2="472"/>
+          <text class="lname" x="80" y="426">能力层</text><text class="lsub" x="80" y="442">CAPABILITIES</text>
+          <rect class="cb" x="162" y="407" width="118" height="46" rx="8"/><text class="m" x="221" y="427">技能体系</text><text class="s" x="221" y="442">SKILL.md</text>
+          <rect class="cb" x="288" y="407" width="118" height="46" rx="8"/><text class="m" x="347" y="427">工作流引擎</text><text class="s" x="347" y="442">workflow_templates</text>
+          <rect class="cb" x="414" y="407" width="118" height="46" rx="8"/><text class="m" x="473" y="427">知识库 RAG</text><text class="s" x="473" y="442">jina + cosine</text>
+          <rect class="cb" x="540" y="407" width="118" height="46" rx="8"/><text class="m" x="599" y="427">员工记忆</text><text class="s" x="599" y="442">employee_memories</text>
+          <rect class="cgate" x="666" y="407" width="118" height="46" rx="8"/><text class="m" x="725" y="427">工具 · MCP 网关</text><text class="s" x="725" y="442">tool() 现态</text>
+          <rect class="mcpbox" x="800" y="402" width="132" height="58" rx="8"/><text class="mcpt" x="866" y="427">外部 MCP Servers</text><text class="mcps" x="866" y="443">目标演进态（规划）</text>
+          <path class="mcparr" d="M784 430 L798 430" marker-end="url(#a1b)"/>
+          <path class="arr" d="M480 482 L480 498" marker-end="url(#a1a)"/>
+          <!-- L5 大模型 -->
+          <rect class="band" x="14" y="500" width="932" height="104" rx="10"/>
+          <line class="sep" x1="146" y1="510" x2="146" y2="594"/>
+          <text class="lname" x="80" y="548">大模型</text><text class="lsub" x="80" y="564">LLM</text>
+          <rect class="cn" x="162" y="529" width="190" height="46" rx="8"/><text class="m" x="257" y="549">DeepSeek（主）</text><text class="s" x="257" y="564">deepseek-chat</text>
+          <rect class="cn" x="368" y="529" width="150" height="46" rx="8"/><text class="m" x="443" y="549">智谱（辅）</text><text class="s" x="443" y="564">zhipu</text>
+          <rect class="cn" x="534" y="529" width="190" height="46" rx="8"/><text class="m" x="629" y="549">Jina Embeddings</text><text class="s" x="629" y="564">1024 维</text>
+          <rect class="cn" x="740" y="529" width="192" height="46" rx="8"/><text class="m" x="836" y="549">model-router</text><text class="s" x="836" y="564">按技能类别选温度</text>
+          <path class="arr" d="M550 604 L550 620" marker-end="url(#a1a)"/>
+          <!-- L6 数据 / 外部 -->
+          <rect class="band" x="14" y="622" width="932" height="104" rx="10"/>
+          <line class="sep" x1="146" y1="632" x2="146" y2="716"/>
+          <text class="lname" x="80" y="667">数据 · 外部</text><text class="lsub" x="80" y="683">DATA &amp; EXTERNAL</text>
+          <rect class="cn" x="162" y="651" width="148" height="46" rx="8"/><text class="m" x="236" y="671">PostgreSQL</text><text class="s" x="236" y="686">Drizzle · 134 表</text>
+          <rect class="cn" x="318" y="651" width="148" height="46" rx="8"/><text class="m" x="392" y="671">Inngest 后台</text><text class="s" x="392" y="686">46 函数</text>
+          <rect class="cn" x="474" y="651" width="148" height="46" rx="8"/><text class="m" x="548" y="671">采集 API</text><text class="s" x="548" y="686">Bocha·Tavily·TopHub</text>
+          <rect class="cn" x="630" y="651" width="148" height="46" rx="8"/><text class="m" x="704" y="671">华栖云 CMS</text><text class="s" x="704" y="686">发布出口</text>
+          <rect class="cn" x="786" y="651" width="148" height="46" rx="8"/><text class="m" x="860" y="671">Ayrshare</text><text class="s" x="860" y="686">海外社媒</text>
+        </g>
+      </svg>
+      <div class="lgd">
+        <span><i style="border-color:var(--accent)"></i>实线箭头：当前调用 / 数据流向</span>
+        <span><i style="border-color:var(--info);border-top-style:dashed"></i>蓝色虚线：MCP 标准协议接入（目标演进态，当前为 AI SDK <code>tool()</code> 原生工具体系）</span>
+      </div>
+      <p class="cap">注：智能应用模块（青色）是面向业务的「智能应用」，复用下方能力层 / 大模型；能力层的「工具 · MCP 网关」当前以 AI SDK <code>tool()</code> 直连各工具，未来对接外部 MCP Servers。</p>
       </div>
     </section>
 
@@ -427,9 +533,292 @@ Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revali
       </ul>
     </section>
 
+    <section class="section anchor-h" id="craft-model">
+      <div class="section-head">
+        <span class="kicker">07 · 四层模型</span>
+        <h2>数字员工四层模型</h2>
+        <p class="lead">系统把「数字员工」拆成四层正交概念：<b>工具 → 技能 → 工种 → 场景</b>。<b>员工</b>是「工种」的配置实例、连接四层的枢纽。这套模型对标真实媒体团队，让能力跨「中心 / 领域 / 媒体形态」复用（最新一次重构 commit <code>a80339a</code>「工具 / 技能 / 工种 / 场景应用」）。</p>
+      </div>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 600" style="width:100%;min-width:680px" role="img" aria-label="数字员工四层关系图">
+        <style>
+          .a2 text{font-family:var(--font-sans)}
+          .a2 .box{fill:var(--surface);stroke:var(--line);stroke-width:1}
+          .a2 .boxb{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1}
+          .a2 .ttl{font-weight:700;font-size:14px;fill:var(--brand-strong);text-anchor:middle}
+          .a2 .ttll{font-weight:700;font-size:13.5px;fill:var(--brand-strong)}
+          .a2 .sub{font-size:10px;fill:var(--muted);text-anchor:middle}
+          .a2 .subl{font-size:10px;fill:var(--muted)}
+          .a2 .chip{fill:var(--brand-weak);stroke:var(--brand-weak2);stroke-width:1}
+          .a2 .chipa{fill:var(--accent-weak);stroke:#c4e8e0;stroke-width:1}
+          .a2 .chipn{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+          .a2 .ct{font-weight:600;font-size:10.5px;fill:var(--ink);text-anchor:middle}
+          .a2 .rel{stroke:var(--brand);stroke-width:1.7;fill:none}
+          .a2 .rela{stroke:var(--accent);stroke-width:1.7;fill:none}
+          .a2 .reld{stroke:var(--muted);stroke-width:1.3;fill:none;stroke-dasharray:4 3}
+          .a2 .rlab{font-size:10.5px;font-weight:700;fill:var(--brand-strong)}
+          .a2 .rlaba{font-size:10.5px;font-weight:700;fill:#0b7a6c}
+          .a2 .rlabd{font-size:10px;font-weight:600;fill:var(--muted)}
+        </style>
+        <defs>
+          <marker id="a2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--brand)"/></marker>
+          <marker id="a2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+          <marker id="a2d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
+        </defs>
+        <g class="a2">
+          <rect class="boxb" x="140" y="20" width="680" height="98" rx="12"/>
+          <text class="ttl" x="480" y="44">场景应用 Scenario · workflow_templates</text>
+          <text class="sub" x="480" y="62">有序技能步骤编排（示例场景：突发新闻追踪）</text>
+          <rect class="chipn" x="172" y="74" width="120" height="26" rx="7"/><text class="ct" x="232" y="91">①新闻聚合</text>
+          <rect class="chipn" x="300" y="74" width="120" height="26" rx="7"/><text class="ct" x="360" y="91">②全网搜索</text>
+          <rect class="chipn" x="428" y="74" width="120" height="26" rx="7"/><text class="ct" x="488" y="91">③事实核查</text>
+          <rect class="chipn" x="556" y="74" width="120" height="26" rx="7"/><text class="ct" x="616" y="91">④内容生成</text>
+          <rect class="chipn" x="684" y="74" width="96" height="26" rx="7"/><text class="ct" x="732" y="91">⑤发布</text>
+          <path class="rel" d="M705 118 L705 186" marker-end="url(#a2a)"/>
+          <text class="rlab" x="716" y="148">① 按 requiredSkill 派单</text>
+          <text class="rlabd" x="716" y="164">compatibleRolesFor → pickEmployeeForStep</text>
+          <rect class="box" x="70" y="190" width="370" height="130" rx="12"/>
+          <text class="ttll" x="86" y="215">工种 Craft · 能力模板</text>
+          <text class="subl" x="86" y="233">对标真实媒体岗位 · 定义 core skills · 默认权限档</text>
+          <rect class="chip" x="86" y="248" width="104" height="26" rx="7"/><text class="ct" x="138" y="265">编导</text>
+          <rect class="chip" x="196" y="248" width="104" height="26" rx="7"/><text class="ct" x="248" y="265">记者</text>
+          <rect class="chip" x="306" y="248" width="104" height="26" rx="7"/><text class="ct" x="358" y="265">编辑</text>
+          <rect class="chip" x="86" y="282" width="104" height="26" rx="7"/><text class="ct" x="138" y="299">审核</text>
+          <rect class="chip" x="196" y="282" width="104" height="26" rx="7"/><text class="ct" x="248" y="299">运营</text>
+          <rect class="chip" x="306" y="282" width="104" height="26" rx="7"/><text class="ct" x="358" y="299">分析…</text>
+          <rect class="boxb" x="520" y="190" width="370" height="130" rx="12"/>
+          <text class="ttll" x="536" y="215">员工 Employee · 配置实例</text>
+          <text class="subl" x="536" y="233">工种 ＋ 领域 ＋ 额外技能 ＋ 权限 ＋ 平台规格</text>
+          <rect class="chipa" x="536" y="250" width="338" height="26" rx="7"/><text class="ct" x="705" y="267">记者·小雷 — roleType=reporter / 财经 / advisor</text>
+          <rect class="chipa" x="536" y="284" width="338" height="26" rx="7"/><text class="ct" x="705" y="301">审核·小审 — roleType=reviewer / executor</text>
+          <path class="rela" d="M520 250 L444 250" marker-end="url(#a2b)"/>
+          <text class="rlaba" x="482" y="243" text-anchor="middle">② 实例化自 roleType</text>
+          <path class="rel" d="M648 320 L606 374" marker-end="url(#a2a)"/>
+          <text class="rlab" x="658" y="352">③ employee_skills 绑定</text>
+          <path class="reld" d="M262 320 L322 374" marker-end="url(#a2d)"/>
+          <text class="rlabd" x="150" y="352">工种定义 core skills</text>
+          <rect class="box" x="140" y="378" width="680" height="92" rx="12"/>
+          <text class="ttll" x="156" y="402">技能 Skill · skills (kind=skill)</text>
+          <text class="subl" x="156" y="420">工种强相关 · 须 employee_skills 绑定(core / extended / knowledge) · compatibleRoles 限定可用工种</text>
+          <rect class="chip" x="164" y="432" width="156" height="26" rx="7"/><text class="ct" x="242" y="449">content_generate</text>
+          <rect class="chip" x="330" y="432" width="118" height="26" rx="7"/><text class="ct" x="389" y="449">fact_check</text>
+          <rect class="chip" x="458" y="432" width="140" height="26" rx="7"/><text class="ct" x="528" y="449">quality_review</text>
+          <rect class="chip" x="608" y="432" width="156" height="26" rx="7"/><text class="ct" x="686" y="449">headline_generate</text>
+          <path class="rela" d="M480 470 L480 498" marker-end="url(#a2b)"/>
+          <text class="rlaba" x="492" y="489">④ 运行时调用</text>
+          <rect class="box" x="140" y="500" width="680" height="82" rx="12"/>
+          <text class="ttll" x="156" y="524">工具 Tool · tool-kinds.ts 单一清单</text>
+          <text class="subl" x="156" y="542">通用能力 · 无条件注入（写工具受 authority 门控）· 不归属工种</text>
+          <rect class="chipn" x="164" y="552" width="130" height="24" rx="7"/><text class="ct" x="229" y="568">web_search</text>
+          <rect class="chipn" x="304" y="552" width="140" height="24" rx="7"/><text class="ct" x="374" y="568">trending_topics</text>
+          <rect class="chipn" x="454" y="552" width="140" height="24" rx="7"/><text class="ct" x="524" y="568">web_deep_read</text>
+          <rect class="chipn" x="604" y="552" width="150" height="24" rx="7"/><text class="ct" x="679" y="568">cms_publish（写）</text>
+        </g>
+      </svg>
+      <div class="lgd">
+        <span><i style="border-color:var(--brand)"></i>实线（绿）：派单 / 绑定</span>
+        <span><i style="border-color:var(--accent)"></i>实线（青）：实例化 / 运行时调用</span>
+        <span><i style="border-color:var(--muted);border-top-style:dashed"></i>虚线：工种定义核心技能</span>
+      </div>
+      <p class="cap">四层自上而下：<b>场景</b>编排技能步骤 → 按所需技能<b>派单</b>到对应<b>工种</b>的<b>员工</b>实例 → 员工绑定<b>技能</b> → 技能运行时调用<b>工具</b>。员工是「工种模板」的配置实例，是连接四层的枢纽。</p>
+      </div>
+
+      <h3>四层逐层定义</h3>
+      <div class="grid cols-2">
+        <div class="card card--accent" data-animate style="--i:0"><div class="cnum">① 工具 TOOL</div><h4>通用能力，不归属工种</h4><p>数据获取 / 检索 / 可复算分析（读）与状态变更（写）。所有非 observer 员工<b>无条件注入</b>读工具；写工具受 authority 门控。单一真相源 <code>tool-kinds.ts</code>、<code>skills.kind='tool'</code>。判定准则：换个工种来用、逻辑与产物一样 → 工具。</p></div>
+        <div class="card card--accent" data-animate style="--i:1"><div class="cnum">② 技能 SKILL</div><h4>工种强相关的专业能力</h4><p>必须经 <code>employee_skills</code> 绑定到工种才能调用（硬边界）。<code>SkillOwnership{core, shared[]}</code> 声明归属、<code>compatibleRoles</code> 限定可用工种。判定准则：代表某工种专业判断、换人变味 → 技能。</p></div>
+        <div class="card card--accent" data-animate style="--i:2"><div class="cnum">③ 工种 CRAFT（＋员工实例）</div><h4>对标媒体岗位的能力模板</h4><p>10 个工种（编导 / 记者 / 编辑 / 评论员 / 后期 / 审核 / 运营 / 播报 / 分析 / 制片）。<b>员工</b>＝工种 ＋ 领域标签 ＋ 额外技能 ＋ 权限 ＋ 平台规格 的实例，承载于 <code>ai_employees.roleType</code> ＋ <code>instanceConfig</code>。</p></div>
+        <div class="card card--accent" data-animate style="--i:3"><div class="cnum">④ 场景 SCENARIO</div><h4>工作流编排的技能步骤</h4><p><code>workflow_templates</code> 是所有「场景」单一真相源（每 org 27+ 内置、12 category）。每步声明 <code>requiredSkill</code>，启动时按 <code>requiredSkill → compatibleRolesFor → pickEmployeeForStep</code> <b>确定性派单</b>到员工。</p></div>
+      </div>
+
+      <h3>工种从哪来：对标真实媒体台的岗位收敛</h3>
+      <p class="prose">这 10 个工种不是拍脑袋定的，而是对标真实媒体台的岗位结构收敛而来。以北京广播电视台为例（9 个频道中心 ＋ 5 个广播中心 ＋ 融媒体平台 ＋ 16 个职能部室），关键观察是：<b>每个内容中心（新闻 / 文艺 / 财经 / 体育…）的岗位几乎是同一套，变的只是领域</b>——体育记者 ≠ 新闻记者，不是工种不同，是<b>领域</b>不同。于是「中心」不必做成系统实体，用「绑不同知识库 / 项目上下文」表达即可；真正跨中心复用的，是那套岗位 = 工种。</p>
+
+      <h4>一个「岗位名」= 工种 × 三个修饰维度</h4>
+      <p class="prose">真实媒体台几十种岗位名，拆开看大多是<b>同一工种被三个维度修饰</b>出来的——这正是「工种（模板）」与「员工（实例）」的分界，且三个维度全部落在现有字段上、<b>零新表</b>：</p>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>看似不同的岗位</th><th>其实是</th><th>修饰维度</th><th>落到哪个字段（零新表）</th></tr></thead>
+          <tbody>
+            <tr><td>财经记者 / 时政记者 / 体育记者</td><td><b>记者</b> ＋ 领域知识库</td><td><span class="tag tag--accent">领域 domain</span></td><td><code>employee_knowledge_bases</code> ＋ <code>instanceConfig.domainTags</code></td></tr>
+            <tr><td>记者 → 责编 → 主编 → 总编</td><td>同一稿流上<b>权限递增</b></td><td><span class="tag tag--brand">层级 level</span></td><td><code>authorityLevel</code>（observer / advisor / executor / coordinator）</td></tr>
+            <tr><td>新闻编辑 / 新媒体编辑 / 融媒体编辑</td><td><b>编辑</b> ＋ 渠道适配技能</td><td><span class="tag tag--info">媒体形态</span></td><td>额外技能 ＋ <code>instanceConfig.mediaForm</code></td></tr>
+            <tr><td>摄像 / 航拍 / 灯光 / 导播 / 音频</td><td>物理岗，AI 顶不了</td><td><span class="tag tag--muted">排除</span></td><td>排除 / 留「人工占位」支持人机混排</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">所以「财经记者」不是一个新员工，是<b>记者工种</b>绑了财经知识库；「责编」不是新员工，是<b>编辑工种</b>拿到了定稿权。用<b>配置实例化</b>而非新增员工——10 个工种就能覆盖几十种岗位名，否则几十个「员工」没人配得动、也没法考核。</p>
+
+      <h4>三维如何修饰：改什么 · 怎么落地 · 差异在哪</h4>
+      <p class="prose">三个维度<b>正交</b>——各自作用在 agent 的不同部位、互不干扰，所以少量工种 × 配置就能组合出大量岗位：</p>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>维度</th><th>改变 agent 的什么</th><th>怎么落地（字段 / 机制）</th><th>同一工种的差异化举例</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="tag tag--accent">领域 domain</span></td>
+              <td>知识来源 ＋ 视角 / 术语</td>
+              <td>绑 <code>employee_knowledge_bases</code>（主，限定 <code>kb_search</code> 检索范围）＋ <code>instanceConfig.domainTags</code>（补，注入 prompt 领域标签）</td>
+              <td><b>记者</b>绑《财经库》→ <code>kb_search</code> 查财报、谈股价 / 营收；绑《体育库》→ 查赛事、谈积分 / 战术——同一条素材落点完全不同</td>
+            </tr>
+            <tr>
+              <td><span class="tag tag--brand">层级 level</span></td>
+              <td>权限边界（能否定稿 / 发布 / 派单）</td>
+              <td><code>authorityLevel</code> → 装配期<b>过滤工具</b>（<code>assembly.ts</code>）＋ 执行后<b>产出状态</b>判定</td>
+              <td><b>记者</b>（advisor）无 <code>cms_publish</code>、产出标 <code>needs_approval</code> 交审；<b>审核</b>（executor）有发布权、可直接 published；<b>制片人</b>（coordinator）能 <code>create_task</code> 跨工种派单</td>
+            </tr>
+            <tr>
+              <td><span class="tag tag--info">形态 media form</span></td>
+              <td>产物的<b>形式 / 语态 / 平台</b></td>
+              <td><code>instanceConfig.mediaForm</code>（news / newmedia / convergence）＋ <code>platformSpecs</code> → prompt <b>Layer 4.6</b></td>
+              <td><b>编辑</b>出新闻稿（规范长文）/ 新媒体文案（口语短 ＋ hook ＋ 话题# ＋ 封面）/ 融媒体（同内容按各平台出多版）</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose">三维<b>组合</b>出实例：同一个「记者」工种可配出——① 《财经库》＋ advisor ＋ news ＝ <b>财经记者</b>（出规范财经稿、交审）；② 《科技库》＋ advisor ＋ newmedia ＝ <b>科技新媒体记者</b>（出口语化科技短文案 ＋ 话题标签）；③ 同记者升 executor ＝ <b>有定稿权的资深记者</b>。维度正交、互不干扰，这就是「8~10 工种覆盖几十岗位」的数学来源。</p>
+      <div class="callout callout--info" data-animate><div class="ct">ℹ 一句话记住三维落点</div><p><b>领域</b>改「<b>知道什么、用什么视角</b>」（知识库 ＋ domainTags）；<b>层级</b>改「<b>能拍板到哪一步</b>」（authority → 工具集 ＋ 产出状态）；<b>形态</b>改「<b>产物长什么样、给哪个平台</b>」（mediaForm ＋ platformSpecs → prompt）。三者分别落在<b>知识层 / 权限层 / 输出层</b>，零耦合。</p></div>
+
+      <h4>实战：给员工配了领域 / 形态后，运行时到底发生了什么</h4>
+      <p class="prose">以「让<b>财经记者</b>做<b>线索采集</b>」为例，追一遍从配置到执行——重点是<b>领域 / 形态走两条完全不同的路</b>：<code>roleType</code> 参与<b>派单选人</b>，而 <code>domainTags / mediaForm</code> 只进 <b>prompt</b>。</p>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 466" style="width:100%;min-width:680px" role="img" aria-label="实例配置运行时链路图">
+        <style>
+          .a7 text{font-family:var(--font-sans)}
+          .a7 .box{fill:var(--surface);stroke:var(--line);stroke-width:1}
+          .a7 .boxb{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1.4}
+          .a7 .bxn{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+          .a7 .tb{font-weight:700;font-size:13px;fill:var(--brand-strong);text-anchor:middle}
+          .a7 .t{font-weight:700;font-size:12.5px;fill:var(--ink);text-anchor:middle}
+          .a7 .sub{font-size:9.5px;fill:var(--muted);text-anchor:middle;font-family:var(--font-mono)}
+          .a7 .gr{font-size:10.5px;fill:#0a6051;text-anchor:middle}
+          .a7 .bl{font-size:10.5px;fill:var(--info)}
+          .a7 .ok{font-size:10.5px;fill:#0a6051}
+          .a7 .no{font-size:10.5px;font-weight:600;fill:var(--danger)}
+          .a7 .ink{font-size:10px;fill:var(--ink-2)}
+          .a7 .mg{stroke:var(--brand);stroke-width:1.7;fill:none}
+          .a7 .mb{stroke:var(--info);stroke-width:1.7;fill:none}
+          .a7 .lab{font-size:9.5px;font-weight:600;text-anchor:middle}
+        </style>
+        <defs>
+          <marker id="a7g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--brand)"/></marker>
+          <marker id="a7b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--info)"/></marker>
+        </defs>
+        <g class="a7">
+          <rect class="boxb" x="288" y="16" width="384" height="92" rx="10"/>
+          <text class="tb" x="480" y="40">员工实例：财经记者·小刚</text>
+          <text class="gr" x="480" y="62">roleType = reporter　（工种）</text>
+          <text class="bl" x="480" y="82" text-anchor="middle">domainTags=[财经] · mediaForm=news · 绑《财经库》</text>
+          <text class="sub" x="480" y="99">ai_employees.instanceConfig（JSONB）</text>
+          <path class="mg" d="M380 108 L252 176" marker-end="url(#a7g)"/>
+          <text class="lab" x="284" y="142" fill="#0a6051">roleType 工种</text>
+          <path class="mb" d="M580 108 L708 176" marker-end="url(#a7b)"/>
+          <text class="lab" x="676" y="142" fill="var(--info)">领域/形态/KB</text>
+          <rect class="box" x="60" y="178" width="372" height="162" rx="10"/>
+          <text class="t" x="246" y="202">① 派单 routing</text>
+          <text class="sub" x="246" y="218">pickEmployeeForStep</text>
+          <text class="ok" x="80" y="248">✓ 只看 roleType ＋ isPreset 选人</text>
+          <text class="ink" x="80" y="274">→ 在所有 reporter 实例里挑优先级最高的</text>
+          <text class="no" x="80" y="306">✗ domainTags / mediaForm 不参与选人！</text>
+          <rect class="boxb" x="528" y="178" width="372" height="162" rx="10"/>
+          <text class="t" x="714" y="202">② Prompt 注入</text>
+          <text class="sub" x="714" y="218">buildSystemPrompt</text>
+          <text class="bl" x="548" y="248">domainTags → Layer 4.5 领域专精</text>
+          <text class="bl" x="548" y="274">mediaForm → Layer 4.6 媒体形态</text>
+          <text class="bl" x="548" y="300">绑库 → Layer 4 知识背景 ＋ kb_search</text>
+          <text class="ink" x="548" y="324">（kb_search 检索锁定该员工的库）</text>
+          <path class="mg" d="M246 340 L420 388" marker-end="url(#a7g)"/>
+          <path class="mb" d="M714 340 L540 388" marker-end="url(#a7b)"/>
+          <rect class="bxn" x="300" y="390" width="360" height="60" rx="10"/>
+          <text class="t" x="480" y="414">executeAgent → LLM 按财经口径 / 新闻形态产出</text>
+          <text class="sub" x="480" y="432">产物差异化就体现在这里</text>
+        </g>
+      </svg>
+      <div class="lgd">
+        <span><i style="border-color:var(--brand)"></i>绿路：roleType → 派单选人</span>
+        <span><i style="border-color:var(--info)"></i>蓝路：领域 / 形态 / 知识库 → 只进 prompt</span>
+      </div>
+      <p class="cap">同一份配置分两路：<b>工种（roleType）</b>决定「<b>派给谁</b>」，<b>领域 / 形态 / 知识库</b>决定「<b>选中的人怎么干、产物什么味</b>」。两路互不交叉——这是下面那个「坑」的根因。</p>
+      </div>
+
+      <p class="prose">配了 <code>domainTags=["财经"]</code> ＋ <code>mediaForm="news"</code> 后，<code>assembleAgent</code> 给 system prompt <b>实际多注入</b>这两段（原文）：</p>
+      <pre class="code"><span class="c"># 领域专精（Layer 4.5 · 因 domainTags=["财经"]）</span>
+你专注于以下领域：财经。
+- 使用该领域的专业术语与表达习惯，不说外行话。
+- 遵循该领域的报道口径与禁忌（如财经不作投资建议、时政遵守称谓与排序规范）。
+- 优先引用该领域的权威来源与你绑定知识库中的事实。
+
+<span class="c"># 媒体形态与平台规格（Layer 4.6 · 因 mediaForm="news"）</span>
+- 媒体形态：新闻（规范书面语，导语+主体+结语）。按该形态的语态与篇幅产出。</pre>
+
+      <div class="callout callout--warn" data-animate><div class="ct">⚠ 关键坑：领域 / 形态只改「产物」，不改「派单选人」</div><p><code>pickEmployeeForStep</code>（<code>mission-core.ts:135</code>）派单时<b>只看 <code>roleType</code>（工种）＋ <code>isPreset</code>，完全不看 <code>domainTags</code></b>。所以若你有多个 reporter 实例（财经记者、体育记者…），笼统说「让记者采集」可能<b>派到非财经那个</b>，再靠 prompt 补领域口径——往往不是你要的。<b>要精确派给财经记者，必须在场景步骤里显式指定该员工实例（<code>employeeSlug</code>），或让该领域只配这一个 reporter 实例。</b></p></div>
+
+      <p class="prose"><b>所以「让财经记者做线索采集」的正确操作：</b></p>
+      <ol class="list num">
+        <li><b>配实例：</b><code>/employee/[id]</code> →「领域·形态」Tab 设 <code>domainTags=["财经"]</code>、<code>mediaForm="news"</code>，「知识库」Tab 绑《财经知识库》→ 保存（走 <code>updateEmployeeInstanceConfig</code> 写 <code>instanceConfig</code>）。</li>
+        <li><b>选对技能：</b>系统<b>没有独立的「线索采集」skill</b>——记者用<b>核心技能 <code>content_generate</code> ＋ 通用检索工具</b>（<code>web_search</code> / <code>trending_topics</code> / <code>news_aggregation</code> / <code>web_deep_read</code>）组合完成采集。</li>
+        <li><b>确保派对人：</b>因 domainTags 不参与派单，在场景步骤里<b>显式指定这个财经记者实例</b>（<code>employeeSlug</code>）。它被选中后，prompt 已带财经口径 ＋ 财经库 <code>kb_search</code>，产出就是「财经味」的线索采集结果。</li>
+      </ol>
+
+      <h4>10 个工种 · 覆盖的真实岗位 · 核心能力</h4>
+      <div class="table-wrap" data-animate>
+        <table class="table">
+          <thead><tr><th>工种</th><th>覆盖的真实岗位</th><th>核心专业技能</th><th>默认权限</th></tr></thead>
+          <tbody>
+            <tr><td><b>编导 / 策划</b></td><td>编导、新闻 / 专题策划、短视频编导</td><td>选题、专题策划、脚本、结构设计</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>记者</b></td><td>时政 / 社会 / 财经 / 法治 / 调查记者、出镜记者</td><td>线索挖掘、资料采集、采访整理、信息核实</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>编辑</b></td><td>新闻 / 责任 / 值班 / 新媒体 / 融媒体编辑</td><td>成稿、改稿、标题、摘要、节目编排</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>评论员</b></td><td>新闻评论员、特约观察员</td><td>观点研判、深度评论、立场表达</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>后期剪辑</b></td><td>视频剪辑、包装设计、特效制作</td><td>拆条、剪辑、竖屏重构、字幕、封面、包装</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>审核</b></td><td>责编（审核职）、值班总编、编委导向把关</td><td>事实核查、敏感词、导向、合规、终审</td><td><span class="tag tag--accent">executor</span></td></tr>
+            <tr><td><b>新媒体运营</b></td><td>新媒体 / 社交 / 直播运营</td><td>一稿多发适配、平台调性、分发、互动监测</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>播报 / 主持</b></td><td>主播、播音员、数字人</td><td>数字人播报、配音、口播</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>数据分析</b></td><td>数据运营、效果追踪</td><td>受众分析、复盘、反哺选题</td><td><span class="tag tag--muted">advisor</span></td></tr>
+            <tr><td><b>制片人 / 总编</b></td><td>制片人、执行制片、总监制、总编辑、中心主任</td><td>拆解任务、跨工种派单、统筹、最终把关</td><td><span class="tag tag--brand">coordinator</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">最后一行「制片人 / 总编」不是普通出活的员工，而是<b>编排器 ＋ 最高审核权</b>：接到一个活，负责拆任务、把每步派给对应工种、最后终审——正好对应真实编委会 / 总编的导向把关与统筹职责（即第 08 章多智能体协作里的 Leader）。</p>
+
+      <div class="callout callout--accent" data-animate><div class="ct">◆ 为什么必须有「工种」这一层</div><p>工种（岗位）是这套模型里<b>唯一可考核、可问责的最小单元</b>。工具没法考核、场景应用太粗，只有「工种」既能积累<b>垂类深度</b>（绑专属技能 / 知识库 / 记忆），又能背 <b>KPI</b>（出稿量、采纳率、质量分、返工率——由 <code>employee_skills.usageCount / successCount</code>、<code>ai_employees.tasksCompleted / accuracy</code> 等字段承载并反哺熟练度）。这正是「垂类深度、产出效果、考核、职责边界」的落点——没有工种这一层，这些维度无处安放。<b>场景是成品应用、工种是干活的岗位，两者分属不同层、各司其职。</b></p></div>
+
+      <h3>端到端例子：「突发新闻追踪」如何串起四层</h3>
+      <p class="prose">该场景 5 个步骤，启动时逐步按「所需技能」确定性派单到对应工种的员工，员工执行时再调用底层通用工具：</p>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>步骤</th><th>技能 / 工具</th><th>类型</th><th>派给工种</th><th>运行时调用的工具</th></tr></thead>
+          <tbody>
+            <tr><td>① 新闻聚合</td><td><code>news_aggregation</code></td><td><span class="tag tag--brand">技能</span></td><td>记者 / 编辑</td><td>web_search · 多源新闻</td></tr>
+            <tr><td>② 全网搜索</td><td><code>web_search</code></td><td><span class="tag tag--muted">工具</span></td><td>（人人可用）</td><td>本身即通用工具</td></tr>
+            <tr><td>③ 事实核查</td><td><code>fact_check</code></td><td><span class="tag tag--brand">技能</span></td><td><b>审核 reviewer</b></td><td>web_search · web_deep_read</td></tr>
+            <tr><td>④ 内容生成</td><td><code>content_generate</code></td><td><span class="tag tag--brand">技能</span></td><td><b>记者 reporter</b></td><td>web_search · kb_search</td></tr>
+            <tr><td>⑤ 发布</td><td><code>cms_publish</code></td><td><span class="tag tag--danger">工具·写</span></td><td>仅 executor / coordinator</td><td>华栖云 CMS API</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">同一技能可被多个工种共享：<code>content_generate</code> 的 <code>SkillOwnership</code> 为 <code>{core:"reporter", shared:["editor","commentator"]}</code>——派单时按 <code>compatibleRolesFor</code> 顺序（core 优先）在 <code>defaultTeam</code> 内择优。</p>
+
+      <h3>支撑四层的核心表</h3>
+      <div class="table-wrap" data-animate>
+        <table class="table">
+          <thead><tr><th>表</th><th>承载 / 关系</th></tr></thead>
+          <tbody>
+            <tr><td><code>ai_employees</code></td><td><code>roleType</code>→工种 · <code>instanceConfig</code>(领域 / 形态 / 平台) · <code>authorityLevel</code> · <code>hidden</code>(旧员工置 1)</td></tr>
+            <tr><td><code>skills</code></td><td><code>kind</code>(tool / skill) · <code>compatibleRoles</code>[] · builtin 读 SKILL.md / custom 读 DB</td></tr>
+            <tr><td><code>employee_skills</code></td><td>员工 × 技能 M:N · <code>bindingType</code>(core / extended / knowledge) · <code>level</code> 熟练度</td></tr>
+            <tr><td><code>workflow_templates</code></td><td><code>steps[].requiredSkill</code> · <code>defaultTeam</code>[] · <code>category</code> · <code>legacy_scenario_key</code></td></tr>
+            <tr><td><code>missions</code> · <code>mission_tasks</code></td><td><code>workflowTemplateId</code> · <code>assignedEmployeeId</code>(派单结果) · DAG 依赖</td></tr>
+            <tr><td><code>employee_memories</code></td><td>员工 × 记忆 · 装配期按 importance 取 <b>top-10</b> 注入 prompt</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--info" data-animate><div class="ct">ℹ 「工种」与「员工」的计数差异</div><p><b>10 个工种</b>是能力模板（<code>CRAFT_META</code>）；<b>12 个员工</b>是 org 内可见的配置实例。四层重构（<code>migration-craft-001/002</code>）回填 <code>skills.kind</code> ＋ <code>compatibleRoles</code>、为每工种 seed 一个默认实例、并将旧 10 个内容员工（小雷 / 小策…）置 <code>hidden=1</code> 仅供历史 mission 显示——向后兼容，旧数据与产物不受影响。</p></div>
+    </section>
+
     <section class="section anchor-h" id="agent">
       <div class="section-head">
-        <span class="kicker">07 · Agent</span>
+        <span class="kicker">08 · Agent</span>
         <h2>AI Agent 系统</h2>
         <p class="lead">系统核心。位于 <code>src/lib/agent/</code>。每次员工工作前都会「装配」成一个带人格、技能、记忆、权限的 Agent，再以分层 System Prompt 驱动 LLM 执行。</p>
       </div>
@@ -467,11 +856,77 @@ Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revali
       </ul>
 
       <div class="callout callout--danger" data-animate><div class="ct">🛡 防幻觉是贯穿全系统的一等设计</div><p>多处真实事故驱动（伪造 WWDC 新闻、把「3 月 20 日」当 2024 年、反爬登录页被当正文入库）。五重防线：① Prompt 真实性硬约束层；② <code>invokeToolDirectly</code> 服务端直调工具（步骤显式绑参时绕过 LLM，结果不可伪造）；③ 工具 <code>success:false</code> 检测 override 状态；④ 检索类工具缺 API key 时<b>显式 throw</b> 让步骤标 failed 而非静默编造；⑤ 执行期注入真实时间基准。</p></div>
+
+      <h3>智能体执行架构：自主 Loop ＋ 多智能体协作</h3>
+      <p class="prose">系统的「智能体能力」由两层叠成——<b>单体强自主执行闭环</b> ＋ <b>团队级多智能体编排</b>。下图是一次场景任务的完整时序：总编拆解派单、各工种 Agent 并行自主执行、产物互传、最后汇总终审。</p>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 548" style="width:100%;min-width:700px" role="img" aria-label="多智能体协作时序图">
+        <style>
+          .a3 text{font-family:var(--font-sans)}
+          .a3 .hd{fill:var(--brand-weak);stroke:var(--brand-weak2);stroke-width:1}
+          .a3 .hdt{font-weight:700;font-size:11.5px;fill:var(--brand-strong);text-anchor:middle}
+          .a3 .hds{font-size:8.5px;fill:var(--muted);text-anchor:middle}
+          .a3 .life{stroke:var(--line-2);stroke-width:1;stroke-dasharray:4 4}
+          .a3 .msg{stroke:var(--brand);stroke-width:1.5;fill:none}
+          .a3 .ret{stroke:var(--accent);stroke-width:1.4;fill:none;stroke-dasharray:5 3}
+          .a3 .mlab{font-size:9.5px;fill:var(--ink-2);text-anchor:middle}
+          .a3 .selfbox{fill:var(--brand-weak);stroke:var(--brand-weak2);stroke-width:1}
+          .a3 .selft{font-weight:700;font-size:10px;fill:var(--brand-strong);text-anchor:middle}
+          .a3 .selfs{font-size:9px;fill:var(--ink-2);text-anchor:middle}
+          .a3 .loopbox{fill:var(--accent-weak);stroke:#c4e8e0;stroke-width:1.2}
+          .a3 .loopt{font-weight:700;font-size:11px;fill:#0b7a6c;text-anchor:middle}
+          .a3 .loops{font-size:9px;fill:var(--ink-2);text-anchor:middle}
+          .a3 .nt{font-size:9.5px;fill:var(--muted);text-anchor:middle}
+        </style>
+        <defs>
+          <marker id="a3m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--brand)"/></marker>
+          <marker id="a3r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+        </defs>
+        <g class="a3">
+          <rect class="hd" x="40" y="18" width="160" height="40" rx="8"/><text class="hdt" x="120" y="38">用户 / 场景</text><text class="hds" x="120" y="51">INTERFACE</text>
+          <rect class="hd" x="280" y="18" width="160" height="40" rx="8"/><text class="hdt" x="360" y="38">Leader 总编</text><text class="hds" x="360" y="51">producer 工种</text>
+          <rect class="hd" x="540" y="18" width="160" height="40" rx="8"/><text class="hdt" x="620" y="38">子任务 Agent ×N</text><text class="hds" x="620" y="51">各工种</text>
+          <rect class="hd" x="780" y="18" width="160" height="40" rx="8"/><text class="hdt" x="860" y="38">数据层</text><text class="hds" x="860" y="51">mission_tasks / DB</text>
+          <line class="life" x1="120" y1="58" x2="120" y2="520"/>
+          <line class="life" x1="360" y1="58" x2="360" y2="520"/>
+          <line class="life" x1="620" y1="58" x2="620" y2="520"/>
+          <line class="life" x1="860" y1="58" x2="860" y2="520"/>
+          <text class="mlab" x="240" y="84">① 场景启动 startMission</text>
+          <path class="msg" d="M120 92 L358 92" marker-end="url(#a3m)"/>
+          <rect class="selfbox" x="250" y="108" width="220" height="36" rx="6"/><text class="selft" x="360" y="124">② leaderPlanDirect</text><text class="selfs" x="360" y="138">有模板→物化 DAG / 无模板→LLM 拆解</text>
+          <text class="mlab" x="612" y="170">③ 写 mission_tasks（status=ready）</text>
+          <path class="msg" d="M360 178 L858 178" marker-end="url(#a3m)"/>
+          <text class="mlab" x="492" y="206">④ 派单 → assembleAgent → executeAgent</text>
+          <path class="msg" d="M360 214 L618 214" marker-end="url(#a3m)"/>
+          <rect class="loopbox" x="514" y="236" width="212" height="92" rx="8"/>
+          <text class="loopt" x="620" y="256">⑤ 单体自主 Loop</text>
+          <text class="loops" x="620" y="275">规划 → 调用工具 → 观察 → 反思 → 继续</text>
+          <text class="loops" x="620" y="292">generateText · stopWhen stepCountIs(20)</text>
+          <text class="loops" x="620" y="309">最多 20 步 · 3min 超时 · 抓 success:false</text>
+          <text class="mlab" x="795" y="296">调用工具 web_search/kb_search</text>
+          <path class="msg" d="M726 302 L858 302" marker-end="url(#a3m)"/>
+          <text class="mlab" x="742" y="350">⑥ 回写 outputData（completed）</text>
+          <path class="msg" d="M620 358 L858 358" marker-end="url(#a3m)"/>
+          <text class="mlab" x="612" y="386">⑦ check-task-dependencies · {{stepN.field}} 传递产物</text>
+          <path class="ret" d="M860 394 L362 394" marker-end="url(#a3r)"/>
+          <rect class="selfbox" x="250" y="412" width="220" height="36" rx="6"/><text class="selft" x="360" y="428">⑧ leaderConsolidateDirect</text><text class="selfs" x="360" y="442">LLM 汇总终审 → consolidatedOutput</text>
+          <text class="mlab" x="240" y="476">⑨ consolidatedOutput 回显</text>
+          <path class="ret" d="M360 484 L122 484" marker-end="url(#a3r)"/>
+          <text class="nt" x="480" y="512">④–⑥ 对 N 个 ready 任务并行执行（executeReadyTasksDirect）；后置任务依赖解除后转 ready 继续</text>
+        </g>
+      </svg>
+      <p class="cap">竖线为生命线，横向箭头为消息（绿=调用 / 青虚线=返回）。子任务 Agent 的活动框（⑤）即「单体自主 Loop」——一个 Agent 在 20 步内自主规划、调用工具、观察、反思直到产出。</p>
+      </div>
+      <div class="split">
+        <div class="card" data-animate><div class="cnum">① 单体自主 Loop</div><h4>一个 Agent 自己把任务做完</h4><p><code>executeAgent</code> 以 <code>generateText({ stopWhen: stepCountIs(20) })</code> 跑多步循环：LLM 自主<b>规划 → 调用工具 → 观察结果 → 反思 → 继续</b>，最多 20 步、3 分钟超时。<code>onStepFinish</code> 逐步收集工具产物与 <code>success:false</code> 失败，不信 LLM 口头叙述、只认真实工具返回。</p></div>
+        <div class="card" data-animate><div class="cnum">② 多智能体协作</div><h4>一个团队按工种分工协作</h4><p><code>leaderPlanDirect</code>（总编 producer 拆解派单）→ <code>executeReadyTasksDirect</code>（各工种 Agent 并行执行、<code>{{stepN.field}}</code> 传递产物、<code>check-task-dependencies</code> 解阻塞）→ <code>leaderConsolidateDirect</code>（汇总终审）。</p></div>
+      </div>
+      <div class="callout callout--accent" data-animate><div class="ct">◆ 对标业界领先 Agentic 系统</div><p>这两层正对应当前最强 Agent 产品的核心能力：<b>单体强自主执行闭环</b>（如 Claude Code / Devin / Manus——自己规划-调用-反思直到完成，而非一问一答）＋ <b>团队级多智能体编排</b>（总编派单、多工种并行、产物互传、汇总终审）。VibeTide 的 Mission 引擎把二者合一——既有单兵的执行深度，也有团队的协同广度。</p></div>
     </section>
 
     <section class="section anchor-h" id="intent">
       <div class="section-head">
-        <span class="kicker">08 · 意图</span>
+        <span class="kicker">09 · 意图</span>
         <h2>意图识别与模型路由</h2>
         <p class="lead">聊天中心用 AI 把用户消息解析成「该让谁、用哪些技能、按什么顺序做」；模型路由按技能类别选 provider 与温度。</p>
       </div>
@@ -502,9 +957,114 @@ CATEGORY_DEFAULTS = {
 SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c">// 只产 schema，提速</span></pre>
     </section>
 
+    <section class="section anchor-h" id="bizflow">
+      <div class="section-head">
+        <span class="kicker">10 · 业务流</span>
+        <h2>业务数据流：从一次输入到产出</h2>
+        <p class="lead">从用户的「一句话」或「一次点击」到最终产出，数据流经<b>意图理解 → Mission 规划 → 逐任务自主执行 → 汇总</b>。关键在于<b>每一步何时调用 LLM、何时调用真实工具（及未来的 MCP）</b>。</p>
+      </div>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 592" style="width:100%;min-width:680px" role="img" aria-label="业务数据流图">
+        <style>
+          .a4 text{font-family:var(--font-sans)}
+          .a4 .nd{fill:var(--surface);stroke:var(--line);stroke-width:1}
+          .a4 .nd2{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1}
+          .a4 .ndt{font-weight:700;font-size:12.5px;fill:var(--ink);text-anchor:middle}
+          .a4 .ndl{font-weight:700;font-size:12.5px;fill:var(--ink)}
+          .a4 .nds{font-size:9.5px;fill:var(--muted);text-anchor:middle}
+          .a4 .br{font-size:10px;fill:var(--ink-2)}
+          .a4 .brs{font-size:9.5px;fill:var(--muted)}
+          .a4 .cnum{fill:var(--brand)}
+          .a4 .num{fill:#fff;font-weight:800;font-size:11px;text-anchor:middle}
+          .a4 .flow{stroke:var(--brand);stroke-width:1.7;fill:none}
+          .a4 .lk{stroke:var(--line-2);stroke-width:1}
+          .a4 .p-llm{fill:var(--brand-weak);stroke:var(--brand-weak2);stroke-width:1}
+          .a4 .p-tool{fill:var(--accent-weak);stroke:#c4e8e0;stroke-width:1}
+          .a4 .p-mcp{fill:var(--info-weak);stroke:#bcd3fb;stroke-width:1}
+          .a4 .p-none{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+          .a4 .pt{font-weight:600;font-size:9.5px;text-anchor:middle}
+          .a4 .tll{fill:var(--brand-strong)} .a4 .ttl2{fill:#0b7a6c} .a4 .tmc{fill:var(--info)} .a4 .tnn{fill:var(--muted)} .a4 .tdb{fill:var(--ink-2)}
+        </style>
+        <defs>
+          <marker id="a4m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--brand)"/></marker>
+        </defs>
+        <g class="a4">
+          <circle class="cnum" cx="170" cy="45" r="11"/><text class="num" x="170" y="49">1</text>
+          <rect class="nd" x="210" y="24" width="380" height="42" rx="9"/><text class="ndt" x="400" y="50">用户输入一句话 / 点击场景启动</text>
+          <path class="flow" d="M400 66 L400 82" marker-end="url(#a4m)"/>
+          <circle class="cnum" cx="170" cy="113" r="11"/><text class="num" x="170" y="117">2</text>
+          <rect class="nd" x="210" y="84" width="380" height="58" rx="9"/><text class="ndt" x="400" y="108">意图识别 recognizeIntent</text><text class="nds" x="400" y="126">fast-path：问候语直接 general_chat，跳过 LLM</text>
+          <line class="lk" x1="590" y1="113" x2="620" y2="113"/><rect class="p-llm" x="620" y="99" width="300" height="28" rx="14"/><text class="pt tll" x="770" y="117">调 LLM · 温度 0.2 / 1024 tok / 15s 超时</text>
+          <path class="flow" d="M400 142 L400 156" marker-end="url(#a4m)"/>
+          <circle class="cnum" cx="170" cy="179" r="11"/><text class="num" x="170" y="183">3</text>
+          <rect class="nd" x="210" y="158" width="380" height="42" rx="9"/><text class="ndt" x="400" y="184">路由判定 executionMode = skill | workflow</text>
+          <line class="lk" x1="590" y1="179" x2="620" y2="179"/><rect class="p-none" x="620" y="165" width="200" height="28" rx="14"/><text class="pt tnn" x="720" y="183">规则判定 · 不调 LLM</text>
+          <path class="flow" d="M400 200 L400 216" marker-end="url(#a4m)"/>
+          <circle class="cnum" cx="170" cy="258" r="11"/><text class="num" x="170" y="262">4</text>
+          <rect class="nd2" x="210" y="218" width="380" height="80" rx="9"/><text class="ndl" x="228" y="240">Mission 规划 leaderPlanDirect</text>
+          <text class="br" x="240" y="264">· 有模板 → 物化 DAG（跳过 LLM 分解）</text>
+          <text class="br" x="240" y="286">· 无模板 → LLM 拆解任务为 DAG</text>
+          <line class="lk" x1="590" y1="262" x2="620" y2="262"/><rect class="p-none" x="620" y="250" width="150" height="24" rx="12"/><text class="pt tnn" x="695" y="266">不调 LLM</text>
+          <line class="lk" x1="590" y1="287" x2="620" y2="287"/><rect class="p-llm" x="620" y="276" width="150" height="24" rx="12"/><text class="pt tll" x="695" y="292">调 LLM</text>
+          <path class="flow" d="M400 298 L400 314" marker-end="url(#a4m)"/>
+          <circle class="cnum" cx="170" cy="376" r="11"/><text class="num" x="170" y="380">5</text>
+          <rect class="nd2" x="210" y="316" width="380" height="122" rx="9"/><text class="ndl" x="228" y="338">逐任务 assembleAgent → executeAgent</text><text class="brs" x="228" y="355">单体自主 Loop（最多 20 步，LLM 自主决定调工具）</text>
+          <text class="br" x="240" y="380">· 检索类 → web_search / trending_topics</text>
+          <text class="br" x="240" y="403">· 生成类 → content_generate / headline_generate</text>
+          <text class="br" x="240" y="426">· 写型 → cms_publish / archive_to_drafts（authority 门控）</text>
+          <line class="lk" x1="590" y1="380" x2="620" y2="380"/><rect class="p-mcp" x="620" y="368" width="200" height="24" rx="12"/><text class="pt tmc" x="720" y="384">调工具 · (目标)MCP</text>
+          <line class="lk" x1="590" y1="403" x2="620" y2="403"/><rect class="p-llm" x="620" y="392" width="120" height="24" rx="12"/><text class="pt tll" x="680" y="408">调 LLM</text>
+          <line class="lk" x1="590" y1="426" x2="620" y2="426"/><rect class="p-tool" x="620" y="415" width="160" height="24" rx="12"/><text class="pt ttl2" x="700" y="431">调工具（写）</text>
+          <path class="flow" d="M400 438 L400 452" marker-end="url(#a4m)"/>
+          <circle class="cnum" cx="170" cy="476" r="11"/><text class="num" x="170" y="480">6</text>
+          <rect class="nd" x="210" y="454" width="380" height="44" rx="9"/><text class="ndt" x="400" y="481">leaderConsolidate 汇总终审</text>
+          <line class="lk" x1="590" y1="476" x2="620" y2="476"/><rect class="p-llm" x="620" y="462" width="120" height="28" rx="14"/><text class="pt tll" x="680" y="480">调 LLM</text>
+          <path class="flow" d="M400 498 L400 514" marker-end="url(#a4m)"/>
+          <circle class="cnum" cx="170" cy="544" r="11"/><text class="num" x="170" y="548">7</text>
+          <rect class="nd" x="210" y="516" width="380" height="56" rx="9"/><text class="ndt" x="400" y="540">产出回显 ＋ 写库</text><text class="nds" x="400" y="558">mission_tasks / articles / cms_publications</text>
+          <line class="lk" x1="590" y1="544" x2="620" y2="544"/><rect class="p-none" x="620" y="530" width="150" height="28" rx="14"/><text class="pt tdb" x="695" y="548">DB 写</text>
+        </g>
+      </svg>
+      <div class="lgd">
+        <span><i style="border-color:var(--brand-weak2);border-top-width:8px;border-radius:4px"></i>调 LLM（语言理解 / 创造）</span>
+        <span><i style="border-color:#bcd3fb;border-top-width:8px;border-radius:4px"></i>调工具 · 目标态 MCP（外部数据）</span>
+        <span><i style="border-color:#c4e8e0;border-top-width:8px;border-radius:4px"></i>调写型工具（authority 门控）</span>
+        <span><i style="border-color:var(--line-2);border-top-width:8px;border-radius:4px"></i>规则 / DB（不调 LLM）</span>
+      </div>
+      </div>
+
+      <h3>两个场景走查</h3>
+      <div class="split">
+        <div class="card card--accent" data-animate><h4>场景 A · 对话里问「分析今天的热点」</h4>
+          <ol class="list num">
+            <li>意图识别 → 派给热点工种员工（<code>executionMode=skill</code>）。</li>
+            <li>Agent 自主调 <code>trending_topics</code>（真 TopHub API，<b>非 LLM 编造</b>）。</li>
+            <li>LLM 综合工具返回 → 产出热点简报。</li>
+          </ol>
+          <p class="note">路由硬规则：问「热榜 / 热搜」必走 <code>trending_topics</code>、<b>禁</b> <code>web_search</code>（避免拉训练数据旧文）。</p>
+        </div>
+        <div class="card card--accent" data-animate><h4>场景 B · 点击「海外热点搬运」工作流</h4>
+          <p class="prose">5 步 DAG，逐步用 <code>{{stepN.field}}</code> 串联，LLM 与工具交替：</p>
+          <div class="flow">
+            <div class="step"><div class="sn">trending_topics</div><div class="sw">工具</div></div>
+            <div class="arrow">→</div>
+            <div class="step"><div class="sn">topic_classifier</div><div class="sw">LLM</div></div>
+            <div class="arrow">→</div>
+            <div class="step"><div class="sn">batch_deep_read</div><div class="sw">工具</div></div>
+            <div class="arrow">→</div>
+            <div class="step"><div class="sn">cross_language_rewrite</div><div class="sw">LLM</div></div>
+            <div class="arrow">→</div>
+            <div class="step"><div class="sn">archive_to_drafts</div><div class="sw">工具</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout--info" data-animate><div class="ct">ℹ 何时调 LLM · 何时调工具 / MCP</div><p><b>调 LLM：</b>意图理解、任务拆解、内容生成 / 改写 / 分类、汇总终审——需要语言理解与创造的环节。<b>调工具（及目标态 MCP）：</b>一切外部世界数据——联网搜索、实时热榜、网页正文、知识库检索、CMS 发布。铁律：<b>外部事实绝不让 LLM 凭空生成</b>，必须经真实工具获取（呼应第 08 章五重防幻觉设计）。</p></div>
+    </section>
+
     <section class="section anchor-h" id="tools">
       <div class="section-head">
-        <span class="kicker">09 · 工具</span>
+        <span class="kicker">11 · 工具</span>
         <h2>Agent 工具体系</h2>
         <p class="lead"><code>tool-registry.ts</code>（约 2900 行）。检索类工具<b>必须调真 API</b>——LLM 无法凭空伪造外部世界数据。</p>
       </div>
@@ -535,9 +1095,213 @@ SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c"
       <p class="prose"><code>createMissionTools</code>（协作：send_message / read_messages，leader 额外 create_task / check_progress）；<code>createKnowledgeBaseTools</code>（<code>kb_search</code>：限员工绑定 KB、只查 <code>vectorization_status='done'</code>）；<code>createXiaoyanChatTools</code>（org-scoped：research_query_builder / data_pivoter）。</p>
     </section>
 
+    <section class="section anchor-h" id="exec-cli">
+      <div class="section-head">
+        <span class="kicker">12 · 执行模型</span>
+        <h2>执行模型：SKILL / 工具 / MCP 怎么跑 · CLI 改造</h2>
+        <p class="lead">把三件事讲透：<b>技能（SKILL）到底怎么"执行"</b>、<b>工具与（目标态）MCP 怎么调用</b>、<b>能否用 CLI 跑、要支持 CLI 需要哪些改造</b>。结论先行：技能是注入 prompt 的能力指导（非脚本）、工具当前同进程直调、CLI 已被零散脚本部分验证、统一 CLI 改造成本中等。</p>
+      </div>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 432" style="width:100%;min-width:700px" role="img" aria-label="执行拓扑与 CLI/MCP 改造图">
+        <style>
+          .a5 text{font-family:var(--font-sans)}
+          .a5 .bx{fill:var(--surface);stroke:var(--line);stroke-width:1}
+          .a5 .bxb{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1}
+          .a5 .bxa{fill:var(--accent-weak);stroke:#c4e8e0;stroke-width:1}
+          .a5 .bxw{fill:var(--warn-weak);stroke:var(--warn);stroke-width:1.4;stroke-dasharray:5 4}
+          .a5 .bxi{fill:var(--info-weak);stroke:var(--info);stroke-width:1.4;stroke-dasharray:5 4}
+          .a5 .bxn{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+          .a5 .t{font-weight:700;font-size:12px;fill:var(--ink);text-anchor:middle}
+          .a5 .tb{font-weight:700;font-size:13.5px;fill:var(--brand-strong);text-anchor:middle}
+          .a5 .ta{font-weight:700;font-size:12px;fill:#0b7a6c;text-anchor:middle}
+          .a5 .ti{font-weight:700;font-size:12px;fill:var(--info);text-anchor:middle}
+          .a5 .s{font-size:9.5px;fill:var(--muted);text-anchor:middle}
+          .a5 .sw{font-size:9.5px;fill:var(--warn);text-anchor:middle}
+          .a5 .si{font-size:9.5px;fill:var(--info);text-anchor:middle}
+          .a5 .sa{font-size:9.5px;fill:#0b7a6c;text-anchor:middle}
+          .a5 .nt{font-size:10px;fill:var(--ink-2);text-anchor:middle}
+          .a5 .mb{stroke:var(--brand);stroke-width:1.6;fill:none}
+          .a5 .mw{stroke:var(--warn);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+          .a5 .mi{stroke:var(--info);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+        </style>
+        <defs>
+          <marker id="a5b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--brand)"/></marker>
+          <marker id="a5w" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--warn)"/></marker>
+          <marker id="a5i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--info)"/></marker>
+        </defs>
+        <g class="a5">
+          <rect class="bx" x="24" y="54" width="212" height="68" rx="9"/><text class="t" x="130" y="84">Web · Server Action</text><text class="s" x="130" y="102">requireAuth → session</text>
+          <rect class="bx" x="24" y="156" width="212" height="68" rx="9"/><text class="t" x="130" y="186">Inngest 后台</text><text class="s" x="130" y="204">event → 显式 orgId</text>
+          <rect class="bxw" x="24" y="258" width="212" height="68" rx="9"/><text class="t" x="130" y="286">CLI 入口（待改造）</text><text class="sw" x="130" y="304">--org · dotenv · 跳过 auth</text>
+          <rect class="bxb" x="318" y="66" width="304" height="258" rx="12"/>
+          <text class="tb" x="470" y="90">Agent 执行核心</text><text class="s" x="470" y="107">零 server-only · 可脱离 Next.js</text>
+          <rect class="bx" x="336" y="122" width="268" height="56" rx="8"/><text class="t" x="470" y="143">assembleAgent</text><text class="s" x="470" y="161">SKILL.md → prompt · 工具按权限过滤</text>
+          <rect class="bx" x="336" y="188" width="268" height="56" rx="8"/><text class="t" x="470" y="209">executeAgent</text><text class="s" x="470" y="227">generateText loop · stepCountIs(20)</text>
+          <text class="nt" x="470" y="272">SKILL 执行 = LLM 按指导自主调工具</text>
+          <text class="s" x="470" y="290">scriptPath / 子模板当前为 stub（无确定性脚本）</text>
+          <rect class="bxa" x="706" y="92" width="230" height="80" rx="9"/><text class="ta" x="821" y="122">同进程 tool().execute()</text><text class="sa" x="821" y="142">AI SDK v6 自动路由 · 现状</text>
+          <rect class="bxi" x="706" y="216" width="230" height="80" rx="9"/><text class="ti" x="821" y="246">MCP Server</text><text class="si" x="821" y="266">stdio · HTTP transport · 目标态</text>
+          <rect class="bxn" x="318" y="356" width="304" height="58" rx="10"/><text class="t" x="470" y="380">共享依赖：PostgreSQL（Drizzle）＋ env keys</text><text class="s" x="470" y="398">已被 scripts/run-real-mission.ts 证明可脱离 Next</text>
+          <path class="mb" d="M236 88 L314 132" marker-end="url(#a5b)"/>
+          <path class="mb" d="M236 190 L314 198" marker-end="url(#a5b)"/>
+          <path class="mw" d="M236 292 L314 250" marker-end="url(#a5w)"/>
+          <path class="mb" d="M622 140 L702 132" marker-end="url(#a5b)"/>
+          <path class="mi" d="M622 250 L702 256" marker-end="url(#a5i)"/>
+          <path class="mb" d="M470 324 L470 354" marker-end="url(#a5b)"/>
+        </g>
+      </svg>
+      <div class="lgd">
+        <span><i style="border-color:var(--brand)"></i>实线（绿）：现有入口 / 调用</span>
+        <span><i style="border-color:var(--warn);border-top-style:dashed"></i>橙虚线：CLI 入口（待改造）</span>
+        <span><i style="border-color:var(--info);border-top-style:dashed"></i>蓝虚线：MCP（目标演进态）</span>
+      </div>
+      <p class="cap">Agent 执行核心被三类入口驱动（Web / Inngest / CLI），向右经工具层执行（同进程 <code>tool()</code> 现状 / MCP 目标态），向下落到可脱离 Next 的共享依赖。CLI 与 MCP 是图中仅有的两处「待改造 / 目标态」。</p>
+      </div>
+
+      <h3>前提澄清：Web 应用能执行 CLI、调本地工具吗？</h3>
+      <p class="prose">这是常见困惑。答案关键在于：<b>「Web 应用」不是一个整体，它分前端、后端两半，能力天差地别</b>。把这条边界讲清，CLI / MCP 的可行性就一目了然。</p>
+      <div class="svgfig" data-animate>
+      <svg viewBox="0 0 960 356" style="width:100%;min-width:680px" role="img" aria-label="三执行域能力边界图">
+        <style>
+          .a6 text{font-family:var(--font-sans)}
+          .a6 .bx{fill:var(--surface);stroke:var(--line);stroke-width:1}
+          .a6 .boxb{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1.5}
+          .a6 .bxn{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
+          .a6 .bxi{fill:var(--info-weak);stroke:var(--info);stroke-width:1.3;stroke-dasharray:5 4}
+          .a6 .tb{font-weight:700;font-size:13.5px;fill:var(--brand-strong);text-anchor:middle}
+          .a6 .sub{font-size:9.5px;fill:var(--muted);text-anchor:middle}
+          .a6 .ok{font-size:10.5px;fill:#0a6051}
+          .a6 .no{font-size:10.5px;fill:var(--danger)}
+          .a6 .foot{font-size:9.5px;fill:var(--muted);text-anchor:middle}
+          .a6 .foota{font-size:9.5px;font-weight:600;fill:#0b7a6c;text-anchor:middle}
+          .a6 .tn{font-weight:600;font-size:10.5px;fill:var(--ink);text-anchor:middle}
+          .a6 .ts{font-size:8.5px;fill:var(--muted);text-anchor:middle}
+          .a6 .mb{stroke:var(--brand);stroke-width:1.5;fill:none}
+          .a6 .mi{stroke:var(--info);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+          .a6 .mlab{font-size:9px;fill:var(--ink-2);text-anchor:middle}
+        </style>
+        <defs>
+          <marker id="a6b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--brand)"/></marker>
+          <marker id="a6i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--info)"/></marker>
+        </defs>
+        <g class="a6">
+          <rect class="bx" x="24" y="28" width="284" height="208" rx="10"/>
+          <text class="tb" x="166" y="54">浏览器前端</text><text class="sub" x="166" y="71">React · 安全沙箱</text>
+          <text class="no" x="44" y="108">✗ 执行本地命令</text>
+          <text class="no" x="44" y="134">✗ 读写文件系统</text>
+          <text class="ok" x="44" y="160">✓ 渲染 UI · 发 HTTP 请求</text>
+          <text class="foot" x="166" y="214">碰不到任何本地资源</text>
+          <rect class="boxb" x="338" y="28" width="284" height="208" rx="10"/>
+          <text class="tb" x="480" y="54">服务器后端</text><text class="sub" x="480" y="71">Next.js Node · 自托管 Docker</text>
+          <text class="ok" x="358" y="108">✓ child_process 调本地命令</text>
+          <text class="ok" x="358" y="134">✓ 读写文件 · 原生库 canvas</text>
+          <text class="ok" x="358" y="160">✓ 外部 HTTP API（当前工具）</text>
+          <text class="foota" x="480" y="214">← Agent 执行核心在这里跑</text>
+          <rect class="bx" x="652" y="28" width="284" height="208" rx="10"/>
+          <text class="tb" x="794" y="54">用户本地机器</text><text class="sub" x="794" y="71">用户自己的电脑</text>
+          <text class="ok" x="672" y="108">✓ 本地命令 / 文件 / 工具</text>
+          <text class="no" x="672" y="134">✗ Web 后端碰不到这里</text>
+          <text class="foot" x="794" y="214">需本地 CLI / 桌面 agent</text>
+          <path class="mb" d="M312 122 L334 122" marker-start="url(#a6b)" marker-end="url(#a6b)"/>
+          <text class="mlab" x="323" y="113">HTTP</text>
+          <rect class="bxn" x="398" y="284" width="164" height="50" rx="8"/><text class="tn" x="480" y="305">服务器本地工具</text><text class="ts" x="480" y="322">ffmpeg · whisper · py 脚本</text>
+          <path class="mb" d="M480 236 L480 282" marker-end="url(#a6b)"/>
+          <text class="mlab" x="540" y="263">child_process</text>
+          <rect class="bxi" x="712" y="284" width="164" height="50" rx="8"/><text class="tn" x="794" y="305">用户本地工具</text><text class="ts" x="794" y="322">目标态 · 需本地 agent</text>
+          <path class="mi" d="M794 236 L794 282" marker-end="url(#a6i)"/>
+          <text class="mlab" x="852" y="263">本地 agent / MCP</text>
+        </g>
+      </svg>
+      <p class="cap">三个「执行域」能力边界：<b>浏览器前端</b>沙箱禁本地；<b>服务器后端</b>（Agent 在此跑）可调服务器本地命令；<b>用户本地机器</b>后端碰不到，需本地 agent。</p>
+      </div>
+      <ul class="list">
+        <li><b>浏览器前端（React）：</b>跑在浏览器<b>安全沙箱</b>里，<b>绝对不能</b>执行本地命令、读写文件、调本地工具（否则任何网页都能控制你电脑）。它只能渲染 UI、发 HTTP 请求。</li>
+        <li><b>服务器后端（Node 进程）：</b>VibeTide 是 Next.js 全栈，后端是普通 Node 进程（<b>自托管 Docker</b>，<code>output: "standalone"</code>）。它<b>完全可以</b> <code>child_process.spawn</code> 调服务器本地的 CLI / 二进制（ffmpeg、whisper、python…）、读写文件、跑原生库——项目已在用 <code>canvas</code> / <code>chartjs-node-canvas</code>（需系统级图形库）就是后端能跑本地原生代码的活证据。</li>
+        <li><b>当前现状：</b>所有工具（<code>web_search</code> / <code>cms_publish</code>…）当前都<b>调外部 HTTP API</b>，没有调本地命令——但这是<b>实现选择，不是能力限制</b>。要加个调本地 ffmpeg 的工具，在 <code>tool-registry.ts</code> 写 <code>execute: () =&gt; spawn("ffmpeg", […])</code> 即可，架构开箱支持。</li>
+      </ul>
+      <div class="callout callout--warn" data-animate><div class="ct">⚠ 关键区分：「本地」是谁的本地？</div><p>Web 后端调的本地命令 = <b>服务器的本地</b>（Docker 容器里装的 ffmpeg 等），<b>不是用户浏览器所在电脑的本地</b>——那台机器后端碰不到（沙箱挡着）、也不该碰。若要像 Claude Code 那样操作<b>用户自己电脑</b>的本地文件与工具，Web 形态做不到，必须把 agent 打包成<b>本地 CLI / 桌面应用</b>（即下文 ④ 的 CLI 改造延伸），让 agent 直接跑在用户机器上。</p></div>
+      <h4>三种「调本地工具」形态对照</h4>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>形态</th><th>调谁的本地</th><th>机制</th><th>可行性</th></tr></thead>
+          <tbody>
+            <tr><td>Web 后端 <code>child_process</code></td><td>服务器本地（容器内）</td><td>工具 <code>execute</code> 里 spawn 本地命令</td><td><span class="tag tag--accent">✅ 架构支持，加工具即可</span></td></tr>
+            <tr><td>Web 后端 ＋ 本地 MCP server</td><td>服务器本地（标准化）</td><td>后端做 MCP client 连本地 MCP server</td><td><span class="tag tag--info">🔵 需接 MCP（目标态）</span></td></tr>
+            <tr><td>本地 CLI / 桌面 agent</td><td><b>用户自己电脑</b></td><td>agent 装在用户机器跑，直连或经本地 MCP</td><td><span class="tag tag--info">🔵 需 CLI 改造（见 ④）</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">MCP 的一大典型用途，正是<b>安全、标准地桥接「本地工具」</b>：在本地起一个 MCP server（stdio）把本地命令 / 文件 / 数据库包装成 MCP tools，agent（无论 Web 后端还是 CLI）作为 client 连接它——比裸 <code>child_process</code> 散落各处更可控、可审计。这也是文档多处把 MCP 列为「目标演进态」的原因之一。</p>
+
+      <h4>那工具到底该部署在哪？</h4>
+      <p class="prose">直接回答这个疑问：<b>绝大多数工具就该在服务端</b>（也是当前架构）。只有两类例外需要拆出去——判断只看「这个工具碰不碰<b>特殊系统依赖</b>或<b>用户本地资源</b>」：</p>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>工具类型</th><th>部署位置</th><th>为什么</th></tr></thead>
+          <tbody>
+            <tr><td>检索 / 生成 / 发布（调外部 API、纯计算）——<b>当前全部工具</b></td><td><span class="tag tag--brand">服务端主进程</span></td><td>多租户共享、密钥不下发前端、统一鉴权 / 配额 / 审计、可水平扩缩容。<b>默认就该这样</b></td></tr>
+            <tr><td>重型 / 特殊系统依赖（ffmpeg 转码、whisper ASR、本地模型推理）</td><td><span class="tag tag--accent">服务端 · 独立工具服务 / MCP server</span></td><td>单独容器装系统依赖、独立扩缩容、<b>不拖垮主 web 进程</b>（一次转码几分钟会堵请求）</td></tr>
+            <tr><td>操作<b>用户本地</b>文件 / 工具（读本地素材、调本地软件）</td><td><span class="tag tag--info">用户本地 · 本地 agent ＋ 本地 MCP</span></td><td>服务端<b>碰不到</b>用户本地（沙箱）；数据不出本地更安全合规</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout--accent" data-animate><div class="ct">◆ 部署原则：三档按需升级</div><p><b>默认服务端</b>（一体打包、最简单）→ 工具变<b>重 / 有特殊依赖</b>就拆成<b>独立工具服务或 MCP server</b>（与 web 进程解耦）→ 只有要碰<b>用户本地资源</b>时，才下沉到<b>用户本地 agent</b>。不必一步到位：当前阶段全部工具留在服务端主进程即可，等真有视频转码 / ASR 这类重活，再把那几个工具单独拆成 MCP server。</p></div>
+
+      <h3>① SKILL 如何执行：prompt 注入，不是跑脚本</h3>
+      <ul class="list">
+        <li><b>本质：</b>技能是<b>注入 system prompt 的能力指导</b>，不是可执行代码。装配期 <code>assembleAgent</code> 把 SKILL.md 正文读进「技能执行指南层」（<code>assembly.ts:29</code> / <code>prompt-templates.ts</code>）。</li>
+        <li><b>两种来源：</b>builtin 读 <code>skills/&lt;slug&gt;/SKILL.md</code> body；custom / plugin 读 DB <code>skills.content</code>。</li>
+        <li><b>执行 = LLM 自主调工具：</b>步骤绑定技能时，<code>skillSpec</code> 整段 pin 进 system prompt，强制三段式输出（<code>execution.ts:190</code> 附近）。LLM 按 SKILL.md 流程<b>自己决定调哪些工具</b>、产出【执行摘要 / 执行过程 / 产出结果】。</li>
+        <li><b>子模板 / scriptPath 当前是 stub：</b><code>src/lib/agent/skills/{duanju,zhongcao,podcast}-subtemplates.ts</code> 均为 <code>export const SUBTEMPLATES = {}</code>，全库无任何代码 import 执行——<b>没有确定性脚本</b>，技能 100% 走 LLM-in-the-loop。</li>
+        <li><b>旁路：</b><code>invokeToolDirectly</code>（<code>tool-registry.ts:2239</code>）——步骤显式绑参时<b>服务端直调工具、绕过 LLM</b>，结果不可伪造（五重防幻觉之一）。这是唯一的「非 LLM」确定性执行路径。</li>
+      </ul>
+
+      <h3>② 工具与 MCP 如何执行：同进程直调 vs 跨进程协议</h3>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>维度</th><th>当前 · AI SDK <code>tool()</code></th><th>目标 · MCP 协议</th></tr></thead>
+          <tbody>
+            <tr><td>进程模型</td><td><b>同进程</b> 直接调 <code>execute()</code></td><td><b>跨进程</b> client ↔ server</td></tr>
+            <tr><td>调用路由</td><td><code>generateText</code> 自动表查 <code>toolName → execute</code></td><td>JSON-RPC over <b>stdio / HTTP</b></td></tr>
+            <tr><td>上下文注入</td><td><code>wrapToolExecuteWithContext</code> 合并 org / operator / mission / task（<code>tool-registry.ts</code>）</td><td>MCP roots / 资源声明 + 协商</td></tr>
+            <tr><td>部署</td><td>随 app 一体打包</td><td>工具可<b>独立部署 / 跨语言</b></td></tr>
+            <tr><td>现状</td><td>✅ 已实装 47+ 工具</td><td><span class="tag tag--warn">0 代码 / 0 依赖</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">接 MCP 的最小改造：agent 端做 MCP client，把各 MCP server 暴露的 tools 转成 AI SDK <code>ToolSet</code> 注入 <code>generateText</code>——<b>executeAgent 的工具装配口不变</b>，只是工具来源从同进程函数换成跨进程 MCP。AI SDK v6 原生支持 MCP client，故改造点集中在 <code>toVercelTools</code> 的工具来源层。</p>
+
+      <h3>③ CLI 现状：部分支持（零散脚本，无统一框架）</h3>
+      <ul class="list">
+        <li><b>已能脱离 Web 跑：</b><code>scripts/</code> 下有一批 tsx 脚本（<code>run-real-mission.ts</code> / <code>retry-stuck-missions.ts</code> / <code>run-missed-topic-detection.ts</code> / <code>run-catalog-sync.ts</code>…），手工 <code>tsx scripts/xxx.ts</code> 直跑。</li>
+        <li><b>关键证据：</b><code>run-real-mission.ts</code> 自建 postgres 连接 + 动态 <code>import</code> <code>executeMissionDirect(missionId, orgId)</code>（<code>mission-executor.ts:2124</code>），<code>dotenv</code> 读 key、<b>完全不经 <code>requireAuth</code></b>——证明 Agent 执行核心可在纯 Node 环境跑通。</li>
+        <li><b>但还不是「CLI」：</b>无 <code>commander/yargs</code>、无 <code>package.json</code> <code>bin</code>、面向「跑一个<b>已存在的</b> mission」，没有通用的「执行任意 skill / agent」入口。</li>
+      </ul>
+      <pre class="code"><span class="c">// scripts/run-real-mission.ts —— 已存在的「类 CLI」入口（脱离 Web 跑完整 mission）</span>
+<span class="k">const</span> client = <span class="f">postgres</span>(process.env.DATABASE_URL!, { prepare: false });
+<span class="k">const</span> { executeMissionDirect } = <span class="k">await</span> <span class="f">import</span>(<span class="s">"../src/lib/mission-executor"</span>);
+<span class="k">await</span> <span class="f">executeMissionDirect</span>(mission.id, org.id);  <span class="c">// 显式接 orgId，不经 requireAuth</span></pre>
+
+      <h3>④ 支持 CLI 调用需要的改造</h3>
+      <p class="prose">前提很好：Agent 核心（<code>assembleAgent</code> / <code>executeAgent</code> / <code>tool-registry</code>）<b>零 <code>server-only</code> 依赖</b>，DB 连接已被脚本证明可脱离 Next。改造成本<b>中等</b>，主要是「入口封装 + auth 旁路 + 单技能入口」：</p>
+      <ol class="list num">
+        <li><b>统一 CLI 入口：</b>引入 <code>commander</code> / <code>yargs</code> + <code>package.json</code> 的 <code>bin</code> 字段，封装子命令（<code>run-mission</code> / <code>run-skill</code> / <code>list-employees</code>…）。</li>
+        <li><b>Auth 旁路标准化：</b>复用 <code>startMissionFromTemplateScheduled</code>（<code>workflow-launch.ts:134</code>）的「显式接 <code>orgId</code> 跳过 <code>requireAuth</code>」模式；CLI 用 <code>--org</code> / <code>--operator</code> 参数提供身份。</li>
+        <li><b>上下文显式注入：</b><code>executeAgent</code> 已接 <code>context</code> 参数，CLI 构造 <code>{ organizationId, operatorId, missionId, taskId }</code> 传入，工具层经 <code>wrapToolExecuteWithContext</code> 自动合并——<b>无需改工具</b>。</li>
+        <li><b>env 装载：</b><code>dotenv</code> 读 <code>.env.local</code>（检索类工具的 API key、CMS env 照常从 env 取，与 Web 一致）。</li>
+        <li><b>新增「单技能直跑」入口：</b>当前缺「跑单个 skill」的封装。需包一层：给定 <code>employeeSlug + skillSlug + 输入</code> → <code>assembleAgent</code> → 构造 <code>skillSpec</code> → <code>executeAgent(context)</code> → 打印三段式产出。</li>
+        <li><b>（可选）MCP：</b>若要把工具暴露为 MCP server、或 CLI 兼作 MCP host，引入 <code>@modelcontextprotocol/sdk</code> + stdio transport，把 <code>tool-registry</code> 的工具包装成 MCP tools。</li>
+      </ol>
+      <pre class="code"><span class="c"># 改造目标：通用 agent CLI（commander + package.json bin）</span>
+$ vibetide run-skill --employee xiaolei --skill trending_topics \
+    --org org_123 --input <span class="s">'{"topic":"今日热点"}'</span>
+<span class="c"># 内部：dotenv → assembleAgent(employee) → 构造 skillSpec → executeAgent(context{orgId,operatorId}) → 打印三段式</span></pre>
+      <div class="callout callout--accent" data-animate><div class="ct">◆ 改造成本评估</div><p><b>低成本可复用：</b>Agent 核心、工具上下文注入通道、DB 脱离能力、auth 旁路模式<b>都已现成</b>。<b>真正要新写的</b>只有三块：① CLI 入口框架（commander + bin）；② 「单技能直跑」封装；③ 若上 MCP，则加 <code>@modelcontextprotocol/sdk</code> 的 server / client 适配层。多智能体 mission 的 CLI 化几乎是<b>零核心改动</b>——直接复用 <code>executeMissionDirect</code> 即可。</p></div>
+    </section>
+
     <section class="section anchor-h" id="workflow">
       <div class="section-head">
-        <span class="kicker">10 · 工作流</span>
+        <span class="kicker">13 · 工作流</span>
         <h2>工作流与定时任务引擎</h2>
         <p class="lead">统一场景架构（B.1）：<code>workflow_templates</code> 表是所有「场景」的<b>单一真相源</b>。首页场景网格、任务中心都调 <code>listWorkflowTemplatesByOrg</code>。</p>
       </div>
@@ -564,7 +1328,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="inngest">
       <div class="section-head">
-        <span class="kicker">11 · 后台</span>
+        <span class="kicker">14 · 后台</span>
         <h2>Inngest 后台任务</h2>
         <p class="lead">事件驱动后台引擎。<code>src/inngest/functions/</code> 下 <b>46 个</b>文件，注册约 <b>45+</b> 个函数（CLAUDE.md 写 16，已严重过时）。</p>
       </div>
@@ -588,7 +1352,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="knowledge">
       <div class="section-head">
-        <span class="kicker">12 · 知识库</span>
+        <span class="kicker">15 · 知识库</span>
         <h2>知识库 RAG</h2>
         <p class="lead"><code>src/lib/knowledge/</code>。三件套：分块 → 嵌入 → 检索。V1 务实——jsonb 存向量 + 应用层余弦，明确标注 10k chunk 后升级 pgvector 的路径。</p>
       </div>
@@ -606,7 +1370,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="cms">
       <div class="section-head">
-        <span class="kicker">13 · CMS</span>
+        <span class="kicker">16 · CMS</span>
         <h2>CMS 集成层</h2>
         <p class="lead"><code>src/lib/cms/</code> 是 VibeTide → 华栖云 CMS 的<b>唯一出口</b>，调用方只从 <code>@/lib/cms</code> import，禁止直接引用内部文件。</p>
       </div>
@@ -637,7 +1401,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="designsys">
       <div class="section-head">
-        <span class="kicker">14 · 设计系统</span>
+        <span class="kicker">17 · 设计系统</span>
         <h2>设计系统约束与 ESLint</h2>
         <p class="lead">每一轮样式漂移都源于绕过共享原语。这套规则（含 ESLint 强制）让 UI 长期不走样。</p>
       </div>
@@ -663,7 +1427,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="env">
       <div class="section-head">
-        <span class="kicker">15 · 环境</span>
+        <span class="kicker">18 · 环境</span>
         <h2>环境变量</h2>
         <p class="lead">统一放 <code>.env.local</code>（非 <code>.env</code>），模板见 <code>.env.example</code>。</p>
       </div>
@@ -688,7 +1452,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="testing">
       <div class="section-head">
-        <span class="kicker">16 · 工程纪律</span>
+        <span class="kicker">19 · 工程纪律</span>
         <h2>测试 · 验证 · Git 纪律</h2>
         <p class="lead">Vitest 单测 + 强制验证流程 + 短生命周期分支策略，保证每个 commit 都能独立构建。</p>
       </div>
@@ -714,7 +1478,7 @@ UI/action → schedules DAL → scheduled_jobs(kind='workflow_template')
 
     <section class="section anchor-h" id="debt">
       <div class="section-head">
-        <span class="kicker">17 · 演进</span>
+        <span class="kicker">20 · 演进</span>
         <h2>技术债与演进路线</h2>
         <p class="lead">最大的「债」是文档与代码的 drift。研发负责人接手时，请以源码为准，并推进下列收口项。</p>
       </div>
