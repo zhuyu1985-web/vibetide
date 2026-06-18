@@ -11,6 +11,7 @@ import { eq, desc, and, gt, sql } from "drizzle-orm";
 import { READ_ONLY_TOOL_NAMES, type EmployeeId } from "@/lib/constants";
 import type { SkillCategory } from "@/lib/types";
 import { loadSkillContent, getBuiltinSkillNameToSlug } from "@/lib/skill-loader";
+import { getDomainById } from "@/lib/dal/domains";
 import { buildSystemPrompt } from "./prompt-templates";
 import { resolveModelConfig } from "./model-router";
 import { resolveTools, isToolRegistered } from "./tool-registry";
@@ -215,6 +216,15 @@ export async function assembleAgent(
     platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
   };
 
+  // 领域一等维度：实例绑 domain_id → 取口径包（promptGuidance / authoritySources）。
+  let domainGuidance: string | undefined;
+  let domainAuthoritySources: string[] | undefined;
+  if (employee.domainId) {
+    const dom = await getDomainById(employee.domainId);
+    domainGuidance = dom?.promptGuidance ?? undefined;
+    domainAuthoritySources = dom?.authoritySources?.length ? dom.authoritySources : undefined;
+  }
+
   // 6. Build the assembled agent (system prompt built inside)
   const agent: AssembledAgent = {
     employeeId,
@@ -237,6 +247,8 @@ export async function assembleAgent(
     knowledgeBaseIds: empKBs.length > 0 ? empKBs.map((kb) => kb.kbId) : undefined,
     craftType: employee.roleType || undefined,
     domainTags: instanceConfig.domainTags,
+    domainGuidance,
+    domainAuthoritySources,
     mediaForm: instanceConfig.mediaForm,
     platformSpecs: instanceConfig.platformSpecs,
   };

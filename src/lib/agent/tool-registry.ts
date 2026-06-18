@@ -2770,6 +2770,8 @@ export interface ToolContext {
   operatorId?: string;
   missionId?: string;
   taskId?: string;
+  /** 领域权威源 → 注入 web_search 的 includeDomains（仅对有该入参的工具生效）。 */
+  authorityDomains?: string[];
 }
 
 /**

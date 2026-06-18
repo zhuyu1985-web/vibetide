@@ -81,6 +81,10 @@ export interface AssembledAgent {
   craftType?: string;
   /** 领域标签(时政/财经/法治…),来自 instanceConfig.domainTags → 领域层(改"内容/术语/口径")。 */
   domainTags?: string[];
+  /** 领域口径包：专属提示词 → Layer 4.5（有则替代通用模板）。来自 domains.prompt_guidance。 */
+  domainGuidance?: string;
+  /** 领域权威源域名白名单 → web_search includeDomains。来自 domains.authority_sources。 */
+  domainAuthoritySources?: string[];
   /** 媒体形态(news/newmedia/convergence),来自 instanceConfig.mediaForm → 形态层。 */
   mediaForm?: string;
   /** 平台规格,来自 instanceConfig.platformSpecs → 形态层(改"形式/语态/平台")。 */
