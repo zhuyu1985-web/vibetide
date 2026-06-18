@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./users";
+import { domains } from "./domains";
 import { employeeStatusEnum, authorityLevelEnum } from "./enums";
 
 export const aiEmployees = pgTable("ai_employees", {
@@ -85,6 +86,9 @@ export const aiEmployees = pgTable("ai_employees", {
       };
     }>()
     .default({}),
+
+  // 领域一等维度（P1）：实例的主领域外键。null = 通用（不限领域）。
+  domainId: uuid("domain_id").references(() => domains.id),
 
   // Metadata
   isPreset: integer("is_preset").notNull().default(1), // 1 = built-in, 0 = custom

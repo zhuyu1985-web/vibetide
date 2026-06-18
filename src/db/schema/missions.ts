@@ -118,6 +118,8 @@ export const missionTasks = pgTable("mission_tasks", {
   // Acceptance & role
   acceptanceCriteria: text("acceptance_criteria"),
   assignedRole: text("assigned_role"),
+  // 领域一等维度（P1）：派单时领域未精确命中、回退通用实例 → 1，供 UI 提示「领域未精确匹配」。
+  domainFallback: integer("domain_fallback").notNull().default(0),
   outputSummary: text("output_summary"),
 
   // Data flow
