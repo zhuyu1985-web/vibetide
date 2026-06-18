@@ -104,6 +104,9 @@ export * from "./help-feedback";
 // Cowork 化对话中心 (2026-06-10, P1) — projects 项目 / conversations 会话 + 消息
 export * from "./projects";
 export * from "./conversations";
+
+// 领域一等维度 (2026-06-18, P1) — domains 受控字典表（含口径包：promptGuidance / authoritySources）
+export * from "./domains";
 // app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
