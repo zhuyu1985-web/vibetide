@@ -37,6 +37,8 @@ export interface EmployeeWithSkills {
   isPreset?: number;
   /** 绑定技能的 slug 列表(与 skills 名称一一对应),用于按 slug 匹配 requiredSkill。 */
   skillSlugs?: string[];
+  /** 领域一等维度：实例主领域 = ai_employees.domain_id。null/undefined = 通用。 */
+  domainId?: string | null;
 }
 
 export interface ParsedTaskDef {
@@ -65,6 +67,7 @@ export async function loadAvailableEmployees(
       nickname: aiEmployees.nickname,
       roleType: aiEmployees.roleType,
       isPreset: aiEmployees.isPreset,
+      domainId: aiEmployees.domainId,
       skillName: skills.name,
       skillSlug: skills.slug,
     })
@@ -94,6 +97,7 @@ export async function loadAvailableEmployees(
         nickname: row.nickname,
         roleType: row.roleType,
         isPreset: row.isPreset,
+        domainId: row.domainId,
         skills: [],
         skillSlugs: [],
       };
@@ -142,26 +146,28 @@ export function pickEmployeeForStep(
       skillSlug?: string;
       requiredSkill?: string;
       requiredCraft?: string;
+      domainId?: string | null;
     };
   },
   defaultTeamSlugs: string[],
   employees: EmployeeWithSkills[],
   /** slug → 工种 slug 列表;不传则回退到静态 compatibleRolesFor(覆盖全部 builtin 技能)。 */
   skillCraftMap?: Map<string, string[]>,
-): EmployeeWithSkills | null {
+): { employee: EmployeeWithSkills | null; domainFallback: boolean } {
   // 1) Explicit assignment wins.
   const explicit = step.config?.employeeSlug ?? step.employeeSlug;
   if (explicit) {
     const e = employees.find((x) => x.slug === explicit);
-    if (e) return e;
+    if (e) return { employee: e, domainFallback: false };
   }
 
-  // 1.5) 确定性技能→工种派单。
+  // 1.5) 确定性技能→工种派单。requiredCraft 可单独声明工种(无需配套 requiredSkill);
+  // 否则由 requiredSkill/skillSlug 经 compatibleRoles 解析工种集。
   const requiredSkill = step.config?.requiredSkill ?? step.config?.skillSlug;
-  if (requiredSkill) {
+  if (requiredSkill || step.config?.requiredCraft) {
     const craftSet = step.config?.requiredCraft
       ? [step.config.requiredCraft]
-      : skillCraftMap?.get(requiredSkill) ?? compatibleRolesFor(requiredSkill);
+      : skillCraftMap?.get(requiredSkill!) ?? compatibleRolesFor(requiredSkill!);
     if (craftSet.length > 0) {
       const candidates = employees.filter(
         (e) => e.roleType && craftSet.includes(e.roleType),
@@ -169,7 +175,20 @@ export function pickEmployeeForStep(
       if (candidates.length > 0) {
         // defaultTeam 内的候选优先(场景显式班子);否则全体候选。
         const inTeam = candidates.filter((e) => defaultTeamSlugs.includes(e.slug));
-        const pool = inTeam.length > 0 ? inTeam : candidates;
+        let pool = inTeam.length > 0 ? inTeam : candidates;
+        // 领域第二因子：指定 domainId 时缩小到该领域实例；无则 fallback 通用实例并标注。
+        let domainFallback = false;
+        const wantDomain = step.config?.domainId;
+        if (wantDomain) {
+          const matched = pool.filter((e) => e.domainId === wantDomain);
+          if (matched.length > 0) {
+            pool = matched;
+          } else {
+            const generic = pool.filter((e) => !e.domainId);
+            pool = generic.length > 0 ? generic : pool;
+            domainFallback = true;
+          }
+        }
         // 同池内:按 craftSet 顺序(core 主人 index 最小→优先),同工种再优先 isPreset=1。
         pool.sort((a, b) => {
           const ia = craftSet.indexOf(a.roleType!);
@@ -177,7 +196,7 @@ export function pickEmployeeForStep(
           if (ia !== ib) return ia - ib;
           return (b.isPreset ?? 0) - (a.isPreset ?? 0);
         });
-        return pool[0];
+        return { employee: pool[0], domainFallback };
       }
       // craftSet 有但本 org 无对应工种实例 → 落到旧逻辑兜底(迁移前/数据缺失场景)。
     }
@@ -185,11 +204,11 @@ export function pickEmployeeForStep(
 
   // 2/3) Restrict candidate pool to defaultTeam members. If the template did
   // not specify a defaultTeam, fall through to caller (returns null).
-  if (defaultTeamSlugs.length === 0) return null;
+  if (defaultTeamSlugs.length === 0) return { employee: null, domainFallback: false };
   const teamMembers = defaultTeamSlugs
     .map((slug) => employees.find((e) => e.slug === slug))
     .filter((e): e is EmployeeWithSkills => Boolean(e));
-  if (teamMembers.length === 0) return null;
+  if (teamMembers.length === 0) return { employee: null, domainFallback: false };
 
   // 2) Skill-name match: the step declares a skill name; pick the team member
   // who actually has that skill bound. employee_skills stores the human-
@@ -197,13 +216,16 @@ export function pickEmployeeForStep(
   const skillName = step.config?.skillName;
   if (skillName) {
     const skilled = teamMembers.find((e) => e.skills.includes(skillName));
-    if (skilled) return skilled;
+    if (skilled) return { employee: skilled, domainFallback: false };
   }
 
   // 3) Round-robin by step order so consecutive steps spread across the team.
   // step.order is 1-based in the seed, but defensively handle 0/undefined.
   const order = Math.max(1, step.order ?? 1);
-  return teamMembers[(order - 1) % teamMembers.length] ?? null;
+  return {
+    employee: teamMembers[(order - 1) % teamMembers.length] ?? null,
+    domainFallback: false,
+  };
 }
 
 // ---------------------------------------------------------------------------

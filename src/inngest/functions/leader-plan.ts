@@ -89,8 +89,8 @@ export const leaderPlan = inngest.createFunction(
 
         for (const s of sorted) {
           // 员工分配：显式 employeeSlug → defaultTeam 内技能匹配 → 团队轮询 → leader
-          const matched = pickEmployeeForStep(s, templateDefaultTeam, availableEmployees);
-          const assignedEmployeeId = matched?.id ?? mission.leaderEmployeeId;
+          const picked = pickEmployeeForStep(s, templateDefaultTeam, availableEmployees);
+          const assignedEmployeeId = picked.employee?.id ?? mission.leaderEmployeeId;
           selectedEmployeeIds.add(assignedEmployeeId);
 
           // 描述：优先 config.description，退化为 step name + skill 提示
@@ -115,6 +115,7 @@ export const leaderPlan = inngest.createFunction(
               // See mission-executor.ts fast-path: persist skillSlug so task
               // executor can load the matching SKILL.md at runtime.
               assignedRole: s.config?.skillSlug ?? null,
+              domainFallback: picked.domainFallback ? 1 : 0,
               dependencies: depTaskIds,
               priority: s.order ?? 0,
               status: "pending",

@@ -199,8 +199,8 @@ export async function leaderPlanDirect(
           : {};
 
       for (const s of sorted) {
-        const matched = pickEmployeeForStep(s, defaultTeamSlugs, employeesWithSkills);
-        const assignedEmployeeId = matched?.id ?? mission.leaderEmployeeId;
+        const picked = pickEmployeeForStep(s, defaultTeamSlugs, employeesWithSkills);
+        const assignedEmployeeId = picked.employee?.id ?? mission.leaderEmployeeId;
         selectedEmployeeIds.add(assignedEmployeeId);
 
         const skillHint = s.config?.skillName || s.config?.skillSlug;
@@ -255,6 +255,7 @@ export async function leaderPlanDirect(
             // then lost — agents did a generic generate instead of following
             // the skill's workflow/output schema.
             assignedRole: s.config?.skillSlug ?? null,
+            domainFallback: picked.domainFallback ? 1 : 0,
             dependencies: depTaskIds,
             priority: s.order ?? 0,
             status: "pending",

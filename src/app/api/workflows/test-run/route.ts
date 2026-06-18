@@ -204,13 +204,13 @@ export async function POST(req: Request) {
 
             try {
               // ── 1. 选员工（对齐 mission-executor 的 pickEmployeeForStep） ──
-              const matched = pickEmployeeForStep(
+              const picked = pickEmployeeForStep(
                 step,
                 [], // 测试运行没 defaultTeam 概念；pick 内部会跳到"员工技能匹配"逻辑
                 availableEmployees,
               );
-              const assignedEmployeeId = matched?.id ?? leader.id;
-              const employeeName = matched?.name ?? leader.name;
+              const assignedEmployeeId = picked.employee?.id ?? leader.id;
+              const employeeName = picked.employee?.name ?? leader.name;
 
               send("step-progress", {
                 stepId: step.id,
@@ -362,7 +362,7 @@ ${truncated}
                       rawOutput: invocation.result,
                       output: {
                         stepKey: step.id,
-                        employeeSlug: (matched?.slug ??
+                        employeeSlug: (picked.employee?.slug ??
                           leader.slug) as EmployeeId,
                         summary,
                         artifacts: [
@@ -411,7 +411,7 @@ ${truncated}
                     rawOutput: invocation.result,
                     output: {
                       stepKey: step.id,
-                      employeeSlug: (matched?.slug ??
+                      employeeSlug: (picked.employee?.slug ??
                         leader.slug) as EmployeeId,
                       summary,
                       artifacts: [
@@ -466,7 +466,7 @@ ${truncated}
                   rawOutput: null,
                   output: {
                     stepKey: step.id,
-                    employeeSlug: (matched?.slug ??
+                    employeeSlug: (picked.employee?.slug ??
                       leader.slug) as EmployeeId,
                     summary: `${skillSlug} 调用失败：${invocation.error}`,
                     artifacts: [],

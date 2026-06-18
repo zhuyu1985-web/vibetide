@@ -36,7 +36,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       [],
       TEAM,
     );
-    expect(picked?.roleType).toBe("reporter");
+    expect(picked.employee?.roleType).toBe("reporter");
   });
 
   it("video_edit_plan(core=post_production)派给后期实例", () => {
@@ -45,7 +45,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       [],
       TEAM,
     );
-    expect(picked?.roleType).toBe("post_production");
+    expect(picked.employee?.roleType).toBe("post_production");
   });
 
   it("fact_check 归 reviewer(按锁定模型 D7),非 reporter", () => {
@@ -54,7 +54,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       [],
       TEAM,
     );
-    expect(picked?.roleType).toBe("reviewer");
+    expect(picked.employee?.roleType).toBe("reviewer");
   });
 
   it("defaultTeam 内的工种优先于默认 core 主人", () => {
@@ -64,7 +64,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       ["editor"],
       TEAM,
     );
-    expect(picked?.roleType).toBe("editor");
+    expect(picked.employee?.roleType).toBe("editor");
   });
 
   it("requiredCraft 显式指定工种时直接命中", () => {
@@ -73,7 +73,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       [],
       TEAM,
     );
-    expect(picked?.roleType).toBe("commentator");
+    expect(picked.employee?.roleType).toBe("commentator");
   });
 
   it("显式 employeeSlug 优先级最高", () => {
@@ -82,7 +82,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       [],
       TEAM,
     );
-    expect(picked?.slug).toBe("reviewer");
+    expect(picked.employee?.slug).toBe("reviewer");
   });
 
   it("向后兼容:员工无 roleType(旧数据)时退回 skillName 名称匹配", () => {
@@ -95,7 +95,7 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       ["xiaowen", "xiaoshen"],
       legacy,
     );
-    expect(picked?.slug).toBe("xiaoshen");
+    expect(picked.employee?.slug).toBe("xiaoshen");
   });
 
   it("无任何工种实例匹配该技能且无 defaultTeam → 返回 null(交由调用方兜底)", () => {
@@ -105,6 +105,6 @@ describe("pickEmployeeForStep — 确定性技能→工种派单", () => {
       [],
       TEAM,
     );
-    expect(picked).toBeNull();
+    expect(picked.employee).toBeNull();
   });
 });
