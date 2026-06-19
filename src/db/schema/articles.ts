@@ -104,6 +104,13 @@ export const articles = pgTable("articles", {
     culturalNotes?: string;
     workflowTaskId?: string;
     createdByWorkflow?: boolean;
+    ingestedFromChannel?: {
+      platform: string;
+      configId: string;
+      chatId: string;
+      externalUserId: string;
+      externalMessageId: string;
+    };
   }>(),
 
   createdAt: timestamp("created_at", { withTimezone: true })
