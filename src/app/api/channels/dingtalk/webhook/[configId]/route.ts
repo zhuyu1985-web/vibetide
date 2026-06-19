@@ -13,6 +13,15 @@ export async function POST(
   try {
     const { configId } = await params;
 
+    // [debug] 入口日志：确认钉钉回调是否真的打到本端点（排查"后台收不到"）。
+    // 只要这行打印了，就说明钉钉确实 POST 过来了；没打印 = 机器人类型/回调地址/公网可达性问题。
+    console.log("[dingtalk/webhook] 收到入站请求", {
+      configId,
+      hasTimestamp: !!req.headers.get("timestamp"),
+      hasSign: !!req.headers.get("sign"),
+      contentType: req.headers.get("content-type"),
+    });
+
     // 1. Load config
     const config = await getChannelConfig(configId);
     if (!config || config.platform !== "dingtalk" || !config.isEnabled) {
@@ -39,6 +48,18 @@ export async function POST(
     // 3. Parse body
     const body = await req.json();
     const msgtype = body.msgtype as string;
+
+    // [debug] body 摘要：判断消息类型 / 是否带 sessionWebhook（异步"已收录"回执依赖它）。
+    console.log("[dingtalk/webhook] 消息体", {
+      msgtype,
+      conversationId: body.conversationId,
+      sender: body.senderStaffId ?? body.senderNick,
+      textPreview:
+        typeof body.text?.content === "string"
+          ? body.text.content.slice(0, 80)
+          : undefined,
+      hasSessionWebhook: !!body.sessionWebhook,
+    });
 
     // Only handle text messages for MVP
     if (msgtype !== "text") {
