@@ -32,7 +32,8 @@ export const channelConfigs = pgTable("channel_configs", {
   appKey: text("app_key"),            // DingTalk AppKey / WeChat CorpID
   appSecret: text("app_secret"),      // DingTalk AppSecret / WeChat Secret
   robotSecret: text("robot_secret"),  // DingTalk robot sign secret
-  inboundSecret: text("inbound_secret"), // DingTalk 企业内部机器人 AppSecret（入站回调验签）
+  inboundSecret: text("inbound_secret"), // DingTalk 企业内部机器人 AppSecret（入站回调验签 / Stream 连接密钥）
+  clientId: text("client_id"),        // DingTalk 企业内部机器人 Client ID/AppKey（Stream 模式连接用）
   agentId: text("agent_id"),          // WeChat Work AgentId
   token: text("token"),               // WeChat URL verification token
   encodingAesKey: text("encoding_aes_key"), // WeChat message encryption key

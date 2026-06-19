@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { channelConfigs, channelMessages } from "@/db/schema/channels";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNotNull } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,6 +19,7 @@ export type ChannelConfigRow = {
   appSecret: string | null;
   robotSecret: string | null;
   inboundSecret: string | null;
+  clientId: string | null;
   agentId: string | null;
   token: string | null;
   encodingAesKey: string | null;
@@ -78,6 +79,7 @@ function mapChannelConfig(
     appSecret: r.appSecret ?? null,
     robotSecret: r.robotSecret ?? null,
     inboundSecret: r.inboundSecret ?? null,
+    clientId: r.clientId ?? null,
     agentId: r.agentId ?? null,
     token: r.token ?? null,
     encodingAesKey: r.encodingAesKey ?? null,
@@ -135,6 +137,26 @@ export async function getChannelConfig(
   });
   if (!row) return null;
   return mapChannelConfig(row);
+}
+
+// ---------------------------------------------------------------------------
+// 2b. listDingtalkStreamConfigs — 跨 org 列出已配 Stream 凭证的启用中钉钉渠道
+//     （clientId + inboundSecret 都填了才算）。给常驻 Stream worker 用，无 auth。
+// ---------------------------------------------------------------------------
+
+export async function listDingtalkStreamConfigs(): Promise<ChannelConfigRow[]> {
+  const rows = await db
+    .select()
+    .from(channelConfigs)
+    .where(
+      and(
+        eq(channelConfigs.platform, "dingtalk"),
+        eq(channelConfigs.isEnabled, true),
+        isNotNull(channelConfigs.clientId),
+        isNotNull(channelConfigs.inboundSecret),
+      ),
+    );
+  return rows.map(mapChannelConfig);
 }
 
 // ---------------------------------------------------------------------------
