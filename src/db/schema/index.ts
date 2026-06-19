@@ -107,6 +107,9 @@ export * from "./conversations";
 
 // 领域一等维度 (2026-06-18, P1) — domains 受控字典表（含口径包：promptGuidance / authoritySources）
 export * from "./domains";
+
+// IM ChatOps → Mission (2026-06-19) — channel_sessions 澄清/执行状态机
+export * from "./channel-sessions";
 // app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20

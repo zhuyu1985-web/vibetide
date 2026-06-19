@@ -1,0 +1,55 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  jsonb,
+  integer,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
+import { organizations } from "./users";
+import { channelConfigs } from "./channels";
+import { missions } from "./missions";
+import { channelPlatformEnum } from "./enums";
+
+/** 一个 IM 会话（configId+chatId+发送者）一份澄清/执行状态。回执反查的真相源。 */
+export const channelSessions = pgTable(
+  "channel_sessions",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    configId: uuid("config_id")
+      .notNull()
+      .references(() => channelConfigs.id, { onDelete: "cascade" }),
+    platform: channelPlatformEnum("platform").notNull(),
+    chatId: text("chat_id").notNull(),
+    externalUserId: text("external_user_id").notNull(),
+    status: text("status").notNull().default("idle"),
+    contextTurns: jsonb("context_turns")
+      .$type<{ role: string; content: string }[]>()
+      .notNull()
+      .default([]),
+    activeMissionId: uuid("active_mission_id").references(() => missions.id, {
+      onDelete: "set null",
+    }),
+    clarifyRounds: integer("clarify_rounds").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique("channel_sessions_triple_uidx").on(
+      t.configId,
+      t.chatId,
+      t.externalUserId
+    ),
+  ]
+);
