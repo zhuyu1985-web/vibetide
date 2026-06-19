@@ -14,15 +14,13 @@
  * 会重复建 task)。
  */
 import { db } from "@/db";
-import { missions, missionTasks } from "@/db/schema";
+import { missions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { getOrProvisionLeader } from "@/app/actions/missions";
-import { loadAvailableEmployees } from "@/lib/mission-core";
 import { executeMissionDirect } from "@/lib/mission-executor";
-import { buildAdHocTasks } from "@/lib/agent/intent-to-tasks";
+import { materializeAdHocMission } from "@/lib/missions/materialize-ad-hoc";
 import type { IntentStep } from "@/lib/agent/types";
 import type { StartMissionResult } from "@/app/actions/workflow-launch";
 
@@ -52,52 +50,14 @@ export async function startAdHocMission(
     return { ok: false, errors: { _global: "无可执行步骤(应走自由聊天)" } };
   }
 
-  const leader = await getOrProvisionLeader(orgId);
-  const employees = await loadAvailableEmployees(orgId);
-  const { tasks, teamMemberIds } = buildAdHocTasks(steps, employees, leader.id);
-
-  const title =
-    (input.title?.trim() || input.message.trim()).slice(0, 60) || "新任务";
-
-  // 1. 插 mission(无 workflowTemplateId;ad-hoc 用 scenario="custom")
-  const [mission] = await db
-    .insert(missions)
-    .values({
-      organizationId: orgId,
-      title,
-      scenario: "custom",
-      userInstruction: input.message,
-      leaderEmployeeId: leader.id,
-      status: "queued",
-      teamMembers: teamMemberIds,
-      inputParams: input.summary ? { intentSummary: input.summary } : {},
-      projectId: input.projectId ?? null,
-      conversationId: input.conversationId ?? null,
-    })
-    .returning({ id: missions.id });
-  const missionId = mission.id;
-
-  // 2. 手动物化 task DAG(dependsOnIndices → 已插入的 task id)
-  const taskIds: string[] = [];
-  for (const def of tasks) {
-    const depIds = def.dependsOnIndices
-      .map((i) => taskIds[i])
-      .filter((v): v is string => Boolean(v));
-    const [created] = await db
-      .insert(missionTasks)
-      .values({
-        missionId,
-        title: def.title,
-        description: def.description,
-        assignedEmployeeId: def.assignedEmployeeId,
-        assignedRole: def.assignedRole,
-        dependencies: depIds,
-        priority: def.priority,
-        status: "pending",
-      })
-      .returning({ id: missionTasks.id });
-    taskIds.push(created.id);
-  }
+  const { missionId } = await materializeAdHocMission(orgId, {
+    message: input.message,
+    steps,
+    title: input.title,
+    summary: input.summary,
+    conversationId: input.conversationId,
+    projectId: input.projectId,
+  });
 
   revalidatePath("/missions");
   if (input.conversationId) revalidatePath(`/cowork/${input.conversationId}`);
