@@ -29,6 +29,7 @@ export async function createChannelConfig(input: {
   appKey?: string;
   appSecret?: string;
   robotSecret?: string;
+  inboundSecret?: string;
   agentId?: string;
   token?: string;
   encodingAesKey?: string;
@@ -48,6 +49,7 @@ export async function createChannelConfig(input: {
       appKey: input.appKey?.trim() || null,
       appSecret: input.appSecret?.trim() || null,
       robotSecret: input.robotSecret?.trim() || null,
+      inboundSecret: input.inboundSecret?.trim() || null,
       agentId: input.agentId?.trim() || null,
       token: input.token?.trim() || null,
       encodingAesKey: input.encodingAesKey?.trim() || null,
@@ -70,6 +72,7 @@ export async function updateChannelConfig(
     appKey?: string | null;
     appSecret?: string | null;
     robotSecret?: string | null;
+    inboundSecret?: string | null;
     agentId?: string | null;
     token?: string | null;
     encodingAesKey?: string | null;
@@ -95,6 +98,7 @@ export async function updateChannelConfig(
   if (updates.appKey !== undefined) patch.appKey = updates.appKey?.trim() || null;
   if (updates.appSecret !== undefined) patch.appSecret = updates.appSecret?.trim() || null;
   if (updates.robotSecret !== undefined) patch.robotSecret = updates.robotSecret?.trim() || null;
+  if (updates.inboundSecret !== undefined) patch.inboundSecret = updates.inboundSecret?.trim() || null;
   if (updates.agentId !== undefined) patch.agentId = updates.agentId?.trim() || null;
   if (updates.token !== undefined) patch.token = updates.token?.trim() || null;
   if (updates.encodingAesKey !== undefined) patch.encodingAesKey = updates.encodingAesKey?.trim() || null;

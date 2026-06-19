@@ -255,6 +255,7 @@ export function ChannelsClient({
             appKey: form.appKey || null,
             appSecret: form.appSecret || null,
             robotSecret: form.robotSecret || null,
+            inboundSecret: null,
             agentId: form.agentId || null,
             token: form.token || null,
             encodingAesKey: form.encodingAesKey || null,

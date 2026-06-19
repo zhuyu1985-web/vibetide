@@ -18,6 +18,7 @@ export type ChannelConfigRow = {
   appKey: string | null;
   appSecret: string | null;
   robotSecret: string | null;
+  inboundSecret: string | null;
   agentId: string | null;
   token: string | null;
   encodingAesKey: string | null;
@@ -76,6 +77,7 @@ function mapChannelConfig(
     appKey: r.appKey ?? null,
     appSecret: r.appSecret ?? null,
     robotSecret: r.robotSecret ?? null,
+    inboundSecret: r.inboundSecret ?? null,
     agentId: r.agentId ?? null,
     token: r.token ?? null,
     encodingAesKey: r.encodingAesKey ?? null,
