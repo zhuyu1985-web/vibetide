@@ -820,31 +820,57 @@ Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revali
       <div class="section-head">
         <span class="kicker">08 · Agent</span>
         <h2>AI Agent 系统</h2>
-        <p class="lead">系统核心。位于 <code>src/lib/agent/</code>。每次员工工作前都会「装配」成一个带人格、技能、记忆、权限的 Agent，再以分层 System Prompt 驱动 LLM 执行。</p>
+        <p class="lead">位于 <code>src/lib/agent/</code>。它把「数字员工」在运行时变成真正能干活的 Agent，分四个环节：<b>意图识别（路由）→ 装配 assembleAgent → 执行 executeAgent（自主 loop）→ 多智能体编排（mission）</b>。第 07 章的工种 / 领域 / 形态三维，最终都落在「装配」时拼出的分层 System Prompt 里。</p>
+      </div>
+
+      <h3>系统组成（四环节，都在 <code>src/lib/agent/</code> 内）</h3>
+      <p class="prose">所谓「AI Agent 系统」不是单个文件，而是从「听懂用户要什么」到「多个数字员工协作产出」的一条链。下表是它的骨架——<b>意图识别与模型路由（第 09 章）就是本系统的一环</b>，不是独立模块。</p>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>环节</th><th>文件</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><b>① 意图识别</b>（路由前置）</td><td><code>intent-recognition.ts</code></td><td>对话中心一句话 → LLM 解析「<b>派给谁 + 用什么技能 + 什么顺序</b>」，产出 <code>intent.steps</code>（详见第 09 章）</td></tr>
+            <tr><td><b>② 装配</b></td><td><code>assembly.ts</code></td><td>把员工 + 技能 + 知识库 + 记忆 + <b>工种/领域/形态</b> 拼成带分层 System Prompt 的 <code>AssembledAgent</code></td></tr>
+            <tr><td><b>③ 执行</b></td><td><code>execution.ts</code></td><td><code>generateText</code> 自主 loop：LLM 规划→调工具→观察→反思→继续，最多 20 步</td></tr>
+            <tr><td><b>④ 多智能体编排</b></td><td><code>mission-executor.ts</code></td><td>一个 mission 内：总编拆解派单 → 多工种 Agent 执行 → 汇总终审（见下方时序图）</td></tr>
+            <tr><td>模型路由（正交辅助）</td><td><code>model-router.ts</code></td><td>按 skill category 选模型/温度/maxTokens——决定「<b>用什么模型</b>」，与意图识别的「派给谁」互不耦合</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <h3>装配流水线 <code>assembleAgent()</code></h3>
       <ol class="list num">
         <li><b>并行加载 4 路数据</b>（<code>Promise.all</code>）：员工 profile、该员工技能（join skills）、绑定知识库、<code>confidence&gt;0.3</code> 按 importance 取 <b>top-10</b> 记忆。</li>
         <li><b>记忆访问统计</b> fire-and-forget：accessCount+1、更新 lastAccessedAt。</li>
-        <li><b>计算熟练度</b>：<code>avgLevel = round(Σ skill.level / 技能数)</code>，无技能默认 50。</li>
+        <li><b>计算熟练度</b>：<code>avgLevel = round(Σ skill.level / 技能数)</code>，无技能默认 50（<b>仅用于 prompt 软提示</b>，无硬作用——见下方说明）。</li>
         <li><b>加载技能内容</b>：builtin 从 <code>skills/&lt;slug&gt;/SKILL.md</code> 文件读，custom/plugin 从 DB <code>skills.content</code>。</li>
         <li><b>按权限过滤工具</b>：observer→清空；advisor→仅 19 个只读工具；<code>skillOverrides</code>（意图驱动）→进一步收窄；有 KB 绑定且非 observer →自动追加 <code>kb_search</code>。</li>
         <li><b>解析模型</b> + <b>构建分层 System Prompt</b>。</li>
       </ol>
 
-      <h3>分层 System Prompt（注释称 7 层，实际 9 段）</h3>
-      <div class="stack" data-animate>
-        <div class="lyr"><span class="ln">1</span><span class="lt">身份</span><span class="ld">姓名 / 昵称 / 职位；custom 员工追加自定义工作指令</span></div>
-        <div class="lyr"><span class="ln">2</span><span class="lt">技能 + 熟练度</span><span class="ld">列出可用工具；按熟练度三档给引导（≤30 严格按步 / ≤70 适当发挥 / &gt;70 自由创新）</span></div>
-        <div class="lyr"><span class="ln">3</span><span class="lt">真实性硬约束</span><span class="ld">最高优先级：必须真调工具、严禁伪造来源/时间/数据、空结果如实说明（防幻觉合同）</span></div>
-        <div class="lyr"><span class="ln">4</span><span class="lt">技能执行指南</span><span class="ld">从 SKILL.md 抽「执行流程 + 输出规格」注入，截断 ~3000 字防膨胀</span></div>
-        <div class="lyr"><span class="ln">5</span><span class="lt">权限</span><span class="ld">声明 authorityLevel，超权限动作标「需要审批」</span></div>
-        <div class="lyr"><span class="ln">6</span><span class="lt">知识背景</span><span class="ld">注入绑定知识库的名称 + 描述</span></div>
-        <div class="lyr"><span class="ln">7</span><span class="lt">敏感话题</span><span class="ld">条件注入；涉及时需人工审核</span></div>
-        <div class="lyr"><span class="ln">8</span><span class="lt">工作风格</span><span class="ld">主动性 / 汇报频率 / 自主度% / 沟通风格 / 工作时间</span></div>
-        <div class="lyr"><span class="ln">9</span><span class="lt">记忆 + 输出</span><span class="ld">经验记忆；要求中文 Markdown、末尾附【质量自评 XX/100】+【输入参数不足】</span></div>
+      <h3>分层 System Prompt：每段干什么、数据从哪来、是硬约束还是软引导</h3>
+      <p class="prose">代码注释沿用「7 层」旧称，实际 <code>buildSystemPrompt</code> 按顺序 <code>layers.push</code> 拼 <b>12 段</b>。这张表是整章最该看清的——<b>第 07 章的工种 / 领域 / 形态，就是这里的身份段 / 4.5 段 / 4.6 段</b>；每段标了数据源字段与「硬/软」：<b>硬约束</b>真改变能不能做、产物什么格式；<b>软引导</b>只是提示、LLM 自己权衡。</p>
+      <div class="table-wrap" data-animate>
+        <table class="table zebra">
+          <thead><tr><th>段</th><th>标题</th><th>数据源字段</th><th>类型</th><th>技术实现 / 作用</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>身份</td><td><code>name/nickname/title</code> ＋ <b><code>craftType</code> 工种</b></td><td><span class="tag tag--muted">软</span></td><td>经 <code>CRAFT_META</code> 渲染工种职责边界（记者采写 / 编辑加工…）</td></tr>
+            <tr><td>2</td><td>技能 ＋ 熟练度</td><td><code>tools[]</code> ＋ <b><code>proficiencyLevel</code></b></td><td><span class="tag tag--muted">软</span></td><td>列可用工具 + 按 ≤30/≤70/&gt;70 拼一句引导文字（无硬作用，见下）</td></tr>
+            <tr><td>2.1</td><td>真实性约束</td><td>全局常量</td><td><span class="tag tag--danger">硬</span></td><td>最高优先级：必须真调工具、禁伪造来源/时间/数据</td></tr>
+            <tr><td>2.5</td><td>技能执行指南</td><td><code>skillContents</code>（SKILL.md 抽「执行流程/输出规格」，截 3000 字）</td><td><span class="tag tag--danger">硬</span></td><td>「严格遵循」该技能的流程与输出规格</td></tr>
+            <tr><td>3</td><td>权限</td><td><code>authorityLevel</code></td><td><span class="tag tag--danger">硬</span></td><td>observer/advisor/executor/coordinator 门控——超权限动作标「需审批」</td></tr>
+            <tr><td>4</td><td>知识背景</td><td><code>knowledgeContext</code></td><td><span class="tag tag--muted">软</span></td><td>绑定知识库名 + 描述（背景参考）</td></tr>
+            <tr><td>4.5</td><td><b>领域专精</b></td><td><b><code>domainGuidance</code></b> 口径包／回退 <code>domainTags</code></td><td><span class="tag tag--muted">软</span></td><td><b>第 07 章「领域」落点</b>：口径/术语/禁忌（财经不荐股…）+ 权威源</td></tr>
+            <tr><td>4.6</td><td><b>媒体形态</b></td><td><b><code>mediaForm</code></b> ＋ <code>platformSpecs</code></td><td><span class="tag tag--muted">软</span></td><td><b>第 07 章「形态」落点</b>：新闻/新媒体/融媒体改变产物形式与篇幅</td></tr>
+            <tr><td>3.5</td><td>敏感话题</td><td><code>sensitiveTopics</code></td><td><span class="tag tag--danger">硬</span></td><td>涉及必须标「需审批」、人工审核后才发</td></tr>
+            <tr><td>5</td><td>工作风格</td><td><code>workPreferences</code></td><td><span class="tag tag--muted">软</span></td><td>主动性/汇报频率/自主度/沟通/工时</td></tr>
+            <tr><td>6</td><td>经验记忆</td><td><code>memories</code>（top-10 by importance）</td><td><span class="tag tag--muted">软</span></td><td>过往经验参考（认知引擎反哺）</td></tr>
+            <tr><td>7</td><td>输出 ＋ 质量自评</td><td>全局常量</td><td><span class="tag tag--warn">半硬</span></td><td>强制中文 Markdown + 末尾【质量自评 XX/100】+ 参数不足提示</td></tr>
+          </tbody>
+        </table>
       </div>
+      <p class="note">另有最强硬约束不在此表：步骤绑定技能时，<code>execution.ts</code> 把 <code>skillSpec</code>（整篇 SKILL.md body）pin 到 system prompt <b>末尾</b>，附「## 输出格式要求（强制）」逼出【执行摘要 / 执行过程 / 产出结果】三段式——prompt 末尾的「合同」位置，覆盖力最强。</p>
+      <div class="callout callout--warn" data-animate><div class="ct">⚠ 熟练度（proficiencyLevel）是「软提示」，几乎没有硬作用</div><p>它由 <code>avg(employee_skills.level)</code> 算出（默认 50），但全库<b>唯一消费点</b>就是上表第 2 段——按 ≤30 / ≤70 / &gt;70 拼一句「严格按步 / 适度发挥 / 自由创新」的文字。它<b>不影响模型选择、不影响 temperature、不过滤工具、不改 stepCountIs(20)、不进任何 if 分支</b>。换句话说「说说而已，LLM 自己看着办」。真正硬性改变执行的是<b>权限</b>（决定工具集）、<b>技能执行指南</b>（决定流程）、<b>真实性约束</b>这几段。认知引擎（<code>cognitive/skill-manager.ts</code>）会按任务质量动态调 <code>level</code>，但调完也只是换那句提示的档位——所以「感觉它没什么作用」是准确的。</p></div>
 
       <h3>执行 <code>executeAgent()</code></h3>
       <ul class="list">
@@ -858,7 +884,7 @@ Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revali
       <div class="callout callout--danger" data-animate><div class="ct">🛡 防幻觉是贯穿全系统的一等设计</div><p>多处真实事故驱动（伪造 WWDC 新闻、把「3 月 20 日」当 2024 年、反爬登录页被当正文入库）。五重防线：① Prompt 真实性硬约束层；② <code>invokeToolDirectly</code> 服务端直调工具（步骤显式绑参时绕过 LLM，结果不可伪造）；③ 工具 <code>success:false</code> 检测 override 状态；④ 检索类工具缺 API key 时<b>显式 throw</b> 让步骤标 failed 而非静默编造；⑤ 执行期注入真实时间基准。</p></div>
 
       <h3>智能体执行架构：自主 Loop ＋ 多智能体协作</h3>
-      <p class="prose">系统的「智能体能力」由两层叠成——<b>单体强自主执行闭环</b> ＋ <b>团队级多智能体编排</b>。下图是一次场景任务的完整时序：总编拆解派单、各工种 Agent 并行自主执行、产物互传、最后汇总终审。</p>
+      <p class="prose">系统的「智能体能力」由两层叠成——<b>单体强自主执行闭环</b> ＋ <b>团队级多智能体编排</b>。下图是一次场景任务的完整时序。<b>关键：生产环境的多智能体编排走 <code>executeMissionDirect</code>——在一个 Node 进程内顺序 <code>await</code> 三段（拆解 → 执行 → 汇总），不发 Inngest 事件</b>（UI 的 server action 内 fire-and-forget 直接调用）。Inngest 那套事件链是并存的等价实现，当前 UI 不触发（见图下说明）。</p>
       <div class="svgfig" data-animate>
       <svg viewBox="0 0 960 548" style="width:100%;min-width:700px" role="img" aria-label="多智能体协作时序图">
         <style>
@@ -907,7 +933,7 @@ Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revali
           <path class="msg" d="M726 302 L858 302" marker-end="url(#a3m)"/>
           <text class="mlab" x="742" y="350">⑥ 回写 outputData（completed）</text>
           <path class="msg" d="M620 358 L858 358" marker-end="url(#a3m)"/>
-          <text class="mlab" x="612" y="386">⑦ check-task-dependencies · {{stepN.field}} 传递产物</text>
+          <text class="mlab" x="612" y="386">⑦ 依赖解除 → 取下个 ready（同进程循环）· {{stepN.field}} 传产物</text>
           <path class="ret" d="M860 394 L362 394" marker-end="url(#a3r)"/>
           <rect class="selfbox" x="250" y="412" width="220" height="36" rx="6"/><text class="selft" x="360" y="428">⑧ leaderConsolidateDirect</text><text class="selfs" x="360" y="442">LLM 汇总终审 → consolidatedOutput</text>
           <text class="mlab" x="240" y="476">⑨ consolidatedOutput 回显</text>
@@ -915,11 +941,12 @@ Mutations ──▶ Server Actions ("use server" + requireAuth) ┘  →  revali
           <text class="nt" x="480" y="512">④–⑥ 对 N 个 ready 任务并行执行（executeReadyTasksDirect）；后置任务依赖解除后转 ready 继续</text>
         </g>
       </svg>
-      <p class="cap">竖线为生命线，横向箭头为消息（绿=调用 / 青虚线=返回）。子任务 Agent 的活动框（⑤）即「单体自主 Loop」——一个 Agent 在 20 步内自主规划、调用工具、观察、反思直到产出。</p>
+      <p class="cap">竖线为生命线，横向箭头为消息（绿=调用 / 青虚线=返回）。子任务 Agent 的活动框（⑤）即「单体自主 Loop」——一个 Agent 在 20 步内自主规划、调用工具、观察、反思直到产出。全程在<b>同一 Node 进程</b>内顺序推进。</p>
       </div>
+      <div class="callout callout--info" data-animate><div class="ct">ℹ 多智能体协作怎么实现的：同进程编排（生产） vs Inngest 事件链（并存未启用）</div><p><b>① 当前生产 UI</b> 启动 mission 走 <code>executeMissionDirect</code>——server action 内 fire-and-forget，同一 Node 进程顺序 <code>await</code> <code>leaderPlanDirect → executeReadyTasksDirect → leaderConsolidateDirect</code>，任务依赖在进程内循环推进，<b>不经消息队列</b>（dev 不起 Inngest 也能跑全链路）。所以「多智能体协作」当前<b>不是</b>靠 Inngest，而是同进程顺序编排。<br><b>② Inngest 5 函数事件链</b>（<code>src/inngest/functions/</code>）是并存的等价实现、事件驱动：<code>mission/created → leaderPlan</code> 发 <code>task-ready → executeMissionTask</code> 发 <code>task-completed → checkTaskDependencies</code> 解阻塞回 <code>task-ready</code>（闭环推 DAG），全完发 <code>all-tasks-done → leaderConsolidate</code>；失败 <code>task-failed → handleTaskFailure</code> 重试/级联。<b>当前 UI 不发 <code>mission/created</code>，故这套未被触发</b>——为未来跨进程横向扩展、重试限流预留。</p></div>
       <div class="split">
         <div class="card" data-animate><div class="cnum">① 单体自主 Loop</div><h4>一个 Agent 自己把任务做完</h4><p><code>executeAgent</code> 以 <code>generateText({ stopWhen: stepCountIs(20) })</code> 跑多步循环：LLM 自主<b>规划 → 调用工具 → 观察结果 → 反思 → 继续</b>，最多 20 步、3 分钟超时。<code>onStepFinish</code> 逐步收集工具产物与 <code>success:false</code> 失败，不信 LLM 口头叙述、只认真实工具返回。</p></div>
-        <div class="card" data-animate><div class="cnum">② 多智能体协作</div><h4>一个团队按工种分工协作</h4><p><code>leaderPlanDirect</code>（总编 producer 拆解派单）→ <code>executeReadyTasksDirect</code>（各工种 Agent 并行执行、<code>{{stepN.field}}</code> 传递产物、<code>check-task-dependencies</code> 解阻塞）→ <code>leaderConsolidateDirect</code>（汇总终审）。</p></div>
+        <div class="card" data-animate><div class="cnum">② 多智能体协作</div><h4>一个团队按工种分工协作</h4><p><code>leaderPlanDirect</code>（总编 producer 拆解派单）→ <code>executeReadyTasksDirect</code>（各工种 Agent 执行、<code>{{stepN.field}}</code> 传递产物、依赖解除后转 ready 继续）→ <code>leaderConsolidateDirect</code>（汇总终审）。<b>全程同进程顺序 await。</b></p></div>
       </div>
       <div class="callout callout--accent" data-animate><div class="ct">◆ 对标业界领先 Agentic 系统</div><p>这两层正对应当前最强 Agent 产品的核心能力：<b>单体强自主执行闭环</b>（如 Claude Code / Devin / Manus——自己规划-调用-反思直到完成，而非一问一答）＋ <b>团队级多智能体编排</b>（总编派单、多工种并行、产物互传、汇总终审）。VibeTide 的 Mission 引擎把二者合一——既有单兵的执行深度，也有团队的协同广度。</p></div>
     </section>
@@ -1098,28 +1125,27 @@ SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c"
     <section class="section anchor-h" id="exec-cli">
       <div class="section-head">
         <span class="kicker">12 · 执行模型</span>
-        <h2>执行模型：SKILL / 工具 / MCP 怎么跑 · CLI 改造</h2>
-        <p class="lead">把三件事讲透：<b>技能（SKILL）到底怎么"执行"</b>、<b>工具与（目标态）MCP 怎么调用</b>、<b>能否用 CLI 跑、要支持 CLI 需要哪些改造</b>。结论先行：技能是注入 prompt 的能力指导（非脚本）、工具当前同进程直调、CLI 已被零散脚本部分验证、统一 CLI 改造成本中等。</p>
+        <h2>执行模型：两条轴——谁驱动 Agent（入口）· Agent 调什么（工具）</h2>
+        <p class="lead">把 Agent 执行模型拆成<b>两条正交的轴</b>讲清，避免混淆：<b>① 驱动轴——谁启动 Agent</b>（Web / Inngest / 定时 / Agent CLI）；<b>② 工具轴——Agent 能调什么能力</b>（同进程 <code>tool()</code> / MCP / 本地命令封装）。SKILL 则是「怎么指导 Agent 干活」（prompt 注入，不在任一轴上）。<b>「CLI」一词有两义</b>——既能指驱动轴的 Agent 入口，也能指工具轴的命令行工具封装，这正是之前讲糊涂的根源，下图与说明会点破。</p>
       </div>
       <div class="svgfig" data-animate>
-      <svg viewBox="0 0 960 432" style="width:100%;min-width:700px" role="img" aria-label="执行拓扑与 CLI/MCP 改造图">
+      <svg viewBox="0 0 980 392" style="width:100%;min-width:720px" role="img" aria-label="Agent 执行模型双轴图">
         <style>
           .a5 text{font-family:var(--font-sans)}
           .a5 .bx{fill:var(--surface);stroke:var(--line);stroke-width:1}
-          .a5 .bxb{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1}
+          .a5 .bxb{fill:#f1f9f5;stroke:var(--brand-weak2);stroke-width:1.4}
           .a5 .bxa{fill:var(--accent-weak);stroke:#c4e8e0;stroke-width:1}
           .a5 .bxw{fill:var(--warn-weak);stroke:var(--warn);stroke-width:1.4;stroke-dasharray:5 4}
           .a5 .bxi{fill:var(--info-weak);stroke:var(--info);stroke-width:1.4;stroke-dasharray:5 4}
           .a5 .bxn{fill:var(--surface-3);stroke:var(--line-2);stroke-width:1}
-          .a5 .t{font-weight:700;font-size:12px;fill:var(--ink);text-anchor:middle}
-          .a5 .tb{font-weight:700;font-size:13.5px;fill:var(--brand-strong);text-anchor:middle}
-          .a5 .ta{font-weight:700;font-size:12px;fill:#0b7a6c;text-anchor:middle}
-          .a5 .ti{font-weight:700;font-size:12px;fill:var(--info);text-anchor:middle}
-          .a5 .s{font-size:9.5px;fill:var(--muted);text-anchor:middle}
-          .a5 .sw{font-size:9.5px;fill:var(--warn);text-anchor:middle}
-          .a5 .si{font-size:9.5px;fill:var(--info);text-anchor:middle}
-          .a5 .sa{font-size:9.5px;fill:#0b7a6c;text-anchor:middle}
-          .a5 .nt{font-size:10px;fill:var(--ink-2);text-anchor:middle}
+          .a5 .axt{font-weight:700;font-size:12.5px;text-anchor:middle}
+          .a5 .t{font-weight:700;font-size:11.5px;fill:var(--ink);text-anchor:middle}
+          .a5 .tb{font-weight:700;font-size:13px;fill:var(--brand-strong);text-anchor:middle}
+          .a5 .s{font-size:9px;fill:var(--muted);text-anchor:middle}
+          .a5 .sw{font-size:9px;fill:var(--warn);text-anchor:middle}
+          .a5 .si{font-size:9px;fill:var(--info);text-anchor:middle}
+          .a5 .sa{font-size:9px;fill:#0b7a6c;text-anchor:middle}
+          .a5 .nt{font-size:9.5px;fill:var(--ink-2);text-anchor:middle}
           .a5 .mb{stroke:var(--brand);stroke-width:1.6;fill:none}
           .a5 .mw{stroke:var(--warn);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
           .a5 .mi{stroke:var(--info);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
@@ -1130,36 +1156,42 @@ SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c"
           <marker id="a5i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--info)"/></marker>
         </defs>
         <g class="a5">
-          <rect class="bx" x="24" y="54" width="212" height="68" rx="9"/><text class="t" x="130" y="84">Web · Server Action</text><text class="s" x="130" y="102">requireAuth → session</text>
-          <rect class="bx" x="24" y="156" width="212" height="68" rx="9"/><text class="t" x="130" y="186">Inngest 后台</text><text class="s" x="130" y="204">event → 显式 orgId</text>
-          <rect class="bxw" x="24" y="258" width="212" height="68" rx="9"/><text class="t" x="130" y="286">CLI 入口（待改造）</text><text class="sw" x="130" y="304">--org · dotenv · 跳过 auth</text>
-          <rect class="bxb" x="318" y="66" width="304" height="258" rx="12"/>
-          <text class="tb" x="470" y="90">Agent 执行核心</text><text class="s" x="470" y="107">零 server-only · 可脱离 Next.js</text>
-          <rect class="bx" x="336" y="122" width="268" height="56" rx="8"/><text class="t" x="470" y="143">assembleAgent</text><text class="s" x="470" y="161">SKILL.md → prompt · 工具按权限过滤</text>
-          <rect class="bx" x="336" y="188" width="268" height="56" rx="8"/><text class="t" x="470" y="209">executeAgent</text><text class="s" x="470" y="227">generateText loop · stepCountIs(20)</text>
-          <text class="nt" x="470" y="272">SKILL 执行 = LLM 按指导自主调工具</text>
-          <text class="s" x="470" y="290">scriptPath / 子模板当前为 stub（无确定性脚本）</text>
-          <rect class="bxa" x="706" y="92" width="230" height="80" rx="9"/><text class="ta" x="821" y="122">同进程 tool().execute()</text><text class="sa" x="821" y="142">AI SDK v6 自动路由 · 现状</text>
-          <rect class="bxi" x="706" y="216" width="230" height="80" rx="9"/><text class="ti" x="821" y="246">MCP Server</text><text class="si" x="821" y="266">stdio · HTTP transport · 目标态</text>
-          <rect class="bxn" x="318" y="356" width="304" height="58" rx="10"/><text class="t" x="470" y="380">共享依赖：PostgreSQL（Drizzle）＋ env keys</text><text class="s" x="470" y="398">已被 scripts/run-real-mission.ts 证明可脱离 Next</text>
-          <path class="mb" d="M236 88 L314 132" marker-end="url(#a5b)"/>
-          <path class="mb" d="M236 190 L314 198" marker-end="url(#a5b)"/>
-          <path class="mw" d="M236 292 L314 250" marker-end="url(#a5w)"/>
-          <path class="mb" d="M622 140 L702 132" marker-end="url(#a5b)"/>
-          <path class="mi" d="M622 250 L702 256" marker-end="url(#a5i)"/>
-          <path class="mb" d="M470 324 L470 354" marker-end="url(#a5b)"/>
+          <text class="axt" x="132" y="24" fill="var(--brand-strong)">① 驱动轴 · 谁启动 Agent</text>
+          <rect class="bx" x="20" y="40" width="224" height="56" rx="9"/><text class="t" x="132" y="64">Web · Server Action</text><text class="s" x="132" y="80">requireAuth（现）</text>
+          <rect class="bx" x="20" y="104" width="224" height="56" rx="9"/><text class="t" x="132" y="128">Inngest 后台</text><text class="s" x="132" y="144">event → orgId（现）</text>
+          <rect class="bx" x="20" y="168" width="224" height="56" rx="9"/><text class="t" x="132" y="192">定时 scheduled_jobs</text><text class="s" x="132" y="208">cron 启动（现）</text>
+          <rect class="bxw" x="20" y="232" width="224" height="56" rx="9"/><text class="t" x="132" y="256">Agent CLI（待改造）</text><text class="sw" x="132" y="272">人在终端驱动 agent</text>
+          <rect class="bxb" x="300" y="84" width="300" height="212" rx="12"/>
+          <text class="tb" x="450" y="110">Agent 执行核心</text><text class="s" x="450" y="126">零 server-only · 可脱离 Next.js</text>
+          <rect class="bx" x="318" y="140" width="264" height="50" rx="8"/><text class="t" x="450" y="160">assembleAgent</text><text class="s" x="450" y="176">SKILL.md → prompt · 按权限过滤工具</text>
+          <rect class="bx" x="318" y="200" width="264" height="50" rx="8"/><text class="t" x="450" y="220">executeAgent</text><text class="s" x="450" y="236">generateText loop · stepCountIs(20)</text>
+          <text class="nt" x="450" y="278">SKILL = LLM 按指导自主调工具（无确定性脚本）</text>
+          <text class="axt" x="836" y="24" fill="#0b7a6c">② 工具轴 · Agent 调什么</text>
+          <rect class="bxa" x="712" y="40" width="248" height="62" rx="9"/><text class="t" x="836" y="64" fill="#0b7a6c">同进程 tool().execute()</text><text class="sa" x="836" y="82">AI SDK v6 · 现状（47+ 工具）</text>
+          <rect class="bxi" x="712" y="116" width="248" height="62" rx="9"/><text class="t" x="836" y="140" fill="var(--info)">MCP server</text><text class="si" x="836" y="158">跨进程标准协议 · 目标态</text>
+          <rect class="bxi" x="712" y="192" width="248" height="62" rx="9"/><text class="t" x="836" y="214" fill="var(--info)">本地命令封装（CLI 工具）</text><text class="si" x="836" y="232">ffmpeg/git 包成 tool · 目标态</text>
+          <rect class="bxn" x="300" y="316" width="300" height="52" rx="10"/><text class="t" x="450" y="338">共享依赖：PostgreSQL ＋ env keys</text><text class="s" x="450" y="354">可脱离 Next（run-real-mission.ts 已证）</text>
+          <path class="mb" d="M244 66 L298 130" marker-end="url(#a5b)"/>
+          <path class="mb" d="M244 130 L298 162" marker-end="url(#a5b)"/>
+          <path class="mb" d="M244 194 L298 188" marker-end="url(#a5b)"/>
+          <path class="mw" d="M244 258 L298 222" marker-end="url(#a5w)"/>
+          <path class="mb" d="M600 150 L710 74" marker-end="url(#a5b)"/>
+          <path class="mi" d="M600 180 L710 148" marker-end="url(#a5i)"/>
+          <path class="mi" d="M600 214 L710 222" marker-end="url(#a5i)"/>
+          <path class="mb" d="M450 296 L450 314" marker-end="url(#a5b)"/>
         </g>
       </svg>
       <div class="lgd">
-        <span><i style="border-color:var(--brand)"></i>实线（绿）：现有入口 / 调用</span>
-        <span><i style="border-color:var(--warn);border-top-style:dashed"></i>橙虚线：CLI 入口（待改造）</span>
-        <span><i style="border-color:var(--info);border-top-style:dashed"></i>蓝虚线：MCP（目标演进态）</span>
+        <span><i style="border-color:var(--brand)"></i>绿：现状（已实现）</span>
+        <span><i style="border-color:var(--warn);border-top-style:dashed"></i>橙虚线：驱动轴待改造（Agent CLI）</span>
+        <span><i style="border-color:var(--info);border-top-style:dashed"></i>蓝虚线：工具轴目标态（MCP · CLI 工具封装）</span>
       </div>
-      <p class="cap">Agent 执行核心被三类入口驱动（Web / Inngest / CLI），向右经工具层执行（同进程 <code>tool()</code> 现状 / MCP 目标态），向下落到可脱离 Next 的共享依赖。CLI 与 MCP 是图中仅有的两处「待改造 / 目标态」。</p>
+      <p class="cap">两条正交的轴：<b>左 = 驱动轴</b>（谁启动 Agent）、<b>右 = 工具轴</b>（Agent 能调什么）。中间 Agent 核心两侧都可插拔——换入口不动核心，加工具来源也不动核心。</p>
       </div>
+      <div class="callout callout--info" data-animate><div class="ct">ℹ「CLI」有两个意思，别混了——这正是之前图最容易乱的地方</div><p><b>① 驱动轴的 Agent CLI</b> ＝ 把整个 agent 做成命令行程序，<b>人在终端敲命令来驱动 agent 跑</b>（像 Claude Code 那样 <code>vibetide run-skill ...</code>）。它和 Web / Inngest 并列，回答「<b>谁启动 agent</b>」。本章下文 ④「CLI 改造」、spec §8 说的都是<b>这个</b>。<br><b>② 工具轴的 CLI 工具封装</b> ＝ 把某个命令行工具 / 桌面应用（ffmpeg、git、本地脚本）<b>包装成 LLM 能调用的 tool</b>，让 agent 在执行时调它。它和 <b>MCP 同类</b>（都在工具轴、都回答「agent 调什么」）——<b>这才是你说的「工具 / 桌面应用转成大模型能调的命令」</b>。<br>结论：CLI 不是和 MCP 对立的输入 / 输出，<b>它俩根本在不同的轴</b>——Agent CLI 在驱动轴，CLI 工具封装在工具轴（与 MCP 并列）。</p></div>
 
-      <h3>前提澄清：Web 应用能执行 CLI、调本地工具吗？</h3>
-      <p class="prose">这是常见困惑。答案关键在于：<b>「Web 应用」不是一个整体，它分前端、后端两半，能力天差地别</b>。把这条边界讲清，CLI / MCP 的可行性就一目了然。</p>
+      <h3>Web 应用的执行边界：前端、后端、用户本地三个域</h3>
+      <p class="prose"><b>「Web 应用」不是一个整体，它分前端、后端两半，能力天差地别。</b>讲清这条边界，就知道「调本地命令 / CLI 工具封装 / MCP」各自能在哪一侧落地。下图是三个「执行域」各自能做什么。</p>
       <div class="svgfig" data-animate>
       <svg viewBox="0 0 960 356" style="width:100%;min-width:680px" role="img" aria-label="三执行域能力边界图">
         <style>
@@ -1270,6 +1302,7 @@ SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c"
         </table>
       </div>
       <p class="note">接 MCP 的最小改造：agent 端做 MCP client，把各 MCP server 暴露的 tools 转成 AI SDK <code>ToolSet</code> 注入 <code>generateText</code>——<b>executeAgent 的工具装配口不变</b>，只是工具来源从同进程函数换成跨进程 MCP。AI SDK v6 原生支持 MCP client，故改造点集中在 <code>toVercelTools</code> 的工具来源层。</p>
+      <div class="callout callout--accent" data-animate><div class="ct">◆ 工具轴 = 同一个「Agent 调什么」的三种来源（呼应上方双轴图右轴）</div><p>「Agent 能调什么」有三种工具来源，<b>对 <code>executeAgent</code> 完全等价</b>（都产出一个 <code>ToolSet</code> 喂 <code>generateText</code>），区别只在工具从哪来、跑在哪个进程：<b>① 同进程 <code>tool()</code></b>（现状：execute 是 JS 函数，随 app 打包）· <b>② MCP server</b>（跨进程标准协议，可独立部署 / 跨语言）· <b>③ 本地命令封装</b>（把 ffmpeg / git 等命令行工具用 <code>child_process</code> 包成一个 tool）。后两者是目标态。三者都在<b>工具轴</b>——和「驱动轴的 Agent CLI」不是一回事，别再把 CLI 与 MCP 当成对立的两极。</p></div>
 
       <h3>③ CLI 现状：部分支持（零散脚本，无统一框架）</h3>
       <ul class="list">
@@ -1282,8 +1315,8 @@ SKILL_MODEL_OVERRIDES = { layout_design: { maxTokens: 2048 } };  <span class="c"
 <span class="k">const</span> { executeMissionDirect } = <span class="k">await</span> <span class="f">import</span>(<span class="s">"../src/lib/mission-executor"</span>);
 <span class="k">await</span> <span class="f">executeMissionDirect</span>(mission.id, org.id);  <span class="c">// 显式接 orgId，不经 requireAuth</span></pre>
 
-      <h3>④ 支持 CLI 调用需要的改造</h3>
-      <p class="prose">前提很好：Agent 核心（<code>assembleAgent</code> / <code>executeAgent</code> / <code>tool-registry</code>）<b>零 <code>server-only</code> 依赖</b>，DB 连接已被脚本证明可脱离 Next。改造成本<b>中等</b>，主要是「入口封装 + auth 旁路 + 单技能入口」：</p>
+      <h3>④ 支持 Agent CLI（驱动轴）需要的改造</h3>
+      <p class="prose">（此处 CLI ＝ <b>驱动轴的 Agent CLI</b>——「人在终端跑命令驱动 agent」，不是工具轴的命令行工具封装，见上文双轴说明。）前提很好：Agent 核心（<code>assembleAgent</code> / <code>executeAgent</code> / <code>tool-registry</code>）<b>零 <code>server-only</code> 依赖</b>，DB 连接已被脚本证明可脱离 Next。改造成本<b>中等</b>，主要是「入口封装 + auth 旁路 + 单技能入口」：</p>
       <ol class="list num">
         <li><b>统一 CLI 入口：</b>引入 <code>commander</code> / <code>yargs</code> + <code>package.json</code> 的 <code>bin</code> 字段，封装子命令（<code>run-mission</code> / <code>run-skill</code> / <code>list-employees</code>…）。</li>
         <li><b>Auth 旁路标准化：</b>复用 <code>startMissionFromTemplateScheduled</code>（<code>workflow-launch.ts:134</code>）的「显式接 <code>orgId</code> 跳过 <code>requireAuth</code>」模式；CLI 用 <code>--org</code> / <code>--operator</code> 参数提供身份。</li>
