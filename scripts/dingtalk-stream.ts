@@ -26,7 +26,12 @@ import {
 } from "@/lib/channels/dingtalk-stream-handler";
 
 async function main() {
+  console.log("[dingtalk-stream] 启动，正在读取渠道配置（连本地库）...");
   const configs = await listDingtalkStreamConfigs();
+  console.log(
+    `[dingtalk-stream] 找到 ${configs.length} 个已配 Stream 凭证的钉钉渠道：` +
+      (configs.map((c) => c.name).join("、") || "(无)"),
+  );
   if (configs.length === 0) {
     console.error(
       "没有可用的钉钉 Stream 渠道。请到 /settings/channels 编辑钉钉渠道，填写「Client ID」" +
@@ -65,6 +70,7 @@ async function main() {
       })();
     });
 
+    console.log(`[dingtalk-stream] 正在连接「${config.name}」（clientId=${clientId.slice(0, 8)}…）...`);
     await client.connect();
     console.log(
       `[dingtalk-stream] 已连接「${config.name}」(org=${ctx.organizationId}, config=${ctx.configId})`,
