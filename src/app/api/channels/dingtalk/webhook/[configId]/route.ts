@@ -19,8 +19,10 @@ export async function POST(
       return NextResponse.json({ errcode: 404, errmsg: "Config not found" }, { status: 404 });
     }
 
-    // 2. Verify signature (if robotSecret is configured)
-    if (config.robotSecret) {
+    // 2. 入站回调验签：优先用企业内部机器人 AppSecret（inboundSecret），
+    //    回退旧字段 robotSecret 以兼容存量配置。
+    const inboundSecret = config.inboundSecret ?? config.robotSecret;
+    if (inboundSecret) {
       const timestamp = req.headers.get("timestamp");
       const sign = req.headers.get("sign");
       if (!timestamp || !sign) {
@@ -29,7 +31,7 @@ export async function POST(
       if (!isDingtalkTimestampValid(timestamp)) {
         return NextResponse.json({ errcode: 401, errmsg: "Timestamp expired" }, { status: 401 });
       }
-      if (!verifyDingtalkSignature(timestamp, sign, config.robotSecret)) {
+      if (!verifyDingtalkSignature(timestamp, sign, inboundSecret)) {
         return NextResponse.json({ errcode: 401, errmsg: "Invalid signature" }, { status: 401 });
       }
     }
@@ -64,6 +66,7 @@ export async function POST(
       chatId: body.conversationId ?? "unknown",
       textContent,
       rawMessage: body,
+      replyWebhook: typeof body.sessionWebhook === "string" ? body.sessionWebhook : undefined,
     });
 
     // 5. Format response
