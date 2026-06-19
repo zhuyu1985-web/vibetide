@@ -50,7 +50,8 @@ describe("ingestLinkToArticle", () => {
     returning.mockResolvedValue([{ id: "new1" }]);
     const r = await ingestLinkToArticle(baseInput);
     expect(r).toEqual({ skipped: false, articleId: "new1", title: "标题" });
-    const inserted = values.mock.calls[0][0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inserted = (values.mock.calls as any)[0][0];
     expect(inserted).toMatchObject({
       organizationId: "org1",
       title: "标题",
