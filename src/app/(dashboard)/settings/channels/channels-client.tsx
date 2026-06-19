@@ -121,6 +121,7 @@ interface ChannelFormState {
   appKey: string;
   appSecret: string;
   robotSecret: string;
+  inboundSecret: string;
   agentId: string;
   token: string;
   encodingAesKey: string;
@@ -132,6 +133,7 @@ const defaultForm = (): ChannelFormState => ({
   appKey: "",
   appSecret: "",
   robotSecret: "",
+  inboundSecret: "",
   agentId: "",
   token: "",
   encodingAesKey: "",
@@ -186,6 +188,7 @@ export function ChannelsClient({
       appKey: cfg.appKey ?? "",
       appSecret: cfg.appSecret ?? "",
       robotSecret: cfg.robotSecret ?? "",
+      inboundSecret: cfg.inboundSecret ?? "",
       agentId: cfg.agentId ?? "",
       token: cfg.token ?? "",
       encodingAesKey: cfg.encodingAesKey ?? "",
@@ -213,6 +216,7 @@ export function ChannelsClient({
             appKey: form.appKey || null,
             appSecret: form.appSecret || null,
             robotSecret: form.robotSecret || null,
+            inboundSecret: form.inboundSecret || null,
             agentId: form.agentId || null,
             token: form.token || null,
             encodingAesKey: form.encodingAesKey || null,
@@ -226,6 +230,7 @@ export function ChannelsClient({
                     appKey: form.appKey || null,
                     appSecret: form.appSecret || null,
                     robotSecret: form.robotSecret || null,
+                    inboundSecret: form.inboundSecret || null,
                     agentId: form.agentId || null,
                     token: form.token || null,
                     encodingAesKey: form.encodingAesKey || null,
@@ -242,6 +247,7 @@ export function ChannelsClient({
             appKey: form.appKey || undefined,
             appSecret: form.appSecret || undefined,
             robotSecret: form.robotSecret || undefined,
+            inboundSecret: form.inboundSecret || undefined,
             agentId: form.agentId || undefined,
             token: form.token || undefined,
             encodingAesKey: form.encodingAesKey || undefined,
@@ -255,7 +261,7 @@ export function ChannelsClient({
             appKey: form.appKey || null,
             appSecret: form.appSecret || null,
             robotSecret: form.robotSecret || null,
-            inboundSecret: null,
+            inboundSecret: form.inboundSecret || null,
             agentId: form.agentId || null,
             token: form.token || null,
             encodingAesKey: form.encodingAesKey || null,
@@ -591,6 +597,17 @@ export function ChannelsClient({
                     onToggle={() => toggleSecret("robotSecret")}
                     onChange={(v) => setField("robotSecret", v)}
                     placeholder="SEC..."
+                  />
+                  <SecretField
+                    id="ch-inboundSecret"
+                    label="入站验签密钥（企业内部机器人 AppSecret）"
+                    helper="企业内部应用机器人的 AppSecret，用于验证入站消息签名"
+                    value={form.inboundSecret}
+                    masked={editTarget ? !showSecrets["inboundSecret"] : false}
+                    showToggle={!!editTarget}
+                    onToggle={() => toggleSecret("inboundSecret")}
+                    onChange={(v) => setField("inboundSecret", v)}
+                    placeholder="AppSecret..."
                   />
                 </>
               )}
