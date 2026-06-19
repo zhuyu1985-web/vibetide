@@ -56,6 +56,7 @@ import { topicCompareSyncFromCollection } from "./topic-compare/sync-on-run-comp
 import { topicCompareBackfill } from "./topic-compare/backfill";
 import { topicCompareFindMatchesOnNew } from "./topic-compare/find-matches-on-new-mypost";
 import { missedTopicDetectionDaily } from "./topic-compare/missed-topic-cron";
+import { channelLinkIngest, channelLinkIngestFailureHandler } from "./channel-link-ingest";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -133,4 +134,7 @@ export const functions = [
   topicCompareFindMatchesOnNew,
   // Topic Compare missed-topic detection (2026-05-31) — 06:00 SH 每天跑漏题检测
   missedTopicDetectionDaily,
+  // Channel inbound link ingest (2026-06-19)
+  channelLinkIngest,
+  channelLinkIngestFailureHandler,
 ];

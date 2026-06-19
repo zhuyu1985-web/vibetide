@@ -437,6 +437,23 @@ export type InngestEvents = {
       triggeredBy: "daily-cron" | "manual";
     };
   };
+
+  // ─── Channel Inbound Link Ingest (2026-06-19) ───
+  /** 钉钉/企微入站消息含链接 → 抓取存稿。由 gateway 派发，channelLinkIngest 消费 */
+  "channel/link-ingest.requested": {
+    data: {
+      organizationId: string;
+      configId: string;
+      platform: "dingtalk" | "wechat_work";
+      url: string;
+      sourceName: string;
+      chatId: string;
+      externalUserId: string;
+      externalMessageId: string;
+      /** 钉钉回调自带的 sessionWebhook，用于异步回执；空串表示无 */
+      replyWebhook: string;
+    };
+  };
 };
 
 /** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */
