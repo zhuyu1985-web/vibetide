@@ -247,6 +247,7 @@ async function handleQuickCommand(
 // ---------------------------------------------------------------------------
 
 const MAX_CLARIFY_ROUNDS = 5;
+const SESSION_TTL_MS = 30 * 60 * 1000;
 
 async function handleFreeFormMessage(
   text: string,
@@ -278,13 +279,14 @@ async function handleFreeFormMessage(
   if (result.action === "clarify") {
     const rounds = session.clarifyRounds + 1;
     if (rounds > MAX_CLARIFY_ROUNDS) {
-      await updateSession(session.id, { status: "idle", clarifyRounds: 0, contextTurns: [] });
+      await updateSession(session.id, { status: "idle", clarifyRounds: 0, contextTurns: [], expiresAt: null });
       return { reply: "没太理解你的需求，请换个说法，或用 #场景名 直接发起任务。" };
     }
     await updateSession(session.id, {
       status: "clarifying",
       clarifyRounds: rounds,
       contextTurns: [...turns, { role: "assistant", content: result.question }],
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     });
     return { reply: result.question };
   }
@@ -296,7 +298,7 @@ async function handleFreeFormMessage(
     externalMessageId: msg.externalMessageId,
     channelCtx,
   });
-  await updateSession(session.id, { status: "running", activeMissionId: missionId, contextTurns: turns });
+  await updateSession(session.id, { status: "running", activeMissionId: missionId, contextTurns: turns, expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
   return { reply: `✅ 收到，正在处理：${result.summary}。完成后在群里回结果。`, missionId };
 }
 

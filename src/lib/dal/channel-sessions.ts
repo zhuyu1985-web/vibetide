@@ -26,7 +26,17 @@ export async function getOrCreateSession(
       eq(channelSessions.externalUserId, key.externalUserId)
     ),
   });
-  if (existing) return existing;
+  if (existing) {
+    if (existing.expiresAt && new Date(existing.expiresAt).getTime() < Date.now()) {
+      const [refreshed] = await db
+        .update(channelSessions)
+        .set({ status: "idle", activeMissionId: null, clarifyRounds: 0, contextTurns: [], expiresAt: null, updatedAt: new Date() })
+        .where(eq(channelSessions.id, existing.id))
+        .returning();
+      return refreshed;
+    }
+    return existing;
+  }
 
   const [row] = await db
     .insert(channelSessions)
