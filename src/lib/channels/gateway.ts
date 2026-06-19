@@ -12,6 +12,8 @@ import { recognizeIntent } from "@/lib/agent/intent-recognition";
 import { EMPLOYEE_META } from "@/lib/constants";
 import { recordInboundMessage, recordOutboundMessage } from "@/app/actions/channels";
 import { findTemplateByNameOrSlug } from "@/lib/dal/workflow-templates-listing";
+import { inngest } from "@/inngest/client";
+import { extractUrls } from "./link-extract";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
 
@@ -28,6 +30,7 @@ export interface StandardizedMessage {
   chatId: string;            // conversation/group ID
   textContent: string;       // plain text content
   rawMessage: unknown;       // original platform payload for debugging
+  replyWebhook?: string;     // 钉钉 sessionWebhook（异步回执用）
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +116,50 @@ export async function handleInboundMessage(msg: StandardizedMessage): Promise<{
     return handleQuickCommand(command, msg);
   }
 
-  // 3. Free-form message → intent recognition
+  // 3. 含链接 → 异步抓取存稿
+  const urls = extractUrls(text);
+  if (urls.length > 0) {
+    return handleLinkIngest(urls, msg);
+  }
+
+  // 4. Free-form message → intent recognition
   return handleFreeFormMessage(text, msg);
+}
+
+// ---------------------------------------------------------------------------
+// Link ingest handler
+// ---------------------------------------------------------------------------
+
+async function handleLinkIngest(
+  urls: string[],
+  msg: StandardizedMessage
+): Promise<{ reply: string; missionId?: string }> {
+  const sourceName = `钉钉收稿·@${msg.externalUserId || "未知"}`;
+  await Promise.all(
+    urls.map((url, i) =>
+      inngest.send({
+        id: `${msg.externalMessageId}#${i}`,
+        name: "channel/link-ingest.requested",
+        data: {
+          organizationId: msg.organizationId,
+          configId: msg.configId,
+          platform: msg.platform,
+          url,
+          sourceName,
+          chatId: msg.chatId,
+          externalUserId: msg.externalUserId,
+          externalMessageId: msg.externalMessageId,
+          replyWebhook: msg.replyWebhook ?? "",
+        },
+      })
+    )
+  );
+  return {
+    reply:
+      urls.length === 1
+        ? "⏳ 已收到链接，正在抓取，稍后回执。"
+        : `⏳ 已收到 ${urls.length} 条链接，正在抓取，稍后回执。`,
+  };
 }
 
 // ---------------------------------------------------------------------------
