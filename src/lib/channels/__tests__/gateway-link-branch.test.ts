@@ -1,14 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { send, recordInboundMessage, recordOutboundMessage, recognizeIntent } = vi.hoisted(() => ({
+const { send, recordInboundMessage, recordOutboundMessage, recognizeIntent, getOrCreateSession, updateSession, clarifyOrPlan, startChannelMission } = vi.hoisted(() => ({
   send: vi.fn(),
   recordInboundMessage: vi.fn().mockResolvedValue({ messageId: "x" }),
   recordOutboundMessage: vi.fn().mockResolvedValue({ messageId: "y" }),
   recognizeIntent: vi.fn().mockResolvedValue({ summary: "闲聊", intentType: "general_chat", steps: [] }),
+  getOrCreateSession: vi.fn().mockResolvedValue({ id: "s1", status: "idle", contextTurns: [], clarifyRounds: 0 }),
+  updateSession: vi.fn().mockResolvedValue(undefined),
+  clarifyOrPlan: vi.fn().mockResolvedValue({ action: "clarify", question: "请问是什么需求？" }),
+  startChannelMission: vi.fn().mockResolvedValue({ missionId: "mis1" }),
 }));
 vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 vi.mock("@/app/actions/channels", () => ({ recordInboundMessage, recordOutboundMessage }));
 vi.mock("@/lib/agent/intent-recognition", () => ({ recognizeIntent }));
+vi.mock("@/lib/dal/channel-sessions", () => ({ getOrCreateSession, updateSession, resetSession: vi.fn() }));
+vi.mock("@/lib/channels/clarify-or-plan", () => ({ clarifyOrPlan }));
+vi.mock("@/lib/channels/start-channel-mission", () => ({ startChannelMission }));
 
 import { handleInboundMessage } from "../gateway";
 

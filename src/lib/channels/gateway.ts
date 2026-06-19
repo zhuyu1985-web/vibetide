@@ -8,12 +8,13 @@
  * 4. Format outbound payloads for each platform
  */
 
-import { recognizeIntent } from "@/lib/agent/intent-recognition";
-import { EMPLOYEE_META } from "@/lib/constants";
 import { recordInboundMessage, recordOutboundMessage } from "@/app/actions/channels";
 import { findTemplateByNameOrSlug } from "@/lib/dal/workflow-templates-listing";
 import { inngest } from "@/inngest/client";
 import { extractUrls } from "./link-extract";
+import { getOrCreateSession, updateSession } from "@/lib/dal/channel-sessions";
+import { clarifyOrPlan } from "./clarify-or-plan";
+import { startChannelMission } from "./start-channel-mission";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
 
@@ -242,56 +243,61 @@ async function handleQuickCommand(
 }
 
 // ---------------------------------------------------------------------------
-// Free-form message handler (intent recognition)
+// Free-form message handler (session-aware clarification loop)
 // ---------------------------------------------------------------------------
+
+const MAX_CLARIFY_ROUNDS = 5;
 
 async function handleFreeFormMessage(
   text: string,
   msg: StandardizedMessage
 ): Promise<{ reply: string; missionId?: string }> {
-  try {
-    // Build a minimal employee catalog using xiaolei as the default leader
-    const defaultSlug = "xiaolei";
-    const meta = EMPLOYEE_META[defaultSlug];
-    const availableEmployees = [
-      {
-        slug: defaultSlug,
-        name: meta.name,
-        nickname: meta.nickname,
-        title: meta.title,
-        skills: [],
-      },
-    ];
+  const channelCtx = {
+    organizationId: msg.organizationId,
+    configId: msg.configId,
+    platform: msg.platform,
+    chatId: msg.chatId,
+    externalUserId: msg.externalUserId,
+  };
+  const session = await getOrCreateSession(channelCtx);
 
-    const result = await recognizeIntent(
-      text,
-      defaultSlug,
-      availableEmployees,
-      [],
-      []
-    );
-
-    // For MVP, do not execute — just acknowledge with intent summary
-    const reply = `已识别意图: ${result.summary}`;
-
-    // Persist outbound acknowledgement (fire-and-forget)
-    recordOutboundMessage({
-      organizationId: msg.organizationId,
-      configId: msg.configId,
-      platform: msg.platform,
-      externalUserId: msg.externalUserId || undefined,
-      chatId: msg.chatId || undefined,
-      content: { text: reply },
-      status: "sent",
-    }).catch((err) =>
-      console.error("[gateway] recordOutboundMessage failed:", err)
-    );
-
-    return { reply };
-  } catch (err) {
-    console.error("[gateway] intent recognition failed:", err);
-    return { reply: "收到您的消息，正在处理中" };
+  if (session.status === "running") {
+    return { reply: "⏳ 上一个请求还在处理中，完成后会在群里回结果，请稍候。" };
   }
+
+  let result;
+  try {
+    result = await clarifyOrPlan(msg.organizationId, session, text);
+  } catch (err) {
+    console.error("[gateway] clarifyOrPlan failed:", err);
+    return { reply: "系统忙，请稍后再试。" };
+  }
+
+  const turns = [...(session.contextTurns ?? []), { role: "user", content: text }];
+
+  if (result.action === "clarify") {
+    const rounds = session.clarifyRounds + 1;
+    if (rounds > MAX_CLARIFY_ROUNDS) {
+      await updateSession(session.id, { status: "idle", clarifyRounds: 0, contextTurns: [] });
+      return { reply: "没太理解你的需求，请换个说法，或用 #场景名 直接发起任务。" };
+    }
+    await updateSession(session.id, {
+      status: "clarifying",
+      clarifyRounds: rounds,
+      contextTurns: [...turns, { role: "assistant", content: result.question }],
+    });
+    return { reply: result.question };
+  }
+
+  const { missionId } = await startChannelMission(msg.organizationId, {
+    message: text,
+    summary: result.summary,
+    steps: result.steps,
+    externalMessageId: msg.externalMessageId,
+    channelCtx,
+  });
+  await updateSession(session.id, { status: "running", activeMissionId: missionId, contextTurns: turns });
+  return { reply: `✅ 收到，正在处理：${result.summary}。完成后在群里回结果。`, missionId };
 }
 
 // Outbound formatters are in ./format.ts (re-exported above)
