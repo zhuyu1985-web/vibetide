@@ -438,6 +438,12 @@ export type InngestEvents = {
     };
   };
 
+  // ─── Mission Terminal Events (2026-06-21) ───
+  /** mission 进入终态（completed/failed），所有终态写入点派发。渠道回执 handler 消费。 */
+  "mission/reached-terminal": {
+    data: { missionId: string; organizationId: string; status: "completed" | "failed" };
+  };
+
   // ─── Channel Inbound Link Ingest (2026-06-19) ───
   /** 钉钉/企微入站消息含链接 → 抓取存稿。由 gateway 派发，channelLinkIngest 消费 */
   "channel/link-ingest.requested": {

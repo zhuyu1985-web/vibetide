@@ -74,6 +74,19 @@ export async function updateSession(
 }
 
 /**
+ * 按 activeMissionId 反查渠道会话，给终态回执 handler 使用。
+ * 查不到返回 null。
+ */
+export async function getSessionByActiveMissionId(
+  missionId: string,
+): Promise<ChannelSessionRow | null> {
+  const row = await db.query.channelSessions.findFirst({
+    where: eq(channelSessions.activeMissionId, missionId),
+  });
+  return row ?? null;
+}
+
+/**
  * 按三元组键将会话复位为 idle 状态，清除 activeMissionId 和澄清轮次。
  */
 export async function resetSession(
