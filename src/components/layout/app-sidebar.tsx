@@ -12,6 +12,7 @@ import {
   Shield,
   ChevronDown,
   Clock,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -77,6 +78,7 @@ const ADMIN_ITEMS: DashboardSubItem[] = [
   { label: "角色权限", href: "/admin/roles", icon: Shield },
   { label: "组织管理", href: "/admin/organizations", icon: Building2 },
   { label: "定时任务", href: "/settings/scheduled-jobs", icon: Clock },
+  { label: "领域", href: "/settings/domains", icon: Tags },
 ];
 
 /* ─── Helpers ─── */
