@@ -692,6 +692,11 @@ export function shouldUseStrictToolEnforcement(
   return isToolRegistered(assignedRole) || isLLMSkillRegistered(assignedRole);
 }
 
+/** mission 已被协作式取消时短路：跳过 Phase 3 降级总结，保持 cancelled 状态，不派终态事件。 */
+export function shouldShortCircuitForCancel(status: string | null | undefined): boolean {
+  return status === "cancelled";
+}
+
 export function buildImplicitTrendingTopicsParams(
   missionTitle: string,
   missionInputParams: Record<string, unknown> | null | undefined,
@@ -2193,6 +2198,17 @@ export async function executeMissionDirect(
         eq(missionTasks.missionId, missionId),
         inArray(missionTasks.status, ["pending", "ready"]),
       ));
+  }
+
+  // Phase 2.5: 取消短路 — 协作停后保持 cancelled，跳过总结，不派终态事件（gateway 已同步回执 + 复位 session）
+  const cancelCheck = await db
+    .select({ status: missions.status })
+    .from(missions)
+    .where(eq(missions.id, missionId))
+    .limit(1);
+  if (shouldShortCircuitForCancel(cancelCheck[0]?.status)) {
+    console.log(`[mission-executor] Mission ${missionId} cancelled, skipping consolidation`);
+    return { status: "cancelled", taskCount: plan.taskCount };
   }
 
   // Phase 3: 4-level degradation strategy

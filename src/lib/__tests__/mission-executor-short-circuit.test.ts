@@ -9,6 +9,7 @@ import {
   shouldBlockRegisteredSkillFallback,
   shouldForceInjectWorkflowTool,
   shouldUseStrictToolEnforcement,
+  shouldShortCircuitForCancel,
 } from "../mission-executor";
 
 describe("renderStepParameters", () => {
@@ -385,6 +386,18 @@ describe("workflow skill tool enforcement guards", () => {
   it("写入工具仍强制工具路径", () => {
     expect(shouldForceInjectWorkflowTool("archive_to_drafts")).toBe(true);
     expect(shouldUseStrictToolEnforcement("archive_to_drafts", false)).toBe(true);
+  });
+});
+
+describe("shouldShortCircuitForCancel", () => {
+  it("cancelled → 短路跳过总结", () => {
+    expect(shouldShortCircuitForCancel("cancelled")).toBe(true);
+  });
+  it("failed/completed/executing/undefined → 不短路（仍走 Phase 3 降级）", () => {
+    expect(shouldShortCircuitForCancel("failed")).toBe(false);
+    expect(shouldShortCircuitForCancel("completed")).toBe(false);
+    expect(shouldShortCircuitForCancel("executing")).toBe(false);
+    expect(shouldShortCircuitForCancel(undefined)).toBe(false);
   });
 });
 
