@@ -351,6 +351,13 @@
       "when": 1781146006486,
       "tag": "0049_motionless_malice",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1782040444245,
+      "tag": "0050_new_metal_master",
+      "breakpoints": true
     }
   ]
 }
