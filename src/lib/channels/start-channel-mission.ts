@@ -4,13 +4,12 @@
  * 流程：
  *   1. materializeAdHocMission → 物化 mission + task DAG（同步，返回 missionId）
  *   2. executeMissionDirect    → fire-and-forget（void）
- *   3. .then(sendChannelResult) — mission 完成后发结果回执 + 复位会话
+ *   3. 回执由 mission/reached-terminal 事件驱动（见 channel-mission-terminal-notify）
  *   4. .catch(sendChannelFailure) — 意外抛出时（Level4 不抛，但其他错误会）发错误通知
  */
 import { materializeAdHocMission } from "@/lib/missions/materialize-ad-hoc";
 import { executeMissionDirect } from "@/lib/mission-executor";
 import {
-  sendChannelResult,
   sendChannelFailure,
   type ChannelCtx,
 } from "./channel-result-notify";
@@ -45,10 +44,11 @@ export async function startChannelMission(
     sourceEntityId: input.externalMessageId,
   });
 
-  // Fire-and-forget：执行完成后经渠道发回结果并复位会话
-  void executeMissionDirect(missionId, orgId)
-    .then(() => sendChannelResult(input.channelCtx, missionId))
-    .catch((err) => sendChannelFailure(input.channelCtx, missionId, err));
+  // 回执改由 mission/reached-terminal 事件驱动（覆盖看门狗杀任务 / worker 重启）。
+  // 这里只 fire-and-forget 执行；.catch 兜 executeMissionDirect 在写任何终态前就抛错的极端情况。
+  void executeMissionDirect(missionId, orgId).catch((err) =>
+    sendChannelFailure(input.channelCtx, missionId, err),
+  );
 
   return { missionId };
 }
