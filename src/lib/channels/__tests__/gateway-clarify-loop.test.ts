@@ -93,6 +93,8 @@ describe("gateway 自由消息澄清循环", () => {
     startChannelMission.mockResolvedValue({ missionId: "mis1" });
     const r = await handleInboundMessage({ ...msg, textContent: "开始" });
     expect(startChannelMission).toHaveBeenCalled();
+    // 去重 key：必须传当前这条「开始」消息的 externalMessageId，进 missions_source_dedup_uidx 做幂等
+    expect(startChannelMission).toHaveBeenCalledWith("org1", expect.objectContaining({ externalMessageId: "m1" }));
     expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "running", activeMissionId: "mis1", pendingPlan: null }));
     expect(r.reply).toContain("收到");
   });

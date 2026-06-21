@@ -101,6 +101,7 @@ export async function resetSession(
       clarifyRounds: 0,
       contextTurns: [],
       pendingPlan: null,
+      expiresAt: null,
       updatedAt: new Date(),
     })
     .where(

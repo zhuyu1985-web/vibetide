@@ -330,11 +330,11 @@ async function handleConfirmingMessage(
 ): Promise<{ reply: string; missionId?: string }> {
   const plan = session.pendingPlan as { summary: string; steps: IntentStep[] } | null;
   if (!plan) {
-    await updateSession(session.id, { status: "idle", pendingPlan: null, contextTurns: [], clarifyRounds: 0 });
+    await updateSession(session.id, { status: "idle", pendingPlan: null, contextTurns: [], clarifyRounds: 0, expiresAt: null });
     return { reply: "请重新说一下你的需求。" };
   }
   if (isCancel(text)) {
-    await updateSession(session.id, { status: "idle", pendingPlan: null, clarifyRounds: 0, contextTurns: [] });
+    await updateSession(session.id, { status: "idle", pendingPlan: null, clarifyRounds: 0, contextTurns: [], expiresAt: null });
     return { reply: "已取消，可重新发起。" };
   }
   if (isConfirm(text)) {
