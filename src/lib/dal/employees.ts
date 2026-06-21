@@ -68,6 +68,7 @@ export async function getEmployees(): Promise<AIEmployee[]> {
       roleType: emp.roleType,
       authorityLevel: emp.authorityLevel as AuthorityLevel,
       instanceConfig: (emp.instanceConfig as AIEmployee["instanceConfig"]) ?? null,
+      domainId: emp.domainId ?? null,
       status: emp.status,
       currentTask: emp.currentTask || undefined,
       isPreset: emp.isPreset === 1,
@@ -127,6 +128,7 @@ export async function getEmployee(
     motto: emp.motto || "",
     status: emp.status,
     currentTask: emp.currentTask || undefined,
+    domainId: emp.domainId ?? null,
     isPreset: emp.isPreset === 1,
     skills: empSkills.map((s) => ({
       id: s.id,
@@ -201,6 +203,7 @@ export async function getEmployeeFullProfile(
     roleType: emp.roleType,
     authorityLevel: emp.authorityLevel as AuthorityLevel,
     instanceConfig: (emp.instanceConfig as EmployeeFullProfile["instanceConfig"]) ?? null,
+    domainId: emp.domainId ?? null,
     autoActions: (emp.autoActions as string[]) || [],
     needApprovalActions: (emp.needApprovalActions as string[]) || [],
     workPreferences: emp.workPreferences as WorkPreferences | null,

@@ -200,15 +200,16 @@ export async function updateWorkPreferences(
 }
 
 /**
- * 四层重构:写工种实例的「领域 / 媒体形态」配置(instanceConfig)。
- * 领域 = domainTags(+ 知识库绑定),媒体形态 = mediaForm + platformSpecs。
- * assembleAgent 读取后注入 prompt 的「领域专精 / 媒体形态」层,使产物按这两维差异化。
+ * 四层重构 + P2 领域一等维度:写工种实例的「领域 / 媒体形态」配置。
+ * 领域 = domain_id(domains 字典外键,assembleAgent join 取口径包注入 Layer 4.5),
+ * 媒体形态 = mediaForm + platformSpecs(instanceConfig)。
+ * 硬切:不再写 instanceConfig.domainTags(列保留向后兼容,P3 清)。
  * 层级维度走 updateAuthorityLevel(authorityLevel)。
  */
 export async function updateEmployeeInstanceConfig(
   employeeId: string,
   config: {
-    domainTags?: string[];
+    domainId?: string | null;
     mediaForm?: "news" | "newmedia" | "convergence";
     platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
   }
@@ -218,12 +219,19 @@ export async function updateEmployeeInstanceConfig(
 
   await db
     .update(aiEmployees)
-    .set({ instanceConfig: config, updatedAt: new Date() })
+    .set({
+      domainId: config.domainId ?? null,
+      instanceConfig: {
+        mediaForm: config.mediaForm,
+        platformSpecs: config.platformSpecs,
+      },
+      updatedAt: new Date(),
+    })
     .where(eq(aiEmployees.id, employeeId));
 
   import("@/app/actions/employee-advanced")
     .then((m) =>
-      m.saveEmployeeConfigVersion(employeeId, ["instanceConfig"], "领域/形态配置更新"),
+      m.saveEmployeeConfigVersion(employeeId, ["domainId", "instanceConfig"], "领域/形态配置更新"),
     )
     .catch(() => {});
   revalidatePath("/employee");

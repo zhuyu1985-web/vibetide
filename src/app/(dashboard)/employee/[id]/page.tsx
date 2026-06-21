@@ -6,6 +6,7 @@ import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectA
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
 import { listTemplatesByOwnerEmployee } from "@/lib/dal/workflow-templates-listing";
+import { listDomainsByOrg } from "@/lib/dal/domains";
 import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
 import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
@@ -77,7 +78,7 @@ export default async function EmployeeProfilePage({
     getSkillCombos(orgId).catch(() => []),
   ]);
 
-  const [recentMemories, unprocessedFeedbackCount, employeeWorkflows] =
+  const [recentMemories, unprocessedFeedbackCount, employeeWorkflows, domains] =
     await Promise.all([
       getRecentMemories(employee.dbId, 20).catch(() => []),
       getUnprocessedFeedbackCount(employee.dbId, orgId).catch(() => 0),
@@ -87,6 +88,7 @@ export default async function EmployeeProfilePage({
       orgId
         ? listTemplatesByOwnerEmployee(orgId, employee.id).catch(() => [])
         : Promise.resolve([]),
+      orgId ? listDomainsByOrg(orgId).catch(() => []) : Promise.resolve([]),
     ]);
 
   return (
@@ -105,6 +107,7 @@ export default async function EmployeeProfilePage({
       recentMemories={recentMemories}
       unprocessedFeedbackCount={unprocessedFeedbackCount}
       employeeWorkflows={employeeWorkflows}
+      domains={domains}
       canManageScenarios={canManageScenarios}
       canManage={canManage}
     />

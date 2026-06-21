@@ -16,6 +16,8 @@ export interface AIEmployee {
   /** 层级(authority)+ 领域/形态(instanceConfig):花名册卡片三维徽章用。 */
   authorityLevel?: AuthorityLevel;
   instanceConfig?: EmployeeInstanceConfig | null;
+  /** 领域一等维度（P2）：ai_employees.domain_id。null = 通用/不限领域。 */
+  domainId?: string | null;
   status: EmployeeStatus;
   currentTask?: string;
   skills: Skill[];
@@ -476,6 +478,19 @@ export interface EmployeeInstanceConfig {
   mediaForm?: "news" | "newmedia" | "convergence";
   platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
 }
+
+/** 领域字典记录（P2，供下拉/管理/编排器）。 */
+export interface DomainRecord {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  promptGuidance: string | null;
+  authoritySources: string[];
+  sortOrder: number;
+}
+/** 下拉用精简形态。 */
+export type DomainOption = Pick<DomainRecord, "id" | "name">;
 
 export interface EmployeeFullProfile extends AIEmployee {
   dbId: string;

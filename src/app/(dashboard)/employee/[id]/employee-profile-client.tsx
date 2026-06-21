@@ -77,7 +77,7 @@ import { EvolutionTab } from "./evolution-tab";
 import { VersionHistory } from "./version-history";
 import { SkillTestDialog } from "./skill-test-dialog";
 import { SkillComboManager } from "./skill-combo-manager";
-import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo } from "@/lib/types";
+import type { EmployeeFullProfile, Skill, KnowledgeBaseInfo, DomainRecord } from "@/lib/types";
 import type { SkillRecommendation } from "@/lib/dal/skills";
 import type { WorkflowTemplateRow } from "@/db/types";
 import { WorkflowLaunchDialog } from "@/components/workflows/workflow-launch-dialog";
@@ -140,6 +140,8 @@ interface EmployeeProfileClientProps {
    * These ARE the employee's scenarios in the unified model (场景 = 工作流).
    */
   employeeWorkflows?: WorkflowTemplateRow[];
+  /** 领域一等维度（P2）：org 领域字典，配置页领域下拉用。 */
+  domains?: DomainRecord[];
   /** Whether the current user can write scenarios (ai:manage permission).
    * For now we derive this lazily inside the tab via the server action's
    * own guard — no gating on the client. */
@@ -148,11 +150,7 @@ interface EmployeeProfileClientProps {
   canManage?: boolean;
 }
 
-// 四层重构:常见领域标签预设(领域维度);媒体形态选项(形态维度)。
-const PRESET_DOMAINS = [
-  "时政", "财经", "社会", "民生", "法治", "文体",
-  "科技", "国际", "娱乐", "教育", "健康", "军事",
-];
+// 媒体形态选项(形态维度)。领域维度改用 domains 字典下拉(P2),不再用自由标签。
 const MEDIA_FORM_OPTIONS: { value: string; label: string }[] = [
   { value: "news", label: "新闻 · 规范书面语" },
   { value: "newmedia", label: "新媒体 · 口语化/短/带标签" },
@@ -174,6 +172,7 @@ export function EmployeeProfileClient({
   recentMemories = [],
   unprocessedFeedbackCount = 0,
   employeeWorkflows = [],
+  domains = [],
   canManageScenarios = true,
   canManage = false,
 }: EmployeeProfileClientProps) {
@@ -209,11 +208,8 @@ export function EmployeeProfileClient({
   const [newAutoAction, setNewAutoAction] = useState("");
   const [newApprovalAction, setNewApprovalAction] = useState("");
 
-  // 四层重构:领域 / 媒体形态(instanceConfig)配置态
-  const [domainTags, setDomainTags] = useState<string[]>(
-    employee.instanceConfig?.domainTags ?? [],
-  );
-  const [newDomainTag, setNewDomainTag] = useState("");
+  // P2 领域一等维度:领域改 domain_id 字典单选;媒体形态仍走 instanceConfig。
+  const [domainId, setDomainId] = useState<string | null>(employee.domainId ?? null);
   const [mediaForm, setMediaForm] = useState<string>(
     employee.instanceConfig?.mediaForm ?? "",
   );
@@ -276,7 +272,7 @@ export function EmployeeProfileClient({
     setInstanceSaving(true);
     try {
       await updateEmployeeInstanceConfig(employee.dbId, {
-        domainTags,
+        domainId,
         mediaForm: (mediaForm || undefined) as
           | "news"
           | "newmedia"
@@ -1094,50 +1090,31 @@ export function EmployeeProfileClient({
               <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">
                 决定产物的内容 / 术语 / 口径。例:「财经」→ 用对营收同比、毛利率,守「不作投资建议」红线;「时政」→ 守称谓与排序规范。配合「知识库」绑定效果更佳。
               </p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {domainTags.map((t) => (
-                  <Badge key={t} variant="secondary" className="text-xs pr-1 gap-1">
-                    {t}
-                    <button
-                      className="ml-1 hover:text-red-500"
-                      onClick={() => setDomainTags(domainTags.filter((x) => x !== t))}
-                    >
-                      <X size={10} />
-                    </button>
-                  </Badge>
-                ))}
-                {domainTags.length === 0 && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    未设置领域(按通用处理)
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {PRESET_DOMAINS.filter((d) => !domainTags.includes(d)).map((d) => (
-                  <Button
-                    key={d}
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs"
-                    onClick={() => setDomainTags([...domainTags, d])}
-                  >
-                    + {d}
-                  </Button>
-                ))}
-              </div>
-              <Input
-                placeholder="自定义领域标签…回车添加"
-                value={newDomainTag}
-                onChange={(e) => setNewDomainTag(e.target.value)}
-                className="h-8 text-xs glass-input max-w-xs"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newDomainTag.trim()) {
-                    const v = newDomainTag.trim();
-                    if (!domainTags.includes(v)) setDomainTags([...domainTags, v]);
-                    setNewDomainTag("");
-                  }
-                }}
-              />
+              <Select
+                value={domainId ?? "none"}
+                onValueChange={(v) => setDomainId(v === "none" ? null : v)}
+              >
+                <SelectTrigger className="glass-input max-w-xs">
+                  <SelectValue placeholder="选择领域" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">不限领域（通用）</SelectItem>
+                  {domains.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {domains.length === 0 && (
+                <p className="text-[11px] text-amber-500 mt-2">
+                  尚无领域字典，去{" "}
+                  <a className="underline" href="/settings/domains">
+                    领域管理
+                  </a>{" "}
+                  创建或导入默认领域。
+                </p>
+              )}
             </GlassCard>
 
             {/* 媒体形态 + 平台规格 */}
