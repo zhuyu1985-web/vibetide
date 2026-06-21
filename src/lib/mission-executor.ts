@@ -11,6 +11,7 @@
  */
 
 import { db } from "@/db";
+import { inngest } from "@/inngest/client";
 import {
   missions,
   missionTasks,
@@ -2110,6 +2111,7 @@ export async function leaderConsolidateDirect(
       tokensUsed: sql`${missions.tokensUsed} + ${result.tokensUsed.input + result.tokensUsed.output}`,
     })
     .where(eq(missions.id, missionId));
+  await emitMissionTerminal(missionId, organizationId, "completed");
 
   // Post completion message
   await db.insert(missionMessages).values({
@@ -2135,6 +2137,19 @@ export async function leaderConsolidateDirect(
 // ---------------------------------------------------------------------------
 // 5. Full pipeline — plan + execute + consolidate
 // ---------------------------------------------------------------------------
+
+/** mission 进入终态时派统一事件（带 id 去重）。供渠道回执 handler 消费。 */
+async function emitMissionTerminal(
+  missionId: string,
+  organizationId: string,
+  status: "completed" | "failed",
+): Promise<void> {
+  await inngest.send({
+    name: "mission/reached-terminal",
+    id: `terminal:${missionId}`,
+    data: { missionId, organizationId, status },
+  });
+}
 
 export async function executeMissionDirect(
   missionId: string,
@@ -2205,6 +2220,7 @@ export async function executeMissionDirect(
           },
         })
         .where(eq(missions.id, missionId));
+      await emitMissionTerminal(missionId, organizationId, "completed");
     }
     await db
       .update(missions)
@@ -2235,6 +2251,7 @@ export async function executeMissionDirect(
           },
         })
         .where(eq(missions.id, missionId));
+      await emitMissionTerminal(missionId, organizationId, "completed");
     }
     await db
       .update(missions)
@@ -2269,6 +2286,7 @@ export async function executeMissionDirect(
         },
       })
       .where(eq(missions.id, missionId));
+    await emitMissionTerminal(missionId, organizationId, "failed");
     return { status: "failed", taskCount: plan.taskCount, failedCount };
   }
 }

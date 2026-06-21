@@ -72,6 +72,13 @@ export const leaderConsolidate = inngest.createFunction(
           config: sql`jsonb_set(COALESCE(${missions.config}, '{}'::jsonb), '{degradation_level}', '4')`,
         }).where(eq(missions.id, missionId));
       });
+      await step.run("emit-terminal-failed", () =>
+        inngest.send({
+          name: "mission/reached-terminal",
+          id: `terminal:${missionId}`,
+          data: { missionId, organizationId, status: "failed" },
+        })
+      );
       await step.run("cancel-remaining-tasks-on-fail", async () => {
         await db.update(missionTasks).set({ status: "cancelled" }).where(
           and(
@@ -164,6 +171,13 @@ export const leaderConsolidate = inngest.createFunction(
         })
         .where(eq(missions.id, missionId));
     });
+    await step.run("emit-terminal-completed", () =>
+      inngest.send({
+        name: "mission/reached-terminal",
+        id: `terminal:${missionId}`,
+        data: { missionId, organizationId, status: "completed" },
+      })
+    );
 
     // 5.5 Auto-publish to CMS. 推送目标（siteId/appId/catalogId）在 article-mapper
     // 里硬编码；是否推送完全由 VIBETIDE_CMS_PUBLISH_ENABLED 控制。
