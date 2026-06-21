@@ -70,6 +70,11 @@ vi.mock("@/lib/skill-loader", () => ({
 vi.mock("@/lib/mission-core", () => ({
   loadAvailableEmployees: loadAvailableEmployeesMock,
   pickEmployeeForStep: pickEmployeeForStepMock,
+  // 领域一等维度（P2）：route 用它解析节点>场景>空，mock 用真实逻辑透传。
+  resolveStepDomainId: (
+    step: { config?: { domainId?: string | null } | null },
+    def?: string | null,
+  ) => step?.config?.domainId ?? def ?? null,
 }));
 
 vi.mock("@/app/actions/missions", () => ({

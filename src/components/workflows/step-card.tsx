@@ -124,6 +124,9 @@ export interface StepCardProps {
   onViewResult?: () => void;
   isFirst: boolean;
   isLast: boolean;
+  /** 领域一等维度（P2）：有效领域名（节点>场景）+ 是否继承（true=灰，false=覆盖高亮）。 */
+  domainName?: string | null;
+  domainInherited?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +183,8 @@ export function StepCard({
   onViewResult,
   isFirst,
   isLast,
+  domainName,
+  domainInherited = false,
 }: StepCardProps) {
   const catConfig = getCategoryConfig(step.config?.skillCategory);
   const CategoryIcon = catConfig?.icon ?? Cog;
@@ -229,6 +234,22 @@ export function StepCard({
         <span className="text-sm font-medium text-foreground flex-1 text-left truncate">
           步骤 {index + 1}：{step.name}
         </span>
+
+        {/* 领域一等维度（P2）：领域徽章（继承灰 / 覆盖高亮） */}
+        {domainName && (
+          <span
+            className={`shrink-0 rounded px-1.5 py-px text-[10px] ${
+              domainInherited
+                ? "bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground"
+                : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+            }`}
+          >
+            {domainName}
+            <span className="ml-0.5 opacity-60">
+              {domainInherited ? "·继承" : "·覆盖"}
+            </span>
+          </span>
+        )}
 
         {/* Three-dot menu */}
         <DropdownMenu>

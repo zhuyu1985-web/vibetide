@@ -4,6 +4,7 @@ import { Plus, AlertCircle } from "lucide-react";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import { TriggerCard } from "./trigger-card";
 import { StepCard } from "./step-card";
+import type { DomainOption } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,6 +38,9 @@ interface WorkflowCanvasProps {
   onStepMoveDown: (stepId: string) => void;
   onAddStep: () => void;
   onViewStepResult?: (stepId: string) => void;
+  /** 领域一等维度（P2）：领域字典 + 场景默认，用于节点领域徽章（继承/覆盖）。 */
+  domains?: DomainOption[];
+  defaultDomainId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,8 +65,11 @@ export function WorkflowCanvas({
   onStepMoveDown,
   onAddStep,
   onViewStepResult,
+  domains = [],
+  defaultDomainId = null,
 }: WorkflowCanvasProps) {
   const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+  const domainNameById = new Map(domains.map((d) => [d.id, d.name]));
 
   return (
     <div className="flex flex-col items-center w-full max-w-2xl mx-auto py-6 px-4">
@@ -94,6 +101,12 @@ export function WorkflowCanvas({
 
       {sortedSteps.map((step, idx) => {
         const stepStatus = stepStatuses[step.id];
+        // 领域一等维度（P2）：节点>场景>空；无节点级即"继承"。
+        const effectiveDomainId = step.config?.domainId ?? defaultDomainId ?? null;
+        const domainName = effectiveDomainId
+          ? domainNameById.get(effectiveDomainId) ?? null
+          : null;
+        const domainInherited = !step.config?.domainId;
         return (
           <div key={step.id} className="flex flex-col items-center w-full">
             {/* Connector between steps */}
@@ -102,6 +115,8 @@ export function WorkflowCanvas({
             <StepCard
               step={step}
               index={idx}
+              domainName={domainName}
+              domainInherited={domainInherited}
               selected={selectedStepId === step.id}
               status={stepStatus?.status ?? "idle"}
               statusMessage={stepStatus?.message}

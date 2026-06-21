@@ -120,6 +120,8 @@ export async function getBuiltinTemplates(): Promise<WorkflowTemplateRow[]> {
     category: t.category,
     triggerType: t.triggerType,
     triggerConfig: t.triggerConfig ?? null,
+    // 领域一等维度（P2）：静态 builtin 模板无场景默认领域。
+    defaultDomainId: null,
     isBuiltin: true,
     isEnabled: true,
     createdBy: null,

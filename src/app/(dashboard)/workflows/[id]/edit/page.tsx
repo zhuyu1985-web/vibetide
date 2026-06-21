@@ -5,6 +5,7 @@ import { WorkflowEditor } from "@/components/workflows/workflow-editor";
 import { notFound } from "next/navigation";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { listSchedulesByTemplate } from "@/lib/dal/workflow-template-schedules";
+import { listDomainsByOrg } from "@/lib/dal/domains";
 
 export default async function EditWorkflowPage({
   params,
@@ -30,6 +31,7 @@ export default async function EditWorkflowPage({
     orgId && workflow.organizationId === orgId
       ? await listSchedulesByTemplate(orgId, id)
       : [];
+  const domains = orgId ? await listDomainsByOrg(orgId).catch(() => []) : [];
 
   return (
     <div className="-m-6 h-[calc(100%+48px)] overflow-hidden">
@@ -37,6 +39,7 @@ export default async function EditWorkflowPage({
         mode="edit"
         skills={skills}
         toolParamSpecs={toolParamSpecs}
+        domains={domains}
         initialData={{
           id: workflow.id,
           name: workflow.name,
@@ -47,6 +50,7 @@ export default async function EditWorkflowPage({
           steps: workflow.steps,
           inputFields: workflow.inputFields ?? [],
           promptTemplate: workflow.promptTemplate ?? "",
+          defaultDomainId: workflow.defaultDomainId ?? null,
         }}
         initialSchedules={initialSchedules}
         workflowMeta={{

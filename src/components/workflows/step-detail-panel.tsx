@@ -2,12 +2,19 @@
 
 import { useMemo, useState } from "react";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
-import type { InputFieldDef } from "@/lib/types";
+import type { InputFieldDef, DomainOption } from "@/lib/types";
 import { ChevronDown, Info, Plus, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
@@ -56,6 +63,9 @@ interface StepDetailPanelProps {
    * instead of guessing what to type.
    */
   toolParamSpecs?: Record<string, ToolParamSpec[]>;
+  /** 领域一等维度（P2）：领域字典 + 场景默认，供节点领域继承/覆盖。 */
+  domains?: DomainOption[];
+  defaultDomainId?: string | null;
   onSave: (updated: WorkflowStepDef) => void;
   onClose: () => void;
 }
@@ -69,9 +79,13 @@ export function StepDetailPanel({
   skills,
   inputFields = [],
   toolParamSpecs = {},
+  domains = [],
+  defaultDomainId = null,
   onSave,
   onClose,
 }: StepDetailPanelProps) {
+  const inheritedDomainName =
+    domains.find((d) => d.id === defaultDomainId)?.name ?? null;
   // 针对当前步骤的 skill 查找参数 spec；没有就退化到"手输参数名"。
   const currentToolParams = useMemo<ToolParamSpec[]>(() => {
     const slug = step.config?.skillSlug;
@@ -151,6 +165,44 @@ export function StepDetailPanel({
             告诉 AI 这一步具体要做什么、有哪些约束（受众、字数、风格、渠道等）。说明越具体，测试/执行结果越贴合预期。
           </p>
         </div>
+
+        {/* 领域一等维度（P2）：节点领域（继承场景默认 / 覆盖） */}
+        {domains.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <Label>领域</Label>
+            <Select
+              value={step.config?.domainId ?? "__inherit__"}
+              onValueChange={(v) =>
+                onSave({
+                  ...step,
+                  config: {
+                    ...step.config,
+                    parameters: step.config?.parameters ?? {},
+                    domainId: v === "__inherit__" ? null : v,
+                  },
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__inherit__">
+                  继承场景默认
+                  {inheritedDomainName ? `（${inheritedDomainName}）` : "（不限）"}
+                </SelectItem>
+                {domains.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              留空继承场景默认领域；设定后该节点按所选领域派单（如财经记者）。
+            </p>
+          </div>
+        )}
 
         {/* Current skill display — click opens an info dialog */}
         {step.type === "skill" && step.config?.skillName && (

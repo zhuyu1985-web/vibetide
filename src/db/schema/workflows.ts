@@ -13,6 +13,7 @@ import { relations, sql } from "drizzle-orm";
 import { organizations } from "./users";
 import { aiEmployees } from "./ai-employees";
 import { missions } from "./missions";
+import { domains } from "./domains";
 import {
   artifactTypeEnum,
   workflowCategoryEnum,
@@ -43,6 +44,11 @@ export interface WorkflowStepDef {
      * 留空则由派单逻辑按默认班子/熟练度/领域 tie-break。
      */
     requiredCraft?: string;
+    /**
+     * 领域一等维度（P2）：节点级领域覆盖。空 = 继承场景默认 defaultDomainId。
+     * 解析（节点>场景>空）见 resolveStepDomainId；pickEmployeeForStep 据此缩领域。
+     */
+    domainId?: string | null;
     outputAction?: string;
     parameters: Record<string, any>;
     description?: string;
@@ -90,6 +96,9 @@ export const workflowTemplates = pgTable("workflow_templates", {
   defaultTeam: jsonb("default_team").$type<string[]>().default([]),
   systemInstruction: text("system_instruction"),
   legacyScenarioKey: text("legacy_scenario_key"),
+
+  // 领域一等维度（P2）：场景默认领域。节点未覆盖时继承此值（resolveStepDomainId）。
+  defaultDomainId: uuid("default_domain_id").references(() => domains.id),
 
   // Scenario spec document (Markdown, baoyu-standard).
   // Mirrors `skills.content` for the workflow side. Loaded from

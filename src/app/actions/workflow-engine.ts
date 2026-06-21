@@ -279,6 +279,7 @@ export async function saveWorkflow(data: {
   steps: WorkflowStepDef[];
   inputFields?: InputFieldDef[];
   promptTemplate?: string;
+  defaultDomainId?: string | null;
 }) {
   const user = await requireAuth();
   const orgId = await getCurrentUserOrg();
@@ -299,6 +300,7 @@ export async function saveWorkflow(data: {
       isBuiltin: false,
       isEnabled: false,
       createdBy: user.id,
+      defaultDomainId: data.defaultDomainId ?? null,
       ...(data.inputFields !== undefined
         ? { inputFields: data.inputFields }
         : {}),
@@ -349,6 +351,7 @@ export async function updateWorkflow(
     steps?: WorkflowStepDef[];
     inputFields?: InputFieldDef[];
     promptTemplate?: string;
+    defaultDomainId?: string | null;
   }
 ): Promise<UpdateWorkflowResult> {
   const user = await requireAuth();
@@ -385,6 +388,7 @@ export async function updateWorkflow(
         category: patch.category ?? existing.category ?? "custom",
         triggerType: patch.triggerType ?? existing.triggerType ?? "manual",
         triggerConfig: patch.triggerConfig ?? existing.triggerConfig,
+        defaultDomainId: patch.defaultDomainId ?? existing.defaultDomainId,
         isBuiltin: false,
         // legacyScenarioKey 必须置空 —— 它的 partial unique index 是
         // (org, legacy_scenario_key) WHERE legacy_scenario_key IS NOT NULL,

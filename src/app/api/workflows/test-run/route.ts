@@ -17,6 +17,7 @@ import { loadSkillContent } from "@/lib/skill-loader";
 import {
   loadAvailableEmployees,
   pickEmployeeForStep,
+  resolveStepDomainId,
 } from "@/lib/mission-core";
 import { getOrProvisionLeader } from "@/app/actions/missions";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
@@ -79,6 +80,7 @@ export async function POST(req: Request) {
       promptTemplate,
       inputFields,
       clientRunId,
+      defaultDomainId,
     } = body as {
       steps: WorkflowStepDef[];
       triggerType: "manual" | "scheduled";
@@ -87,6 +89,8 @@ export async function POST(req: Request) {
       promptTemplate?: string;
       inputFields?: InputFieldDef[];
       clientRunId?: string;
+      // 领域一等维度（P2）：测试运行无 template，可选由编辑器传入场景默认领域。
+      defaultDomainId?: string | null;
     };
     const runId = clientRunId || crypto.randomUUID();
 
@@ -204,8 +208,16 @@ export async function POST(req: Request) {
 
             try {
               // ── 1. 选员工（对齐 mission-executor 的 pickEmployeeForStep） ──
+              // 领域一等维度（P2）：节点 domainId > 场景默认 > 空。
+              const effectiveStep = {
+                ...step,
+                config: {
+                  ...(step.config ?? {}),
+                  domainId: resolveStepDomainId(step, defaultDomainId ?? null),
+                },
+              };
               const picked = pickEmployeeForStep(
-                step,
+                effectiveStep,
                 [], // 测试运行没 defaultTeam 概念；pick 内部会跳到"员工技能匹配"逻辑
                 availableEmployees,
               );

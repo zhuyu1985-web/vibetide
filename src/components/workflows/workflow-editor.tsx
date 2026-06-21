@@ -24,7 +24,7 @@ import { TestRunInputsDialog } from "./test-run-inputs-dialog";
 import { ScheduleSheet } from "./schedule-sheet";
 import { saveWorkflow, updateWorkflow } from "@/app/actions/workflow-engine";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
-import type { InputFieldDef } from "@/lib/types";
+import type { InputFieldDef, DomainOption } from "@/lib/types";
 import type { WorkflowPickerSkill } from "@/lib/dal/skills";
 import type { ToolParamSpec } from "./step-detail-panel";
 import type { ScheduledJob } from "@/db/schema/scheduled-jobs";
@@ -59,6 +59,8 @@ interface WorkflowEditorProps {
     steps: WorkflowStepDef[];
     inputFields?: InputFieldDef[];
     promptTemplate?: string;
+    /** 领域一等维度（P2）：场景默认领域。 */
+    defaultDomainId?: string | null;
   };
   mode: "create" | "edit";
   /** Live skills pool loaded server-side; drives the add-step picker. */
@@ -84,6 +86,8 @@ interface WorkflowEditorProps {
     name: string;
     inputFields: InputFieldDef[];
   };
+  /** 领域一等维度（P2）：org 领域字典，驱动场景默认领域 + 节点领域徽章/覆盖。 */
+  domains?: DomainOption[];
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +115,7 @@ export function WorkflowEditor({
   toolParamSpecs,
   initialSchedules = [],
   workflowMeta,
+  domains = [],
 }: WorkflowEditorProps) {
   const router = useRouter();
 
@@ -121,6 +126,10 @@ export function WorkflowEditor({
   );
   const [category, setCategory] = useState<Category>(
     (initialData?.category as Category) ?? "custom"
+  );
+  // 领域一等维度（P2）：场景默认领域。节点未覆盖时继承此值。
+  const [defaultDomainId, setDefaultDomainId] = useState<string | null>(
+    initialData?.defaultDomainId ?? null,
   );
 
   // 2026-05-29 移除 triggerType / triggerConfig / isEnabled 三个 state ——
@@ -237,6 +246,7 @@ export function WorkflowEditor({
           steps: stepsHook.steps,
           inputFields,
           promptTemplate: promptTemplate.trim() || undefined,
+          defaultDomainId,
         });
         // 2026-05-30:builtin + 非 super admin 的编辑会被 server action 自动
         // fork 成新副本(避免改动丢失)。此时 result.forked=true,跳到新副本 url。
@@ -259,6 +269,7 @@ export function WorkflowEditor({
           steps: stepsHook.steps,
           inputFields,
           promptTemplate: promptTemplate.trim() || undefined,
+          defaultDomainId,
         });
         // 创建成功 → 跳到该工作流的 edit 页（mode=edit），用户继续在同一个工作流上
         // 调整不会产生副本；同时让 toast 在新页面上展示（sonner 是全局 Toaster）。
@@ -407,6 +418,29 @@ export function WorkflowEditor({
           </SelectContent>
         </Select>
 
+        {/* 领域一等维度（P2）：场景默认领域，节点可继承/覆盖 */}
+        {domains.length > 0 && (
+          <Select
+            value={defaultDomainId ?? "none"}
+            onValueChange={(v) => {
+              setDefaultDomainId(v === "none" ? null : v);
+              stepsHook.setHasChanges(true);
+            }}
+          >
+            <SelectTrigger className="w-[130px] h-8 text-xs">
+              <SelectValue placeholder="默认领域" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">不限领域</SelectItem>
+              {domains.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <div className="flex-1" />
       </div>
 
@@ -449,6 +483,8 @@ export function WorkflowEditor({
               scheduleCount={schedules.length}
               enabledScheduleCount={enabledScheduleCount}
               nextScheduleSummary={nextScheduleSummary}
+              domains={domains}
+              defaultDomainId={defaultDomainId}
               steps={stepsHook.steps}
               selectedStepId={stepsHook.selectedStepId}
               testResultStepId={testResultStepId}
@@ -481,6 +517,8 @@ export function WorkflowEditor({
             skills={skills}
             inputFields={inputFields}
             toolParamSpecs={toolParamSpecs}
+            domains={domains}
+            defaultDomainId={defaultDomainId}
             onAddSkillStep={stepsHook.addSkillStep}
             onAddOutputStep={stepsHook.addOutputStep}
             onAddAIStep={stepsHook.addAIStep}

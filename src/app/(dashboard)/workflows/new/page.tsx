@@ -1,12 +1,16 @@
 import { WorkflowEditor } from "@/components/workflows/workflow-editor";
 import { listSkillsForWorkflowPicker } from "@/lib/dal/skills";
 import { getAllToolParamSpecs } from "@/lib/agent/tool-registry";
+import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { listDomainsByOrg } from "@/lib/dal/domains";
 
 export default async function NewWorkflowPage() {
   const skills = await listSkillsForWorkflowPicker().catch(() => []);
   // 预计算工具参数 spec 透传给 WorkflowEditor —— 客户端不能直接 import
   // tool-registry（server-only 依赖）。
   const toolParamSpecs = getAllToolParamSpecs();
+  const orgId = await getCurrentUserOrg();
+  const domains = orgId ? await listDomainsByOrg(orgId).catch(() => []) : [];
 
   return (
     <div className="-m-6 h-[calc(100%+48px)] overflow-hidden">
@@ -14,6 +18,7 @@ export default async function NewWorkflowPage() {
         mode="create"
         skills={skills}
         toolParamSpecs={toolParamSpecs}
+        domains={domains}
       />
     </div>
   );

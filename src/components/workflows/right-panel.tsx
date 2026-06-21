@@ -2,7 +2,7 @@
 
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { WorkflowPickerSkill } from "@/lib/dal/skills";
-import type { InputFieldDef } from "@/lib/types";
+import type { InputFieldDef, DomainOption } from "@/lib/types";
 import { AddStepPanel } from "./add-step-panel";
 import { StepDetailPanel, type ToolParamSpec } from "./step-detail-panel";
 import {
@@ -42,6 +42,9 @@ interface RightPanelProps {
   selectedStep: WorkflowStepDef | null;
   onSaveStep: (step: WorkflowStepDef) => void;
   onCloseDetail: () => void;
+  /** 领域一等维度（P2）：领域字典 + 场景默认，供节点领域覆盖。 */
+  domains?: DomainOption[];
+  defaultDomainId?: string | null;
   // Test result mode
   testResultStep?: WorkflowStepDef | null;
   testResultStepIndex?: number;
@@ -63,6 +66,8 @@ export function RightPanel({
   selectedStep,
   onSaveStep,
   onCloseDetail,
+  domains,
+  defaultDomainId,
   testResultStep,
   testResultStepIndex,
   testResult,
@@ -91,6 +96,8 @@ export function RightPanel({
         skills={skills}
         inputFields={inputFields}
         toolParamSpecs={toolParamSpecs}
+        domains={domains}
+        defaultDomainId={defaultDomainId}
         onSave={onSaveStep}
         onClose={onCloseDetail}
       />

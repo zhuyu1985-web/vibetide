@@ -14,6 +14,7 @@ import {
   parseLeaderOutput,
   validateDAG,
   pickEmployeeForStep,
+  resolveStepDomainId,
 } from "@/lib/mission-core";
 
 /**
@@ -70,11 +71,17 @@ export const leaderPlan = inngest.createFunction(
               ? (tpl.steps as WorkflowStepDef[])
               : null;
           const defaultTeam = (tpl.defaultTeam as string[] | null) ?? [];
-          return { name: tpl.name, steps, defaultTeam };
+          return {
+            name: tpl.name,
+            steps,
+            defaultTeam,
+            defaultDomainId: (tpl.defaultDomainId as string | null) ?? null,
+          };
         })
       : null;
     const templateSteps = templateInfo?.steps ?? null;
     const templateDefaultTeam = templateInfo?.defaultTeam ?? [];
+    const templateDefaultDomainId = templateInfo?.defaultDomainId ?? null;
     // 优先展示模板名，fallback 到 legacy slug。
     const scenarioLabel = templateInfo?.name ?? mission.scenario;
 
@@ -89,7 +96,18 @@ export const leaderPlan = inngest.createFunction(
 
         for (const s of sorted) {
           // 员工分配：显式 employeeSlug → defaultTeam 内技能匹配 → 团队轮询 → leader
-          const picked = pickEmployeeForStep(s, templateDefaultTeam, availableEmployees);
+          const effectiveStep = {
+            ...s,
+            config: {
+              ...(s.config ?? {}),
+              domainId: resolveStepDomainId(s, templateDefaultDomainId),
+            },
+          };
+          const picked = pickEmployeeForStep(
+            effectiveStep,
+            templateDefaultTeam,
+            availableEmployees,
+          );
           const assignedEmployeeId = picked.employee?.id ?? mission.leaderEmployeeId;
           selectedEmployeeIds.add(assignedEmployeeId);
 

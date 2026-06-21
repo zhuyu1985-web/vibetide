@@ -228,6 +228,20 @@ export function pickEmployeeForStep(
   };
 }
 
+/**
+ * 领域一等维度（P2）—— 解析某 step 的有效领域：
+ * 节点级 domainId > 场景默认 defaultDomainId > 空。
+ *
+ * pickEmployeeForStep 已消费 step.config.domainId（P1）；调用方用本函数算出有效值后
+ * 填进 effective step 再派单。null 视作“未指定 → 派单不缩领域”。
+ */
+export function resolveStepDomainId(
+  step: { config?: { domainId?: string | null } | null },
+  templateDefaultDomainId?: string | null,
+): string | null {
+  return step.config?.domainId ?? templateDefaultDomainId ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // 2. buildLeaderDecomposePrompt — build the prompt the leader uses to
 //    decompose a mission into sub-tasks (content identical to both files)

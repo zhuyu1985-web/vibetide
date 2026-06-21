@@ -47,6 +47,7 @@ import {
   mapTaskOutputsToStepOutputs,
   checkTokenBudget,
   pickEmployeeForStep,
+  resolveStepDomainId,
 } from "@/lib/mission-core";
 import { loadScenarioLabel } from "@/lib/mission-scenario-label";
 
@@ -186,6 +187,8 @@ export async function leaderPlanDirect(
         (a, b) => (a.order ?? 0) - (b.order ?? 0)
       );
       const defaultTeamSlugs = (tpl.defaultTeam as string[] | null) ?? [];
+      // 领域一等维度（P2）：场景默认领域，节点未覆盖时继承（resolveStepDomainId）。
+      const templateDefaultDomainId = (tpl.defaultDomainId as string | null) ?? null;
       const stepIdToTaskId = new Map<string, string>();
       const selectedEmployeeIds = new Set<string>();
       const allTaskAssignments = new Map<string, string>(); // taskId → employeeId
@@ -199,7 +202,18 @@ export async function leaderPlanDirect(
           : {};
 
       for (const s of sorted) {
-        const picked = pickEmployeeForStep(s, defaultTeamSlugs, employeesWithSkills);
+        const effectiveStep = {
+          ...s,
+          config: {
+            ...(s.config ?? {}),
+            domainId: resolveStepDomainId(s, templateDefaultDomainId),
+          },
+        };
+        const picked = pickEmployeeForStep(
+          effectiveStep,
+          defaultTeamSlugs,
+          employeesWithSkills,
+        );
         const assignedEmployeeId = picked.employee?.id ?? mission.leaderEmployeeId;
         selectedEmployeeIds.add(assignedEmployeeId);
 
