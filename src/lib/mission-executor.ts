@@ -11,6 +11,7 @@
  */
 
 import { db } from "@/db";
+import { runWithTimeout } from "@/lib/missions/run-with-timeout";
 import { inngest } from "@/inngest/client";
 import {
   missions,
@@ -53,6 +54,7 @@ import {
 import { loadScenarioLabel } from "@/lib/mission-scenario-label";
 
 const MISSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 分钟
+const TASK_TIMEOUT_MS = 3 * 60 * 1000; // 单任务硬超时（可调）
 
 /**
  * Produce a leader "analysis + dispatch" coordination message for the template
@@ -1948,7 +1950,17 @@ export async function executeAllTasksDirect(missionId: string, missionStartTime:
     await Promise.allSettled(
       [...employeeGroups.values()].map(async (group) => {
         for (const task of group) {
-          await executeTaskDirect(task.id, missionId, cachedMission);
+          try {
+            await runWithTimeout(
+              executeTaskDirect(task.id, missionId, cachedMission),
+              TASK_TIMEOUT_MS,
+              "任务执行超时（超过 3 分钟），已自动跳过",
+            );
+          } catch (err) {
+            await db.update(missionTasks)
+              .set({ status: "failed", errorMessage: err instanceof Error ? err.message : String(err) })
+              .where(eq(missionTasks.id, task.id));
+          }
         }
       })
     );
