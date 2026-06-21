@@ -56,7 +56,9 @@ mission 完成 → channelMissionTerminalNotify(Inngest) → sendChannelResult(c
 
 复用：`clarifyOrPlan`（读 contextTurns，不改）、confirming 流、`getOrCreateSession` 过期复位、`resetSession`（失败路径仍用）。
 
-不动：schema、gateway、规划器、执行下游。
+**明确不改 `sendChannelFailure`**：`channel-result-notify.ts` 另一个导出 `sendChannelFailure`（executor 抛异常时由 `start-channel-mission.ts` 的 `.catch()` 调用）也调 `resetSession`——它**保持不变**。原因：executor 抛错=没有产出可跟进，全清复位才对，不写跟进上下文。实现者看到这第二个 `resetSession` 调用不要误改。
+
+不动：schema、gateway、规划器、执行下游、`sendChannelFailure`。
 
 ## Error Handling
 
