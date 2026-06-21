@@ -59,9 +59,9 @@ export async function clarifyOrPlan(
       temperature: 0.3,
       maxTokens: 256,
     }),
-    prompt:
-      `你是任务助手。用户在 IM 里的请求信息不足以执行。基于对话：\n${fullMessage}\n\n` +
-      `用一句中文问一个最关键的澄清问题，帮你补齐执行所需信息。只输出问题本身。`,
+    prompt: `你是任务助手。用户在 IM 里的请求信息还不足以执行。基于对话：\n${fullMessage}\n\n` +
+      `想想要把这个任务做好还缺哪些关键信息（比如：领域/主题、篇幅、风格/调性、是否配图、目标渠道等，按任务类型挑最关键的 1-2 项）。` +
+      `用一句简洁中文把缺的关键项问出来。只输出问题本身。`,
     maxOutputTokens: 256,
   });
 
