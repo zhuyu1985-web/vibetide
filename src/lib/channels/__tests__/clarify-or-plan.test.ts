@@ -9,6 +9,11 @@ const { generateText, getLanguageModel, loadAvailableEmployees } = vi.hoisted(()
 vi.mock("ai", () => ({ generateText }));
 vi.mock("@/lib/agent/model-router", () => ({ getLanguageModel }));
 vi.mock("@/lib/mission-core", () => ({ loadAvailableEmployees }));
+// 隔离文件系统：getBuiltinSkillSlugs 校验 step.skills；getAllBuiltinSkills 给 buildSkillCatalog 用
+vi.mock("@/lib/skill-loader", () => ({
+  getBuiltinSkillSlugs: () => new Set(["content_generate"]),
+  getAllBuiltinSkills: () => [{ category: "内容创作", slug: "content_generate", name: "内容生成" }],
+}));
 
 import { clarifyOrPlan } from "../clarify-or-plan";
 
