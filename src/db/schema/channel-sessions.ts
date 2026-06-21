@@ -11,6 +11,7 @@ import { organizations } from "./users";
 import { channelConfigs } from "./channels";
 import { missions } from "./missions";
 import { channelPlatformEnum } from "./enums";
+import type { IntentStep } from "@/lib/agent/types";
 
 /** 一个 IM 会话（configId+chatId+发送者）一份澄清/执行状态。回执反查的真相源。 */
 export const channelSessions = pgTable(
@@ -37,6 +38,10 @@ export const channelSessions = pgTable(
       onDelete: "set null",
     }),
     clarifyRounds: integer("clarify_rounds").notNull().default(0),
+    pendingPlan: jsonb("pending_plan").$type<{
+      summary: string;
+      steps: IntentStep[];
+    }>(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

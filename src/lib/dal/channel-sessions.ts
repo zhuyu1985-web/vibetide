@@ -30,7 +30,7 @@ export async function getOrCreateSession(
     if (existing.expiresAt && new Date(existing.expiresAt).getTime() < Date.now()) {
       const [refreshed] = await db
         .update(channelSessions)
-        .set({ status: "idle", activeMissionId: null, clarifyRounds: 0, contextTurns: [], expiresAt: null, updatedAt: new Date() })
+        .set({ status: "idle", activeMissionId: null, clarifyRounds: 0, contextTurns: [], pendingPlan: null, expiresAt: null, updatedAt: new Date() })
         .where(eq(channelSessions.id, existing.id))
         .returning();
       return refreshed;
@@ -64,6 +64,7 @@ export async function updateSession(
       | "activeMissionId"
       | "clarifyRounds"
       | "expiresAt"
+      | "pendingPlan"
     >
   >
 ): Promise<void> {
@@ -99,6 +100,7 @@ export async function resetSession(
       activeMissionId: null,
       clarifyRounds: 0,
       contextTurns: [],
+      pendingPlan: null,
       updatedAt: new Date(),
     })
     .where(
