@@ -78,32 +78,39 @@ describe("gateway 自由消息澄清循环", () => {
     );
   });
 
-  it("execute → 起 mission，session=running，回收到", async () => {
-    getOrCreateSession.mockResolvedValue({
-      id: "s1",
-      status: "idle",
-      contextTurns: [],
-      clarifyRounds: 0,
-    });
-    clarifyOrPlan.mockResolvedValue({
-      action: "execute",
-      summary: "抓热点",
-      steps: [
-        {
-          employeeSlug: "xiaolei",
-          employeeName: "小蕾",
-          skills: ["x"],
-          taskDescription: "抓热点",
-        },
-      ],
-    });
-    startChannelMission.mockResolvedValue({ missionId: "mis1" });
+  it("execute → 进 confirming 发计划卡，不直接起 mission", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "idle", contextTurns: [], clarifyRounds: 0 });
+    clarifyOrPlan.mockResolvedValue({ action: "execute", summary: "抓热点", steps: [{ employeeSlug: "xiaolei", employeeName: "小蕾", skills: [], taskDescription: "抓热点" }] });
     const r = await handleInboundMessage(msg);
+    expect(startChannelMission).not.toHaveBeenCalled();
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "confirming" }));
+    expect(r.reply).toContain("开始");
+  });
+
+  it("confirming + 开始 → 起 mission，running，清 pendingPlan", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: { summary: "抓热点", steps: [{ employeeSlug: "xiaolei", employeeName: "小蕾", skills: [], taskDescription: "抓热点" }] } });
+    startChannelMission.mockResolvedValue({ missionId: "mis1" });
+    const r = await handleInboundMessage({ ...msg, textContent: "开始" });
     expect(startChannelMission).toHaveBeenCalled();
-    expect(updateSession).toHaveBeenCalledWith(
-      "s1",
-      expect.objectContaining({ status: "running", activeMissionId: "mis1" }),
-    );
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "running", activeMissionId: "mis1", pendingPlan: null }));
     expect(r.reply).toContain("收到");
+  });
+
+  it("confirming + 取消 → idle，清 pendingPlan，不起 mission", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0, pendingPlan: { summary: "x", steps: [] } });
+    const r = await handleInboundMessage({ ...msg, textContent: "取消" });
+    expect(startChannelMission).not.toHaveBeenCalled();
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "idle", pendingPlan: null }));
+    expect(r.reply).toContain("取消");
+  });
+
+  it("confirming + 编辑 → 重规划更新 pendingPlan 回新卡，留 confirming", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0, pendingPlan: { summary: "科技", steps: [] } });
+    clarifyOrPlan.mockResolvedValue({ action: "execute", summary: "财经热点", steps: [{ employeeSlug: "xiaolei", employeeName: "小蕾", skills: [], taskDescription: "抓财经热榜" }] });
+    const r = await handleInboundMessage({ ...msg, textContent: "换财经" });
+    expect(startChannelMission).not.toHaveBeenCalled();
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "confirming", pendingPlan: expect.objectContaining({ summary: "财经热点" }) }));
+    expect(r.reply).toContain("抓财经热榜");
   });
 });

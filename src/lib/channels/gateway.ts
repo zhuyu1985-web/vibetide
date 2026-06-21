@@ -13,8 +13,12 @@ import { findTemplateByNameOrSlug } from "@/lib/dal/workflow-templates-listing";
 import { inngest } from "@/inngest/client";
 import { extractUrls } from "./link-extract";
 import { getOrCreateSession, updateSession } from "@/lib/dal/channel-sessions";
+import type { ChannelSessionRow } from "@/lib/dal/channel-sessions";
 import { clarifyOrPlan } from "./clarify-or-plan";
 import { startChannelMission } from "./start-channel-mission";
+import { formatPlanCard } from "./format-plan-card";
+import { isConfirm, isCancel } from "./confirm-keywords";
+import type { IntentStep } from "@/lib/agent/types";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
 
@@ -266,6 +270,10 @@ async function handleFreeFormMessage(
     return { reply: "⏳ 上一个请求还在处理中，完成后会在群里回结果，请稍候。" };
   }
 
+  if (session.status === "confirming") {
+    return handleConfirmingMessage(text, msg, session, channelCtx);
+  }
+
   let result;
   try {
     result = await clarifyOrPlan(msg.organizationId, session, text);
@@ -291,15 +299,83 @@ async function handleFreeFormMessage(
     return { reply: result.question };
   }
 
-  const { missionId } = await startChannelMission(msg.organizationId, {
-    message: text,
-    summary: result.summary,
-    steps: result.steps,
-    externalMessageId: msg.externalMessageId,
-    channelCtx,
+  return enterConfirming(session.id, turns, result.summary, result.steps);
+}
+
+// ---------------------------------------------------------------------------
+// Confirming state helpers
+// ---------------------------------------------------------------------------
+
+async function enterConfirming(
+  sessionId: string,
+  turns: { role: string; content: string }[],
+  summary: string,
+  steps: IntentStep[],
+): Promise<{ reply: string }> {
+  const card = formatPlanCard(summary, steps);
+  await updateSession(sessionId, {
+    status: "confirming",
+    pendingPlan: { summary, steps },
+    contextTurns: [...turns, { role: "assistant", content: card }],
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
   });
-  await updateSession(session.id, { status: "running", activeMissionId: missionId, contextTurns: turns, expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
-  return { reply: `✅ 收到，正在处理：${result.summary}。完成后在群里回结果。`, missionId };
+  return { reply: card };
+}
+
+async function handleConfirmingMessage(
+  text: string,
+  msg: StandardizedMessage,
+  session: ChannelSessionRow,
+  channelCtx: { organizationId: string; configId: string; platform: "dingtalk" | "wechat_work"; chatId: string; externalUserId: string },
+): Promise<{ reply: string; missionId?: string }> {
+  const plan = session.pendingPlan as { summary: string; steps: IntentStep[] } | null;
+  if (!plan) {
+    await updateSession(session.id, { status: "idle", pendingPlan: null, contextTurns: [], clarifyRounds: 0 });
+    return { reply: "请重新说一下你的需求。" };
+  }
+  if (isCancel(text)) {
+    await updateSession(session.id, { status: "idle", pendingPlan: null, clarifyRounds: 0, contextTurns: [] });
+    return { reply: "已取消，可重新发起。" };
+  }
+  if (isConfirm(text)) {
+    const { missionId } = await startChannelMission(msg.organizationId, {
+      message: plan.summary,
+      summary: plan.summary,
+      steps: plan.steps,
+      externalMessageId: msg.externalMessageId,
+      channelCtx,
+    });
+    await updateSession(session.id, {
+      status: "running",
+      activeMissionId: missionId,
+      pendingPlan: null,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    });
+    return { reply: `✅ 收到，正在处理：${plan.summary}。完成后在群里回结果。`, missionId };
+  }
+  let result;
+  try {
+    result = await clarifyOrPlan(msg.organizationId, session, text);
+  } catch (err) {
+    console.error("[gateway] clarifyOrPlan failed:", err);
+    return { reply: "系统忙，请稍后再试。" };
+  }
+  const turns = [...(session.contextTurns ?? []), { role: "user", content: text }];
+  if (result.action === "clarify") {
+    const rounds = session.clarifyRounds + 1;
+    if (rounds > MAX_CLARIFY_ROUNDS) {
+      await updateSession(session.id, { status: "idle", clarifyRounds: 0, contextTurns: [], pendingPlan: null, expiresAt: null });
+      return { reply: "没太理解你的需求，请换个说法，或用 #场景名 直接发起任务。" };
+    }
+    await updateSession(session.id, {
+      status: "clarifying",
+      clarifyRounds: rounds,
+      contextTurns: [...turns, { role: "assistant", content: result.question }],
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    });
+    return { reply: result.question };
+  }
+  return enterConfirming(session.id, turns, result.summary, result.steps);
 }
 
 // Outbound formatters are in ./format.ts (re-exported above)
