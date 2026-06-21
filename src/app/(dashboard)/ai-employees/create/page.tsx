@@ -1,6 +1,7 @@
 import { getSkills } from "@/lib/dal/skills";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { listKnowledgeBaseSummariesByOrg } from "@/lib/dal/knowledge-bases";
+import { listDomainsByOrg } from "@/lib/dal/domains";
 import { CreateEmployeeClient } from "./create-employee-client";
 
 function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 15000): Promise<T> {
@@ -13,11 +14,12 @@ function withTimeout<T>(promise: Promise<T>, fallback: T, ms = 15000): Promise<T
 export default async function CreateEmployeePage() {
   const orgId = await withTimeout(getCurrentUserOrg(), null);
 
-  const [skills, knowledgeBases] = await Promise.all([
+  const [skills, knowledgeBases, domains] = await Promise.all([
     withTimeout(getSkills(), []),
     orgId
       ? withTimeout(listKnowledgeBaseSummariesByOrg(orgId), [])
       : Promise.resolve([]),
+    orgId ? withTimeout(listDomainsByOrg(orgId), []) : Promise.resolve([]),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function CreateEmployeePage() {
         type: kb.type,
         documentCount: kb.documentCount,
       }))}
+      domains={domains}
     />
   );
 }

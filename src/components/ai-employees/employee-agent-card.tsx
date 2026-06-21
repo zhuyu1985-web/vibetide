@@ -15,7 +15,7 @@ const STATUS_CONFIG = {
   reviewing: { label: "审核中", dotColor: "bg-amber-400", textColor: "text-amber-400/80" },
 };
 
-// 三维徽章标签(层级 / 媒体形态)。领域直接显示 domainTags。
+// 三维徽章标签(层级 / 媒体形态)。领域显示 domains 字典名(P2,经 domainName prop 传入)。
 const CARD_AUTHORITY_LABEL: Record<string, string> = {
   observer: "观察",
   advisor: "建议",
@@ -31,6 +31,8 @@ const CARD_MEDIA_LABEL: Record<string, string> = {
 interface EmployeeAgentCardProps {
   employee: AIEmployee;
   hotTasks: HotTask[];
+  /** 领域一等维度（P2）：employee.domainId 解析出的领域名，用于卡片领域徽章。 */
+  domainName?: string | null;
   onDispatchTask: (employeeSlug: string) => void;
   onHotTaskClick: (employeeSlug: string, prompt: string) => void;
 }
@@ -38,6 +40,7 @@ interface EmployeeAgentCardProps {
 export function EmployeeAgentCard({
   employee,
   hotTasks,
+  domainName,
   onDispatchTask,
   onHotTaskClick,
 }: EmployeeAgentCardProps) {
@@ -117,16 +120,13 @@ export function EmployeeAgentCard({
         {description}
       </p>
 
-      {/* 三维徽章:领域(domainTags) / 媒体形态 / 层级(authority) */}
+      {/* 三维徽章:领域(domain) / 媒体形态 / 层级(authority) */}
       <div className="mt-2 flex flex-wrap gap-1">
-        {(employee.instanceConfig?.domainTags ?? []).slice(0, 3).map((t) => (
-          <span
-            key={t}
-            className="rounded bg-indigo-500/10 px-1.5 py-px text-[10px] text-indigo-600 dark:text-indigo-400"
-          >
-            {t}
+        {domainName && (
+          <span className="rounded bg-indigo-500/10 px-1.5 py-px text-[10px] text-indigo-600 dark:text-indigo-400">
+            {domainName}
           </span>
-        ))}
+        )}
         {employee.instanceConfig?.mediaForm && (
           <span className="rounded bg-teal-500/10 px-1.5 py-px text-[10px] text-teal-600 dark:text-teal-400">
             {CARD_MEDIA_LABEL[employee.instanceConfig.mediaForm] ??

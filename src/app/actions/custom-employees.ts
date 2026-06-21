@@ -53,8 +53,9 @@ export async function createCustomEmployee(input: {
   visibility?: "private" | "org";
   // 四层重构:层级(authority)+ 领域/形态(instanceConfig)
   authorityLevel?: "observer" | "advisor" | "executor" | "coordinator";
+  // P2 领域一等维度:domain_id 字典外键(硬切 instanceConfig.domainTags)。
+  domainId?: string | null;
   instanceConfig?: {
-    domainTags?: string[];
     mediaForm?: "news" | "newmedia" | "convergence";
     platformSpecs?: { channels?: string[]; formatRules?: Record<string, unknown> };
   };
@@ -91,6 +92,7 @@ export async function createCustomEmployee(input: {
       motto: input.description?.trim() || null,
       roleType: input.baseTemplateSlug,
       authorityLevel: input.authorityLevel ?? "executor",
+      domainId: input.domainId ?? null,
       instanceConfig: input.instanceConfig ?? {},
       status: "idle",
       isPreset: 0,

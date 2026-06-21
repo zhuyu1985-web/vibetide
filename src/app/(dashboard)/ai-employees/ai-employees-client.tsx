@@ -6,7 +6,14 @@ import { EmployeeAgentCard } from "@/components/ai-employees/employee-agent-card
 import { SearchInput } from "@/components/shared/search-input";
 import { EMPLOYEE_HOT_TASKS } from "@/lib/employee-tasks";
 import { CRAFT_META, ORDERED_CRAFTS, type CraftType } from "@/lib/constants";
-import type { AIEmployee } from "@/lib/types";
+import type { AIEmployee, DomainRecord } from "@/lib/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +35,7 @@ const STATUS_TABS = [
 interface AiEmployeesClientProps {
   employees: AIEmployee[];
   organizationId: string;
+  domains: DomainRecord[];
 }
 
 // ---------------------------------------------------------------------------
@@ -37,10 +45,18 @@ interface AiEmployeesClientProps {
 export function AiEmployeesClient({
   employees,
   organizationId: _organizationId,
+  domains,
 }: AiEmployeesClientProps) {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [domainFilter, setDomainFilter] = useState("all");
+
+  // domainId → 领域名,用于卡片领域徽章。
+  const domainNameById = useMemo(
+    () => new Map(domains.map((d) => [d.id, d.name])),
+    [domains],
+  );
 
   // ── Filtering + 按工种(roleType)分组 ──
   // 同一工种(记者)下挂多个实例(基础记者 / 财经记者 / 时政记者…),工种内
@@ -50,6 +66,11 @@ export function AiEmployeesClient({
 
     if (statusFilter !== "all") {
       result = result.filter((e) => e.status === statusFilter);
+    }
+    if (domainFilter !== "all") {
+      result = result.filter((e) =>
+        domainFilter === "none" ? !e.domainId : e.domainId === domainFilter,
+      );
     }
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
@@ -83,7 +104,7 @@ export function AiEmployeesClient({
     }));
 
     return { craftGroups: groups, otherEmployees: other, total: result.length };
-  }, [employees, statusFilter, searchText]);
+  }, [employees, statusFilter, domainFilter, searchText]);
 
   // ── Handlers ──
   const handleDispatchTask = useCallback(
@@ -147,6 +168,24 @@ export function AiEmployeesClient({
             </button>
           ))}
         </div>
+
+        {/* 领域筛选(第二级:工种 → 领域) */}
+        {domains.length > 0 && (
+          <Select value={domainFilter} onValueChange={setDomainFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="全部领域" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部领域</SelectItem>
+              <SelectItem value="none">不限领域</SelectItem>
+              {domains.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* ── Employee count ── */}
@@ -185,6 +224,7 @@ export function AiEmployeesClient({
                     <EmployeeAgentCard
                       key={emp.dbId}
                       employee={emp}
+                      domainName={emp.domainId ? domainNameById.get(emp.domainId) : undefined}
                       hotTasks={EMPLOYEE_HOT_TASKS[emp.id] || []}
                       onDispatchTask={handleDispatchTask}
                       onHotTaskClick={handleHotTaskClick}
@@ -209,6 +249,7 @@ export function AiEmployeesClient({
                   <EmployeeAgentCard
                     key={emp.dbId}
                     employee={emp}
+                    domainName={emp.domainId ? domainNameById.get(emp.domainId) : undefined}
                     hotTasks={EMPLOYEE_HOT_TASKS[emp.id] || []}
                     onDispatchTask={handleDispatchTask}
                     onHotTaskClick={handleHotTaskClick}

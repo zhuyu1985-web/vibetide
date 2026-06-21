@@ -1,5 +1,6 @@
 import { getEmployees } from "@/lib/dal/employees";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
+import { listDomainsByOrg } from "@/lib/dal/domains";
 import { AiEmployeesClient } from "./ai-employees-client";
 import type { AIEmployee } from "@/lib/types";
 
@@ -17,6 +18,13 @@ export default async function AiEmployeesPage() {
     withTimeout(getEmployees(), []),
     withTimeout(getCurrentUserOrg(), null),
   ]);
+  const domains = orgId ? await withTimeout(listDomainsByOrg(orgId), []) : [];
 
-  return <AiEmployeesClient employees={employees} organizationId={orgId || ""} />;
+  return (
+    <AiEmployeesClient
+      employees={employees}
+      organizationId={orgId || ""}
+      domains={domains}
+    />
+  );
 }

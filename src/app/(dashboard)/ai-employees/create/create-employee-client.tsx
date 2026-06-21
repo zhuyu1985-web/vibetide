@@ -9,7 +9,7 @@ import {
 } from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { createCustomEmployee } from "@/app/actions/custom-employees";
-import type { Skill } from "@/lib/types";
+import type { Skill, DomainRecord } from "@/lib/types";
 import type { KnowledgeBaseInfo } from "@/lib/types";
 import {
   ChevronLeft,
@@ -29,6 +29,7 @@ import {
 interface CreateEmployeeClientProps {
   skills: Skill[];
   knowledgeBases: KnowledgeBaseInfo[];
+  domains: DomainRecord[];
 }
 
 // 9 个内容工种作为基础模板(编排器 producer 是幕后总编,不在此创建实例)。
@@ -36,11 +37,7 @@ const TEMPLATE_CRAFTS: CraftType[] = ORDERED_CRAFTS.filter(
   (c) => c !== "producer",
 );
 
-// 领域(领域维度)预设标签 + 媒体形态(形态维度)+ 层级(authority)。
-const PRESET_DOMAINS = [
-  "时政", "财经", "社会", "民生", "法治", "文体",
-  "科技", "国际", "娱乐", "教育", "健康", "军事",
-];
+// 媒体形态(形态维度)+ 层级(authority)。领域改用 domains 字典单选(P2)。
 const MEDIA_FORMS: { value: "news" | "newmedia" | "convergence"; label: string }[] = [
   { value: "news", label: "新闻 · 规范书面" },
   { value: "newmedia", label: "新媒体 · 口语短" },
@@ -121,6 +118,7 @@ function StepIndicator({ current }: { current: number }) {
 export function CreateEmployeeClient({
   skills,
   knowledgeBases,
+  domains,
 }: CreateEmployeeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -131,8 +129,7 @@ export function CreateEmployeeClient({
   const [selectedCraft, setSelectedCraft] = useState<CraftType | null>(null);
   const [customName, setCustomName] = useState("");
   const [customDesc, setCustomDesc] = useState("");
-  const [domainTags, setDomainTags] = useState<string[]>([]);
-  const [newDomainTag, setNewDomainTag] = useState("");
+  const [domainId, setDomainId] = useState<string | null>(null);
   const [mediaForm, setMediaForm] = useState<
     "news" | "newmedia" | "convergence" | ""
   >("");
@@ -196,8 +193,8 @@ export function CreateEmployeeClient({
           knowledgeBaseIds: Array.from(selectedKBIds),
           visibility,
           authorityLevel: authority,
+          domainId,
           instanceConfig: {
-            domainTags,
             mediaForm: mediaForm || undefined,
             platformSpecs: undefined,
           },
@@ -216,7 +213,7 @@ export function CreateEmployeeClient({
     selectedKBIds,
     visibility,
     authority,
-    domainTags,
+    domainId,
     mediaForm,
     router,
     startTransition,
@@ -246,10 +243,9 @@ export function CreateEmployeeClient({
             onNameChange={setCustomName}
             customDesc={customDesc}
             onDescChange={setCustomDesc}
-            domainTags={domainTags}
-            onDomainTagsChange={setDomainTags}
-            newDomainTag={newDomainTag}
-            onNewDomainTagChange={setNewDomainTag}
+            domains={domains}
+            domainId={domainId}
+            onDomainIdChange={setDomainId}
             mediaForm={mediaForm}
             onMediaFormChange={setMediaForm}
             authority={authority}
@@ -274,7 +270,11 @@ export function CreateEmployeeClient({
             selectedCraft={selectedCraft}
             customName={customName}
             customDesc={customDesc}
-            domainTags={domainTags}
+            domainLabel={
+              domainId
+                ? domains.find((d) => d.id === domainId)?.name ?? "通用"
+                : "通用"
+            }
             mediaForm={mediaForm}
             authority={authority}
             selectedSkillCount={selectedSkillIds.size}
@@ -346,10 +346,9 @@ function Step1Positioning({
   onNameChange,
   customDesc,
   onDescChange,
-  domainTags,
-  onDomainTagsChange,
-  newDomainTag,
-  onNewDomainTagChange,
+  domains,
+  domainId,
+  onDomainIdChange,
   mediaForm,
   onMediaFormChange,
   authority,
@@ -361,10 +360,9 @@ function Step1Positioning({
   onNameChange: (v: string) => void;
   customDesc: string;
   onDescChange: (v: string) => void;
-  domainTags: string[];
-  onDomainTagsChange: (v: string[]) => void;
-  newDomainTag: string;
-  onNewDomainTagChange: (v: string) => void;
+  domains: DomainRecord[];
+  domainId: string | null;
+  onDomainIdChange: (v: string | null) => void;
   mediaForm: "news" | "newmedia" | "convergence" | "";
   onMediaFormChange: (v: "news" | "newmedia" | "convergence" | "") => void;
   authority: "observer" | "advisor" | "executor" | "coordinator";
@@ -451,43 +449,46 @@ function Step1Positioning({
             决定内容 / 术语 / 口径(配合知识库)
           </span>
         </label>
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {PRESET_DOMAINS.map((d) => {
-            const on = domainTags.includes(d);
-            return (
-              <button
-                key={d}
-                onClick={() =>
-                  onDomainTagsChange(
-                    on ? domainTags.filter((x) => x !== d) : [...domainTags, d],
-                  )
-                }
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
-                  on
-                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    : "bg-black/[0.03] dark:bg-white/[0.05] text-gray-500 dark:text-white/45 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
-                }`}
-              >
-                {on && <Check className="w-3 h-3" />}
-                {d}
-              </button>
-            );
-          })}
-        </div>
-        <input
-          type="text"
-          value={newDomainTag}
-          onChange={(e) => onNewDomainTagChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && newDomainTag.trim()) {
-              const v = newDomainTag.trim();
-              if (!domainTags.includes(v)) onDomainTagsChange([...domainTags, v]);
-              onNewDomainTagChange("");
-            }
-          }}
-          placeholder="自定义领域…回车添加"
-          className={inputCls + " max-w-xs"}
-        />
+        {domains.length === 0 ? (
+          <p className="text-xs text-amber-500">
+            尚无领域字典，去{" "}
+            <a className="underline" href="/settings/domains">
+              领域管理
+            </a>{" "}
+            创建或导入默认领域。
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onDomainIdChange(null)}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
+                domainId === null
+                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  : "bg-black/[0.03] dark:bg-white/[0.05] text-gray-500 dark:text-white/45 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
+              }`}
+            >
+              {domainId === null && <Check className="w-3 h-3" />}
+              不限领域
+            </button>
+            {domains.map((d) => {
+              const on = domainId === d.id;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => onDomainIdChange(d.id)}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
+                    on
+                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                      : "bg-black/[0.03] dark:bg-white/[0.05] text-gray-500 dark:text-white/45 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {on && <Check className="w-3 h-3" />}
+                  {d.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 媒体形态(形态维度)*/}
@@ -733,7 +734,7 @@ function Step3Preview({
   selectedCraft,
   customName,
   customDesc,
-  domainTags,
+  domainLabel,
   mediaForm,
   authority,
   selectedSkillCount,
@@ -746,7 +747,7 @@ function Step3Preview({
   selectedCraft: CraftType | null;
   customName: string;
   customDesc: string;
-  domainTags: string[];
+  domainLabel: string;
   mediaForm: "news" | "newmedia" | "convergence" | "";
   authority: "observer" | "advisor" | "executor" | "coordinator";
   selectedSkillCount: number;
@@ -793,7 +794,7 @@ function Step3Preview({
               领域
             </div>
             <div className="text-sm font-medium text-gray-800 dark:text-white/80 line-clamp-1">
-              {domainTags.length > 0 ? domainTags.join("、") : "通用"}
+              {domainLabel}
             </div>
           </div>
           <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3">
