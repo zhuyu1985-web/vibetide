@@ -12,10 +12,11 @@ import { recordInboundMessage, recordOutboundMessage } from "@/app/actions/chann
 import { findTemplateByNameOrSlug } from "@/lib/dal/workflow-templates-listing";
 import { inngest } from "@/inngest/client";
 import { extractUrls } from "./link-extract";
-import { getOrCreateSession, updateSession } from "@/lib/dal/channel-sessions";
+import { getOrCreateSession, updateSession, resetSession } from "@/lib/dal/channel-sessions";
 import type { ChannelSessionRow } from "@/lib/dal/channel-sessions";
 import { clarifyOrPlan } from "./clarify-or-plan";
 import { startChannelMission } from "./start-channel-mission";
+import { cancelChannelMission } from "./cancel-channel-mission";
 import { formatPlanCard } from "./format-plan-card";
 import { isConfirm, isCancel } from "./confirm-keywords";
 import type { IntentStep } from "@/lib/agent/types";
@@ -267,7 +268,7 @@ async function handleFreeFormMessage(
   const session = await getOrCreateSession(channelCtx);
 
   if (session.status === "running") {
-    return { reply: "⏳ 上一个请求还在处理中，完成后会在群里回结果，请稍候。" };
+    return handleRunningMessage(text, msg, session, channelCtx);
   }
 
   if (session.status === "confirming") {
@@ -300,6 +301,34 @@ async function handleFreeFormMessage(
   }
 
   return enterConfirming(session.id, turns, result.summary, result.steps);
+}
+
+// ---------------------------------------------------------------------------
+// Running state handler
+// ---------------------------------------------------------------------------
+
+async function handleRunningMessage(
+  text: string,
+  msg: StandardizedMessage,
+  session: ChannelSessionRow,
+  channelCtx: { organizationId: string; configId: string; platform: "dingtalk" | "wechat_work"; chatId: string; externalUserId: string },
+): Promise<{ reply: string; missionId?: string }> {
+  if (!isCancel(text)) {
+    return { reply: "⏳ 上一个请求还在处理中，完成后会在群里回结果。回复\"取消\"可中止。" };
+  }
+  if (!session.activeMissionId) {
+    await resetSession(channelCtx);
+    return { reply: "任务已结束，无需取消。" };
+  }
+  let ok = false;
+  try {
+    ok = await cancelChannelMission(session.activeMissionId, msg.organizationId);
+  } catch (err) {
+    console.error("[gateway] cancelChannelMission failed:", err);
+    return { reply: "系统忙，请稍后再试。" };
+  }
+  await resetSession(channelCtx);
+  return { reply: ok ? "🛑 已取消任务，可重新发起。" : "任务已结束，无需取消。" };
 }
 
 // ---------------------------------------------------------------------------

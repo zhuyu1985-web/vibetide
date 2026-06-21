@@ -3,15 +3,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   getOrCreateSession,
   updateSession,
+  resetSession,
   clarifyOrPlan,
   startChannelMission,
+  cancelChannelMission,
   recordInboundMessage,
   recordOutboundMessage,
 } = vi.hoisted(() => ({
   getOrCreateSession: vi.fn(),
   updateSession: vi.fn(),
+  resetSession: vi.fn(),
   clarifyOrPlan: vi.fn(),
   startChannelMission: vi.fn(),
+  cancelChannelMission: vi.fn(),
   recordInboundMessage: vi.fn().mockResolvedValue({ messageId: "x" }),
   recordOutboundMessage: vi.fn().mockResolvedValue({ messageId: "y" }),
 }));
@@ -19,10 +23,11 @@ const {
 vi.mock("@/lib/dal/channel-sessions", () => ({
   getOrCreateSession,
   updateSession,
-  resetSession: vi.fn(),
+  resetSession,
 }));
 vi.mock("@/lib/channels/clarify-or-plan", () => ({ clarifyOrPlan }));
 vi.mock("@/lib/channels/start-channel-mission", () => ({ startChannelMission }));
+vi.mock("@/lib/channels/cancel-channel-mission", () => ({ cancelChannelMission }));
 vi.mock("@/app/actions/channels", () => ({ recordInboundMessage, recordOutboundMessage }));
 
 // Mock modules used by other gateway branches (not under test)
@@ -50,16 +55,40 @@ beforeEach(() => {
 });
 
 describe("gateway 自由消息澄清循环", () => {
-  it("running 中 → 回'处理中'，不调 clarifyOrPlan", async () => {
-    getOrCreateSession.mockResolvedValue({
-      id: "s1",
-      status: "running",
-      contextTurns: [],
-      clarifyRounds: 0,
-    });
+  it("running + 非取消词 → 回'处理中'含取消提示，不调 clarifyOrPlan/cancel/reset", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "running", activeMissionId: "m1", contextTurns: [], clarifyRounds: 0 });
     const r = await handleInboundMessage(msg);
     expect(r.reply).toContain("处理中");
+    expect(r.reply).toContain("取消");
     expect(clarifyOrPlan).not.toHaveBeenCalled();
+    expect(cancelChannelMission).not.toHaveBeenCalled();
+    expect(resetSession).not.toHaveBeenCalled();
+  });
+
+  it("running + 取消 → cancelChannelMission + resetSession + 回已取消", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "running", activeMissionId: "m1", contextTurns: [], clarifyRounds: 0 });
+    cancelChannelMission.mockResolvedValue(true);
+    const r = await handleInboundMessage({ ...msg, textContent: "取消" });
+    expect(cancelChannelMission).toHaveBeenCalledWith("m1", "org1");
+    expect(resetSession).toHaveBeenCalled();
+    expect(startChannelMission).not.toHaveBeenCalled();
+    expect(r.reply).toContain("已取消");
+  });
+
+  it("running + 取消 但 cancel 返回 false（已终态）→ 回任务已结束", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "running", activeMissionId: "m1", contextTurns: [], clarifyRounds: 0 });
+    cancelChannelMission.mockResolvedValue(false);
+    const r = await handleInboundMessage({ ...msg, textContent: "取消" });
+    expect(resetSession).toHaveBeenCalled();
+    expect(r.reply).toContain("已结束");
+  });
+
+  it("running + 取消 但 activeMissionId 空 → 仅 resetSession，不调 cancelChannelMission", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "running", activeMissionId: null, contextTurns: [], clarifyRounds: 0 });
+    const r = await handleInboundMessage({ ...msg, textContent: "取消" });
+    expect(cancelChannelMission).not.toHaveBeenCalled();
+    expect(resetSession).toHaveBeenCalled();
+    expect(r.reply).toContain("已结束");
   });
 
   it("clarify → 回问题，session=clarifying，轮数+1", async () => {
