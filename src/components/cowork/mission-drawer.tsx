@@ -1,11 +1,11 @@
 "use client";
 
-import { Loader2, X } from "lucide-react";
+import { ChevronLeft, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CoworkMissionPanel } from "./cowork-mission-panel";
 
 /**
- * 会话页右侧 mission 抽屉:默认收起(open=false 时不渲染,对话流占满宽度)。
+ * 会话页右侧 mission 抽屉:有 mission 时关闭态折叠为窄栏,保留再次展开入口。
  * - 发送瞬间 open=true 但 missionId 仍为空 → 显 loading「正在解析意图…」(立即反馈)。
  * - mission 解析好(focus)→ 渲染 CoworkMissionPanel(含具名 SSE 实时打勾)。
  * - 也可点对话里 mission 卡片直接 focus 打开。关闭按钮回调 onClose。
@@ -13,13 +13,37 @@ import { CoworkMissionPanel } from "./cowork-mission-panel";
 export function MissionDrawer({
   missionId,
   open,
+  onOpen,
   onClose,
 }: {
   missionId: string | null;
   open: boolean;
+  onOpen: () => void;
   onClose: () => void;
 }) {
-  if (!open) return null;
+  if (!open) {
+    if (!missionId) return null;
+    return (
+      <aside className="flex w-11 flex-none flex-col items-center border-l border-border/60 bg-muted/20 py-2">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onOpen}
+          aria-label="展开执行过程"
+          title="展开执行过程"
+          className="size-8"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <div className="mt-2 flex flex-1 items-start justify-center">
+          <span className="[writing-mode:vertical-rl] text-[11px] font-medium text-muted-foreground">
+            执行过程
+          </span>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <div className="flex-none animate-in fade-in slide-in-from-right-4 duration-200">
       {missionId ? (

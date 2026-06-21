@@ -9,9 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Mic, Paperclip, ArrowUp, Route, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
-import { AuroraBackground } from "@/components/shared/aurora-background";
-import { GeminiRing } from "@/components/shared/gemini-ring";
+import { ParticleBackground } from "@/components/shared/particle-background";
 import { HeroSection } from "@/components/home/hero-section";
 import { EmployeeQuickPanel } from "@/components/home/employee-quick-panel";
 import { ScenarioGrid } from "@/components/home/scenario-grid";
@@ -57,12 +55,6 @@ export function HomeWorkspaceClient({
     });
   }
 
-  function handleEmployeeClick(id: EmployeeId) {
-    const name = EMPLOYEE_META[id]?.nickname ?? id;
-    setInput((prev) => (prev.startsWith("@") ? prev : `@${name} ${prev}`));
-    textareaRef.current?.focus();
-  }
-
   return (
     <div className="flex h-full overflow-hidden">
       <CoworkSidebar
@@ -72,7 +64,10 @@ export function HomeWorkspaceClient({
       />
 
       <div className="relative flex-1 overflow-y-auto scrollbar-thin">
-        <AuroraBackground className="pointer-events-none fixed inset-0 z-0" />
+        <ParticleBackground
+          particleCount={60}
+          className="pointer-events-none fixed inset-0 z-0 opacity-20 dark:opacity-50"
+        />
 
         <div className="relative z-10 mx-auto max-w-4xl px-6 pb-12">
           <HeroSection />
@@ -80,7 +75,6 @@ export function HomeWorkspaceClient({
           {/* 居中输入框 */}
           <div className="mx-auto mt-2 max-w-[760px]">
             <div className="gemini-border rounded-2xl bg-white transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
-              <GeminiRing />
               <div className="px-5 pb-2 pt-4">
                 <textarea
                   ref={textareaRef}
@@ -136,9 +130,9 @@ export function HomeWorkspaceClient({
             </div>
           </div>
 
-          {/* AI 专家团队 */}
-          <div className="mx-auto mt-4 max-w-[760px]">
-            <EmployeeQuickPanel onEmployeeClick={handleEmployeeClick} />
+          {/* AI 专家团队（信任条） */}
+          <div className="mx-auto mt-3 max-w-[760px]">
+            <EmployeeQuickPanel />
           </div>
 
           {/* 场景快捷启动 */}

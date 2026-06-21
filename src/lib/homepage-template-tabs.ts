@@ -1,22 +1,27 @@
 /**
- * 首页"共享 tab" 白名单 —— 接受 pin / reorder 操作的 9 个 tab。
+ * 首页"共享 tab" 白名单 —— 接受 pin / reorder 操作的 tab：主流场景 + 11 场景品类。
  *
  * 抽到本模块是为了让 client 组件也能 import：server action 文件
  * (`src/app/actions/homepage-template-order.ts`) 有 `"use server"` 指令，
  * 只允许 export async 函数，不能 export 常量 / 同步函数给客户端使用。
  *
- * `"custom"` 不在此清单里 —— 自定义 tab 不参与置顶 / 排序。
+ * `"custom"`（我的工作流）不在此清单里 —— 自定义 tab 不参与置顶 / 排序。
+ * 与 `ORDERED_CATEGORIES`(constants) 去掉 `custom` 后逐一对应；这里硬编码字面量
+ * 是为了保留 `as const` 精确字面类型给 `AllowedTabKey`。
  */
 export const ALLOWED_TAB_KEYS = [
   "featured",
-  "xiaolei",
-  "xiaoce",
-  "xiaozi",
-  "xiaowen",
-  "xiaojian",
-  "xiaoshen",
-  "xiaofa",
-  "xiaoshu",
+  "news",
+  "deep",
+  "social",
+  "advanced",
+  "livelihood",
+  "podcast",
+  "drama",
+  "daily_brief",
+  "video",
+  "analytics",
+  "distribution",
 ] as const;
 
 export type AllowedTabKey = (typeof ALLOWED_TAB_KEYS)[number];

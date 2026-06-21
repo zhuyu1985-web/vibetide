@@ -5,8 +5,7 @@ import { getPerformanceTrend } from "@/lib/dal/performance";
 import { getUserFeedbackStats, getLearnedPatterns, getEvolutionCurve, getEffectAttributions } from "@/lib/dal/evolution";
 import { getConfigVersions, getSkillCombos } from "@/lib/dal/employee-advanced";
 import { getRecentMemories, getUnprocessedFeedbackCount } from "@/lib/dal/learning";
-import { listTemplatesForHomepageByTab } from "@/lib/dal/workflow-templates-listing";
-import type { EmployeeId } from "@/lib/constants";
+import { listTemplatesByOwnerEmployee } from "@/lib/dal/workflow-templates-listing";
 import { getCurrentUserOrg, getCurrentUserProfile } from "@/lib/dal/auth";
 import { PERMISSIONS } from "@/lib/rbac-constants";
 import { notFound } from "next/navigation";
@@ -86,7 +85,7 @@ export default async function EmployeeProfilePage({
       // 过滤（之前用 defaultTeam 包含匹配，会把"协作成员"身份的场景也算进来，
       // 导致质量审核官显示"深度报道""系列策划"等无关场景）。
       orgId
-        ? listTemplatesForHomepageByTab(orgId, employee.id as EmployeeId).catch(() => [])
+        ? listTemplatesByOwnerEmployee(orgId, employee.id).catch(() => [])
         : Promise.resolve([]),
     ]);
 

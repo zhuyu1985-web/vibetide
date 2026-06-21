@@ -37,6 +37,7 @@ import {
   unpinHomepageTemplate,
 } from "@/app/actions/homepage-template-order";
 import { isAllowedTabKey } from "@/lib/homepage-template-tabs";
+import { ORDERED_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants";
 import type { EmployeeId } from "@/lib/constants";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { HomepageTabKey } from "@/lib/dal/workflow-templates-listing";
@@ -82,16 +83,14 @@ interface TabDef {
   label: string;
 }
 
+// 主流场景 + 11 场景品类（按 ORDERED_CATEGORIES，去掉 custom）+ 我的工作流。
+// 品类标签取自 CATEGORY_LABELS，单一真相源，与首页 fetch / 派单分类一致。
 const TAB_ORDER: TabDef[] = [
   { key: "featured", label: "常用场景" },
-  { key: "xiaolei", label: "热点分析" },
-  { key: "xiaoce", label: "选题策划" },
-  { key: "xiaozi", label: "素材研究" },
-  { key: "xiaowen", label: "内容创作" },
-  { key: "xiaojian", label: "视频脚本" },
-  { key: "xiaoshen", label: "质量审核" },
-  { key: "xiaofa", label: "渠道运营" },
-  { key: "xiaoshu", label: "数据分析" },
+  ...ORDERED_CATEGORIES.filter((c) => c !== "custom").map((c) => ({
+    key: c,
+    label: CATEGORY_LABELS[c],
+  })),
   { key: "custom", label: "我的工作流" },
 ];
 
@@ -263,6 +262,19 @@ export const ScenarioGrid = React.memo(function ScenarioGrid({
     Record<string, string[] | undefined>
   >({});
 
+  // 品类 tab 仅在有模板时显示，避免空 tab 撑满 tab 条；featured / custom 始终
+  // 保留（featured 是默认落地页，custom 是"我的工作流"入口，空态有专属引导）。
+  const visibleTabs = React.useMemo(
+    () =>
+      TAB_ORDER.filter(
+        (t) =>
+          t.key === "featured" ||
+          t.key === "custom" ||
+          (templatesByTab[t.key]?.length ?? 0) > 0,
+      ),
+    [templatesByTab],
+  );
+
   const handleCardClick = React.useCallback(
     (tpl: WorkflowTemplateRow) => {
       setLaunching(tpl);
@@ -360,14 +372,14 @@ export const ScenarioGrid = React.memo(function ScenarioGrid({
           variant="glass"
           className="gap-0.5 max-w-full whitespace-nowrap"
         >
-          {TAB_ORDER.map((t) => (
+          {visibleTabs.map((t) => (
             <TabsTrigger key={t.key} value={t.key}>
               {t.label}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {TAB_ORDER.map((tab) => {
+        {visibleTabs.map((tab) => {
           const rawList = (templatesByTab[tab.key] ?? []) as TplWithPin[];
           const isSharedTab = isAllowedTabKey(tab.key);
           const showEditing =

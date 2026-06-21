@@ -7,6 +7,7 @@ import {
   listTemplatesForHomepageByTab,
   type HomepageTabKey,
 } from "@/lib/dal/workflow-templates-listing";
+import { ORDERED_CATEGORIES } from "@/lib/constants";
 import type { WorkflowTemplateRow } from "@/db/types";
 import type { Project } from "@/db/schema/projects";
 import type { Conversation } from "@/db/schema/conversations";
@@ -14,19 +15,9 @@ import { HomeWorkspaceClient } from "./home-workspace-client";
 
 export const dynamic = "force-dynamic";
 
-// 首页 tab — "主流场景 + 8 职能 + 我的工作流" = 10 tab，服务端并行 fetch。
-const HOMEPAGE_TAB_KEYS: HomepageTabKey[] = [
-  "featured",
-  "xiaolei",
-  "xiaoce",
-  "xiaozi",
-  "xiaowen",
-  "xiaojian",
-  "xiaoshen",
-  "xiaofa",
-  "xiaoshu",
-  "custom",
-];
+// 首页 tab — "主流场景 + 11 场景品类 + 我的工作流"，服务端并行 fetch。
+// ORDERED_CATEGORIES 末项即 "custom"，复用为"我的工作流" tab（DAL 按 createdBy 过滤）。
+const HOMEPAGE_TAB_KEYS: HomepageTabKey[] = ["featured", ...ORDERED_CATEGORIES];
 
 export default async function HomePage() {
   let projects: Project[] = [];

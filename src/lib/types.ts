@@ -38,6 +38,10 @@ export interface Skill {
   type: "builtin" | "custom" | "plugin";
   description: string;
   bindingType?: "core" | "extended" | "knowledge";
+  /** 四层重构:tool=通用工具(人人可调) / skill=专业技能(挂工种)。 */
+  kind?: "tool" | "skill";
+  /** 专业技能的兼容工种(craft slug);通用工具为空。 */
+  compatibleRoles?: string[];
 }
 
 export type SkillCategory =

@@ -9,17 +9,20 @@ import {
 } from "@/lib/homepage-template-tabs";
 
 describe("isAllowedTabKey", () => {
-  it("包含 featured + 8 员工 slug", () => {
+  it("包含 featured + 11 场景品类", () => {
     expect(ALLOWED_TAB_KEYS).toEqual([
       "featured",
-      "xiaolei",
-      "xiaoce",
-      "xiaozi",
-      "xiaowen",
-      "xiaojian",
-      "xiaoshen",
-      "xiaofa",
-      "xiaoshu",
+      "news",
+      "deep",
+      "social",
+      "advanced",
+      "livelihood",
+      "podcast",
+      "drama",
+      "daily_brief",
+      "video",
+      "analytics",
+      "distribution",
     ]);
   });
   it("custom 不在白名单", () => {
@@ -29,7 +32,7 @@ describe("isAllowedTabKey", () => {
     expect(isAllowedTabKey("xiaoming")).toBe(false);
     expect(isAllowedTabKey("")).toBe(false);
   });
-  it("9 个合法 tab 返回 true", () => {
+  it("所有合法 tab 返回 true", () => {
     for (const t of ALLOWED_TAB_KEYS) {
       expect(isAllowedTabKey(t)).toBe(true);
     }

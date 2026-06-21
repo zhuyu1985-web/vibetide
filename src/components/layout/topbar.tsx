@@ -93,11 +93,9 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
     <header
       className="h-14 border-b border-[var(--glass-border)] flex items-center px-4 gap-4 sticky top-0 z-30"
       style={{
-        // 顶栏全宽贴在动画粒子画布上,blur 每帧随画布重算;20→14 明显降 GPU,
-        // 玻璃观感几乎无损。其余 .glass-* 大半径模糊也已在 globals.css 同步下调。
         background: 'var(--glass-panel-bg)',
-        backdropFilter: 'blur(14px) saturate(130%)',
-        WebkitBackdropFilter: 'blur(14px) saturate(130%)',
+        backdropFilter: 'blur(20px) saturate(130%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(130%)',
       }}
     >
       <Breadcrumb>

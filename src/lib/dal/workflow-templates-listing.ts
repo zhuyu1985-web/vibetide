@@ -6,7 +6,7 @@ import {
 import { organizations } from "@/db/schema/users";
 import { and, eq, asc, or, ilike, sql, type SQL } from "drizzle-orm";
 import type { WorkflowTemplateRow } from "@/db/types";
-import type { EmployeeId } from "@/lib/constants";
+import type { OrderedCategory } from "@/lib/constants";
 
 /**
  * Pure selector for the "default" 热点追踪 workflow template.
@@ -149,17 +149,18 @@ export async function findTemplateByNameOrSlug(
  * Homepage "10-tab" grid tab key union.
  *
  * - `"featured"` —— 主流场景 tab（新增，is_featured=true 过滤）
- * - `EmployeeId` —— 8 员工职能 tab（xiaolei / xiaoce / ... / xiaoshu）
- * - `"custom"` —— 我的工作流 tab（is_builtin=false）
+ * - `OrderedCategory`(去 custom) —— 11 个场景品类 tab（news / deep / … / distribution）
+ * - `"custom"` —— 我的工作流 tab（is_builtin=false；OrderedCategory 已含 custom，
+ *   此处复用同名 key 承载"我的工作流"语义，不作 category 过滤）
  */
-export type HomepageTabKey = "featured" | EmployeeId | "custom";
+export type HomepageTabKey = "featured" | OrderedCategory;
 
 /**
  * Unified homepage-grid query. 替代原 `listTemplatesForHomepageByEmployee`。
  *
  * - `"featured"`：`is_featured=true AND is_public=true`
  * - `"custom"`：`is_builtin=false AND created_by=userId`（= /workflows 页 "我的工作流" 语义）
- * - EmployeeId：`owner_employee_id=<id> AND is_public=true`
+ * - category：`category=<key> AND is_public=true`
  *
  * `"custom"` 分支需要 `opts.userId`；若未提供则返回 []（未登录不显示"我的"）。
  * 所有分支附加 `organization_id=orgId` + `orderBy(asc(createdAt))`。
@@ -197,9 +198,9 @@ export async function listTemplatesForHomepageByTab(
     conds.push(eq(workflowTemplates.isBuiltin, false));
     conds.push(eq(workflowTemplates.createdBy, opts!.userId!));
   } else {
-    // tab 是 EmployeeId
+    // tab 是 category（news / deep / … / distribution）
     conds.push(eq(workflowTemplates.isPublic, true));
-    conds.push(eq(workflowTemplates.ownerEmployeeId, tab));
+    conds.push(eq(workflowTemplates.category, tab));
   }
 
   if (tab === "custom") {
@@ -211,7 +212,7 @@ export async function listTemplatesForHomepageByTab(
     return rows as WorkflowTemplateRow[];
   }
 
-  // 9 个共享 tab：LEFT JOIN 顺序表 + 应用层排序
+  // 共享 tab（featured + 品类）：LEFT JOIN 顺序表 + 应用层排序
   const joinedRows = await db
     .select({
       tpl: workflowTemplates,
@@ -249,15 +250,36 @@ export async function listTemplatesForHomepageByTab(
 }
 
 /**
- * @deprecated 2026-04-20 首页 tab 重构 —— 请改用 `listTemplatesForHomepageByTab`。
- * 保留别名是为了不破坏现有调用点；custom 分支需要 userId 才返回结果。
+ * 按 owner 员工(垂类归属)列出该员工"拥有"的公开工作流模板。
+ *
+ * 与首页 `listTemplatesForHomepageByTab` 的品类 tab 不同 —— 这里严格按
+ * `ownerEmployeeId` 过滤（供 `/employee/[id]` 详情页"日常工作流"区使用），
+ * 同样排除 steps 为空 / 无有效 skill 的遗留模板，按 createdAt 升序。
  */
-export async function listTemplatesForHomepageByEmployee(
+export async function listTemplatesByOwnerEmployee(
   orgId: string,
-  employeeId: EmployeeId | null,
-  opts?: { userId?: string },
+  ownerEmployeeId: string,
 ): Promise<WorkflowTemplateRow[]> {
-  return listTemplatesForHomepageByTab(orgId, employeeId ?? "custom", opts);
+  const rows = await db
+    .select()
+    .from(workflowTemplates)
+    .where(
+      and(
+        eq(workflowTemplates.organizationId, orgId),
+        eq(workflowTemplates.isPublic, true),
+        eq(workflowTemplates.ownerEmployeeId, ownerEmployeeId),
+        sql`${workflowTemplates.steps} IS NOT NULL
+          AND jsonb_typeof(${workflowTemplates.steps}) = 'array'
+          AND jsonb_array_length(${workflowTemplates.steps}) > 0
+          AND EXISTS (
+            SELECT 1 FROM jsonb_array_elements(${workflowTemplates.steps}) AS s
+            WHERE coalesce(s->'config'->>'skillSlug', '') <> ''
+               OR coalesce(s->'config'->>'skillName', '') <> ''
+          )`,
+      ),
+    )
+    .orderBy(asc(workflowTemplates.createdAt));
+  return rows as WorkflowTemplateRow[];
 }
 
 export type TemplateWithOrder = {

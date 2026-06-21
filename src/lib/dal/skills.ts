@@ -71,6 +71,7 @@ function mapSkillSummary(s: {
   version: string;
   type: string;
   description: string;
+  kind?: string | null;
 }): Skill {
   return {
     id: s.id,
@@ -80,6 +81,7 @@ function mapSkillSummary(s: {
     level: 0,
     type: s.type as "builtin" | "custom" | "plugin",
     description: s.description,
+    kind: (s.kind as "tool" | "skill" | undefined) ?? undefined,
   };
 }
 
@@ -256,6 +258,7 @@ export async function getSkillsWithBindCount(): Promise<SkillWithBindCount[]> {
       name: skills.name,
       category: skills.category,
       type: skills.type,
+      kind: skills.kind,
       version: skills.version,
       description: skills.description,
       compatibleRoles: skills.compatibleRoles,

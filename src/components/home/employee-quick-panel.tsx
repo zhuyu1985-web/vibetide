@@ -1,123 +1,55 @@
 "use client";
 
-import { memo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
-import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { ORDERED_CRAFTS, type CraftType } from "@/lib/constants";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
-import { cn } from "@/lib/utils";
 
-const DISPLAY_EMPLOYEES: EmployeeId[] = [
-  "xiaolei",
-  "xiaoce",
-  "xiaozi",
-  "xiaowen",
-  "xiaojian",
-  "xiaoshen",
-  "xiaofa",
-  "xiaoshu",
+/**
+ * 首页「AI 专家团队」信任条 —— 四层重构后【纯展示·非选择器】。
+ * 用户开工只面对"场景 / 对话",从不挑员工;这里只用一行轻量信任条让用户感知
+ * "背后有一支按工种分工的专业团队",并提供通往团队管理 / AI-HR 页的入口。
+ * 重叠头像簇(非可点网格)天然读作"一个团队",而非"可选项"。
+ */
+const SHOWCASE_CRAFTS: CraftType[] = ORDERED_CRAFTS.filter(
+  (c) => c !== "producer",
+);
+
+// 信任条里只叠放几个代表工种的头像,营造"团队"观感(不逐个露出全部工种)。
+const AVATAR_CRAFTS: CraftType[] = [
+  "director",
+  "reporter",
+  "editor",
+  "reviewer",
+  "operator",
 ];
 
-interface EmployeeQuickPanelProps {
-  activeEmployee?: EmployeeId | null;
-  onEmployeeClick: (id: EmployeeId) => void;
-}
-
-const containerVariants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" as const } },
-};
-
-// memo: 父组件 keystroke 高频重 render,只有 activeEmployee 切换时才需要更新
-export const EmployeeQuickPanel = memo(function EmployeeQuickPanel({
-  activeEmployee,
-  onEmployeeClick,
-}: EmployeeQuickPanelProps) {
-  // 头像默认静止,仅悬停(或激活)时跑动画 —— 8 个头像 × 多个内部 SVG infinite
-  // 动画常驻是 /home 前台 GPU/CPU 的一块。静止态对页面"观感"几乎无损,
-  // 鼠标移上去才"活过来",反而是更聚焦的交互。
-  const [hoveredId, setHoveredId] = useState<EmployeeId | null>(null);
-
+export function EmployeeQuickPanel() {
   return (
-    <div className="w-full">
-      {/* Section header */}
-      <div className="flex items-center justify-between mb-2 px-1">
-        <span className="text-xs font-medium text-muted-foreground">AI 专家团队</span>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/ai-employees/create"
-            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-200"
-          >
-            <Plus size={14} />
-            创建员工
-          </Link>
-          <Link
-            href="/ai-employees"
-            className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200"
-          >
-            全部员工 →
-          </Link>
+    <motion.div
+      className="flex items-center justify-between gap-3 px-1"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        {/* 重叠头像簇,复用场景卡 defaultTeam 的视觉语言 */}
+        <div className="flex items-center -space-x-2">
+          {AVATAR_CRAFTS.map((craft) => (
+            <EmployeeAvatar key={craft} employeeId={craft} size="sm" />
+          ))}
         </div>
+        <span className="truncate text-xs text-muted-foreground">
+          一支按工种分工的 AI 团队 · {SHOWCASE_CRAFTS.length} 个工种协同
+        </span>
       </div>
 
-      {/* Employee row */}
-      <motion.div
-        className="grid grid-cols-8 gap-1 pb-2"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+      <Link
+        href="/ai-employees"
+        className="shrink-0 text-xs text-muted-foreground/70 transition-colors duration-200 hover:text-foreground"
       >
-        {DISPLAY_EMPLOYEES.map((id) => {
-          const emp = EMPLOYEE_META[id];
-          const isActive = activeEmployee === id;
-          const isLive = hoveredId === id || isActive;
-
-          return (
-            <motion.button
-              key={id}
-              variants={cardVariants}
-              onClick={() => onEmployeeClick(id)}
-              onHoverStart={() => setHoveredId(id)}
-              onHoverEnd={() => setHoveredId((prev) => (prev === id ? null : prev))}
-              whileHover={{ y: -1 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-              className={cn(
-                "flex w-full flex-col items-center gap-2 rounded-xl px-1 py-3",
-                "cursor-pointer transition-colors duration-200 border-0",
-                isActive
-                  ? "bg-accent"
-                  : "bg-transparent hover:bg-muted/50"
-              )}
-            >
-              {/* isLive 时跑完整动画;否则 avatar-static 冻结内部 SVG infinite 动画 */}
-              <EmployeeAvatar
-                employeeId={id}
-                size="lg"
-                animated={isLive}
-                className={isLive ? undefined : "avatar-static"}
-              />
-              <span
-                className={cn(
-                  "text-[11px] text-center leading-tight",
-                  isActive ? "text-foreground" : "text-muted-foreground"
-                )}
-              >
-                {emp.title}
-              </span>
-            </motion.button>
-          );
-        })}
-      </motion.div>
-    </div>
+        团队管理与考核 →
+      </Link>
+    </motion.div>
   );
-});
+}

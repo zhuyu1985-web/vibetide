@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { GeminiRing } from "@/components/shared/gemini-ring";
 import { MissionStepStream } from "@/components/cowork/mission-step-stream";
 import { MessageActions } from "@/components/cowork/message-actions";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
@@ -170,7 +169,6 @@ export function ConversationThread({
       <div className="px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
           <div className="gemini-border rounded-2xl bg-card transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
-            <GeminiRing />
             <div className="px-4 pb-1.5 pt-3">
               {/* 容器即输入框,故用裸 textarea(透明无边框、JS 自动撑高),与落地页同款 */}
               <textarea

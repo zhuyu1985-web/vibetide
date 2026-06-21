@@ -307,8 +307,8 @@
   .glass-primary {
     position: relative;
     background: var(--glass-panel-bg);
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
     border: 1px solid var(--glass-border);
     border-top: 1px solid var(--glass-border-top);
     border-left: 1px solid var(--glass-border-left);
@@ -390,8 +390,8 @@
   .glass-float {
     position: relative;
     background: var(--glass-elevated-bg);
-    backdrop-filter: blur(16px) saturate(150%);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
     border: 1px solid var(--glass-elevated-border);
     border-top: 1px solid var(--glass-border-top);
     border-left: 1px solid var(--glass-border-left);
@@ -438,8 +438,8 @@
   .glass-card {
     position: relative;
     background: var(--glass-card-bg);
-    backdrop-filter: blur(16px) saturate(150%);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
     border: 1px solid var(--glass-border);
     border-top: 1px solid var(--glass-border-top);
     border-left: 1px solid var(--glass-border-left);
@@ -455,8 +455,8 @@
   .glass-card-interactive {
     position: relative;
     background: var(--glass-card-bg);
-    backdrop-filter: blur(16px) saturate(150%);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
     border: 1px solid var(--glass-border);
     border-top: 1px solid var(--glass-border-top);
     border-left: 1px solid var(--glass-border-left);
@@ -488,8 +488,8 @@
   /* .glass-panel → glass-primary */
   .glass-panel {
     background: var(--glass-panel-bg);
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
     border: 1px solid var(--glass-border);
     border-top: 1px solid var(--glass-border-top);
     border-left: 1px solid var(--glass-border-left);
@@ -552,8 +552,8 @@
   /* .glass-sidebar — translucent sidebar background that blends with page glow */
   .glass-sidebar {
     background: var(--glass-sidebar-bg);
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
     border-right: 1px solid var(--glass-border);
     box-shadow:
       inset -1px 0 0 rgba(255, 255, 255, 0.5),
@@ -588,8 +588,8 @@
   .glass-elevated {
     position: relative;
     background: var(--glass-elevated-bg);
-    backdrop-filter: blur(20px) saturate(170%);
-    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(32px) saturate(170%);
+    -webkit-backdrop-filter: blur(32px) saturate(170%);
     border: 1px solid var(--glass-elevated-border);
     border-top: 1px solid var(--glass-border-top);
     border-left: 1px solid var(--glass-border-left);
@@ -642,8 +642,8 @@
   .glass-sidebar {
     position: relative;
     background: var(--glass-sidebar-bg) !important;
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
     border-right: 1px solid var(--glass-border) !important;
   }
 
@@ -1306,134 +1306,47 @@
 }
 
 /* ================================================================
-   Aurora ambient background —— /home 背景,替代原 Canvas2D 粒子。
-   柔光球的 blur 烘焙进图层只算一次,动画只用 transform(纯合成器)。
-   性能史:原 Canvas2D 粒子全屏逐帧重绘 + 模糊跟着重算,实测占 /home GPU
-   一半(用户硬件 51%→26%)。勿改回 <canvas> + rAF 的实现。
-   ================================================================ */
-.aurora-bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-.aurora-blob {
-  position: absolute;
-  width: 48vw;
-  height: 48vw;
-  border-radius: 9999px;
-  /* filter(非 backdrop-filter):模糊作用于球本身,光栅化一次后随 transform
-     平移缩放只做合成,不会逐帧重算 —— 这是它便宜的关键。 */
-  filter: blur(72px);
-  opacity: 0.35;
-  will-change: transform;
-}
-
-.aurora-blob-1 {
-  left: -12%;
-  top: -18%;
-  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
-  animation: aurora-move-1 28s ease-in-out infinite alternate;
-}
-.aurora-blob-2 {
-  right: -12%;
-  top: 6%;
-  background: radial-gradient(circle, #06b6d4 0%, transparent 70%);
-  animation: aurora-move-2 34s ease-in-out infinite alternate;
-}
-.aurora-blob-3 {
-  left: 24%;
-  bottom: -22%;
-  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
-  animation: aurora-move-3 24s ease-in-out infinite alternate;
-}
-
-@keyframes aurora-move-1 {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(18vw, 12vh, 0) scale(1.25); }
-}
-@keyframes aurora-move-2 {
-  from { transform: translate3d(0, 0, 0) scale(1.1); }
-  to   { transform: translate3d(-15vw, 16vh, 0) scale(0.85); }
-}
-@keyframes aurora-move-3 {
-  from { transform: translate3d(0, 0, 0) scale(0.9); }
-  to   { transform: translate3d(12vw, -14vh, 0) scale(1.2); }
-}
-
-:is(.dark) .aurora-blob {
-  opacity: 0.45;
-  filter: blur(84px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .aurora-blob { animation: none; }
-}
-
-/* ================================================================
    Gemini-style Animated Border
-   - 渐变流光环:::before 画 conic-gradient + mask 裁 1.5px 环,起始角
-     --gemini-angle 由容器内的 <GeminiRing />(@/components/shared/gemini-ring)
-     以 30fps JS 驱动,窗口失焦 / 页面隐藏 / 环不可见时完全暂停。
-     性能史(都别走回头路,见 gemini-ring.tsx 注释):
-     ① 勿改回 @property + CSS 动画 —— 不可合成,120Hz 屏每秒 120 次重绘;
-     ② 勿改成"大方块渐变 transform 旋转 + mask 裁环"—— 被 mask 的旋转
-        合成层让 GPU 进程每帧做离屏 mask 合成,实测 GPU 进程 98% CPU。
-   - 外发光呼吸:::after 固定 box-shadow,只动 opacity(可合成,零逐帧
-     重绘)。勿改回直接动画 box-shadow —— 无法被合成器接管。
+   - Rotating conic gradient ring
+   - Breathing opacity + outer glow
+   - Applied to the homepage input box
    ================================================================ */
-
-/* 全局动画暂停 —— <AnimationPauseGuard> 在页面隐藏/窗口失焦时给 <html> 打
-   data-anim-paused,这里把全站 CSS 动画整体冻结(SVG 头像 / ping / gemini 呼吸
-   等)。用户不在看时零 GPU/CPU 占用,回到窗口立即恢复。粒子画布 / gemini 环的
-   JS 循环各自另有失焦暂停,不依赖此规则。 */
-html[data-anim-paused] *,
-html[data-anim-paused] *::before,
-html[data-anim-paused] *::after {
-  animation-play-state: paused !important;
-}
-
-/* inherits: false 是关键 —— JS 每帧改 --gemini-angle,若属性可继承,会让
-   .gemini-border 整个子树(textarea/按钮/图标)每秒被 style 失效 30 次。
-   注册成不继承后,失效只波及读它的 ::before 一个伪元素。 */
 @property --gemini-angle {
   syntax: "<angle>";
   initial-value: 0deg;
   inherits: false;
 }
 
-.gemini-border {
-  position: relative;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
-
-:is(.dark) .gemini-border {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-@keyframes gemini-glow-breath {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
-}
-
-.gemini-border::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  box-shadow: 0 0 26px rgba(99, 102, 241, 0.18);
-  animation: gemini-glow-breath 3.2s ease-in-out infinite;
-}
-
-:is(.dark) .gemini-border::after {
-  box-shadow: 0 0 32px rgba(99, 102, 241, 0.32);
+@keyframes gemini-border-rotate {
+  to { --gemini-angle: 360deg; }
 }
 
 @keyframes gemini-border-breath {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
+}
+
+@keyframes gemini-border-glow {
+  0%, 100% { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); }
+  50% {
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.06),
+      0 0 26px rgba(99, 102, 241, 0.18);
+  }
+}
+
+@keyframes gemini-border-glow-dark {
+  0%, 100% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+  50% {
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 0 32px rgba(99, 102, 241, 0.32);
+  }
+}
+
+.gemini-border {
+  position: relative;
+  animation: gemini-border-glow 3.2s ease-in-out infinite;
 }
 
 /* Draws a 1.5px conic-gradient ring using the mask-composite trick:
@@ -1460,19 +1373,22 @@ html[data-anim-paused] *::after {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  animation: gemini-border-breath 3.2s ease-in-out infinite;
+  animation:
+    gemini-border-rotate 6s linear infinite,
+    gemini-border-breath 3.2s ease-in-out infinite;
+}
+
+:is(.dark) .gemini-border {
+  animation: gemini-border-glow-dark 3.2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gemini-border::before,
-  .gemini-border::after {
+  .gemini-border,
+  .gemini-border::before {
     animation: none;
   }
   .gemini-border::before {
     opacity: 0.7;
-  }
-  .gemini-border::after {
-    opacity: 0;
   }
 }
 

@@ -87,6 +87,7 @@ export function CoworkClient({ conversations, projects, active }: Props) {
           <MissionDrawer
             missionId={drawer.missionId}
             open={drawer.open}
+            onOpen={() => dispatch({ type: "open" })}
             onClose={() => dispatch({ type: "close" })}
           />
         )}

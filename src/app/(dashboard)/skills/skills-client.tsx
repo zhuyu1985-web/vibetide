@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { deleteSkill, getSkillsForExport } from "@/app/actions/skills";
 import { generateSkillMd } from "@/lib/skill-package";
 import type { SkillWithBindCount } from "@/lib/dal/skills";
+import { CRAFT_META, type CraftType } from "@/lib/constants";
 import type { SkillCategory } from "@/lib/types";
 import type { WorkflowTemplateListItem } from "@/lib/dal/workflow-templates";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -193,6 +194,10 @@ export function SkillsClient({
       }
     });
   }, [localSkills, categoryFilter, typeFilter, search, sortBy]);
+
+  // 四层重构:按 kind 分两段 —— 通用工具(人人可调) vs 专业技能(挂工种)。
+  const toolItems = useMemo(() => sorted.filter((s) => s.kind === "tool"), [sorted]);
+  const craftItems = useMemo(() => sorted.filter((s) => s.kind !== "tool"), [sorted]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -414,8 +419,38 @@ export function SkillsClient({
             : "暂无技能，点击「添加技能」创建"}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((skill) => (
+        <div className="space-y-8">
+          {[
+            {
+              key: "tool",
+              title: "通用工具",
+              subtitle: "所有员工无条件可调,不归属工种",
+              items: toolItems,
+            },
+            {
+              key: "skill",
+              title: "专业技能",
+              subtitle: "必须挂在工种上,该工种的员工才能调用",
+              items: craftItems,
+            },
+          ]
+            .filter((sec) => sec.items.length > 0)
+            .map((sec) => (
+              <div key={sec.key}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    {sec.title}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {sec.items.length}
+                  </span>
+                  <span className="text-[11px] text-gray-400 dark:text-gray-500 ml-1 truncate">
+                    · {sec.subtitle}
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200/60 dark:bg-gray-700/40" />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {sec.items.map((skill) => (
             <GlassCard key={skill.id} variant="interactive" padding="none">
               {/* Terminal-style top bar */}
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -465,6 +500,27 @@ export function SkillsClient({
                 <Badge variant="outline" className="text-[10px]">
                   v{skill.version}
                 </Badge>
+                {/* 四层重构:工具=通用;技能=适用工种 */}
+                {skill.kind === "tool" ? (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                  >
+                    通用工具
+                  </Badge>
+                ) : (
+                  (skill.compatibleRoles?.length ?? 0) > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                    >
+                      {skill
+                        .compatibleRoles!.slice(0, 3)
+                        .map((r) => CRAFT_META[r as CraftType]?.name ?? r)
+                        .join(" / ")}
+                    </Badge>
+                  )
+                )}
               </div>
 
               {/* Description */}
@@ -507,7 +563,10 @@ export function SkillsClient({
                 </div>
               </div>
             </GlassCard>
-          ))}
+                  ))}
+                </div>
+              </div>
+            ))}
         </div>
       )}
         </TabsContent>

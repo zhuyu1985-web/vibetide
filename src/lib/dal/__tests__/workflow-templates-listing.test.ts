@@ -183,8 +183,8 @@ describe("listTemplatesForHomepageByTab", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("employeeId tab（xiaolei）：可调用且返回数组", async () => {
-    const result = await listTemplatesForHomepageByTab("org1", "xiaolei");
+  it("category tab（news）：可调用且返回数组", async () => {
+    const result = await listTemplatesForHomepageByTab("org1", "news");
     expect(Array.isArray(result)).toBe(true);
   });
 });
