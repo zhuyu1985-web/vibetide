@@ -47,7 +47,7 @@ interface EmployeeSkillInfo {
   skills: string[];
 }
 
-function buildEmployeeCatalog(
+export function buildEmployeeCatalog(
   availableEmployees: EmployeeSkillInfo[]
 ): string {
   return availableEmployees
@@ -58,7 +58,7 @@ function buildEmployeeCatalog(
     .join("\n");
 }
 
-function buildSkillCatalog(): string {
+export function buildSkillCatalog(): string {
   // Compact format: slug(name) per line, no descriptions (saves ~50% tokens)
   const byCategory = new Map<string, string[]>();
   for (const s of getAllBuiltinSkills()) {
@@ -156,7 +156,7 @@ const INTENT_PROMPT = `意图识别引擎。分析用户输入，输出JSON执�
 const GREETING_PATTERNS = /^(你好|您好|hi|hello|hey|在吗|在么|早|晚安|嗨|哈喽|哈罗|在不在|嘿|啊|嗯|好的|收到|谢谢|thanks|thank you|ok|okay)[\s!！。.?？~～]*$/i;
 const SHORT_CHAT_THRESHOLD = 6; // Messages this short are almost always chat
 
-function isGreeting(message: string): boolean {
+export function isGreeting(message: string): boolean {
   const trimmed = message.trim();
   if (trimmed.length <= SHORT_CHAT_THRESHOLD && GREETING_PATTERNS.test(trimmed)) {
     return true;

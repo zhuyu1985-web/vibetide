@@ -1,58 +1,69 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { recognizeIntent, generateText, loadAvailableEmployees } = vi.hoisted(() => ({
-  recognizeIntent: vi.fn(),
+const { generateText, getLanguageModel, loadAvailableEmployees } = vi.hoisted(() => ({
   generateText: vi.fn(),
+  getLanguageModel: vi.fn(() => ({})),
   loadAvailableEmployees: vi.fn(),
 }));
 
-vi.mock("@/lib/agent/intent-recognition", () => ({ recognizeIntent }));
 vi.mock("ai", () => ({ generateText }));
-vi.mock("@/lib/agent/model-router", () => ({ getLanguageModel: () => ({}) }));
+vi.mock("@/lib/agent/model-router", () => ({ getLanguageModel }));
 vi.mock("@/lib/mission-core", () => ({ loadAvailableEmployees }));
 
 import { clarifyOrPlan } from "../clarify-or-plan";
 
+const session = { contextTurns: [], clarifyRounds: 0 } as never;
+const CATALOG = [
+  { slug: "reporter", name: "记者", nickname: "小记", title: "记者", skills: ["content_generate"] },
+];
 beforeEach(() => {
-  vi.clearAllMocks();
-  loadAvailableEmployees.mockResolvedValue([]);
+  generateText.mockReset();
+  loadAvailableEmployees.mockReset();
+  loadAvailableEmployees.mockResolvedValue(CATALOG);
 });
+const reply = (obj: unknown) => generateText.mockResolvedValue({ text: JSON.stringify(obj) });
 
-describe("clarifyOrPlan", () => {
-  it("高置信 + 有 steps → execute", async () => {
-    recognizeIntent.mockResolvedValue({
-      summary: "抓热点",
-      confidence: 0.9,
-      intentType: "content_creation",
-      steps: [
-        {
-          employeeSlug: "xiaolei",
-          employeeName: "小蕾",
-          skills: ["x"],
-          taskDescription: "抓热点",
-        },
-      ],
-      reasoning: "",
-    });
-    const r = await clarifyOrPlan("org1", { contextTurns: [] } as never, "今天抓个科技热点写成稿");
-    expect(r.action).toBe("execute");
-    if (r.action === "execute") {
-      expect(r.steps.length).toBe(1);
-      expect(r.summary).toBe("抓热点");
-    }
+describe("clarifyOrPlan（重建规划器）", () => {
+  it("needClarify:true → clarify", async () => {
+    reply({ needClarify: true, question: "想写什么主题？" });
+    expect(await clarifyOrPlan("org1", session, "帮我写点东西")).toEqual({ action: "clarify", question: "想写什么主题？" });
   });
-
-  it("低置信 / 无 steps → clarify，产出问题", async () => {
-    recognizeIntent.mockResolvedValue({
-      summary: "不明确",
-      confidence: 0.3,
-      intentType: "general_chat",
-      steps: [],
-      reasoning: "",
-    });
-    generateText.mockResolvedValue({ text: "你想针对哪个平台、什么主题？" });
-    const r = await clarifyOrPlan("org1", { contextTurns: [] } as never, "帮我搞个东西");
+  it("needClarify:false + 合法 steps → execute", async () => {
+    reply({ needClarify: false, summary: "写AI稿", steps: [{ employeeSlug: "reporter", employeeName: "小记", skills: ["content_generate"], taskDescription: "撰写AI深度稿" }] });
+    const r = await clarifyOrPlan("org1", session, "写一篇AI深度稿");
+    expect(r.action).toBe("execute");
+    if (r.action === "execute") { expect(r.summary).toBe("写AI稿"); expect(r.steps).toHaveLength(1); expect(r.steps[0].employeeSlug).toBe("reporter"); }
+  });
+  it("非法 employeeSlug 全过滤 → 退回 clarify（不 fabricate）", async () => {
+    reply({ needClarify: false, summary: "x", steps: [{ employeeSlug: "ghost", employeeName: "鬼", skills: ["content_generate"], taskDescription: "x" }] });
+    expect((await clarifyOrPlan("org1", session, "写稿")).action).toBe("clarify");
+  });
+  it("非法 skill 过滤但 step 保留 → execute", async () => {
+    reply({ needClarify: false, summary: "x", steps: [{ employeeSlug: "reporter", employeeName: "小记", skills: ["content_generate", "fake_skill"], taskDescription: "写" }] });
+    const r = await clarifyOrPlan("org1", session, "写AI稿");
+    expect(r.action).toBe("execute");
+    if (r.action === "execute") expect(r.steps[0].skills).toEqual(["content_generate"]);
+  });
+  it("needClarify:false 但 steps 空 → 退回 clarify", async () => {
+    reply({ needClarify: false, summary: "x", steps: [] });
+    expect((await clarifyOrPlan("org1", session, "写稿")).action).toBe("clarify");
+  });
+  it("JSON 解析失败 → clarify 兜底", async () => {
+    generateText.mockResolvedValue({ text: "这不是JSON" });
+    expect((await clarifyOrPlan("org1", session, "写稿")).action).toBe("clarify");
+  });
+  it("generateText 抛错 → 向上抛", async () => {
+    generateText.mockRejectedValue(new Error("LLM down"));
+    await expect(clarifyOrPlan("org1", session, "写稿")).rejects.toThrow();
+  });
+  it("问候语 → 快路径 clarify，不调 LLM", async () => {
+    const r = await clarifyOrPlan("org1", session, "你好");
     expect(r.action).toBe("clarify");
-    if (r.action === "clarify") expect(r.question).toContain("？");
+    expect(generateText).not.toHaveBeenCalled();
+  });
+  it("employeeName 缺失 → 回填 nickname", async () => {
+    reply({ needClarify: false, summary: "x", steps: [{ employeeSlug: "reporter", skills: ["content_generate"], taskDescription: "写" }] });
+    const r = await clarifyOrPlan("org1", session, "写AI稿");
+    if (r.action === "execute") expect(r.steps[0].employeeName).toBe("小记");
   });
 });
