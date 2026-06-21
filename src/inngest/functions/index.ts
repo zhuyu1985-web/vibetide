@@ -57,6 +57,7 @@ import { topicCompareBackfill } from "./topic-compare/backfill";
 import { topicCompareFindMatchesOnNew } from "./topic-compare/find-matches-on-new-mypost";
 import { missedTopicDetectionDaily } from "./topic-compare/missed-topic-cron";
 import { channelLinkIngest, channelLinkIngestFailureHandler } from "./channel-link-ingest";
+import { channelMissionTerminalNotify } from "./channel-mission-terminal-notify";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -137,4 +138,6 @@ export const functions = [
   // Channel inbound link ingest (2026-06-19)
   channelLinkIngest,
   channelLinkIngestFailureHandler,
+  // Channel mission terminal notify (2026-06-21) — 终态→反查 session→回执
+  channelMissionTerminalNotify,
 ];
