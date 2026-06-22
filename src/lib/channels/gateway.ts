@@ -20,6 +20,7 @@ import { cancelChannelMission } from "./cancel-channel-mission";
 import { formatPlanCard } from "./format-plan-card";
 import { isConfirm, isCancel } from "./confirm-keywords";
 import { isPublishIntent, extractPublishTarget } from "./publish-intent";
+import { isIllustrateIntent } from "./illustrate-intent";
 import { resolveCatalogByName, listAllActiveCmsCatalogs } from "@/lib/dal/cms-catalogs";
 import { getArticleById } from "@/lib/dal/articles";
 import { handlePublishConfirm } from "./publish-followup";
@@ -287,6 +288,12 @@ async function handleFreeFormMessage(
     return handlePublishIntent(text, msg, session, channelCtx);
   }
 
+  // 加配图意图（idle 态）：发布意图分支之后、clarifyOrPlan 之前
+  if (isIllustrateIntent(text)) {
+    if (!session.lastArticleId) return { reply: "没有可配图的稿件，请先生成或发链接收稿。" };
+    return handleIllustrateIntent(msg, session, text);
+  }
+
   let result;
   try {
     result = await clarifyOrPlan(msg.organizationId, session, text);
@@ -355,6 +362,38 @@ async function handlePublishIntent(
   });
 
   return { reply: `📋 将把《${article.title}》发布到「${catalog.name}」，回复 确认 发布，或 取消。` };
+}
+
+// ---------------------------------------------------------------------------
+// Illustrate intent handler (idle state)
+// ---------------------------------------------------------------------------
+
+async function handleIllustrateIntent(
+  msg: StandardizedMessage,
+  session: ChannelSessionRow,
+  text: string,
+): Promise<{ reply: string }> {
+  const article = await getArticleById(session.lastArticleId!);
+  if (!article || article.organizationId !== msg.organizationId) {
+    return { reply: "没有可配图的稿件，请先生成或发链接收稿。" };
+  }
+  await inngest.send({
+    name: "aigc/illustrate.requested",
+    id: `illustrate:${session.lastArticleId}:${msg.externalMessageId}`,
+    data: {
+      organizationId: msg.organizationId,
+      articleId: session.lastArticleId!,
+      userHint: text,
+      channelCtx: {
+        organizationId: msg.organizationId,
+        configId: msg.configId,
+        platform: msg.platform,
+        chatId: msg.chatId,
+        externalUserId: msg.externalUserId,
+      },
+    },
+  });
+  return { reply: `🎨 正在为《${article.title}》生成配图，稍后回结果。` };
 }
 
 // ---------------------------------------------------------------------------

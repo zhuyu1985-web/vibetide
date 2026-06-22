@@ -13,6 +13,7 @@ const {
   listAllActiveCmsCatalogs,
   getArticleById,
   handlePublishConfirm,
+  inngestSend,
 } = vi.hoisted(() => ({
   getOrCreateSession: vi.fn(),
   updateSession: vi.fn(),
@@ -26,6 +27,7 @@ const {
   listAllActiveCmsCatalogs: vi.fn(),
   getArticleById: vi.fn(),
   handlePublishConfirm: vi.fn(),
+  inngestSend: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/dal/channel-sessions", () => ({
@@ -42,7 +44,7 @@ vi.mock("@/app/actions/channels", () => ({ recordInboundMessage, recordOutboundM
 vi.mock("@/lib/agent/intent-recognition", () => ({ recognizeIntent: vi.fn() }));
 vi.mock("@/lib/constants", () => ({ EMPLOYEE_META: { xiaolei: { name: "小蕾", nickname: "小蕾", title: "热搜猎手" } } }));
 vi.mock("@/lib/dal/workflow-templates-listing", () => ({ findTemplateByNameOrSlug: vi.fn() }));
-vi.mock("@/inngest/client", () => ({ inngest: { send: vi.fn() } }));
+vi.mock("@/inngest/client", () => ({ inngest: { send: inngestSend } }));
 vi.mock("@/lib/channels/link-extract", () => ({ extractUrls: vi.fn().mockReturnValue([]) }));
 
 // Mocks for publish follow-up path
@@ -278,5 +280,35 @@ describe("gateway 发布 follow-up 分支", () => {
       expect.objectContaining({ status: "idle", pendingPublish: null }),
     );
     expect(r.reply).toContain("取消");
+  });
+});
+
+describe("gateway 加配图分支", () => {
+  beforeEach(() => {
+    updateSession.mockResolvedValue(undefined);
+    inngestSend.mockResolvedValue(undefined);
+  });
+
+  it("加配图意图 + lastArticleId → 派 aigc 事件 + 回'生成中'", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", lastArticleId: "art1", contextTurns: [], clarifyRounds: 0,
+    });
+    getArticleById.mockResolvedValue({ id: "art1", title: "AI稿", organizationId: "org1" });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "给这篇加配图" });
+
+    expect(inngestSend).toHaveBeenCalledWith(expect.objectContaining({ name: "aigc/illustrate.requested" }));
+    expect(r.reply).toContain("配图");
+  });
+
+  it("加配图意图 但无 lastArticleId → 回'没有可配图的稿件'，不派事件", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", lastArticleId: null, contextTurns: [], clarifyRounds: 0,
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "加配图" });
+
+    expect(r.reply).toContain("没有可配图");
+    expect(inngestSend).not.toHaveBeenCalled();
   });
 });
