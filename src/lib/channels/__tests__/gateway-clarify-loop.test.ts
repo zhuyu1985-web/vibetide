@@ -162,7 +162,7 @@ describe("gateway 自由消息澄清循环", () => {
 describe("gateway 发布 follow-up 分支", () => {
   beforeEach(() => {
     updateSession.mockResolvedValue(undefined);
-    handlePublishConfirm.mockResolvedValue({ reply: "✅ 已发布到「新闻」：https://example.com/1" });
+    handlePublishConfirm.mockResolvedValue({ reply: "✅ 已发布到「新闻」：https://example.com/1", ok: true });
   });
 
   it("idle + lastArticleId + 发布意图 + 栏目命中 + org 一致 → confirming + pendingPublish，不调 handlePublishConfirm", async () => {
@@ -180,6 +180,7 @@ describe("gateway 发布 follow-up 分支", () => {
       "s1",
       expect.objectContaining({
         status: "confirming",
+        pendingPlan: null,
         pendingPublish: expect.objectContaining({ catalogName: "新闻", articleId: "art1" }),
       }),
     );
@@ -227,7 +228,7 @@ describe("gateway 发布 follow-up 分支", () => {
     expect(handlePublishConfirm).not.toHaveBeenCalled();
   });
 
-  it("confirming + pendingPublish + '确认' → 调 handlePublishConfirm + updateSession(idle, pendingPublish:null)", async () => {
+  it("confirming + pendingPublish + '确认' 成功(ok:true) → 调 handlePublishConfirm + updateSession(idle, pendingPublish:null)", async () => {
     const pendingPublish = { articleId: "art1", articleTitle: "测试文章", catalogName: "新闻", target: { catalogId: 101, appId: 1, siteId: 1 } };
     getOrCreateSession.mockResolvedValue({
       id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0,
@@ -242,6 +243,24 @@ describe("gateway 发布 follow-up 分支", () => {
       expect.objectContaining({ status: "idle", pendingPublish: null }),
     );
     expect(r.reply).toContain("已发布");
+  });
+
+  it("confirming + pendingPublish + '确认' 失败(ok:false) → 保留 pendingPublish 可重试，不置 idle", async () => {
+    const pendingPublish = { articleId: "art1", articleTitle: "测试文章", catalogName: "新闻", target: { catalogId: 101, appId: 1, siteId: 1 } };
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish, lastArticleId: "art1",
+    });
+    handlePublishConfirm.mockResolvedValue({ reply: "发布失败：boom，可稍后回复 确认 重试。", ok: false });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "确认" });
+
+    expect(handlePublishConfirm).toHaveBeenCalled();
+    // 失败：刷新窗口但不清 pendingPublish、不置 idle
+    const patch = updateSession.mock.calls[0][1];
+    expect(patch).not.toHaveProperty("pendingPublish");
+    expect(patch.status).not.toBe("idle");
+    expect(r.reply).toContain("发布失败");
   });
 
   it("confirming + pendingPublish + '取消' → updateSession(idle, pendingPublish:null) + 回'已取消发布'，不调 handlePublishConfirm", async () => {

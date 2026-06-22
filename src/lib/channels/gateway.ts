@@ -344,6 +344,7 @@ async function handlePublishIntent(
 
   await updateSession(session.id, {
     status: "confirming",
+    pendingPlan: null,
     pendingPublish: {
       articleId: article.id,
       articleTitle: article.title,
@@ -418,8 +419,13 @@ async function handleConfirmingMessage(
     }
     if (isConfirm(text)) {
       const r = await handlePublishConfirm(session, channelCtx);
-      await updateSession(session.id, { status: "idle", pendingPublish: null, expiresAt: null });
-      return r;
+      if (r.ok) {
+        await updateSession(session.id, { status: "idle", pendingPublish: null, expiresAt: null });
+      } else {
+        // 保留 confirming + pendingPublish，刷新窗口，用户可回"确认"重试
+        await updateSession(session.id, { expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
+      }
+      return { reply: r.reply };
     }
     return { reply: "回复 确认 发布，或 取消。" };
   }

@@ -4,22 +4,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { dbUpdate, publishArticleToCms, CmsConfigError } = vi.hoisted(() => {
+const { dbUpdate, dbSelect, publishArticleToCms, CmsConfigError } = vi.hoisted(() => {
   class CmsConfigError extends Error {
     constructor(msg: string) { super(msg); this.name = "CmsConfigError"; }
   }
 
-  const where = vi.fn().mockResolvedValue(undefined);
-  const set = vi.fn().mockReturnValue({ where });
-  const dbUpdate = vi.fn().mockReturnValue({ set });
+  const dbUpdate = vi.fn();
+  const dbSelect = vi.fn();
 
   const publishArticleToCms = vi.fn();
 
-  return { dbUpdate, publishArticleToCms, CmsConfigError, where, set };
+  return { dbUpdate, dbSelect, publishArticleToCms, CmsConfigError };
 });
 
 vi.mock("@/db", () => ({
-  db: { update: dbUpdate },
+  db: { update: dbUpdate, select: dbSelect },
 }));
 
 vi.mock("@/db/schema", () => ({
@@ -77,13 +76,24 @@ const session = {
   updatedAt: new Date(),
 };
 
+/** db.select().from().where().limit() → resolves to the given rows. */
+function mockSelect(rows: Array<{ status: string }>) {
+  const limit = vi.fn().mockResolvedValue(rows);
+  const where = vi.fn().mockReturnValue({ limit });
+  const from = vi.fn().mockReturnValue({ where });
+  dbSelect.mockReturnValue({ from });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 
-  // Re-setup db.update chain after clearAllMocks
-  const where = vi.fn().mockResolvedValue(undefined);
-  const set = vi.fn().mockReturnValue({ where });
-  dbUpdate.mockReturnValue({ set });
+  // db.update().set().where() → resolves undefined
+  const updWhere = vi.fn().mockResolvedValue(undefined);
+  const updSet = vi.fn().mockReturnValue({ where: updWhere });
+  dbUpdate.mockReturnValue({ set: updSet });
+
+  // db.select() chain — default: current status is "draft" (bumpable)
+  mockSelect([{ status: "draft" }]);
 });
 
 describe("handlePublishConfirm", () => {
@@ -110,17 +120,20 @@ describe("handlePublishConfirm", () => {
         target: { catalogId: 101, appId: 1, siteId: 1 },
       }),
     );
-    // db.update 调用顺序先于 publishArticleToCms
+    // db.update 调用顺序先于 publishArticleToCms（先 bump 再 publish）
     expect(dbUpdate.mock.invocationCallOrder[0]).toBeLessThan(
       publishArticleToCms.mock.invocationCallOrder[0],
     );
-    // 回复含发布 URL
+    // 成功只 bump 一次，不回滚
+    expect(dbUpdate).toHaveBeenCalledTimes(1);
+    // 回复含发布 URL + ok:true
+    expect(r.ok).toBe(true);
     expect(r.reply).toContain("已发布");
     expect(r.reply).toContain("新闻");
     expect(r.reply).toContain("https://cms.example.com/news/1");
   });
 
-  it("publishArticleToCms 成功但无 publishedUrl → 回含 previewUrl", async () => {
+  it("publishArticleToCms 成功但无 publishedUrl → 回含 previewUrl + ok:true", async () => {
     publishArticleToCms.mockResolvedValue({
       success: true,
       publicationId: "pub1",
@@ -130,10 +143,11 @@ describe("handlePublishConfirm", () => {
     });
 
     const r = await handlePublishConfirm(session, channelCtx);
+    expect(r.ok).toBe(true);
     expect(r.reply).toContain("preview.example.com");
   });
 
-  it("publishArticleToCms 成功但无任何 URL → 回含'审核中'", async () => {
+  it("publishArticleToCms 成功但无任何 URL → 回含'审核中' + ok:true", async () => {
     publishArticleToCms.mockResolvedValue({
       success: true,
       publicationId: "pub1",
@@ -142,24 +156,53 @@ describe("handlePublishConfirm", () => {
     });
 
     const r = await handlePublishConfirm(session, channelCtx);
+    expect(r.ok).toBe(true);
     expect(r.reply).toContain("审核中");
   });
 
-  it("CmsConfigError → 回'未开启发布'", async () => {
-    publishArticleToCms.mockRejectedValue(new CmsConfigError("feature flag disabled"));
-    const r = await handlePublishConfirm(session, channelCtx);
-    expect(r.reply).toContain("未开启");
-  });
-
-  it("其它 Error → 回'发布失败'", async () => {
+  it("普通 Error → 回'发布失败' + ok:false + db.update 调两次（bump + 回滚到 draft）", async () => {
+    mockSelect([{ status: "draft" }]);
     publishArticleToCms.mockRejectedValue(new Error("network timeout"));
+
     const r = await handlePublishConfirm(session, channelCtx);
+
+    expect(r.ok).toBe(false);
     expect(r.reply).toContain("发布失败");
     expect(r.reply).toContain("network timeout");
+    // bump（→ approved）+ 回滚（→ draft）
+    expect(dbUpdate).toHaveBeenCalledTimes(2);
+    const rollbackSet = dbUpdate.mock.results[1].value.set;
+    expect(rollbackSet).toHaveBeenCalledWith({ status: "draft" });
   });
 
-  it("pendingPublish 为 null → 回'没有待发布'", async () => {
+  it("CmsConfigError → 回'未开启发布' + ok:false + 回滚", async () => {
+    mockSelect([{ status: "reviewing" }]);
+    publishArticleToCms.mockRejectedValue(new CmsConfigError("feature flag disabled"));
+
+    const r = await handlePublishConfirm(session, channelCtx);
+
+    expect(r.ok).toBe(false);
+    expect(r.reply).toContain("未开启");
+    // bump + 回滚到 reviewing
+    expect(dbUpdate).toHaveBeenCalledTimes(2);
+    const rollbackSet = dbUpdate.mock.results[1].value.set;
+    expect(rollbackSet).toHaveBeenCalledWith({ status: "reviewing" });
+  });
+
+  it("原状态已 approved（无需 bump）→ 失败时不回滚", async () => {
+    mockSelect([{ status: "approved" }]);
+    publishArticleToCms.mockRejectedValue(new Error("boom"));
+
+    const r = await handlePublishConfirm(session, channelCtx);
+
+    expect(r.ok).toBe(false);
+    // 既未 bump 也未回滚（状态本就是 approved）
+    expect(dbUpdate).not.toHaveBeenCalled();
+  });
+
+  it("pendingPublish 为 null → 回'没有待发布' + ok:false", async () => {
     const r = await handlePublishConfirm({ ...session, pendingPublish: null }, channelCtx);
+    expect(r.ok).toBe(false);
     expect(r.reply).toContain("没有待发布");
     expect(publishArticleToCms).not.toHaveBeenCalled();
   });
