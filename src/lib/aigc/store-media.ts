@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
-import { putObject, getPublicUrl, defaultBucket } from "@/lib/volc-tos";
+import { putObject, getPublicUrl, defaultBucket } from "@/lib/storage";
 
 type MediaType = "image" | "video" | "audio";
 

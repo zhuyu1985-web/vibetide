@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { userProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { generateUploadUrl, defaultBucket } from "@/lib/volc-tos";
+import { generateUploadUrl, defaultBucket } from "@/lib/storage";
 import { randomUUID } from "crypto";
 
 export async function POST(request: NextRequest) {

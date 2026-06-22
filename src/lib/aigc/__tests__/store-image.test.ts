@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock 必须在 import 实现模块之前，且工厂函数不能引用外部变量
-vi.mock("@/lib/volc-tos", () => ({
+vi.mock("@/lib/storage", () => ({
   putObject: vi.fn().mockResolvedValue(undefined),
   getPublicUrl: vi.fn().mockReturnValue("https://pub/x.png"),
   defaultBucket: "vibetide-media",
@@ -21,7 +21,7 @@ vi.mock("@/db", () => {
 });
 
 import { storeRemoteImageToTos } from "../store-image";
-import * as volcTos from "@/lib/volc-tos";
+import * as volcTos from "@/lib/storage";
 import { db } from "@/db";
 
 const mockArrayBuffer = new ArrayBuffer(8);

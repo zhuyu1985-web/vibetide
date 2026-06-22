@@ -73,6 +73,7 @@
     "chinese-s2t": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cos-nodejs-sdk-v5": "^2.15.4",
     "cron-parser": "^5.5.0",
     "d3-cloud": "1.2.9",
     "date-fns": "^4.1.0",

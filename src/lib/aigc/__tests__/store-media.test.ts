@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/volc-tos", () => ({
+vi.mock("@/lib/storage", () => ({
   putObject: vi.fn().mockResolvedValue(undefined),
   getPublicUrl: vi.fn().mockReturnValue("https://pub/x.png"),
   defaultBucket: "vibetide-media",
@@ -20,7 +20,7 @@ vi.mock("@/db", () => {
 });
 
 import { storeRemoteMediaToTos } from "../store-media";
-import * as volcTos from "@/lib/volc-tos";
+import * as volcTos from "@/lib/storage";
 import { db } from "@/db";
 
 const mockArrayBuffer = new ArrayBuffer(8);

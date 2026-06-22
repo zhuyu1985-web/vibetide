@@ -5,7 +5,7 @@ import { mediaAssets, assetTags, userProfiles } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { deleteObject } from "@/lib/volc-tos";
+import { deleteObject } from "@/lib/storage";
 import { getAssetsByLibrary } from "@/lib/dal/assets";
 import type { MediaAssetType, SecurityLevel, MediaLibraryType } from "@/lib/types";
 async function getProfile(authUserId: string) {
