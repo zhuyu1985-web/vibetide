@@ -59,6 +59,18 @@ export function getPublicUrl(objectKey: string): string {
 }
 
 /**
+ * 服务端直接上传 Buffer 到 TOS（AI 生成图片转存专用）
+ */
+export async function putObject(
+  objectKey: string,
+  body: Buffer | Uint8Array,
+  contentType: string
+): Promise<void> {
+  const client = getClient();
+  await client.putObject({ bucket, key: objectKey, body: Buffer.from(body), contentType });
+}
+
+/**
  * 删除 TOS 对象
  */
 export async function deleteObject(objectKey: string): Promise<void> {
