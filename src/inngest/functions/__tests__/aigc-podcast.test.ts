@@ -138,6 +138,19 @@ describe("buildDialogueScript", () => {
     expect(result[1].speaker).toBe("B");
   });
 
+  it("generateText 返回纯 ``` 围栏（不带 json）→ 剥离后正常解析，不降级", async () => {
+    generateText.mockResolvedValue({
+      text: "```\n[{\"speaker\":\"A\",\"text\":\"开场\"},{\"speaker\":\"B\",\"text\":\"回应\"}]\n```",
+    });
+
+    const result = await buildDialogueScript({ title: "测试标题", summary: "摘要" });
+
+    // 修复前：纯 ``` 不被剥离 → JSON.parse 失败 → 降级单段；修复后应正常解析为 2 轮
+    expect(result).toHaveLength(2);
+    expect(result[0].speaker).toBe("A");
+    expect(result[1].speaker).toBe("B");
+  });
+
   it("generateText 返回非 JSON 垃圾 → fallback [{speaker:A, text:summary}]", async () => {
     generateText.mockResolvedValue({ text: "这不是 JSON，这是乱码！！！" });
 

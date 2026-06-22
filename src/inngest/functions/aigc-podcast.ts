@@ -35,8 +35,8 @@ export async function buildDialogueScript(
       maxOutputTokens: 1000,
     });
 
-    // 去掉 ```json ... ``` 代码围栏（如有）
-    const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, "");
+    // 去掉 ```json ... ``` 或纯 ``` ... ``` 代码围栏（DeepSeek 两种都可能返回）
+    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
 
     const parsed = JSON.parse(cleaned) as unknown[];
     if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
