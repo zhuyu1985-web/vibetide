@@ -123,7 +123,12 @@ export const FOLLOWUP_WINDOW_MS = 30 * 60 * 1000;
 /**
  * 仅更新 lastArticleId + 刷新 30min 跟进窗口。
  * link-ingest 收稿后调用，把新落库的 articleId 写入会话，让后续配图/发布分支能拿到。
- * 不动 status / contextTurns / activeMissionId，避免覆盖进行中的会话状态。
+ *
+ * **只在 status='idle' 时生效**（条件 UPDATE）：链接分支在 gateway 里排在 running 检查之前，
+ * mission 进行中（clarifying/confirming/running）用户发链接也会派 link-ingest。若此时无条件刷
+ * expiresAt，会给本无过期的进行中会话强加 30min 窗口——mission 跑超 30min 后下条消息触发
+ * getOrCreateSession 过期复位，清掉 activeMissionId，导致终态回执反查不到会话、结果丢失。
+ * 跟进窗口本就是 idle 态特性，故进行中会话下这里直接 no-op，不动任何字段。
  */
 export async function setSessionLastArticleId(
   key: Pick<SessionKey, "configId" | "chatId" | "externalUserId">,
@@ -140,7 +145,8 @@ export async function setSessionLastArticleId(
       and(
         eq(channelSessions.configId, key.configId),
         eq(channelSessions.chatId, key.chatId),
-        eq(channelSessions.externalUserId, key.externalUserId)
+        eq(channelSessions.externalUserId, key.externalUserId),
+        eq(channelSessions.status, "idle")
       )
     );
 }

@@ -16,7 +16,28 @@ vi.mock("@/db", () => ({
   db: { query: { channelSessions: { findFirst } }, insert, update },
 }));
 
-import { getOrCreateSession, resetSession, getSessionByActiveMissionId, recordSessionResult } from "../channel-sessions";
+// 包一层 spy 记录 eq(col, val) 调用，仍委派给真实 eq 让 and() 正常构造 where
+const { eqSpy } = vi.hoisted(() => ({ eqSpy: vi.fn() }));
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("drizzle-orm")>();
+  return {
+    ...actual,
+    eq: (col: unknown, val: unknown) => {
+      eqSpy(col, val);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actual.eq as any)(col, val);
+    },
+  };
+});
+
+import { channelSessions } from "@/db/schema/channel-sessions";
+import {
+  getOrCreateSession,
+  resetSession,
+  getSessionByActiveMissionId,
+  recordSessionResult,
+  setSessionLastArticleId,
+} from "../channel-sessions";
 
 const key = {
   organizationId: "org1",
@@ -166,5 +187,26 @@ describe("resetSession", () => {
     const patch = (set.mock.calls as unknown as unknown[][])[0][0] as Record<string, unknown>;
     expect(patch.lastArticleId).toBeNull();
     expect(patch.pendingPublish).toBeNull();
+  });
+});
+
+describe("setSessionLastArticleId", () => {
+  it("写 lastArticleId + 刷新跟进窗口，不动 status/contextTurns", async () => {
+    set.mockClear();
+    await setSessionLastArticleId({ configId: "cfg1", chatId: "c1", externalUserId: "u1" }, "a1");
+    expect(update).toHaveBeenCalled();
+    const patch = (set.mock.calls as unknown as unknown[][])[0][0] as Record<string, unknown>;
+    expect(patch.lastArticleId).toBe("a1");
+    expect(patch.expiresAt).toBeInstanceOf(Date);
+    // 不应覆盖进行中会话的状态字段
+    expect(patch).not.toHaveProperty("status");
+    expect(patch).not.toHaveProperty("contextTurns");
+    expect(patch).not.toHaveProperty("activeMissionId");
+  });
+
+  it("守卫：where 含 status='idle'（进行中会话下变 no-op，不污染 expiresAt）", async () => {
+    eqSpy.mockClear();
+    await setSessionLastArticleId({ configId: "cfg1", chatId: "c1", externalUserId: "u1" }, "a1");
+    expect(eqSpy).toHaveBeenCalledWith(channelSessions.status, "idle");
   });
 });
