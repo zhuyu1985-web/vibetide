@@ -2,6 +2,13 @@ import { db } from "@/db";
 import { cmsCatalogs } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 
+export interface CatalogResolved {
+  catalogId: number;
+  appId: number;
+  siteId: number;
+  name: string;
+}
+
 export interface CmsCatalogFields {
   cmsCatalogId: number;
   appId: number;
@@ -136,4 +143,39 @@ export async function listCmsCatalogsForBindingDropdown(organizationId: string) 
     appId: r.appId,
     siteId: r.siteId,
   }));
+}
+
+/**
+ * 按栏目名解析 org 下活跃栏目。
+ * 先精确匹配，再双向包含匹配（输入含栏目名 or 栏目名含输入）。
+ * 未命中返回 null。
+ *
+ * 活跃判据：沿用 listAllActiveCmsCatalogs 的 isNull(deletedAt) 过滤。
+ */
+export async function resolveCatalogByName(
+  organizationId: string,
+  name: string,
+): Promise<CatalogResolved | null> {
+  const rows = await db
+    .select({
+      catalogId: cmsCatalogs.cmsCatalogId,
+      appId: cmsCatalogs.appId,
+      siteId: cmsCatalogs.siteId,
+      name: cmsCatalogs.name,
+    })
+    .from(cmsCatalogs)
+    .where(
+      and(
+        eq(cmsCatalogs.organizationId, organizationId),
+        isNull(cmsCatalogs.deletedAt),
+      ),
+    );
+
+  const exact = rows.find((r) => r.name === name);
+  if (exact) return exact;
+
+  const partial = rows.find(
+    (r) => r.name.includes(name) || name.includes(r.name),
+  );
+  return partial ?? null;
 }
