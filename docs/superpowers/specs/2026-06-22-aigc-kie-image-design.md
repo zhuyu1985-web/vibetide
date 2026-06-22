@@ -34,16 +34,22 @@ Out of scope（后续）：
   → gateway isIllustrateIntent → handleIllustrateIntent
      ├─ 无 lastArticleId → "没有可配图的稿件，请先生成或发链接收稿"
      └─ getArticleById + org 校验 → inngest.send("aigc/illustrate.requested",
-          {organizationId, articleId, channelCtx, userHint?}, id:`illustrate:${articleId}:${externalMessageId}`)
+          { organizationId, articleId, userHint?,
+            channelCtx: { organizationId, configId, platform, chatId, externalUserId } },
+          id:`illustrate:${articleId}:${externalMessageId}`)
         → 即时回"🎨 正在为《标题》生成配图，稍后回结果。"
 
 Inngest aigcIllustrate（异步）：
   1. 读 article（title/summary/body 摘要）→ 小 LLM 调用产英文 image prompt（含 userHint）
   2. kieGenerateImage(prompt) → createTask(KIE_IMAGE_MODEL) → 轮询 recordInfo → resultUrls[0]（临时图床 URL）
   3. fetch 临时 URL → buffer → putObject(火山TOS, key=`${orgId}/aigc/${articleId}/${uuid}.png`) → getPublicUrl
-  4. createAsset(media_assets: tosObjectKey/fileUrl/type=image/...) → assetId
-  5. 写回：db.update(articles).set({coverImageUrl: publicUrl})（无 auth，org 限定）；insert article_assets(articleId, assetId, usageType:"cover")
-  6. 频道回执：sendChannelMessage(config.appKey, "✅ 配图已加到《标题》：<publicUrl>")
+  4. **直接 db.insert(mediaAssets)**（createAsset 带 requireAuth，无 auth 任务不能用）→
+     { organizationId, tosObjectKey, tosBucket, fileUrl: publicUrl, type:"image", title:`${article.title} 配图`, ... } → assetId
+  5. 写回（均无 auth，updateArticle 带 requireAuth 也不能用）：
+     db.update(articles).set({ coverImageUrl: publicUrl }).where(and(eq(id), eq(org)))；
+     db.insert(articleAssets){ articleId, assetId, usageType:"cover" }
+  6. 频道回执：const config = await getChannelConfig(channelCtx.configId);
+     sendChannelMessage({ config, chatId: channelCtx.chatId, type:"markdown", content:"✅ 配图已加到《标题》：<publicUrl>" })
   失败任一步 → 频道回执"配图失败：<msg>，可重试"
 ```
 
@@ -62,13 +68,15 @@ Inngest aigcIllustrate（异步）：
 - `src/lib/channels/illustrate-intent.ts`：`isIllustrateIntent(text)`（配图/加图/配个图/来张图）纯函数
 
 改动：
-- `src/lib/volc-tos.ts`：加 `putObject(objectKey, body, contentType): Promise<void>`（TosClient.putObject 服务端上传）。
+- `src/lib/volc-tos.ts`：加 `putObject(objectKey, body, contentType): Promise<void>`，内部 `client.putObject({ bucket, key: objectKey, body: Buffer.from(body), contentType })`（@volcengine/tos-sdk 的 putObject 收**单 input 对象**，非位置参数）。
 - `src/inngest/events.ts`：加 `aigc/illustrate.requested` 事件类型。
 - `src/inngest/functions/index.ts`：注册 `aigcIllustrate`。
 - `src/lib/channels/gateway.ts`：handleFreeFormMessage 加「加配图」意图分支（发布分支旁）+ `handleIllustrateIntent`。
 - `.env.example`：预留 `KIE_API_KEY` / `KIE_BASE_URL`(默认 https://api.kie.ai) / `KIE_IMAGE_MODEL`(默认 nano-banana-pro)。
 
-复用：`getArticleById`（org 校验）、`createAsset`（或直接 db.insert media_assets，无 auth）、`getPublicUrl`、`sendChannelMessage`、`getLanguageModel`/`getDefaultModel`（产 image prompt）。
+复用：`getArticleById`（org 校验）、`getPublicUrl`、`getChannelConfig`+`sendChannelMessage`、`getLanguageModel`/`getDefaultModel`（产 image prompt）。
+
+> ⚠️ **媒资入库 + 写回均走直接 db 操作（无 auth）**：`createAsset`（assets.ts）与 `updateArticle`（articles.ts）都带 `requireAuth()`，Inngest 任务无登录态不能用——直接 `db.insert(mediaAssets)`（title 必填，给 `${title} 配图`）+ `db.update(articles)` + `db.insert(articleAssets)`，与 1d-A 发布置 approved 的无 auth 直写一致。
 
 ## Error Handling
 
