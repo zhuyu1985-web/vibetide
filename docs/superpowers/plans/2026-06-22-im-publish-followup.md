@@ -22,7 +22,14 @@
 
 - [ ] **Step 1: schema**
   - `channel-sessions.ts` 加 `lastArticleId: uuid("last_article_id").references(() => missions... 不对，references articles.id)` — 实际：`import { articles }` 可能成循环；用 `uuid("last_article_id")` 不加 FK 引用（或软引用）。**核对 channel-sessions.ts 是否已 import 其它表做 FK**（activeMissionId references missions）。若 articles import 不成环就加 FK `references(()=>articles.id,{onDelete:"set null"})`，否则裸 uuid 列 + 注释。再加 `pendingPublish: jsonb("pending_publish").$type<{articleId:string;articleTitle:string;catalogName:string;target:{catalogId:number;appId:number;siteId:number}}>()`。
-  - `articles.ts`：表定义末尾 index 加 `index("idx_articles_mission_id").on(table.missionId)`（核对该表 index 数组写法）。
+  - `articles.ts`：当前 `pgTable("articles", {...})` 只有两参，需 ① 从 `drizzle-orm/pg-core` import 补 `index`；② 改成三参回调形式加索引：
+    ```ts
+    import { pgTable, uuid, text, timestamp, integer, jsonb, index /* ...现有 */ } from "drizzle-orm/pg-core";
+    export const articles = pgTable("articles", { /* ...现有列... */ }, (table) => [
+      index("idx_articles_mission_id").on(table.missionId),
+    ]);
+    ```
+    （若该表已有第二参回调/已 import index，则只追加这条 index）。
 - [ ] **Step 2: push schema** — 改完跑本地 `npm run db:push`（卡则临时 ALTER/CREATE INDEX 脚本兜底）。
 - [ ] **Step 3: DAL（先写测试）**
   - `getLatestArticleByMission(missionId, orgId): Promise<{id:string;title:string;status:string}|null>`（articles.ts，`and(eq(missionId),eq(orgId))` orderBy createdAt desc limit 1）。
@@ -58,7 +65,7 @@
 - [ ] **Step 1: 写测试（先红）**
   - channel-result-notify：成功 mission → 先 `getLatestArticleByMission` → recordSessionResult 收到 articleId（mock 反查返回 {id} → 断言 recordSessionResult 第二参含 articleId）。
   - gateway：①有 lastArticleId + 发布意图 + 解析到栏目 → updateSession(confirming, pendingPublish) + 回确认卡，不调 publishArticleToCms；②confirming+pendingPublish+确认 → 调 handlePublishConfirm/publishArticleToCms + 回 URL；③+取消 → idle 清 pendingPublish；④有发布意图但 lastArticleId 空 → 回"没有可发布的稿件"；⑤栏目匹配不到 → 回"没找到「X」栏目"。
-  - publish-followup：handlePublishConfirm mock publishArticleToCms → 置 approved（mock db.update）+ 调用 target 正确 + 成功回 URL；CmsConfigError → "未开启发布"。
+  - publish-followup：handlePublishConfirm mock publishArticleToCms → 置 approved（mock db.update）+ 调用 target 正确 + 成功回 URL；**断言 db.update（置 approved）在 publishArticleToCms 之前调**（顺序反了真环境会被 CmsConfigError 拦，mock 下不报——用 vitest `invocationCallOrder` 或 mock.calls 时序校验）；CmsConfigError → "未开启发布"。
 - [ ] **Step 2: 实现**
   - channel-result-notify 成功路径：`const art = await getLatestArticleByMission(missionId, mission.organizationId); await recordSessionResult(key, { instruction, resultSummary, articleId: art?.id });`
   - `publish-followup.ts`：`handlePublishConfirm(session, channelCtx): Promise<{reply:string}>`——读 session.pendingPublish；置 approved（直接 `db.update(articles).set({status:"approved"}).where(and(eq(id),eq(org)))` 仅当状态∈{draft,reviewing}）；`publishArticleToCms({articleId, operatorId:"channel_system", triggerSource:"manual", target, allowUpdate:true})`；成功回 `✅ 已发布到「${catalogName}」：${result.publishedUrl ?? result.previewUrl ?? "已提交"}`；catch CmsConfigError → "该组织未开启发布功能。"；其它 → "发布失败：<msg>，可稍后重试。"
@@ -69,7 +76,7 @@
       return handlePublishIntent(text, session, channelCtx);
     }
     ```
-    `handlePublishIntent`：extractPublishTarget → 空则回"要发布到哪个栏目？"；resolveCatalogByName → 空则回"没找到「X」栏目，可发布到：<候选>"；命中 → 取 article 标题（getArticleById 或 lastArticle 带的 title——T1 的 lastArticleId 只存 id，标题需查；简化：handlePublishIntent 里 `db.select({title}).from(articles).where(eq(id,lastArticleId))`）→ updateSession(confirming, pendingPublish:{articleId,articleTitle,catalogName,target}, expiresAt) → 回确认卡。
+    `handlePublishIntent`：extractPublishTarget → 空则回"要发布到哪个栏目？"；resolveCatalogByName → 空则回"没找到「X」栏目，可发布到：<候选>"；命中 → 用 `getArticleById(session.lastArticleId)` 取 article（已返回 title + organizationId）；**校验 `article.organizationId === channelCtx.organizationId`**（防 articleId 跨 org 泄露），不符则当作无可发布稿件回提示 → updateSession(confirming, pendingPublish:{articleId,articleTitle:article.title,catalogName,target}, expiresAt) → 回确认卡。
   - `handleConfirmingMessage` 扩展：函数入口先判 `session.pendingPublish`：isCancel→idle清pendingPublish回"已取消发布"；isConfirm→`handlePublishConfirm`→idle清；其它→"回复 确认 发布，或 取消"。再走既有 pendingPlan 逻辑。
 - [ ] **Step 3: tsc + 测试通过**
 - [ ] **Step 4: commit** `feat(channel): IM 发布 follow-up——结果反查 articleId + 发布意图确认 + publishArticleToCms`
