@@ -10,6 +10,7 @@ import {
 import { organizations } from "./users";
 import { channelConfigs } from "./channels";
 import { missions } from "./missions";
+import { articles } from "./articles";
 import { channelPlatformEnum } from "./enums";
 import type { IntentStep } from "@/lib/agent/types";
 
@@ -41,6 +42,17 @@ export const channelSessions = pgTable(
     pendingPlan: jsonb("pending_plan").$type<{
       summary: string;
       steps: IntentStep[];
+    }>(),
+    /** 上次 mission 产出的 articleId，供发布/配图 follow-up 锚定"这篇"。 */
+    lastArticleId: uuid("last_article_id").references(() => articles.id, {
+      onDelete: "set null",
+    }),
+    /** 待确认发布任务（发布意图识别后暂存，等用户二次确认）。 */
+    pendingPublish: jsonb("pending_publish").$type<{
+      articleId: string;
+      articleTitle: string;
+      catalogName: string;
+      target: { catalogId: number; appId: number; siteId: number };
     }>(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

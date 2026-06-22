@@ -30,7 +30,7 @@ export async function getOrCreateSession(
     if (existing.expiresAt && new Date(existing.expiresAt).getTime() < Date.now()) {
       const [refreshed] = await db
         .update(channelSessions)
-        .set({ status: "idle", activeMissionId: null, clarifyRounds: 0, contextTurns: [], pendingPlan: null, expiresAt: null, updatedAt: new Date() })
+        .set({ status: "idle", activeMissionId: null, clarifyRounds: 0, contextTurns: [], pendingPlan: null, lastArticleId: null, pendingPublish: null, expiresAt: null, updatedAt: new Date() })
         .where(eq(channelSessions.id, existing.id))
         .returning();
       return refreshed;
@@ -65,6 +65,8 @@ export async function updateSession(
       | "clarifyRounds"
       | "expiresAt"
       | "pendingPlan"
+      | "lastArticleId"
+      | "pendingPublish"
     >
   >
 ): Promise<void> {
@@ -101,6 +103,8 @@ export async function resetSession(
       clarifyRounds: 0,
       contextTurns: [],
       pendingPlan: null,
+      lastArticleId: null,
+      pendingPublish: null,
       expiresAt: null,
       updatedAt: new Date(),
     })
@@ -123,7 +127,7 @@ const FOLLOWUP_WINDOW_MS = 30 * 60 * 1000;
  */
 export async function recordSessionResult(
   key: Pick<SessionKey, "configId" | "chatId" | "externalUserId">,
-  args: { instruction: string; resultSummary: string }
+  args: { instruction: string; resultSummary: string; articleId?: string }
 ): Promise<void> {
   await db
     .update(channelSessions)
@@ -132,6 +136,7 @@ export async function recordSessionResult(
       activeMissionId: null,
       clarifyRounds: 0,
       pendingPlan: null,
+      lastArticleId: args.articleId ?? null,
       contextTurns: [
         { role: "user", content: args.instruction },
         { role: "assistant", content: `已完成：${args.resultSummary}` },

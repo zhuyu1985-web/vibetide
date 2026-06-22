@@ -137,4 +137,34 @@ describe("recordSessionResult", () => {
     ]);
     expect(patch.expiresAt).toBeInstanceOf(Date);
   });
+
+  it("带 articleId → patch 含 lastArticleId", async () => {
+    set.mockClear();
+    await recordSessionResult(
+      { configId: "cfg1", chatId: "c1", externalUserId: "u1" },
+      { instruction: "写AI稿", resultSummary: "完成了AI稿", articleId: "art1" },
+    );
+    const patch = (set.mock.calls as unknown as unknown[][])[0][0] as Record<string, unknown>;
+    expect(patch.lastArticleId).toBe("art1");
+  });
+
+  it("不传 articleId → patch 含 lastArticleId: null（旧调用兼容）", async () => {
+    set.mockClear();
+    await recordSessionResult(
+      { configId: "cfg1", chatId: "c1", externalUserId: "u1" },
+      { instruction: "写AI稿", resultSummary: "完成了AI稿" },
+    );
+    const patch = (set.mock.calls as unknown as unknown[][])[0][0] as Record<string, unknown>;
+    expect(patch.lastArticleId).toBeNull();
+  });
+});
+
+describe("resetSession", () => {
+  it("patch 含 lastArticleId: null, pendingPublish: null", async () => {
+    set.mockClear();
+    await resetSession({ configId: "cfg1", chatId: "c1", externalUserId: "u1" });
+    const patch = (set.mock.calls as unknown as unknown[][])[0][0] as Record<string, unknown>;
+    expect(patch.lastArticleId).toBeNull();
+    expect(patch.pendingPublish).toBeNull();
+  });
 });

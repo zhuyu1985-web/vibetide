@@ -5,6 +5,7 @@ import {
   timestamp,
   integer,
   jsonb,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations, userProfiles } from "./users";
@@ -119,7 +120,10 @@ export const articles = pgTable("articles", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+},
+(table) => ({
+  missionIdIdx: index("idx_articles_mission_id").on(table.missionId),
+}));
 
 export const articleAssets = pgTable("article_assets", {
   id: uuid("id").defaultRandom().primaryKey(),

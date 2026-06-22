@@ -71,6 +71,23 @@ export async function getArticleById(
   };
 }
 
+/**
+ * 按 missionId 查最新产出的文章（供 IM follow-up 发布/配图锚定"这篇"）。
+ * 需要 org 隔离以防多租户越界。
+ */
+export async function getLatestArticleByMission(
+  missionId: string,
+  organizationId: string,
+): Promise<{ id: string; title: string; status: string } | null> {
+  const rows = await db
+    .select({ id: articles.id, title: articles.title, status: articles.status })
+    .from(articles)
+    .where(and(eq(articles.missionId, missionId), eq(articles.organizationId, organizationId)))
+    .orderBy(desc(articles.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function getArticles(): Promise<ArticleListItem[]> {
   const orgId = await getCurrentUserOrg();
   if (!orgId) return [];
