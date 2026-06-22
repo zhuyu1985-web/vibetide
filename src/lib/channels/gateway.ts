@@ -11,6 +11,7 @@
 import { recordInboundMessage, recordOutboundMessage } from "@/app/actions/channels";
 import { findTemplateByNameOrSlug } from "@/lib/dal/workflow-templates-listing";
 import { inngest } from "@/inngest/client";
+import type { InngestEvents } from "@/inngest/events";
 import { extractUrls } from "./link-extract";
 import { getOrCreateSession, updateSession, resetSession } from "@/lib/dal/channel-sessions";
 import type { ChannelSessionRow } from "@/lib/dal/channel-sessions";
@@ -21,6 +22,7 @@ import { formatPlanCard } from "./format-plan-card";
 import { isConfirm, isCancel } from "./confirm-keywords";
 import { isPublishIntent, extractPublishTarget } from "./publish-intent";
 import { isIllustrateIntent } from "./illustrate-intent";
+import { isVideoIntent, isPodcastIntent } from "./aigc-intent";
 import { resolveCatalogByName, listAllActiveCmsCatalogs } from "@/lib/dal/cms-catalogs";
 import { getArticleById } from "@/lib/dal/articles";
 import { handlePublishConfirm } from "./publish-followup";
@@ -288,6 +290,18 @@ async function handleFreeFormMessage(
     return handlePublishIntent(text, msg, session, channelCtx);
   }
 
+  // 视频意图（idle 态）：发布意图之后、配图之前
+  if (isVideoIntent(text)) {
+    if (!session.lastArticleId) return { reply: "没有可配视频的稿件，请先生成或发链接收稿。" };
+    return handleAigcIntent(msg, session, text, "aigc/video.requested", "video", `🎬 正在为《%s》生成视频，要几分钟，稍后回结果。`);
+  }
+
+  // 播客意图（idle 态）：视频之后、配图之前
+  if (isPodcastIntent(text)) {
+    if (!session.lastArticleId) return { reply: "没有可做播客的稿件，请先生成或发链接收稿。" };
+    return handleAigcIntent(msg, session, text, "aigc/podcast.requested", "podcast", `🎙️ 正在为《%s》生成播客，要几分钟，稍后回结果。`);
+  }
+
   // 加配图意图（idle 态）：发布意图分支之后、clarifyOrPlan 之前
   if (isIllustrateIntent(text)) {
     if (!session.lastArticleId) return { reply: "没有可配图的稿件，请先生成或发链接收稿。" };
@@ -362,6 +376,44 @@ async function handlePublishIntent(
   });
 
   return { reply: `📋 将把《${article.title}》发布到「${catalog.name}」，回复 确认 发布，或 取消。` };
+}
+
+// ---------------------------------------------------------------------------
+// Generic AIGC intent handler (video / podcast / illustrate)
+// ---------------------------------------------------------------------------
+
+type AigcChannelEventName = "aigc/video.requested" | "aigc/podcast.requested";
+
+async function handleAigcIntent(
+  msg: StandardizedMessage,
+  session: ChannelSessionRow,
+  text: string,
+  eventName: AigcChannelEventName,
+  idPrefix: string,
+  replyTpl: string,
+): Promise<{ reply: string }> {
+  const article = await getArticleById(session.lastArticleId!);
+  if (!article || article.organizationId !== msg.organizationId) {
+    return { reply: "没有可处理的稿件，请先生成或发链接收稿。" };
+  }
+  const channelCtx = {
+    organizationId: msg.organizationId,
+    configId: msg.configId,
+    platform: msg.platform,
+    chatId: msg.chatId,
+    externalUserId: msg.externalUserId,
+  };
+  await inngest.send({
+    name: eventName,
+    id: `${idPrefix}:${session.lastArticleId}:${msg.externalMessageId}`,
+    data: {
+      organizationId: msg.organizationId,
+      articleId: session.lastArticleId!,
+      userHint: text,
+      channelCtx,
+    },
+  } as { name: AigcChannelEventName; id: string; data: InngestEvents[AigcChannelEventName]["data"] });
+  return { reply: replyTpl.replace("%s", article.title) };
 }
 
 // ---------------------------------------------------------------------------

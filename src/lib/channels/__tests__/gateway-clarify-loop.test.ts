@@ -283,6 +283,42 @@ describe("gateway 发布 follow-up 分支", () => {
   });
 });
 
+describe("gateway 视频/播客分支", () => {
+  beforeEach(() => {
+    updateSession.mockResolvedValue(undefined);
+    inngestSend.mockResolvedValue(undefined);
+  });
+
+  it("配视频意图 + lastArticleId → 派 aigc/video.requested + 回'视频'", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "idle", lastArticleId: "art1", contextTurns: [], clarifyRounds: 0 });
+    getArticleById.mockResolvedValue({ id: "art1", title: "AI稿", organizationId: "org1" });
+    const r = await handleInboundMessage({ ...msg, textContent: "给这篇做个视频" });
+    expect(inngestSend).toHaveBeenCalledWith(expect.objectContaining({
+      name: "aigc/video.requested",
+      id: expect.stringContaining("video:art1:"),
+    }));
+    expect(r.reply).toContain("视频");
+  });
+
+  it("做播客意图 + lastArticleId → 派 aigc/podcast.requested + 回'播客'", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "idle", lastArticleId: "art1", contextTurns: [], clarifyRounds: 0 });
+    getArticleById.mockResolvedValue({ id: "art1", title: "AI稿", organizationId: "org1" });
+    const r = await handleInboundMessage({ ...msg, textContent: "给这篇做个播客" });
+    expect(inngestSend).toHaveBeenCalledWith(expect.objectContaining({
+      name: "aigc/podcast.requested",
+      id: expect.stringContaining("podcast:art1:"),
+    }));
+    expect(r.reply).toContain("播客");
+  });
+
+  it("配视频 但无 lastArticleId → 回提示不派", async () => {
+    getOrCreateSession.mockResolvedValue({ id: "s1", status: "idle", lastArticleId: null, contextTurns: [], clarifyRounds: 0 });
+    const r = await handleInboundMessage({ ...msg, textContent: "配视频" });
+    expect(r.reply).toContain("没有可");
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+});
+
 describe("gateway 加配图分支", () => {
   beforeEach(() => {
     updateSession.mockResolvedValue(undefined);
