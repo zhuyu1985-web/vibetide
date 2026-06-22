@@ -60,6 +60,7 @@ import { channelLinkIngest, channelLinkIngestFailureHandler } from "./channel-li
 import { channelMissionTerminalNotify } from "./channel-mission-terminal-notify";
 import { aigcIllustrate } from "./aigc-illustrate";
 import { aigcVideo } from "./aigc-video";
+import { aigcPodcast } from "./aigc-podcast";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -146,4 +147,6 @@ export const functions = [
   aigcIllustrate,
   // AIGC Video (2026-06-22) — IM 机器人配视频：文生视频 → TOS 转存 → 写回 article_assets
   aigcVideo,
+  // AIGC Podcast (2026-06-22) — IM 机器人播客：LLM 双主持脚本 → elevenlabs 多人对话合成 → TOS 转存 → 写回 article_assets
+  aigcPodcast,
 ];
