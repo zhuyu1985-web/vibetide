@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { getChannelConfig } from "@/lib/dal/channels";
 import { sendChannelMessage } from "@/lib/channels/outbound";
 import { resetSession, recordSessionResult } from "@/lib/dal/channel-sessions";
+import { getLatestArticleByMission } from "@/lib/dal/articles";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,9 +91,11 @@ export async function sendChannelResult(
 
   // 成功 → 记跟进上下文（30min 窗口，用户回话可在上次基础上重做）；失败 → 全清复位（无产出可跟进）
   if (resultSummary !== null) {
+    const art = await getLatestArticleByMission(missionId, mission.organizationId);
     await recordSessionResult(key, {
       instruction: mission.title ?? resultSummary,
       resultSummary,
+      articleId: art?.id,
     });
   } else {
     await resetSession(key);

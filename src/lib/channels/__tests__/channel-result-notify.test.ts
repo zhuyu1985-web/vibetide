@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { findFirst, getChannelConfig, sendChannelMessage, resetSession, recordSessionResult } =
+const { findFirst, getChannelConfig, sendChannelMessage, resetSession, recordSessionResult, getLatestArticleByMission } =
   vi.hoisted(() => ({
     findFirst: vi.fn(),
     getChannelConfig: vi.fn(),
     sendChannelMessage: vi.fn(),
     resetSession: vi.fn(),
     recordSessionResult: vi.fn(),
+    getLatestArticleByMission: vi.fn(),
   }));
 
 vi.mock("@/db", () => ({ db: { query: { missions: { findFirst } } } }));
 vi.mock("@/lib/dal/channels", () => ({ getChannelConfig }));
 vi.mock("@/lib/channels/outbound", () => ({ sendChannelMessage }));
 vi.mock("@/lib/dal/channel-sessions", () => ({ resetSession, recordSessionResult }));
+vi.mock("@/lib/dal/articles", () => ({ getLatestArticleByMission }));
 
 import { sendChannelResult } from "../channel-result-notify";
 
@@ -34,6 +36,7 @@ beforeEach(() => {
   sendChannelMessage.mockResolvedValue({ success: true });
   resetSession.mockResolvedValue(undefined);
   recordSessionResult.mockResolvedValue(undefined);
+  getLatestArticleByMission.mockResolvedValue({ id: "art1", title: "T", status: "approved" });
 });
 
 describe("sendChannelResult", () => {
@@ -51,7 +54,7 @@ describe("sendChannelResult", () => {
     expect(arg.content).toContain("想继续"); // 跟进提示
     expect(recordSessionResult).toHaveBeenCalledWith(
       { configId: "cfg1", chatId: "c1", externalUserId: "u1" },
-      expect.objectContaining({ instruction: "写AI稿", resultSummary: "完成了X" }),
+      expect.objectContaining({ instruction: "写AI稿", resultSummary: "完成了X", articleId: "art1" }),
     );
     expect(resetSession).not.toHaveBeenCalled();
   });

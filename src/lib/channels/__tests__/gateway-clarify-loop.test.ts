@@ -9,6 +9,10 @@ const {
   cancelChannelMission,
   recordInboundMessage,
   recordOutboundMessage,
+  resolveCatalogByName,
+  listAllActiveCmsCatalogs,
+  getArticleById,
+  handlePublishConfirm,
 } = vi.hoisted(() => ({
   getOrCreateSession: vi.fn(),
   updateSession: vi.fn(),
@@ -18,6 +22,10 @@ const {
   cancelChannelMission: vi.fn(),
   recordInboundMessage: vi.fn().mockResolvedValue({ messageId: "x" }),
   recordOutboundMessage: vi.fn().mockResolvedValue({ messageId: "y" }),
+  resolveCatalogByName: vi.fn(),
+  listAllActiveCmsCatalogs: vi.fn(),
+  getArticleById: vi.fn(),
+  handlePublishConfirm: vi.fn(),
 }));
 
 vi.mock("@/lib/dal/channel-sessions", () => ({
@@ -36,6 +44,11 @@ vi.mock("@/lib/constants", () => ({ EMPLOYEE_META: { xiaolei: { name: "小蕾", 
 vi.mock("@/lib/dal/workflow-templates-listing", () => ({ findTemplateByNameOrSlug: vi.fn() }));
 vi.mock("@/inngest/client", () => ({ inngest: { send: vi.fn() } }));
 vi.mock("@/lib/channels/link-extract", () => ({ extractUrls: vi.fn().mockReturnValue([]) }));
+
+// Mocks for publish follow-up path
+vi.mock("@/lib/dal/cms-catalogs", () => ({ resolveCatalogByName, listAllActiveCmsCatalogs }));
+vi.mock("@/lib/dal/articles", () => ({ getArticleById }));
+vi.mock("@/lib/channels/publish-followup", () => ({ handlePublishConfirm }));
 
 import { handleInboundMessage } from "../gateway";
 
@@ -143,5 +156,108 @@ describe("gateway 自由消息澄清循环", () => {
     expect(startChannelMission).not.toHaveBeenCalled();
     expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "confirming", pendingPlan: expect.objectContaining({ summary: "财经热点" }) }));
     expect(r.reply).toContain("抓财经热榜");
+  });
+});
+
+describe("gateway 发布 follow-up 分支", () => {
+  beforeEach(() => {
+    updateSession.mockResolvedValue(undefined);
+    handlePublishConfirm.mockResolvedValue({ reply: "✅ 已发布到「新闻」：https://example.com/1" });
+  });
+
+  it("idle + lastArticleId + 发布意图 + 栏目命中 + org 一致 → confirming + pendingPublish，不调 handlePublishConfirm", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish: null, lastArticleId: "art1",
+    });
+    resolveCatalogByName.mockResolvedValue({ catalogId: 101, appId: 1, siteId: 1, name: "新闻" });
+    getArticleById.mockResolvedValue({ id: "art1", title: "测试文章", organizationId: "org1", publishStatus: "approved" });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "把这篇发布到新闻" });
+
+    expect(handlePublishConfirm).not.toHaveBeenCalled();
+    expect(updateSession).toHaveBeenCalledWith(
+      "s1",
+      expect.objectContaining({
+        status: "confirming",
+        pendingPublish: expect.objectContaining({ catalogName: "新闻", articleId: "art1" }),
+      }),
+    );
+    expect(r.reply).toContain("确认");
+  });
+
+  it("idle + 无 lastArticleId + 发布意图 → 回'没有可发布的稿件'，不 updateSession", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish: null, lastArticleId: null,
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "发布到新闻" });
+    expect(r.reply).toContain("没有可发布的稿件");
+    expect(updateSession).not.toHaveBeenCalled();
+    expect(handlePublishConfirm).not.toHaveBeenCalled();
+  });
+
+  it("idle + lastArticleId + 发布意图 + 栏目未命中 → 回含'没找到'", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish: null, lastArticleId: "art1",
+    });
+    resolveCatalogByName.mockResolvedValue(null);
+    listAllActiveCmsCatalogs.mockResolvedValue([
+      { name: "体育" }, { name: "娱乐" },
+    ]);
+
+    const r = await handleInboundMessage({ ...msg, textContent: "发布到不存在的栏目" });
+    expect(r.reply).toContain("没找到");
+    expect(handlePublishConfirm).not.toHaveBeenCalled();
+  });
+
+  it("idle + lastArticleId + 发布意图 + org 不一致 → 回'没有可发布的稿件'", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish: null, lastArticleId: "art1",
+    });
+    resolveCatalogByName.mockResolvedValue({ catalogId: 101, appId: 1, siteId: 1, name: "新闻" });
+    // article 属于不同 org
+    getArticleById.mockResolvedValue({ id: "art1", title: "测试文章", organizationId: "other-org", publishStatus: "approved" });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "发布到新闻" });
+    expect(r.reply).toContain("没有可发布的稿件");
+    expect(handlePublishConfirm).not.toHaveBeenCalled();
+  });
+
+  it("confirming + pendingPublish + '确认' → 调 handlePublishConfirm + updateSession(idle, pendingPublish:null)", async () => {
+    const pendingPublish = { articleId: "art1", articleTitle: "测试文章", catalogName: "新闻", target: { catalogId: 101, appId: 1, siteId: 1 } };
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish, lastArticleId: "art1",
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "确认" });
+
+    expect(handlePublishConfirm).toHaveBeenCalled();
+    expect(updateSession).toHaveBeenCalledWith(
+      "s1",
+      expect.objectContaining({ status: "idle", pendingPublish: null }),
+    );
+    expect(r.reply).toContain("已发布");
+  });
+
+  it("confirming + pendingPublish + '取消' → updateSession(idle, pendingPublish:null) + 回'已取消发布'，不调 handlePublishConfirm", async () => {
+    const pendingPublish = { articleId: "art1", articleTitle: "测试文章", catalogName: "新闻", target: { catalogId: 101, appId: 1, siteId: 1 } };
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "confirming", contextTurns: [], clarifyRounds: 0,
+      pendingPlan: null, pendingPublish, lastArticleId: "art1",
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "取消" });
+
+    expect(handlePublishConfirm).not.toHaveBeenCalled();
+    expect(updateSession).toHaveBeenCalledWith(
+      "s1",
+      expect.objectContaining({ status: "idle", pendingPublish: null }),
+    );
+    expect(r.reply).toContain("取消");
   });
 });

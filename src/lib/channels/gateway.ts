@@ -19,6 +19,10 @@ import { startChannelMission } from "./start-channel-mission";
 import { cancelChannelMission } from "./cancel-channel-mission";
 import { formatPlanCard } from "./format-plan-card";
 import { isConfirm, isCancel } from "./confirm-keywords";
+import { isPublishIntent, extractPublishTarget } from "./publish-intent";
+import { resolveCatalogByName, listAllActiveCmsCatalogs } from "@/lib/dal/cms-catalogs";
+import { getArticleById } from "@/lib/dal/articles";
+import { handlePublishConfirm } from "./publish-followup";
 import type { IntentStep } from "@/lib/agent/types";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
@@ -275,6 +279,14 @@ async function handleFreeFormMessage(
     return handleConfirmingMessage(text, msg, session, channelCtx);
   }
 
+  // 发布意图（idle 态）：先于 clarifyOrPlan 拦截
+  if (isPublishIntent(text)) {
+    if (!session.lastArticleId) {
+      return { reply: "没有可发布的稿件，请先生成或发链接收稿。" };
+    }
+    return handlePublishIntent(text, msg, session, channelCtx);
+  }
+
   let result;
   try {
     result = await clarifyOrPlan(msg.organizationId, session, text);
@@ -301,6 +313,47 @@ async function handleFreeFormMessage(
   }
 
   return enterConfirming(session.id, turns, result.summary, result.steps);
+}
+
+// ---------------------------------------------------------------------------
+// Publish intent handler (idle state)
+// ---------------------------------------------------------------------------
+
+async function handlePublishIntent(
+  text: string,
+  msg: StandardizedMessage,
+  session: ChannelSessionRow,
+  channelCtx: { organizationId: string; configId: string; platform: "dingtalk" | "wechat_work"; chatId: string; externalUserId: string },
+): Promise<{ reply: string }> {
+  const target = extractPublishTarget(text);
+  if (!target) {
+    return { reply: "要发布到哪个栏目？比如「发布到新闻」。" };
+  }
+
+  const catalog = await resolveCatalogByName(msg.organizationId, target);
+  if (!catalog) {
+    const all = await listAllActiveCmsCatalogs(msg.organizationId);
+    const names = all.slice(0, 6).map((c) => c.name).join("、");
+    return { reply: `没找到「${target}」栏目。${names ? "可发布到：" + names : ""}` };
+  }
+
+  const article = await getArticleById(session.lastArticleId!);
+  if (!article || article.organizationId !== msg.organizationId) {
+    return { reply: "没有可发布的稿件，请先生成或发链接收稿。" };
+  }
+
+  await updateSession(session.id, {
+    status: "confirming",
+    pendingPublish: {
+      articleId: article.id,
+      articleTitle: article.title,
+      catalogName: catalog.name,
+      target: { catalogId: catalog.catalogId, appId: catalog.appId, siteId: catalog.siteId },
+    },
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+  });
+
+  return { reply: `📋 将把《${article.title}》发布到「${catalog.name}」，回复 确认 发布，或 取消。` };
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +410,20 @@ async function handleConfirmingMessage(
   session: ChannelSessionRow,
   channelCtx: { organizationId: string; configId: string; platform: "dingtalk" | "wechat_work"; chatId: string; externalUserId: string },
 ): Promise<{ reply: string; missionId?: string }> {
+  // pendingPublish 分流（先于 pendingPlan 判断）
+  if (session.pendingPublish) {
+    if (isCancel(text)) {
+      await updateSession(session.id, { status: "idle", pendingPublish: null, expiresAt: null });
+      return { reply: "已取消发布。" };
+    }
+    if (isConfirm(text)) {
+      const r = await handlePublishConfirm(session, channelCtx);
+      await updateSession(session.id, { status: "idle", pendingPublish: null, expiresAt: null });
+      return r;
+    }
+    return { reply: "回复 确认 发布，或 取消。" };
+  }
+
   const plan = session.pendingPlan as { summary: string; steps: IntentStep[] } | null;
   if (!plan) {
     await updateSession(session.id, { status: "idle", pendingPlan: null, contextTurns: [], clarifyRounds: 0, expiresAt: null });
