@@ -59,6 +59,7 @@ import { missedTopicDetectionDaily } from "./topic-compare/missed-topic-cron";
 import { channelLinkIngest, channelLinkIngestFailureHandler } from "./channel-link-ingest";
 import { channelMissionTerminalNotify } from "./channel-mission-terminal-notify";
 import { aigcIllustrate } from "./aigc-illustrate";
+import { aigcVideo } from "./aigc-video";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -143,4 +144,6 @@ export const functions = [
   channelMissionTerminalNotify,
   // AIGC Illustrate (2026-06-22) — IM 机器人配图：出图 → TOS 转存 → 写回 articles.coverImageUrl
   aigcIllustrate,
+  // AIGC Video (2026-06-22) — IM 机器人配视频：文生视频 → TOS 转存 → 写回 article_assets
+  aigcVideo,
 ];

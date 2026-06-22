@@ -461,6 +461,23 @@ export type InngestEvents = {
     };
   };
 
+  // ─── AIGC Video (2026-06-22) ───
+  /** IM 机器人配视频请求 → kieGenerateVideo → TOS 转存 → 写回 article_assets。由 gateway 派发，aigcVideo 消费 */
+  "aigc/video.requested": {
+    data: {
+      organizationId: string;
+      articleId: string;
+      userHint?: string;
+      channelCtx: {
+        organizationId: string;
+        configId: string;
+        platform: "dingtalk" | "wechat_work";
+        chatId: string;
+        externalUserId: string;
+      };
+    };
+  };
+
   // ─── Channel Inbound Link Ingest (2026-06-19) ───
   /** 钉钉/企微入站消息含链接 → 抓取存稿。由 gateway 派发，channelLinkIngest 消费 */
   "channel/link-ingest.requested": {
