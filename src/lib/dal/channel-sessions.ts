@@ -112,3 +112,38 @@ export async function resetSession(
       )
     );
 }
+
+/** mission 成功出结果后的跟进窗口：30 分钟内回话可在上次基础上重做。 */
+const FOLLOWUP_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * mission 成功出结果后调用：软复位为 idle，把"上次请求 + 已完成摘要"写进 contextTurns，
+ * 设 30min 跟进窗口。用户在窗口内回话时 clarifyOrPlan 自动带上这段上下文（一键跟进）。
+ * 过期由 getOrCreateSession 的过期分支清掉 contextTurns，回干净 idle。
+ */
+export async function recordSessionResult(
+  key: Pick<SessionKey, "configId" | "chatId" | "externalUserId">,
+  args: { instruction: string; resultSummary: string }
+): Promise<void> {
+  await db
+    .update(channelSessions)
+    .set({
+      status: "idle",
+      activeMissionId: null,
+      clarifyRounds: 0,
+      pendingPlan: null,
+      contextTurns: [
+        { role: "user", content: args.instruction },
+        { role: "assistant", content: `已完成：${args.resultSummary}` },
+      ],
+      expiresAt: new Date(Date.now() + FOLLOWUP_WINDOW_MS),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(channelSessions.configId, key.configId),
+        eq(channelSessions.chatId, key.chatId),
+        eq(channelSessions.externalUserId, key.externalUserId)
+      )
+    );
+}

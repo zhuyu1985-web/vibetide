@@ -16,7 +16,7 @@ vi.mock("@/db", () => ({
   db: { query: { channelSessions: { findFirst } }, insert, update },
 }));
 
-import { getOrCreateSession, resetSession, getSessionByActiveMissionId } from "../channel-sessions";
+import { getOrCreateSession, resetSession, getSessionByActiveMissionId, recordSessionResult } from "../channel-sessions";
 
 const key = {
   organizationId: "org1",
@@ -113,5 +113,28 @@ describe("getSessionByActiveMissionId", () => {
     findFirst.mockResolvedValue(undefined);
     const s = await getSessionByActiveMissionId("mx");
     expect(s).toBeNull();
+  });
+});
+
+describe("recordSessionResult", () => {
+  it("写 contextTurns(上次请求+已完成摘要) + idle + 跟进窗口", async () => {
+    await recordSessionResult(
+      { configId: "cfg1", chatId: "c1", externalUserId: "u1" },
+      { instruction: "写AI稿", resultSummary: "完成了AI稿" },
+    );
+    expect(update).toHaveBeenCalled();
+    const patch = (set.mock.calls as unknown as unknown[][])[0][0] as {
+      status: string;
+      activeMissionId: null;
+      pendingPlan: null;
+      contextTurns: { role: string; content: string }[];
+      expiresAt: Date;
+    };
+    expect(patch).toMatchObject({ status: "idle", activeMissionId: null, pendingPlan: null });
+    expect(patch.contextTurns).toEqual([
+      { role: "user", content: "写AI稿" },
+      { role: "assistant", content: "已完成：完成了AI稿" },
+    ]);
+    expect(patch.expiresAt).toBeInstanceOf(Date);
   });
 });

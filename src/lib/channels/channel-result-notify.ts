@@ -11,7 +11,7 @@ import { missions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getChannelConfig } from "@/lib/dal/channels";
 import { sendChannelMessage } from "@/lib/channels/outbound";
-import { resetSession } from "@/lib/dal/channel-sessions";
+import { resetSession, recordSessionResult } from "@/lib/dal/channel-sessions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,16 +50,15 @@ export async function sendChannelResult(
     getChannelConfig(ctx.configId),
   ]);
 
-  const reset = () =>
-    resetSession({
-      configId: ctx.configId,
-      chatId: ctx.chatId,
-      externalUserId: ctx.externalUserId,
-    });
+  const key = {
+    configId: ctx.configId,
+    chatId: ctx.chatId,
+    externalUserId: ctx.externalUserId,
+  };
 
   // config 或 mission 缺失：静默复位，不抛
   if (!mission || !config) {
-    await reset();
+    await resetSession(key);
     return;
   }
 
@@ -72,11 +71,12 @@ export async function sendChannelResult(
   const link = `${siteUrl()}/missions/${missionId}`;
 
   let content: string;
+  let resultSummary: string | null = null;
   if (mission.status === "failed") {
     content = `❌ 任务失败：${fo.message ?? fo.summary ?? "执行未完成"}\n详情：${link}`;
   } else {
-    const summary = fo.summary ?? fo.message ?? "已完成";
-    content = `✅ 已完成：${summary}\n在系统查看：${link}`;
+    resultSummary = fo.summary ?? fo.message ?? "已完成";
+    content = `✅ 已完成：${resultSummary}\n在系统查看：${link}\n想继续可以说：换个角度 / 换个方向 / 调整篇幅。`;
   }
 
   await sendChannelMessage({
@@ -88,7 +88,15 @@ export async function sendChannelResult(
     missionId,
   });
 
-  await reset();
+  // 成功 → 记跟进上下文（30min 窗口，用户回话可在上次基础上重做）；失败 → 全清复位（无产出可跟进）
+  if (resultSummary !== null) {
+    await recordSessionResult(key, {
+      instruction: mission.title ?? resultSummary,
+      resultSummary,
+    });
+  } else {
+    await resetSession(key);
+  }
 }
 
 /**
