@@ -16,16 +16,16 @@ type IllustrateData = InngestEvents["aigc/illustrate.requested"]["data"];
 export async function runIllustrate(data: IllustrateData): Promise<void> {
   const { organizationId, articleId, userHint, channelCtx } = data;
 
+  // 回执包 try/catch：出图非幂等且贵，回执失败绝不能把 handler 炸出未捕获异常
+  // 触发 Inngest 重试 → 重复出图烧额度（配合 retries:0 双保险）。
   const reply = async (content: string) => {
-    const config = await getChannelConfig(channelCtx.configId);
-    if (config) {
-      await sendChannelMessage({
-        config,
-        chatId: channelCtx.chatId,
-        type: "markdown",
-        title: "配图",
-        content,
-      });
+    try {
+      const config = await getChannelConfig(channelCtx.configId);
+      if (config) {
+        await sendChannelMessage({ config, chatId: channelCtx.chatId, type: "markdown", title: "配图", content });
+      }
+    } catch (err) {
+      console.error("[aigc-illustrate] 回执失败:", err);
     }
   };
 
@@ -86,7 +86,8 @@ export async function runIllustrate(data: IllustrateData): Promise<void> {
 }
 
 export const aigcIllustrate = inngest.createFunction(
-  { id: "aigc-illustrate", retries: 1 },
+  // retries:0 —— 出图非幂等且贵（一张 ~18 credits），失败不自动重试，由用户手动再发"加配图"重试。
+  { id: "aigc-illustrate", retries: 0 },
   { event: "aigc/illustrate.requested" },
   async ({ event }) => {
     await runIllustrate(event.data);

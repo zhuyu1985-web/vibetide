@@ -59,15 +59,30 @@ export function getPublicUrl(objectKey: string): string {
 }
 
 /**
- * 服务端直接上传 Buffer 到 TOS（AI 生成图片转存专用）
+ * 服务端直接上传 Buffer 到 TOS（AI 生成图片转存专用）。
+ *
+ * ⚠️ 不走 SDK 的 client.putObject——@volcengine/tos-sdk@2.9.1 内部捆绑 axios@0.21.4，
+ * 在 Node 22 上发实际请求会抛 ERR_INVALID_PROTOCOL（generateUploadUrl 只拼串不发请求，故无此问题）。
+ * 改用「预签名 PUT URL（拼串，正常）+ 原生 fetch PUT 字节」绕开坏 axios。
  */
 export async function putObject(
   objectKey: string,
   body: Buffer | Uint8Array,
   contentType: string
 ): Promise<void> {
-  const client = getClient();
-  await client.putObject({ bucket, key: objectKey, body: Buffer.from(body), contentType });
+  const url = generateUploadUrl(objectKey, contentType);
+  // 拷一份独立 ArrayBuffer 作为 Blob body（跨 Node/Edge runtime 通）。
+  const ab = new ArrayBuffer(body.byteLength);
+  new Uint8Array(ab).set(body);
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: new Blob([ab], { type: contentType }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`TOS putObject 失败：${res.status} ${text}`);
+  }
 }
 
 /**

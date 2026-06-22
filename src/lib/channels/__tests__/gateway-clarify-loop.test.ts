@@ -297,7 +297,11 @@ describe("gateway 加配图分支", () => {
 
     const r = await handleInboundMessage({ ...msg, textContent: "给这篇加配图" });
 
-    expect(inngestSend).toHaveBeenCalledWith(expect.objectContaining({ name: "aigc/illustrate.requested" }));
+    expect(inngestSend).toHaveBeenCalledWith(expect.objectContaining({
+      name: "aigc/illustrate.requested",
+      // 幂等键：钉钉重投同一条"加配图"不重复出图
+      id: expect.stringContaining("illustrate:art1:"),
+    }));
     expect(r.reply).toContain("配图");
   });
 
