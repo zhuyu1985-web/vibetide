@@ -87,3 +87,30 @@ export async function kieGenerateImage(args: {
   });
   return kiePollTask(taskId);
 }
+
+export async function kieGenerateVideo(args: {
+  prompt: string;
+  aspectRatio?: string;
+  duration?: number;
+}): Promise<string[]> {
+  const model = process.env.KIE_VIDEO_MODEL || "bytedance/seedance-2-fast";
+  const taskId = await kieCreateTask(model, {
+    prompt: args.prompt,
+    aspect_ratio: args.aspectRatio ?? "16:9",
+    duration: args.duration ?? 5,
+    resolution: "720p",
+  });
+  return kiePollTask(taskId, { timeoutMs: 480_000, intervalMs: 15_000 });
+}
+
+export async function kieGenerateDialogue(args: {
+  dialogue: { text: string; voice: string }[];
+  stability?: number;
+}): Promise<string[]> {
+  const model = process.env.KIE_PODCAST_MODEL || "elevenlabs/text-to-dialogue-v3";
+  const taskId = await kieCreateTask(model, {
+    dialogue: args.dialogue,
+    stability: args.stability ?? 0.5,
+  });
+  return kiePollTask(taskId, { timeoutMs: 300_000, intervalMs: 10_000 });
+}

@@ -84,6 +84,6 @@ describe("storeRemoteImageToTos", () => {
 
     await expect(
       storeRemoteImageToTos("https://img.example.com/gone.png", args)
-    ).rejects.toThrow(/下载图片失败/);
+    ).rejects.toThrow(/下载媒体失败/);
   });
 });

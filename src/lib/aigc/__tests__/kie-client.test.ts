@@ -3,6 +3,8 @@ import {
   kieCreateTask,
   kiePollTask,
   kieGenerateImage,
+  kieGenerateVideo,
+  kieGenerateDialogue,
   KieConfigError,
   KieError,
 } from "../kie-client";
@@ -18,6 +20,8 @@ afterEach(() => {
   delete process.env.KIE_API_KEY;
   delete process.env.KIE_BASE_URL;
   delete process.env.KIE_IMAGE_MODEL;
+  delete process.env.KIE_VIDEO_MODEL;
+  delete process.env.KIE_PODCAST_MODEL;
   vi.restoreAllMocks();
 });
 
@@ -185,5 +189,121 @@ describe("kieGenerateImage", () => {
     const firstCall = mockFetch.mock.calls[0];
     const body = JSON.parse(firstCall[1]?.body as string);
     expect(body.model).toBe("nano-banana-pro");
+  });
+});
+
+// ─── kieGenerateVideo ───────────────────────────────────────────────────────
+
+describe("kieGenerateVideo", () => {
+  it("createTask 使用视频模型且 input 含 prompt/aspect_ratio/duration", async () => {
+    process.env.KIE_VIDEO_MODEL = "bytedance/seedance-2-fast";
+
+    const mockFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        json: async () => ({ code: 200, data: { taskId: "videoTask1" } }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          code: 200,
+          data: {
+            state: "success",
+            resultJson: JSON.stringify({
+              resultUrls: ["https://cdn.example.com/video.mp4"],
+            }),
+          },
+        }),
+      } as Response);
+
+    const urls = await kieGenerateVideo({ prompt: "a flying bird", aspectRatio: "9:16", duration: 8 });
+    expect(urls).toEqual(["https://cdn.example.com/video.mp4"]);
+
+    const createBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(createBody.model).toBe("bytedance/seedance-2-fast");
+    expect(createBody.input.prompt).toBe("a flying bird");
+    expect(createBody.input.aspect_ratio).toBe("9:16");
+    expect(createBody.input.duration).toBe(8);
+  });
+
+  it("不设 KIE_VIDEO_MODEL 时使用默认模型", async () => {
+    const mockFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        json: async () => ({ code: 200, data: { taskId: "videoTaskDef" } }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          code: 200,
+          data: {
+            state: "success",
+            resultJson: JSON.stringify({ resultUrls: ["https://cdn.example.com/def.mp4"] }),
+          },
+        }),
+      } as Response);
+
+    await kieGenerateVideo({ prompt: "a sunset" });
+
+    const createBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(createBody.model).toBe("bytedance/seedance-2-fast");
+  });
+});
+
+// ─── kieGenerateDialogue ────────────────────────────────────────────────────
+
+describe("kieGenerateDialogue", () => {
+  it("createTask input 含 dialogue 数组，返回 urls", async () => {
+    process.env.KIE_PODCAST_MODEL = "elevenlabs/text-to-dialogue-v3";
+
+    const dialogue = [
+      { text: "大家好", voice: "zh-CN-YunyangNeural" },
+      { text: "欢迎收听播客", voice: "zh-CN-XiaoxiaoNeural" },
+    ];
+
+    const mockFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        json: async () => ({ code: 200, data: { taskId: "podcastTask1" } }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          code: 200,
+          data: {
+            state: "success",
+            resultJson: JSON.stringify({
+              resultUrls: ["https://cdn.example.com/podcast.mp3"],
+            }),
+          },
+        }),
+      } as Response);
+
+    const urls = await kieGenerateDialogue({ dialogue, stability: 0.7 });
+    expect(urls).toEqual(["https://cdn.example.com/podcast.mp3"]);
+
+    const createBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(createBody.model).toBe("elevenlabs/text-to-dialogue-v3");
+    expect(createBody.input.dialogue).toEqual(dialogue);
+    expect(createBody.input.stability).toBe(0.7);
+  });
+
+  it("不设 KIE_PODCAST_MODEL 时使用默认模型", async () => {
+    const mockFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        json: async () => ({ code: 200, data: { taskId: "podcastTaskDef" } }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          code: 200,
+          data: {
+            state: "success",
+            resultJson: JSON.stringify({ resultUrls: ["https://cdn.example.com/def.mp3"] }),
+          },
+        }),
+      } as Response);
+
+    await kieGenerateDialogue({ dialogue: [{ text: "hello", voice: "zh-CN-YunyangNeural" }] });
+
+    const createBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(createBody.model).toBe("elevenlabs/text-to-dialogue-v3");
   });
 });
