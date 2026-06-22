@@ -3,6 +3,7 @@ import type { InngestEvents } from "@/inngest/events";
 import { ingestLinkToArticle } from "@/lib/channels/ingest-link-to-article";
 import { postToSessionWebhook } from "@/lib/channels/session-webhook";
 import { recordOutboundMessage } from "@/app/actions/channels";
+import { setSessionLastArticleId } from "@/lib/dal/channel-sessions";
 
 type LinkIngestData = InngestEvents["channel/link-ingest.requested"]["data"];
 
@@ -20,6 +21,15 @@ export async function runIngestAndReply(data: LinkIngestData): Promise<void> {
       externalMessageId: data.externalMessageId,
     },
   });
+
+  // 收稿成功（新建或去重命中已有稿）→ 把 articleId 写回会话，供后续配图/发布分支使用
+  if (result.articleId) {
+    // fire-and-forget：不阻断回执，失败静默（会话少了 articleId 顶多降级提示）
+    setSessionLastArticleId(
+      { configId: data.configId, chatId: data.chatId, externalUserId: data.externalUserId },
+      result.articleId,
+    ).catch(() => undefined);
+  }
 
   if (!data.replyWebhook) return;
 

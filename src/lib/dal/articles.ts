@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { articles, categories, aiEmployees } from "@/db/schema";
+import { articles, categories, aiEmployees, missionTasks } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { getCurrentUserOrg } from "./auth";
 import type { ArticleListItem, ArticleDetail, ArticleStats } from "@/lib/types";
@@ -190,6 +190,61 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
     taskId: row.taskId || undefined,
     publishedAt: row.publishedAt?.toISOString(),
   };
+}
+
+/**
+ * 确保 mission 有对应 article 落库（IM 写稿断链兜底）。
+ *
+ * 三态逻辑：
+ *   ① 已有 article（articles.missionId = missionId）→ 直接返回，不重复 insert。
+ *   ② 无 article 但 missionTasks.outputData 有 articles[0].body 或 .body → insert draft，返回新 id。
+ *   ③ 无 article 且无文章内容（纯检索 / 数据分析 mission）→ 返回 null，不 insert。
+ *
+ * 无需 auth（由 Inngest / channel handler 调用，显式传 orgId）。
+ */
+export async function ensureArticleForMission(
+  missionId: string,
+  organizationId: string,
+): Promise<{ id: string; title: string } | null> {
+  // ① 已有 → 直接返回
+  const existing = await getLatestArticleByMission(missionId, organizationId);
+  if (existing) return { id: existing.id, title: existing.title };
+
+  // ② 从 missionTasks.outputData 里找文章内容
+  const tasks = await db
+    .select({ outputData: missionTasks.outputData })
+    .from(missionTasks)
+    .where(eq(missionTasks.missionId, missionId));
+
+  let title: string | undefined;
+  let body: string | undefined;
+  for (const t of tasks) {
+    const o = (t.outputData ?? {}) as {
+      articles?: { title?: string; body?: string }[];
+      title?: string;
+      body?: string;
+    };
+    const a = o.articles?.[0];
+    if (a?.body) { title = a.title; body = a.body; break; }
+    if (o.body) { title = o.title; body = o.body; break; }
+  }
+
+  // ③ 无文章内容 → 返回 null
+  if (!body) return null;
+
+  // 兜底落 draft article（参照 archive_to_drafts 的列填法）
+  const [row] = await db.insert(articles).values({
+    organizationId,
+    missionId,
+    title: title ?? "未命名稿件",
+    body,
+    status: "draft",
+    mediaType: "article",
+    language: "zh",
+    sourceType: "original",
+  }).returning({ id: articles.id, title: articles.title });
+
+  return row ? { id: row.id, title: row.title } : null;
 }
 
 export async function getArticlesByCategory(categoryId: string): Promise<ArticleListItem[]> {

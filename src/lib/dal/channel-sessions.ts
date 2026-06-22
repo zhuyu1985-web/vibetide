@@ -118,7 +118,32 @@ export async function resetSession(
 }
 
 /** mission 成功出结果后的跟进窗口：30 分钟内回话可在上次基础上重做。 */
-const FOLLOWUP_WINDOW_MS = 30 * 60 * 1000;
+export const FOLLOWUP_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * 仅更新 lastArticleId + 刷新 30min 跟进窗口。
+ * link-ingest 收稿后调用，把新落库的 articleId 写入会话，让后续配图/发布分支能拿到。
+ * 不动 status / contextTurns / activeMissionId，避免覆盖进行中的会话状态。
+ */
+export async function setSessionLastArticleId(
+  key: Pick<SessionKey, "configId" | "chatId" | "externalUserId">,
+  articleId: string,
+): Promise<void> {
+  await db
+    .update(channelSessions)
+    .set({
+      lastArticleId: articleId,
+      expiresAt: new Date(Date.now() + FOLLOWUP_WINDOW_MS),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(channelSessions.configId, key.configId),
+        eq(channelSessions.chatId, key.chatId),
+        eq(channelSessions.externalUserId, key.externalUserId)
+      )
+    );
+}
 
 /**
  * mission 成功出结果后调用：软复位为 idle，把"上次请求 + 已完成摘要"写进 contextTurns，

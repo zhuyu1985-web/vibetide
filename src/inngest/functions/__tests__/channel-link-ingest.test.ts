@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { ingestLinkToArticle, postToSessionWebhook, recordOutboundMessage } = vi.hoisted(() => ({
+const { ingestLinkToArticle, postToSessionWebhook, recordOutboundMessage, setSessionLastArticleId } = vi.hoisted(() => ({
   ingestLinkToArticle: vi.fn(),
   postToSessionWebhook: vi.fn(),
   recordOutboundMessage: vi.fn(),
+  setSessionLastArticleId: vi.fn(),
 }));
 vi.mock("@/lib/channels/ingest-link-to-article", () => ({ ingestLinkToArticle }));
 vi.mock("@/lib/channels/session-webhook", () => ({ postToSessionWebhook }));
 vi.mock("@/app/actions/channels", () => ({ recordOutboundMessage }));
+vi.mock("@/lib/dal/channel-sessions", () => ({ setSessionLastArticleId }));
 
 import { runIngestAndReply, notifyIngestFailure } from "../channel-link-ingest";
 
@@ -27,10 +29,12 @@ beforeEach(() => {
   ingestLinkToArticle.mockReset();
   postToSessionWebhook.mockReset();
   recordOutboundMessage.mockReset();
+  setSessionLastArticleId.mockReset();
+  setSessionLastArticleId.mockResolvedValue(undefined);
 });
 
 describe("runIngestAndReply", () => {
-  it("新稿入库 → 回执 ✅ 含查看链接", async () => {
+  it("新稿入库 → 回执 ✅ 含查看链接 + setSessionLastArticleId 被调", async () => {
     ingestLinkToArticle.mockResolvedValue({ skipped: false, articleId: "a1", title: "标题" });
     postToSessionWebhook.mockResolvedValue({ ok: true });
     await runIngestAndReply(data);
@@ -38,6 +42,11 @@ describe("runIngestAndReply", () => {
     const [, payload] = postToSessionWebhook.mock.calls[0] as any;
     expect(payload.content).toContain("✅ 已收录");
     expect(payload.content).toContain("标题");
+    // link-ingest 成功 → 会话 lastArticleId 应被回写
+    expect(setSessionLastArticleId).toHaveBeenCalledWith(
+      { configId: "cfg1", chatId: "c1", externalUserId: "u1" },
+      "a1",
+    );
   });
 
   it("命中去重 → 回执已收录过", async () => {

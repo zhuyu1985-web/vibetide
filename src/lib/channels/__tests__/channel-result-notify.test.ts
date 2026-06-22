@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { findFirst, getChannelConfig, sendChannelMessage, resetSession, recordSessionResult, getLatestArticleByMission } =
+const { findFirst, getChannelConfig, sendChannelMessage, resetSession, recordSessionResult, ensureArticleForMission } =
   vi.hoisted(() => ({
     findFirst: vi.fn(),
     getChannelConfig: vi.fn(),
     sendChannelMessage: vi.fn(),
     resetSession: vi.fn(),
     recordSessionResult: vi.fn(),
-    getLatestArticleByMission: vi.fn(),
+    ensureArticleForMission: vi.fn(),
   }));
 
 vi.mock("@/db", () => ({ db: { query: { missions: { findFirst } } } }));
 vi.mock("@/lib/dal/channels", () => ({ getChannelConfig }));
 vi.mock("@/lib/channels/outbound", () => ({ sendChannelMessage }));
 vi.mock("@/lib/dal/channel-sessions", () => ({ resetSession, recordSessionResult }));
-vi.mock("@/lib/dal/articles", () => ({ getLatestArticleByMission }));
+vi.mock("@/lib/dal/articles", () => ({ ensureArticleForMission }));
 
 import { sendChannelResult } from "../channel-result-notify";
 
@@ -36,7 +36,7 @@ beforeEach(() => {
   sendChannelMessage.mockResolvedValue({ success: true });
   resetSession.mockResolvedValue(undefined);
   recordSessionResult.mockResolvedValue(undefined);
-  getLatestArticleByMission.mockResolvedValue({ id: "art1", title: "T", status: "approved" });
+  ensureArticleForMission.mockResolvedValue({ id: "art1", title: "T" });
 });
 
 describe("sendChannelResult", () => {
