@@ -45,9 +45,9 @@
   - `fetch(url)` → arrayBuffer → Buffer。
   - `objectKey = ${organizationId}/aigc/${articleId}/${crypto.randomUUID()}.png`。
   - `putObject(objectKey, buf, "image/png")` → `publicUrl = getPublicUrl(objectKey)`。
-  - 直接 `db.insert(mediaAssets).values({organizationId, tosObjectKey:objectKey, tosBucket:defaultBucket, fileUrl:publicUrl, type:"image", title:`${title} 配图`, ...必填}).returning({id})` → assetId。
+  - 直接 `db.insert(mediaAssets).values({organizationId, tosObjectKey:objectKey, tosBucket:defaultBucket, fileUrl:publicUrl, type:"image", title:`${title} 配图`}).returning({id})` → assetId。
   - 返回 {assetId, publicUrl}。
-  > ⚠️ 先 Read `src/db/schema/media-assets.ts` 确认 mediaAssets 必填列（type enum 值、有无 status/uploadedBy 等 notNull 无默认列），按真实列填；缺啥补啥。
+  > ✅ 已核验（plan-review）：mediaAssets **只需上面这 6 列**——其余 notNull 列（libraryType/isPublic/isDeleted/securityLevel/各 status/versionNumber/createdAt 等）全有 DB 默认值。`type:"image"` 是 `mediaAssetTypeEnum` 合法值。无需 Read schema。
   测试：mock fetch（返回 arrayBuffer）、`@/lib/volc-tos`（putObject/getPublicUrl/defaultBucket）、`@/db`（insert 链）；断言 putObject 被调 + 返回 publicUrl + insert values 含 type:"image"。
 
 - [ ] **Step 4: tsc + 测试**；**Step 5: commit** `feat(aigc): kie.ai 客户端 + 火山 TOS putObject + 出图转存管线`
