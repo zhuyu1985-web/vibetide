@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { getLanguageModel } from "./model-router";
+import { getLanguageModel, getDefaultModel } from "./model-router";
 import type { EmployeeId } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -89,12 +89,8 @@ ${employeeList}
 - 每个步骤必须分配一个可用的员工slug`;
 
   try {
-    const modelName = process.env.OPENAI_MODEL;
-    if (!modelName) {
-      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
-    }
     const result = await generateText({
-      model: getLanguageModel({ provider: "openai", model: modelName, temperature: 0.3, maxTokens: 2048 }),
+      model: getLanguageModel({ provider: "openai", model: getDefaultModel(), temperature: 0.3, maxTokens: 2048 }),
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       maxOutputTokens: 2048,

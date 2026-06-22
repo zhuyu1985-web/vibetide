@@ -1,13 +1,8 @@
 import { streamText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import { after } from "next/server";
 import { cacheAIAnalysis } from "@/app/actions/ai-analysis";
 import type { AIAnalysisPerspective } from "@/app/(dashboard)/articles/[id]/types";
-
-const deepseek = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-  baseURL: process.env.OPENAI_API_BASE_URL!,
-});
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 
 const PROMPTS: Record<AIAnalysisPerspective, string> = {
   summary: `请对以下文章生成一份结构化摘要，格式要求：
@@ -80,12 +75,8 @@ ${(articleContent ?? "").slice(0, 12000)}`;
 
     let fullText = "";
 
-    const modelName = process.env.OPENAI_MODEL;
-    if (!modelName) {
-      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
-    }
     const result = streamText({
-      model: deepseek.chat(modelName),
+      model: getLanguageModel({ provider: "openai", model: getDefaultModel(), temperature: 0.7, maxTokens: 4096 }),
       system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
       onFinish: ({ text }) => {

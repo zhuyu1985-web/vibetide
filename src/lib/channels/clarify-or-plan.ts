@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { getLanguageModel } from "@/lib/agent/model-router";
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 import {
   buildSkillCatalog,
   buildEmployeeCatalog,
@@ -89,9 +89,8 @@ export async function clarifyOrPlan(
     .replace("{SKILL_CATALOG}", buildSkillCatalog())
     .replace("{EMPLOYEE_CATALOG}", buildEmployeeCatalog(catalog));
 
-  const modelName = process.env.OPENAI_MODEL ?? "deepseek-chat";
   const { text } = await generateText({
-    model: getLanguageModel({ provider: "openai", model: modelName, temperature: 0.2, maxTokens: 1024 }),
+    model: getLanguageModel({ provider: "openai", model: getDefaultModel(), temperature: 0.2, maxTokens: 1024 }),
     system: systemPrompt,
     messages: [{ role: "user", content: fullMessage }],
     temperature: 0.2,

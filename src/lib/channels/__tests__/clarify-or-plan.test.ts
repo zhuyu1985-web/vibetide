@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { generateText, getLanguageModel, loadAvailableEmployees } = vi.hoisted(() => ({
+const { generateText, getLanguageModel, getDefaultModel, loadAvailableEmployees } = vi.hoisted(() => ({
   generateText: vi.fn(),
   getLanguageModel: vi.fn(() => ({})),
+  getDefaultModel: vi.fn(() => "deepseek-chat"),
   loadAvailableEmployees: vi.fn(),
 }));
 
 vi.mock("ai", () => ({ generateText }));
-vi.mock("@/lib/agent/model-router", () => ({ getLanguageModel }));
+vi.mock("@/lib/agent/model-router", () => ({ getLanguageModel, getDefaultModel }));
 vi.mock("@/lib/mission-core", () => ({ loadAvailableEmployees }));
 // 隔离文件系统：getBuiltinSkillSlugs 校验 step.skills；getAllBuiltinSkills 给 buildSkillCatalog 用
 vi.mock("@/lib/skill-loader", () => ({

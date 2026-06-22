@@ -2,37 +2,69 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { zhipu } from "zhipu-ai-provider";
 import type { LanguageModel } from "ai";
 import type { SkillCategory } from "@/lib/types";
-import type { ModelConfig } from "./types";
+import type { ModelConfig, ModelProvider } from "./types";
 
-// Lazy-init: create the DeepSeek client on first use so env vars are guaranteed loaded.
-// Uses `compatibility: "compatible"` so the SDK calls /chat/completions (not /responses).
+// 2-min 超时 fetch 包装（DeepSeek / DashScope 等 OpenAI 兼容 client 共用）。
+function timeoutFetch(): typeof globalThis.fetch {
+  return (async (url: string, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+    try {
+      return await globalThis.fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }) as typeof globalThis.fetch;
+}
+
+// Lazy-init clients（首次使用才建，确保 env 已加载）。
+// Uses `compatibility: "compatible"` 隐含——SDK 调 /chat/completions（非 /responses）。
 let _deepseek: ReturnType<typeof createOpenAI> | null = null;
-
 function getDeepSeekClient() {
   if (!_deepseek) {
-    const baseURL = process.env.OPENAI_API_BASE_URL || "https://api.deepseek.com/v1";
-    const apiKey = process.env.OPENAI_API_KEY;
     _deepseek = createOpenAI({
-      apiKey,
-      baseURL,
-      fetch: async (url, init) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
-        try {
-          return await globalThis.fetch(url as string, { ...init as RequestInit, signal: controller.signal });
-        } finally {
-          clearTimeout(timeout);
-        }
-      },
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_API_BASE_URL || "https://api.deepseek.com/v1",
+      fetch: timeoutFetch(),
     });
   }
   return _deepseek;
 }
 
-function getDefaultModel() {
+// 阿里百炼 / 通义（DashScope OpenAI 兼容端点）。
+let _dashscope: ReturnType<typeof createOpenAI> | null = null;
+function getDashScopeClient() {
+  if (!_dashscope) {
+    _dashscope = createOpenAI({
+      apiKey: process.env.DASHSCOPE_API_KEY,
+      baseURL: process.env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      fetch: timeoutFetch(),
+    });
+  }
+  return _dashscope;
+}
+
+/**
+ * 平台默认 LLM provider，由 env `LLM_PROVIDER` 选择（按客户部署切换）。
+ * openai(=DeepSeek 兼容，默认) | dashscope(阿里百炼/通义) | zhipu(智谱)。
+ */
+export function getActiveProvider(): ModelProvider {
+  const p = (process.env.LLM_PROVIDER || "").trim().toLowerCase();
+  if (["dashscope", "qwen", "tongyi", "bailian", "aliyun"].includes(p)) return "dashscope";
+  if (p === "zhipu") return "zhipu";
+  return "openai";
+}
+
+/** 活动 provider 的默认模型名（按 LLM_PROVIDER 取对应 *_MODEL）。 */
+export function getDefaultModel(): string {
+  const provider = getActiveProvider();
+  if (provider === "dashscope") return process.env.DASHSCOPE_MODEL || "qwen-max";
+  if (provider === "zhipu") return process.env.ZHIPU_MODEL || "glm-4";
   const model = process.env.OPENAI_MODEL;
   if (!model) {
-    throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
+    throw new Error(
+      "OPENAI_MODEL 未配置。请在 .env.local 设置 OPENAI_MODEL，或设 LLM_PROVIDER=dashscope + DASHSCOPE_MODEL 切到阿里百炼/通义。",
+    );
   }
   return model;
 }
@@ -99,8 +131,13 @@ export function resolveModelConfig(
  * Convert ModelConfig to a Vercel AI SDK LanguageModel instance.
  */
 export function getLanguageModel(config: ModelConfig): LanguageModel {
-  if (config.provider === "zhipu") {
-    return zhipu(config.model);
-  }
+  // 显式指定 zhipu / dashscope 的，直接走对应 client。
+  if (config.provider === "zhipu") return zhipu(config.model);
+  if (config.provider === "dashscope") return getDashScopeClient().chat(config.model);
+  // provider === "openai" = 平台默认 LLM 槽：按 LLM_PROVIDER 路由到活动 provider + 活动模型。
+  // 默认 LLM_PROVIDER=openai → 仍走 DeepSeek（向后兼容，行为不变）。
+  const active = getActiveProvider();
+  if (active === "dashscope") return getDashScopeClient().chat(getDefaultModel());
+  if (active === "zhipu") return zhipu(getDefaultModel());
   return getDeepSeekClient().chat(config.model);
 }

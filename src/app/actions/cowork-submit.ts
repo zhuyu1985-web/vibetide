@@ -24,7 +24,7 @@ import {
 import { recognizeIntentForOrg } from "@/lib/cowork/intent-routing";
 import { startAdHocMission } from "@/app/actions/ad-hoc-mission";
 import { getMissionById } from "@/lib/dal/missions";
-import { getLanguageModel } from "@/lib/agent/model-router";
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 
 export type CoworkSubmitResult =
   | { ok: false; error: string }
@@ -96,22 +96,19 @@ export async function submitCoworkMessage(
   // general_chat → 非流式简单回复(MVP)
   let reply = "";
   try {
-    const modelName = process.env.OPENAI_MODEL;
-    if (modelName) {
-      const model = getLanguageModel({
-        provider: "openai",
-        model: modelName,
-        temperature: 0.7,
-        maxTokens: 800,
-      });
-      const result = await generateText({
-        model,
-        system: "你是融媒云的 AI 助手，用简洁专业的中文回答用户。",
-        prompt: text,
-        maxOutputTokens: 800,
-      });
-      reply = result.text?.trim() ?? "";
-    }
+    const model = getLanguageModel({
+      provider: "openai",
+      model: getDefaultModel(),
+      temperature: 0.7,
+      maxTokens: 800,
+    });
+    const result = await generateText({
+      model,
+      system: "你是融媒云的 AI 助手，用简洁专业的中文回答用户。",
+      prompt: text,
+      maxOutputTokens: 800,
+    });
+    reply = result.text?.trim() ?? "";
   } catch (err) {
     console.error("[cowork-submit] free chat failed:", err);
   }

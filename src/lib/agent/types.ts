@@ -5,7 +5,7 @@ import type { AuthorityLevel, SkillCategory } from "@/lib/types";
 // Model Configuration
 // ---------------------------------------------------------------------------
 
-export type ModelProvider = "openai" | "zhipu";
+export type ModelProvider = "openai" | "zhipu" | "dashscope";
 
 export interface ModelConfig {
   provider: ModelProvider;

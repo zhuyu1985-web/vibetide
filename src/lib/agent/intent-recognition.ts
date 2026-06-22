@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { getLanguageModel } from "./model-router";
+import { getLanguageModel, getDefaultModel } from "./model-router";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
 import { getAllBuiltinSkills, getBuiltinSkillSlugs } from "@/lib/skill-loader";
 
@@ -196,16 +196,12 @@ export async function recognizeIntent(
   const userPrompt = `当前选中的员工：${currentEmployeeSlug}\n用户输入：${message}`;
 
   try {
-    const modelName = process.env.OPENAI_MODEL;
-    if (!modelName) {
-      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
-    }
     // Add timeout — if LLM takes > 15s, abort and fallback to free chat
     const INTENT_TIMEOUT_MS = 15000;
     const generatePromise = generateText({
       model: getLanguageModel({
         provider: "openai",
-        model: modelName,
+        model: getDefaultModel(),
         temperature: 0.2,
         maxTokens: 1024, // reduced from 2048 — JSON output rarely exceeds 500 tokens
       }),

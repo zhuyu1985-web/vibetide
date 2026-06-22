@@ -9,7 +9,7 @@
  */
 
 import { generateText } from "ai";
-import { getLanguageModel } from "@/lib/agent/model-router";
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 import { db } from "@/db";
 import { employeeMemories, verificationRecords } from "@/db/schema";
 import type {
@@ -216,14 +216,10 @@ export async function verify(
   const level = determineVerificationLevel(input.intentType);
 
   try {
-    const modelName = process.env.OPENAI_MODEL;
-    if (!modelName) {
-      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
-    }
     // 1. Call LLM for self-evaluation
     const model = getLanguageModel({
       provider: "openai",
-      model: modelName,
+      model: getDefaultModel(),
       temperature: 0.2,
       maxTokens: 2000,
     });

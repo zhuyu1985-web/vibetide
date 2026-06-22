@@ -1,10 +1,5 @@
 import { streamText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
-
-const deepseek = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-  baseURL: process.env.OPENAI_API_BASE_URL!,
-});
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 
 export async function POST(req: Request) {
   try {
@@ -17,12 +12,8 @@ export async function POST(req: Request) {
       ? `[用户选中的文本：「${selectedText}」]\n\n${lastMessage.content}`
       : lastMessage.content;
 
-    const modelName = process.env.OPENAI_MODEL;
-    if (!modelName) {
-      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
-    }
     const result = streamText({
-      model: deepseek.chat(modelName),
+      model: getLanguageModel({ provider: "openai", model: getDefaultModel(), temperature: 0.7, maxTokens: 4096 }),
       system: systemPrompt,
       messages: [
         ...messages.slice(0, -1),

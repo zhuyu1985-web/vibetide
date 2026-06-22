@@ -35,7 +35,7 @@ import {
   isLLMSkillRegistered,
   invokeLLMSkillDirectly,
 } from "@/lib/agent/llm-skill-dispatch";
-import { getLanguageModel } from "@/lib/agent/model-router";
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 import { generateText } from "ai";
 import { loadSkillContent } from "@/lib/skill-loader";
 import {
@@ -95,13 +95,9 @@ ${stepLines}
 - 不要用 Markdown 标题，不要用列表符号`;
 
   try {
-    const modelName = process.env.OPENAI_MODEL;
-    if (!modelName) {
-      throw new Error("OPENAI_MODEL 未配置。请在 .env.local 中设置 OPENAI_MODEL=qwen3-max");
-    }
     const model = getLanguageModel({
       provider: "openai",
-      model: modelName,
+      model: getDefaultModel(),
       temperature: 0.7,
       maxTokens: 800,
     });
