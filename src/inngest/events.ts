@@ -444,6 +444,23 @@ export type InngestEvents = {
     data: { missionId: string; organizationId: string; status: "completed" | "failed" };
   };
 
+  // ─── AIGC Illustrate (2026-06-22) ───
+  /** IM 机器人配图请求 → kieGenerateImage → TOS 转存 → 写回 articles.coverImageUrl。由 gateway 派发，aigcIllustrate 消费 */
+  "aigc/illustrate.requested": {
+    data: {
+      organizationId: string;
+      articleId: string;
+      userHint?: string;
+      channelCtx: {
+        organizationId: string;
+        configId: string;
+        platform: "dingtalk" | "wechat_work";
+        chatId: string;
+        externalUserId: string;
+      };
+    };
+  };
+
   // ─── Channel Inbound Link Ingest (2026-06-19) ───
   /** 钉钉/企微入站消息含链接 → 抓取存稿。由 gateway 派发，channelLinkIngest 消费 */
   "channel/link-ingest.requested": {
