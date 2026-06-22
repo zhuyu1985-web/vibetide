@@ -25,13 +25,15 @@ Out of scope（1d-B 独立 spec）：
 
 ## Schema
 
-`channel_sessions` 加两列（均 nullable，走本地 `db:push`）：
+`channel_sessions` 加两列（均 nullable）：
 - `last_article_id uuid`（references articles.id, onDelete set null）——上次 mission 产出的稿件句柄（发布/配图 follow-up 锚点）。
 - `pending_publish jsonb`——待确认的发布意图 `{ articleId, articleTitle, catalogName, target: { catalogId, appId, siteId } }`；非 confirming-publish 态为 null。
 
-`articles` 加索引 `idx_articles_mission_id` on `articles.mission_id`（反查锚点，避免全表扫；走标准 `db:generate` + `db:migrate`——⚠️ 这是 articles 表结构变更，按 CLAUDE.md schema 纪律用 Drizzle 标准流程，不手写 SQL）。
+`articles` 加索引 `idx_articles_mission_id` on `articles.mission_id`（反查锚点，避免全表扫）。
 
 > 注：`articles.missionId` 列已存在（articles.ts:59，FK→missions），只缺索引。
+
+**schema 落地方式（统一，per [[local-db-push-prod-migrate]]）**：改完 `*.ts` schema 后，本期所有变更（channel_sessions 两列 + articles 索引）统一走**本地 `db:push`**（本地 127.0.0.1:5433 journal 空，用 push 维护，**不在本地跑 migrate**）；若 push 交互 TUI 卡住，用一次性 `db.execute(sql\`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...\` / \`CREATE INDEX IF NOT EXISTS ...\`)` 临时脚本 + `npx tsx --env-file=.env.local` 兜底，跑完删脚本。进生产时再按 CLAUDE.md 用 `db:generate` 产 migration。
 
 ## 数据流
 
@@ -83,6 +85,8 @@ confirming 态收到消息（handleConfirmingMessage 扩展：按 pendingPublish
 - `src/lib/channels/channel-result-notify.ts`：成功路径先 `getLatestArticleByMission` 反查 → 传 articleId 给 recordSessionResult。
 - `src/lib/channels/gateway.ts`：新增 `isPublishIntent` + `extractPublishTarget`（纯函数，可单测）+ 发布意图分支 + `handlePublishIntent`；`handleConfirmingMessage` 扩展 pendingPublish 分流。
 - `src/lib/channels/publish-followup.ts`（新）：`handlePublishConfirm(session, channelCtx)` 封装 publishArticleToCms 调用 + 状态置 approved + 错误归类（保持 gateway 瘦）。
+
+> ⚠️ **置 approved 必须直接 `db.update(articles)`，不能用 `updateArticleStatus`**：该 Server Action（`src/app/actions/articles.ts`）第一行 `requireAuth()`，IM gateway 无登录态会抛 redirect。在 publish-followup.ts 里直接 `db.update(articles).set({ status: "approved" }).where(and(eq(articles.id, articleId), eq(articles.organizationId, orgId)))`（无 auth、org 限定），仅当当前状态 ∈ {draft,reviewing} 时置（已 approved/published 不动）。
 
 复用：`publishArticleToCms`（`@/lib/cms`）、`isConfirm`/`isCancel`、confirming 态、`recordSessionResult`。
 
