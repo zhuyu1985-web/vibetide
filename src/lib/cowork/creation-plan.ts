@@ -1,3 +1,7 @@
+import { invokeToolDirectly } from "@/lib/agent/tool-registry";
+import { generateText } from "ai";
+import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
+
 export interface CreationPlanTopicOption { topicId?: string; title: string; heat?: string; source?: string; }
 
 export type CreationGenre = "news" | "commentary" | "explainer" | "xiaohongshu" | "script";
@@ -47,4 +51,42 @@ export function planToGenerateParams(plan: CreationPlan): { outline: string; sty
     `要求：原创新闻/资讯稿件，含标题、导语、正文，观点清晰，有数据或案例支撑；` +
     `**只使用检索到的真实资料，检索为空则如实说明、严禁从训练数据补填任何事实/日期/数据**。`;
   return { outline, style: plan.genre, maxLength: Math.max(plan.wordCount + 200, 600) };
+}
+
+const DEFAULT_CHANNEL: CreationChannel = "wechat_mp";
+
+export async function buildCreationPlan(organizationId: string, userMessage: string): Promise<CreationPlan> {
+  const preset = CHANNEL_PRESETS[DEFAULT_CHANNEL];
+  // 1. 选题：今日热榜
+  let topicOptions: CreationPlanTopicOption[] = [];
+  let hotlistAvailable = false;
+  const r = await invokeToolDirectly("trending_topics", { mode: "hot", limit: 10 }, { organizationId });
+  if (r.ok) {
+    const topics = ((r.result as { topics?: { title: string; heat?: unknown; platform?: string }[] }).topics) ?? [];
+    topicOptions = topics.slice(0, 8).map((t) => ({
+      title: t.title, heat: t.heat != null ? String(t.heat) : undefined, source: t.platform,
+    }));
+    hotlistAvailable = topicOptions.length > 0;
+  }
+  const top1 = topicOptions[0];
+  // 2. 角度（仅在有选题时调 LLM；失败兜底固定句）
+  let angle = "结合最新进展的深度解读";
+  if (top1) {
+    try {
+      const { text } = await generateText({
+        model: getLanguageModel({ provider: "openai", model: getDefaultModel(), temperature: 0.6, maxTokens: 60 }),
+        prompt: `为热点「${top1.title}」给一个适合新媒体资讯稿的创作切入角度，一句话（≤20字），只输出这句话本身。`,
+        maxOutputTokens: 60,
+      });
+      const a = text.trim().replace(/^["'「]|["'」]$/g, "");
+      if (a) angle = a;
+    } catch { /* 用兜底 angle */ }
+  }
+  // 3. 默认值
+  return {
+    topic: { title: top1?.title ?? "" },
+    topicOptions, topicFromHotlist: !!top1,
+    angle, genre: preset.genre, channel: DEFAULT_CHANNEL, wordCount: preset.wordCount,
+    illustrate: false, hotlistAvailable,
+  };
 }
