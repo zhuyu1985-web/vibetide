@@ -27,4 +27,21 @@ describe("buildCreationPlan", () => {
     expect(plan.topicFromHotlist).toBe(false);
     expect(plan.topic.title).toBe("");
   });
+
+  it("角度 LLM 抛错：不抛异常，angle 回兜底句", async () => {
+    invokeMock.mockResolvedValue({ ok: true, result: { topics: [
+      { title: "热点A", heat: "100w", platform: "weibo" }] } });
+    genTextMock.mockRejectedValue(new Error("x"));
+    const plan = await buildCreationPlan("o1", "帮我写篇今天的热点稿");
+    expect(plan.topic.title).toBe("热点A");
+    expect(plan.angle).toBe("结合最新进展的深度解读");
+  });
+
+  it("热榜返回空数组：降级 hotlistAvailable=false，topic 空", async () => {
+    invokeMock.mockResolvedValue({ ok: true, result: { topics: [] } });
+    const plan = await buildCreationPlan("o1", "写篇稿");
+    expect(plan.hotlistAvailable).toBe(false);
+    expect(plan.topicFromHotlist).toBe(false);
+    expect(plan.topic.title).toBe("");
+  });
 });

@@ -2,13 +2,13 @@ import { invokeToolDirectly } from "@/lib/agent/tool-registry";
 import { generateText } from "ai";
 import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 
-export interface CreationPlanTopicOption { topicId?: string; title: string; heat?: string; source?: string; }
+export interface CreationPlanTopicOption { title: string; heat?: string; source?: string; }
 
 export type CreationGenre = "news" | "commentary" | "explainer" | "xiaohongshu" | "script";
 export type CreationChannel = "wechat_mp" | "xiaohongshu" | "official_app" | "douyin";
 
 export interface CreationPlan {
-  topic: { title: string; topicId?: string };
+  topic: { title: string };
   topicOptions: CreationPlanTopicOption[];
   topicFromHotlist: boolean;
   angle: string;
@@ -33,6 +33,15 @@ export const GENRE_LABELS: Record<CreationGenre, string> = {
   news: "新闻消息", commentary: "深度评论", explainer: "大众解读", xiaohongshu: "小红书种草", script: "口播脚本",
 };
 
+/** 体裁专属写作要求（按体裁切换 outline 主体要求，避免对小红书/口播稿强加"导语+正文"新闻结构）。 */
+const GENRE_REQUIREMENT: Record<CreationGenre, string> = {
+  news: "原创新闻/资讯稿件，含标题、导语、正文，观点清晰，有数据或案例支撑",
+  commentary: "原创新闻/资讯稿件，含标题、导语、正文，观点清晰，有数据或案例支撑",
+  explainer: "原创新闻/资讯稿件，含标题、导语、正文，观点清晰，有数据或案例支撑",
+  xiaohongshu: "小红书种草文案：开头抓人、分点呈现、口语化、结尾带话题标签",
+  script: "短视频口播脚本：短句、口播节奏、开头 3 秒抓人",
+};
+
 export function defaultPlanForChannel(channel: CreationChannel): Pick<CreationPlan, "genre" | "wordCount"> {
   const p = CHANNEL_PRESETS[channel];
   return { genre: p.genre, wordCount: p.wordCount };
@@ -48,9 +57,9 @@ export function planToGenerateParams(plan: CreationPlan): { outline: string; sty
     `目标渠道：${preset.label}（风格要求：${preset.styleHint}）\n` +
     `目标字数：约 ${plan.wordCount} 字\n` +
     (plan.purpose ? `用途：${plan.purpose}\n` : "") +
-    `要求：原创新闻/资讯稿件，含标题、导语、正文，观点清晰，有数据或案例支撑；` +
+    `要求：${GENRE_REQUIREMENT[plan.genre]}；` +
     `**只使用检索到的真实资料，检索为空则如实说明、严禁从训练数据补填任何事实/日期/数据**。`;
-  return { outline, style: plan.genre, maxLength: Math.max(plan.wordCount + 200, 600) };
+  return { outline, style: GENRE_LABELS[plan.genre], maxLength: Math.max(plan.wordCount + 200, 600) };
 }
 
 const DEFAULT_CHANNEL: CreationChannel = "wechat_mp";
@@ -83,6 +92,9 @@ export async function buildCreationPlan(organizationId: string, userMessage: str
     } catch { /* 用兜底 angle */ }
   }
   // 3. 默认值
+  // topicFromHotlist：是否已从热榜预选出一个选题（Top1 存在）。
+  // hotlistAvailable：热榜服务本次是否返回了可选项。
+  // 今天两者由同一来源推导（有选项必有 Top1），故同真同假；后续若允许"用户手填选题但热榜也可用"则会分叉。
   return {
     topic: { title: top1?.title ?? "" },
     topicOptions, topicFromHotlist: !!top1,
