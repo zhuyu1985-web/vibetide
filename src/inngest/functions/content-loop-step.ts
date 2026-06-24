@@ -704,8 +704,14 @@ export const contentLoopStepFailureHandler = inngest.createFunction(
       | undefined;
     const data = originalEvent?.data;
     if (!data) return;
-    await step.run("notify-failure", () =>
-      pushCard(data.channelCtx, "内容闭环", "❌ 处理失败，请重试，或说「退出」结束。"),
-    );
+    await step.run("notify-failure", async () => {
+      if (data.step === "fetch_topics") {
+        const s = await getSessionById(data.sessionId);
+        if (s && s.scenarioPhase === "hot_list") {
+          await updateSession(data.sessionId, { scenarioPhase: "idle" });
+        }
+      }
+      await pushCard(data.channelCtx, "内容闭环", "❌ 处理失败，请重试，或说「退出」结束。");
+    });
   },
 );
