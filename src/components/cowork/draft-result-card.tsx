@@ -28,7 +28,8 @@ export function DraftResultCard({ meta }: { meta: DraftResultMeta }) {
   // 仅降级路径（meta.body 存在）才有“展开全文”的意义；已入库时走「打开编辑器」。
   const canExpand = !!meta.body && meta.body.length > meta.bodyPreview.length;
   const shown = expanded && meta.body ? meta.body : meta.bodyPreview;
-  const truncated = !expanded && (canExpand || meta.bodyPreview.length >= 200);
+  // 仅当确实能内联展开时才补省略号；归档/截断路径无“展开全文”，靠「打开编辑器精修」，不挂悬空的 …
+  const truncated = canExpand && !expanded;
 
   return (
     <GlassCard className="max-w-md space-y-2 p-4">

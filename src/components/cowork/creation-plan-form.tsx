@@ -30,17 +30,23 @@ export function CreationPlanForm({
   conversationId: string;
   plan: CreationPlan;
 }) {
+  // 仅以 initial 作为初值播种一次：plan_card 消息一旦落库即不可变，且在消息流里按
+  // 消息 id 作 key（见 conversation-thread），故本卡不会收到变化后的 plan prop，
+  // 后续编辑都在本地 state 内进行，seeding-once 安全。
   const [plan, setPlan] = useState<CreationPlan>(initial);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof CreationPlan>(k: K, v: CreationPlan[K]) =>
     setPlan((p) => ({ ...p, [k]: v }));
 
   const onConfirm = async () => {
     setSubmitting(true);
+    setError(null);
     const res = await confirmCreationPlan(conversationId, plan);
     setSubmitting(false);
     if (res.ok) setDone(true);
+    else setError(res.error);
   };
 
   if (done) {
@@ -66,8 +72,8 @@ export function CreationPlanForm({
               <SelectValue placeholder="选一个热点" />
             </SelectTrigger>
             <SelectContent>
-              {plan.topicOptions.map((t) => (
-                <SelectItem key={t.title} value={t.title}>
+              {plan.topicOptions.map((t, i) => (
+                <SelectItem key={`${t.title}-${i}`} value={t.title}>
                   {t.title}
                   {t.heat ? ` · ${t.heat}` : ""}
                 </SelectItem>
@@ -122,18 +128,22 @@ export function CreationPlanForm({
         />
       </Field>
 
-      <label className="flex items-center gap-2 text-sm">
+      {/* label 用 htmlFor 关联（不包裹 Checkbox），点击文字稳定切换且不会双触发 */}
+      <div className="flex items-center gap-2 text-sm">
         <Checkbox
+          id="cowork-illustrate"
           checked={plan.illustrate}
           onCheckedChange={(c) => set("illustrate", c === true)}
         />
-        出稿后顺便配一张题图（AIGC）
-      </label>
+        <label htmlFor="cowork-illustrate">出稿后顺便配一张题图（AIGC）</label>
+      </div>
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-col gap-2 pt-1">
+        {error && <p className="text-xs text-amber-600">{error}</p>}
         <Button
           onClick={onConfirm}
           disabled={submitting || !plan.topic.title.trim()}
+          className="self-start"
         >
           {submitting ? "撰写中…" : "✅ 开始撰写"}
         </Button>
