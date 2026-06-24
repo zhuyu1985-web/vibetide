@@ -29,7 +29,8 @@ import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 export type CoworkSubmitResult =
   | { ok: false; error: string }
   | { ok: true; kind: "mission"; missionId: string; intentSummary: string }
-  | { ok: true; kind: "chat"; reply: string };
+  | { ok: true; kind: "chat"; reply: string }
+  | { ok: true; kind: "plan" };
 
 export type SaveCoworkArtifactDraftResult =
   | { ok: true; artifactId: string; version: number }
@@ -57,6 +58,22 @@ export async function submitCoworkMessage(
 
   // 2. 意图识别
   const intent = await recognizeIntentForOrg(orgId, user.id, text);
+
+  // 2.5 写稿类意图 → 先弹创作计划卡（不起 mission，等用户确认后走 confirmCreationPlan）
+  if (intent.intentType === "content_creation") {
+    const { buildCreationPlan } = await import("@/lib/cowork/creation-plan");
+    const plan = await buildCreationPlan(orgId, text);
+    await appendMessage(conversationId, {
+      role: "assistant",
+      content: plan.topic.title
+        ? `已读到今天的热点，帮你拟了份创作计划，确认或改一改 👇`
+        : `帮你拟了份创作计划，填一下选题再开始 👇`,
+      kind: "plan_card",
+      meta: { plan },
+    });
+    revalidatePath(`/cowork/${conversationId}`);
+    return { ok: true, kind: "plan" };
+  }
 
   // 3. 路由
   if (intent.steps && intent.steps.length > 0) {
