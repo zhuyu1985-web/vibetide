@@ -21,6 +21,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MissionStepStream } from "@/components/cowork/mission-step-stream";
 import { MessageActions } from "@/components/cowork/message-actions";
+import { CreationPlanForm } from "@/components/cowork/creation-plan-form";
+import {
+  DraftResultCard,
+  type DraftResultMeta,
+} from "@/components/cowork/draft-result-card";
+import type { CreationPlan } from "@/lib/cowork/creation-plan-types";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
 import type { MessageFeedback } from "@/app/actions/cowork-conversations";
 import type { ArtifactPreviewItem } from "@/lib/cowork/artifact-preview";
@@ -309,6 +315,26 @@ function MessageBubble({
           onArtifactSelect={onArtifactSelect}
           artifactOverrides={artifactOverrides}
         />
+      </div>
+    );
+  }
+
+  if (message.kind === "plan_card") {
+    const plan = (message.meta as { plan?: CreationPlan } | null)?.plan;
+    if (!plan) return null;
+    return (
+      <div className="flex justify-start">
+        <CreationPlanForm conversationId={message.conversationId} plan={plan} />
+      </div>
+    );
+  }
+
+  if (message.kind === "draft_result") {
+    const meta = message.meta as DraftResultMeta | null;
+    if (!meta) return null;
+    return (
+      <div className="flex justify-start">
+        <DraftResultCard meta={meta} />
       </div>
     );
   }

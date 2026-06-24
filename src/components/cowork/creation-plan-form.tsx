@@ -19,7 +19,7 @@ import {
   type CreationGenre,
   CHANNEL_PRESETS,
   GENRE_LABELS,
-} from "@/lib/cowork/creation-plan";
+} from "@/lib/cowork/creation-plan-types";
 
 const WORD_OPTIONS = [600, 1000, 1500, 2000];
 
