@@ -457,7 +457,7 @@ export async function crawlAccountOnDemand(input: {
   if (!account.outletId) {
     return {
       success: false,
-      error: "该账号还未绑定 outlet（媒体字典），请先在媒体字典补全",
+      error: "该账号还未绑定 outlet（媒体账号库），请先在媒体账号库补全",
     };
   }
 

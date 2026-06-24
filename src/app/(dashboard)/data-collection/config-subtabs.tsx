@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 const SUB_TABS = [
   { href: "/data-collection/sources", label: "源管理" },
-  { href: "/data-collection/outlets", label: "媒体字典" },
+  { href: "/data-collection/outlets", label: "媒体账号库" },
 ];
 
 export function ConfigSubtabs() {

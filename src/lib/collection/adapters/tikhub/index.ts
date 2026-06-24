@@ -198,7 +198,7 @@ async function resolveAccountPairs(
           outletId,
           outletName: outlet.outletName,
           platform,
-          reason: `${outlet.outletName} 在 ${platform} 平台没有配置 channel,请到媒体字典补全`,
+          reason: `${outlet.outletName} 在 ${platform} 平台没有配置 channel,请到媒体账号库补全`,
         });
         continue;
       }
@@ -279,7 +279,7 @@ export const tikhubAdapter: SourceAdapter<TikhubConfig> = {
   type: "tikhub",
   displayName: "tikhub.io 社媒采集",
   description:
-    "对接 tikhub.io 抓取社媒数据。关键词模式 5 平台(抖音/微博/小红书/视频号/知乎);账号模式 4 平台(抖音/微博/快手/公众号,按媒体字典账号 ID 拉 user-feed)",
+    "对接 tikhub.io 抓取社媒数据。关键词模式 5 平台(抖音/微博/小红书/视频号/知乎);账号模式 4 平台(抖音/微博/快手/公众号,按媒体账号库账号 ID 拉 user-feed)",
   category: "search",
   configSchema: tikhubConfigSchema,
   configFields: tikhubConfigFields,
@@ -291,7 +291,7 @@ export const tikhubAdapter: SourceAdapter<TikhubConfig> = {
       return runKeywordMode(normalized, { sourceId, organizationId, log });
     }
     if (!organizationId) {
-      throw new Error("account 模式需要 organizationId 才能查媒体字典");
+      throw new Error("account 模式需要 organizationId 才能查媒体账号库");
     }
     return runAccountMode(normalized, { sourceId, organizationId, log });
   },
@@ -401,7 +401,7 @@ async function runAccountMode(
 
   if (pairs.length === 0) {
     throw new Error(
-      `tikhub account: 没有任何有效的 (媒体, 平台) 配对 — 检查媒体字典是否给所选平台补全了账号`,
+      `tikhub account: 没有任何有效的 (媒体, 平台) 配对 — 检查媒体账号库是否给所选平台补全了账号`,
     );
   }
 

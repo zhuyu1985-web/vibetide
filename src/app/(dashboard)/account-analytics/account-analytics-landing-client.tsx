@@ -110,7 +110,7 @@ export function AccountAnalyticsLandingClient({ accounts, outlets }: Props) {
               size="sm"
               onClick={handleCleanup}
               disabled={cleaning}
-              title="把媒体字典里 outlet_tier 为非法值 (city / provincial / self_media) 的历史记录批量映射到合法枚举值"
+              title="把媒体账号库里 outlet_tier 为非法值 (city / provincial / self_media) 的历史记录批量映射到合法枚举值"
             >
               {cleaning ? (
                 <>
@@ -224,7 +224,7 @@ export function AccountAnalyticsLandingClient({ accounts, outlets }: Props) {
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <p className="text-sm text-gray-500">
               {accounts.length === 0
-                ? "暂无账号，点击「绑定账号」从媒体字典挑选或手动添加"
+                ? "暂无账号，点击「绑定账号」从媒体账号库挑选或手动添加"
                 : "当前筛选下没有匹配账号，可以试试切换平台或来源"}
             </p>
             {accounts.length === 0 && (

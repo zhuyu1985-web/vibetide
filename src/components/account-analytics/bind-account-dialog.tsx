@@ -83,7 +83,7 @@ export function BindAccountDialog({
         <DialogHeader>
           <DialogTitle>绑定账号</DialogTitle>
           <DialogDescription>
-            把账号加入「账号分析」。可以从「媒体字典」里挑现成的 outlet，也可以手动添加新账号（同时会建一份到媒体字典）。
+            把账号加入「账号分析」。可以从「媒体账号库」里挑现成的 outlet，也可以手动添加新账号（同时会建一份到媒体账号库）。
           </DialogDescription>
         </DialogHeader>
 
@@ -93,7 +93,7 @@ export function BindAccountDialog({
           className="mt-1"
         >
           <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="existing">从媒体字典选择</TabsTrigger>
+            <TabsTrigger value="existing">从媒体账号库选择</TabsTrigger>
             <TabsTrigger value="manual">手动添加</TabsTrigger>
           </TabsList>
 
@@ -128,7 +128,7 @@ export function BindAccountDialog({
                     toast.error(res.error ?? "创建失败");
                     return;
                   }
-                  toast.success("已新建账号并同步到媒体字典");
+                  toast.success("已新建账号并同步到媒体账号库");
                   onSuccess?.();
                   onOpenChange(false);
                 })
@@ -153,7 +153,7 @@ export function BindAccountDialog({
 }
 
 // ────────────────────────────────────────────────────────────
-// Sub-form 1：从媒体字典挑已有 outlet
+// Sub-form 1：从媒体账号库挑已有 outlet
 // ────────────────────────────────────────────────────────────
 
 function FromExistingForm({
@@ -255,7 +255,7 @@ function FromExistingForm({
           {filteredOutlets.length === 0 ? (
             <div className="flex h-full items-center justify-center text-[12px] text-gray-400">
               {outlets.length === 0
-                ? "媒体字典暂无 outlet，请先到「采集配置 / 媒体字典」新建"
+                ? "媒体账号库暂无 outlet，请先到「采集配置 / 媒体账号库」新建"
                 : "没有匹配的 outlet"}
             </div>
           ) : (
@@ -292,7 +292,7 @@ function FromExistingForm({
                       title={
                         hasPlatform
                           ? `outlet 已配 ${platform} channel`
-                          : `outlet 还没有 ${platform} channel —— 绑定后请到媒体字典补齐`
+                          : `outlet 还没有 ${platform} channel —— 绑定后请到媒体账号库补齐`
                       }
                     />
                   </li>
@@ -314,7 +314,7 @@ function FromExistingForm({
 }
 
 // ────────────────────────────────────────────────────────────
-// Sub-form 2：手动添加新账号（自动同步到媒体字典）
+// Sub-form 2：手动添加新账号（自动同步到媒体账号库）
 // ────────────────────────────────────────────────────────────
 
 function ManualAddForm({
