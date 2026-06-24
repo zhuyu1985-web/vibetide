@@ -6,8 +6,7 @@
 //   3. confirmAccountImport          — upsert 媒体账号库 + 返回 outletIds 供向导关联
 //
 // 与 bulk-import.ts 平行。所有 action 都 requireAuth() + organizationId 隔离。
-// P1: 支持抖音/微博/快手/微信公众号 4 平台;抖音 v.douyin.com 短链自动展开;
-//     仅抖音支持「只填名称自动搜号」,其余平台需填主页链接或账号 ID。
+// 纯逻辑(平台识别/URL解析/ID校验/去重/类型)在 account-import-helpers.ts(可单测)。
 
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
@@ -15,226 +14,38 @@ import { z } from "zod";
 import { db } from "@/db";
 import { mediaOutletDictionary } from "@/db/schema/media-outlet-dictionary";
 import { requireAuth } from "@/lib/auth";
-import {
-  OUTLET_TIER_VALUES,
-  OUTLET_TIER_LABELS,
-  type OutletTier,
-} from "@/lib/collection/constants";
+import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS } from "@/lib/collection/constants";
 import {
   bumpDictionaryVersion,
   findOutletByChannelIdentifier,
 } from "@/lib/dal/media-outlet-dictionary";
-import {
-  parseDouyinProfileUrl,
-  parseWeiboProfileUrl,
-  parseKuaishouProfileUrl,
-} from "@/lib/media-outlet/url-parsers";
 import { searchDouyinUser } from "@/lib/collection/adapters/tikhub/account-search";
+import type { Channel } from "@/lib/media-outlet/channels";
 import {
-  getChannelIdentifier,
-  type Channel,
-} from "@/lib/media-outlet/channels";
+  DEFAULT_REGION,
+  PLATFORM_LABELS,
+  PLATFORM_ID_FIELD,
+  resolvePlatform,
+  parseUrlToId,
+  validateId,
+  expandDouyinShortLink,
+  readField,
+  FIELD_KEYS,
+  normalizeTier,
+  mapWithConcurrency,
+  confirmRowSchema,
+  buildChannel,
+  channelKey,
+  toWizardChannels,
+  type SupportedPlatform,
+  type AccountImportRawRow,
+  type PreviewMatchSource,
+  type PreviewRow,
+  type ImportedOutletOption,
+  type ConfirmRow,
+} from "@/lib/collection/account-import-helpers";
 
-const DEFAULT_TIER: OutletTier = "government_self_media";
-const DEFAULT_REGION = "全国";
 const PREVIEW_SEARCH_CONCURRENCY = 5;
-
-// ─── 平台配置 ──────────────────────────────────────────────────────────
-
-export type SupportedPlatform = "douyin" | "weibo" | "kuaishou" | "wechat_oa";
-
-const PLATFORM_LABELS: Record<SupportedPlatform, string> = {
-  douyin: "抖音",
-  weibo: "微博",
-  kuaishou: "快手",
-  wechat_oa: "微信公众号",
-};
-
-/** 各平台的账号识别符字段名(与 channels.ts / findOutletByChannelIdentifier 对齐) */
-const PLATFORM_ID_FIELD: Record<SupportedPlatform, string> = {
-  douyin: "secUid",
-  weibo: "uid",
-  kuaishou: "userId",
-  wechat_oa: "ghid",
-};
-
-function resolvePlatform(raw: string): SupportedPlatform | null {
-  const p = raw.trim();
-  if (!p) return "douyin"; // 平台列留空默认抖音
-  const low = p.toLowerCase();
-  if (p === "抖音" || low === "douyin") return "douyin";
-  if (p === "微博" || low === "weibo") return "weibo";
-  if (p === "快手" || low === "kuaishou") return "kuaishou";
-  if (p === "微信公众号" || p === "公众号" || p === "微信" || low === "wechat_oa" || low === "wechat")
-    return "wechat_oa";
-  return null;
-}
-
-/** 主页链接 → 账号识别符(公众号无标准主页 URL 解析) */
-function parseUrlToId(
-  platform: SupportedPlatform,
-  url: string,
-): { id: string; profileUrl?: string } | null {
-  switch (platform) {
-    case "douyin": {
-      const c = parseDouyinProfileUrl(url);
-      return c ? { id: c.secUid, profileUrl: c.profileUrl } : null;
-    }
-    case "weibo": {
-      const c = parseWeiboProfileUrl(url);
-      return c ? { id: c.uid, profileUrl: c.profileUrl } : null;
-    }
-    case "kuaishou": {
-      const c = parseKuaishouProfileUrl(url);
-      return c ? { id: c.userId, profileUrl: c.profileUrl } : null;
-    }
-    case "wechat_oa":
-      return null;
-  }
-}
-
-/** 直填账号 ID 的基本格式校验,返回错误信息或 null(合法) */
-function validateId(platform: SupportedPlatform, id: string): string | null {
-  switch (platform) {
-    case "weibo":
-      return /^\d+$/.test(id) ? null : "微博 uid 必须是数字";
-    case "wechat_oa":
-      return /^gh_[a-zA-Z0-9]+$/.test(id) ? null : "公众号 ghid 必须以 gh_ 开头";
-    case "douyin":
-    case "kuaishou":
-      return id.trim() ? null : "账号 ID 不能为空";
-  }
-}
-
-/** 抖音 v.douyin.com 短链 → 跟踪重定向拿完整主页 URL(P1) */
-async function expandDouyinShortLink(url: string): Promise<string | null> {
-  try {
-    let current = url.trim();
-    for (let i = 0; i < 5; i++) {
-      const res = await fetch(current, {
-        redirect: "manual",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
-        },
-      });
-      const loc = res.headers.get("location");
-      if (!loc) return current;
-      current = new URL(loc, current).toString();
-      if (/douyin\.com\/(?:share\/)?user\//i.test(current)) return current;
-    }
-    return current;
-  } catch {
-    return null;
-  }
-}
-
-// ─── 类型 ────────────────────────────────────────────────────────────
-
-/** Excel 解析后的原始行(中文表头,key 不保证规范,用 readField 容错读取) */
-export type AccountImportRawRow = Record<string, unknown>;
-
-export type PreviewMatchSource = "id" | "url" | "auto" | "none";
-export type PreviewStatus = "ok" | "auto" | "error" | "duplicate";
-
-export interface PreviewRow {
-  rowIndex: number;
-  outletName: string;
-  platform: SupportedPlatform;
-  platformLabel: string;
-  nickname: string;
-  identifier: string | null; // secUid/uid/userId/ghid
-  identifierLabel: string; // 字段名(给前端占位/提示)
-  followerCount: number | null;
-  verified: boolean | null;
-  avatarUrl: string | null;
-  outletTier: string; // 已填缺省
-  outletRegion: string; // 已填缺省
-  groupName: string | null;
-  description: string | null;
-  profileUrl: string | null;
-  matchSource: PreviewMatchSource;
-  status: PreviewStatus;
-  reason?: string;
-}
-
-/** 结构与 new-source-wizard-client 的 WizardOutletOption 一致,供向导回填候选 */
-export interface ImportedOutletOption {
-  id: string;
-  outletName: string;
-  outletTier: string;
-  channels: Array<{
-    type: string;
-    nickname?: string;
-    name?: string;
-    url?: string;
-    domain?: string;
-  }>;
-}
-
-// ─── 字段读取容错 ──────────────────────────────────────────────────────
-
-function readField(row: AccountImportRawRow, keys: readonly string[]): string {
-  for (const k of keys) {
-    const v = row[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-    if (typeof v === "number" && !Number.isNaN(v)) return String(v);
-  }
-  return "";
-}
-
-const FIELD_KEYS = {
-  outletName: ["媒体名称", "名称", "媒体", "outletName", "name"],
-  platform: ["平台", "platform"],
-  profileUrl: ["主页链接", "链接", "主页", "profileUrl", "url"],
-  identifier: [
-    "账号ID",
-    "账号id",
-    "账号 ID",
-    "secUid",
-    "sec_uid",
-    "secuid",
-    "sec_user_id",
-    "uid",
-    "userId",
-    "user_id",
-    "ghid",
-  ],
-  tier: ["媒体分级", "分级", "tier", "outletTier"],
-  region: ["区域", "地区", "region", "outletRegion"],
-  groupName: ["集团", "母公司", "groupName"],
-  description: ["备注", "说明", "description", "remark"],
-} as const;
-
-function normalizeTier(raw: string): string {
-  const t = raw.trim();
-  if (!t) return DEFAULT_TIER;
-  const byLabel = OUTLET_TIER_VALUES.find((v) => OUTLET_TIER_LABELS[v] === t);
-  if (byLabel) return byLabel;
-  if ((OUTLET_TIER_VALUES as readonly string[]).includes(t)) return t;
-  return DEFAULT_TIER;
-}
-
-// ─── 简易并发池(每批 ≤25 行,并发 5 跑搜索/短链展开) ────────────────────
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const i = cursor++;
-      results[i] = await fn(items[i]!, i);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
-  );
-  return results;
-}
 
 // ─── 1. 模板下载 ──────────────────────────────────────────────────────
 
@@ -510,63 +321,6 @@ async function applyDuplicateFlag(
 }
 
 // ─── 3. 确认导入(upsert 字典 + 返回 outletIds) ─────────────────────────
-
-const confirmRowSchema = z.object({
-  outletName: z.string().min(1),
-  platform: z.enum(["douyin", "weibo", "kuaishou", "wechat_oa"]),
-  nickname: z.string().min(1),
-  identifier: z.string().min(1),
-  profileUrl: z.string().nullable().optional(),
-  outletTier: z.enum(OUTLET_TIER_VALUES),
-  outletRegion: z.string().min(1),
-  groupName: z.string().nullable().optional(),
-  description: z.string().nullable().optional(),
-});
-
-export type ConfirmRow = z.infer<typeof confirmRowSchema>;
-
-function buildChannel(r: ConfirmRow): Channel {
-  const profileUrl = r.profileUrl || undefined;
-  switch (r.platform) {
-    case "douyin":
-      return {
-        type: "douyin",
-        nickname: r.nickname,
-        secUid: r.identifier,
-        ...(profileUrl ? { profileUrl } : {}),
-      };
-    case "weibo":
-      return {
-        type: "weibo",
-        nickname: r.nickname,
-        uid: r.identifier,
-        ...(profileUrl ? { profileUrl } : {}),
-      };
-    case "kuaishou":
-      return {
-        type: "kuaishou",
-        nickname: r.nickname,
-        userId: r.identifier,
-        ...(profileUrl ? { profileUrl } : {}),
-      };
-    case "wechat_oa":
-      return { type: "wechat_oa", name: r.nickname, ghid: r.identifier };
-  }
-}
-
-function channelKey(c: Channel): string {
-  return `${c.type}:${getChannelIdentifier(c) ?? ""}`;
-}
-
-function toWizardChannels(channels: Channel[]): ImportedOutletOption["channels"] {
-  return channels.map((c) => ({
-    type: c.type,
-    nickname: "nickname" in c ? c.nickname : undefined,
-    name: "name" in c ? c.name : undefined,
-    url: "url" in c ? c.url : undefined,
-    domain: "domain" in c ? c.domain : undefined,
-  }));
-}
 
 export async function confirmAccountImport(rawRows: ConfirmRow[]): Promise<{
   outletIds: string[];

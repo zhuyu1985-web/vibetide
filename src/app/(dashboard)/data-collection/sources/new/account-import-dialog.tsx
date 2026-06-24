@@ -19,9 +19,11 @@ import {
   downloadAccountImportTemplate,
   previewAccountImport,
   confirmAccountImport,
+} from "@/app/actions/account-import";
+import {
   type PreviewRow,
   type ImportedOutletOption,
-} from "@/app/actions/account-import";
+} from "@/lib/collection/account-import-helpers";
 
 // 每批送后端解析/搜索的行数 — 与计划一致(避免长搜索超时)
 const PREVIEW_BATCH = 25;
