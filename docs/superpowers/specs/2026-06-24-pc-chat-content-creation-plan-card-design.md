@@ -147,16 +147,16 @@ intentResult.intentType === "content_creation" → 【新】拉创作计划 → 
 
 - 入参新增可选 `plan?: CreationPlan`。当带 `plan` 时：
   - 用 `plan` 字段构造生成参数（替代/补充现有 `step.taskDescription` 与预抓逻辑）：选题 → 检索 query；体裁/字数/渠道 → `content_generate` 的 style/maxLength + 渠道适配提示。
-  - 生成结束后，**强制调 `archive_to_drafts`**（`tool-registry.ts:1842`）落库，拿 `firstArticleId`。
+  - 生成结束后，**强制调 `archive_to_drafts`**（`tool-registry.ts:1842`）落库，拿 `firstArticleId`。⚠️ 该工具默认 `initialStatus: "approved"`（tool-registry.ts:1868），G3 要的是**可编辑草稿**，故必须**显式传 `initialStatus: "draft"` + `organizationId`**，不能用默认值（否则会落成 approved 稿）。工具本身支持 draft，无需改工具。
   - 通过 SSE 新增事件 `draft-saved`（payload：`{ articleId, title, wordCount, channel }`），客户端据此渲染"初稿已生成"结果卡（含进编辑器深链）。
   - 若 `plan.illustrate` 为真，触发题图（复用 [[aigc-provider-kie-ai]] 现成 AIGC 文生图路径），异步回执。
 - 不带 `plan` 时：行为完全不变（其余意图、旧调用方）。
 
 ### 5.5 对话内"说一句改一版"
 
-出稿后，会话记住最近 `articleId`。用户后续自由文本若被识别为改稿意图（复用钉钉 `revise` 的判定思路），调 `reviseDraft(articleId, instruction)`（抽取自 `content-loop-step.ts:139` 的 `reviseDraft` 为共享函数）→ 更新 articles + `appendArticleVersion`（changeKind='rewrite'）→ 回执新版预览。
+出稿后，会话记住最近 `articleId`。用户后续自由文本若被识别为改稿意图（复用钉钉 `revise` 的判定思路），PC 路径：① 按 `articleId` 读 article → ② 调 `reviseDraft(body, title, instruction, language)` → ③ 写回 articles + `appendArticleVersion`（changeKind='rewrite'）→ ④ 回执新版预览。
 
-> 实现选择：把 `reviseDraft` / `splitTitleBody` 从 `content-loop-step.ts` 抽到 `src/lib/content/revise.ts` 共享模块，钉钉与 PC 共用，避免复制。
+> ⚠️ 精度（避免规划误读）：`content-loop-step.ts:139` 现有 `reviseDraft(body, title, instruction, language)` 是**纯函数**——入参是已取出的稿件文本，**不接 articleId、自身不读写 DB**，"读 article / 落库 / 写版本"由调用方做（钉钉调用方已是这套）。抽到 `src/lib/content/revise.ts` 时**保持该纯签名**，PC 与钉钉各自负责 DB 读写，避免复制 `reviseDraft` / `splitTitleBody`。
 
 ---
 
@@ -229,7 +229,7 @@ export interface CreationPlan {
 **目标**：`hot_list` 永不无声卡死。
 
 1. **失败/超时转移**（`orchestrator.ts` + `content-loop-step.ts:311-341,684-699`）：
-   - `fetch_topics` 失败/超时 → 回滚 `scenarioPhase = 'idle'`（最小改动；或新增 `hot_list_failed` 态承载"重试/退出"按钮语义），错误卡明确写："抓取失败，回复『重新获取』重试，或『退出』结束"。
+   - `fetch_topics` 失败/超时 → 回滚 `scenarioPhase = 'idle'`（**选定此最小改动方案**，不新增 `hot_list_failed` 态——避免给状态机加态），错误卡明确写："抓取失败，回复『重新获取』重试，或『退出』结束"。
    - `contentLoopStepFailureHandler` 同样回滚 phase，不只是补推卡。
 2. **被动提示加计数**（`orchestrator.ts:192-194`）：`loopContext` 记 `hotlistWaitCount`，每次空候选 +1；超过阈值（如 3）主动提示"抓取似乎失败了，回复『重新获取』或『退出』"。
 3. **热榜服务优雅降级**（`tool-registry.ts:999`、`trending-api.ts`）：`TRENDING_API_KEY` 缺失 / TopHub 不可达时不 throw 死，返回明确"热榜服务未配置/不可达"，由上层回滚 idle + 提示，而非把失败吞进"稍等"。
