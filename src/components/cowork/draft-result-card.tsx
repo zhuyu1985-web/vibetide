@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { GlassCard } from "@/components/shared/glass-card";
+import { reviseDraftInConversation } from "@/app/actions/cowork-content-creation";
 
 /**
  * draft_result 消息的瘦身 meta 契约：
@@ -23,13 +25,32 @@ export interface DraftResultMeta {
   body?: string;
 }
 
-export function DraftResultCard({ meta }: { meta: DraftResultMeta }) {
+export function DraftResultCard({
+  meta,
+  conversationId,
+}: {
+  meta: DraftResultMeta;
+  conversationId: string;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [revising, setRevising] = useState(false);
   // 仅降级路径（meta.body 存在）才有“展开全文”的意义；已入库时走「打开编辑器」。
   const canExpand = !!meta.body && meta.body.length > meta.bodyPreview.length;
   const shown = expanded && meta.body ? meta.body : meta.bodyPreview;
   // 仅当确实能内联展开时才补省略号；归档/截断路径无“展开全文”，靠「打开编辑器精修」，不挂悬空的 …
   const truncated = canExpand && !expanded;
+
+  const onRevise = async () => {
+    if (!meta.articleId || !instruction.trim() || revising) return;
+    setRevising(true);
+    try {
+      await reviseDraftInConversation(conversationId, meta.articleId, instruction.trim());
+      setInstruction("");
+    } finally {
+      setRevising(false);
+    }
+  };
 
   return (
     <GlassCard className="max-w-md space-y-2 p-4">
@@ -62,8 +83,31 @@ export function DraftResultCard({ meta }: { meta: DraftResultMeta }) {
             <Link href={`/articles/${meta.articleId}`}>📝 打开编辑器精修</Link>
           </Button>
         )}
-        {/* 「说一句改一版」/ 换角度重写：Phase 3 接入。 */}
       </div>
+      {/* 说一句改一版：仅在稿件已入库（有 articleId 可改写）时出现 */}
+      {meta.articleId && (
+        <div className="flex gap-2 pt-1">
+          <Input
+            value={instruction}
+            placeholder="说一句改一版，如「导语短一点、加个数据」"
+            disabled={revising}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void onRevise();
+              }
+            }}
+          />
+          <Button
+            variant="ghost"
+            onClick={() => void onRevise()}
+            disabled={revising || !instruction.trim()}
+          >
+            {revising ? "改稿中…" : "改一版"}
+          </Button>
+        </div>
+      )}
     </GlassCard>
   );
 }

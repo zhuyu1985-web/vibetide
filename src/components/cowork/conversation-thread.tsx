@@ -334,7 +334,7 @@ function MessageBubble({
     if (!meta) return null;
     return (
       <div className="flex justify-start">
-        <DraftResultCard meta={meta} />
+        <DraftResultCard meta={meta} conversationId={message.conversationId} />
       </div>
     );
   }
