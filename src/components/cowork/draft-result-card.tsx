@@ -22,6 +22,8 @@ export interface DraftResultMeta {
   channel: string;
   genre: string;
   illustrate: boolean;
+  /** 勾选了配图且已成功排队 AIGC 出图：稿件落库后封面异步生成中，完成后在编辑器可见。 */
+  coverPending?: boolean;
   body?: string;
 }
 
@@ -67,6 +69,7 @@ export function DraftResultCard({
         <span>📝 约 {meta.wordCount} 字</span>
         <span>🏷 {meta.genre}</span>
         <span>📡 {meta.channel}</span>
+        {meta.coverPending && <span>🎨 题图生成中…</span>}
       </div>
       <div className="whitespace-pre-wrap text-sm text-foreground/90">
         {shown}

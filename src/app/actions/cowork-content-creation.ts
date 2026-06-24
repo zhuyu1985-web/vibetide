@@ -9,8 +9,36 @@ import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { appendMessage, getConversationById } from "@/lib/dal/cowork-conversations";
 import { appendArticleVersion } from "@/lib/dal/article-versions";
 import { invokeToolDirectly } from "@/lib/agent/tool-registry";
+import { inngest } from "@/inngest/client";
 import { deriveTitle, splitTitleBody, reviseDraft } from "@/lib/content/revise";
 import { planToGenerateParams, GENRE_LABELS, CHANNEL_PRESETS, type CreationPlan } from "@/lib/cowork/creation-plan";
+
+/**
+ * 配图（题图）非阻塞触发：稿件已落库后，若计划勾选了配图，则 fire-and-forget 派发
+ * aigc/illustrate.requested（复用既有 kie.ai 出图 → TOS 转存 → 写回 articles.coverImageUrl 链路）。
+ * 不带 channelCtx（PC cowork 无 IM 渠道），出图完成后用户在编辑器看到封面。
+ * ⚠️ 失败绝不能影响出稿：整段包 try/catch，失败只落日志（无声吞会让排障无门 → 留面包屑）。
+ * @returns 是否已成功排队（用于 draft_result 卡显示「题图生成中」）。
+ */
+async function enqueueCoverIllustration(
+  organizationId: string,
+  articleId: string,
+  userHint?: string,
+): Promise<boolean> {
+  try {
+    await inngest.send({
+      name: "aigc/illustrate.requested",
+      // 稳定 id：同一篇稿件的同一次出稿只排一次，避免重复触发烧额度。
+      id: `illustrate:cowork:${articleId}`,
+      data: { organizationId, articleId, ...(userHint ? { userHint } : {}) },
+    });
+    return true;
+  } catch (err) {
+    // 出稿已成功，配图是附加项；这里只记面包屑，不向上抛、不回滚草稿。
+    console.error("[cowork-content] 题图排队失败（不影响出稿）:", err);
+    return false;
+  }
+}
 
 export type ConfirmPlanResult = { ok: false; error: string } | { ok: true; articleId: string | null };
 
@@ -51,6 +79,17 @@ export async function confirmCreationPlan(conversationId: string, plan: Creation
     }).catch((e) => console.error("[cowork-content] 初稿版本留痕失败:", e));
   }
 
+  // 2.5 配图（题图）：勾选了配图且稿件已入库 → 非阻塞触发 AIGC 出图（失败不影响出稿）。
+  // 没拿到 articleId（降级路径）时无处写回封面，留面包屑、跳过。
+  let coverPending = false;
+  if (plan.illustrate) {
+    if (articleId) {
+      coverPending = await enqueueCoverIllustration(orgId, articleId);
+    } else {
+      console.info("[cowork-content] 勾选了配图但稿件未入库，跳过题图生成:", title);
+    }
+  }
+
   // 3. 落 draft_result 消息
   // meta 瘦身：已入库时只放 bodyPreview（文章本身才是真相源，整篇 body 入 jsonb 会膨胀每次会话加载）；
   // 仅在降级（articleId 为 null、没有可打开的编辑器）时把整篇 body 兜底进 meta。
@@ -63,6 +102,7 @@ export async function confirmCreationPlan(conversationId: string, plan: Creation
       bodyPreview: body.slice(0, 200),
       wordCount: body.length,
       channel: CHANNEL_PRESETS[plan.channel].label, genre: GENRE_LABELS[plan.genre], illustrate: plan.illustrate,
+      coverPending,
       ...(articleId ? {} : { body }),
     },
   });

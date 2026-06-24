@@ -445,13 +445,18 @@ export type InngestEvents = {
   };
 
   // ─── AIGC Illustrate (2026-06-22) ───
-  /** IM 机器人配图请求 → kieGenerateImage → TOS 转存 → 写回 articles.coverImageUrl。由 gateway 派发，aigcIllustrate 消费 */
+  /**
+   * 配图请求 → kieGenerateImage → TOS 转存 → 写回 articles.coverImageUrl。
+   * 由 IM gateway（钉钉/企微）或 PC cowork（confirmCreationPlan）派发，aigcIllustrate 消费。
+   * channelCtx 可选：IM 侧传入用于回执；cowork（PC 对话）侧无渠道，省略后跳过 IM 回执，
+   * 封面写回 article 后用户直接在编辑器里看到（2026-06-24 配图开关接 AIGC）。
+   */
   "aigc/illustrate.requested": {
     data: {
       organizationId: string;
       articleId: string;
       userHint?: string;
-      channelCtx: {
+      channelCtx?: {
         organizationId: string;
         configId: string;
         platform: "dingtalk" | "wechat_work";
