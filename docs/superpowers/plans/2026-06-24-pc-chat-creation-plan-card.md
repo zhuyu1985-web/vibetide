@@ -19,7 +19,7 @@
 invokeToolDirectly(toolName, rawParams, { organizationId?, operatorId? }):
   Promise<{ ok:true; toolName; params; result:unknown } | { ok:false; toolName; params; error:string }>
 
-// archive_to_drafts：articles[]{ title(1-200), body(≥10), summary?, sourceTopicId?, language:"zh"|"en"(默认en) },
+// archive_to_drafts：articles[]{ title(长度1~200), body(≥10字), summary?, sourceTopicId?, language:"zh"|"en"(默认en) },
 //   initialStatus:"draft"|"approved"(默认 approved ⚠️必须显式传 "draft"), organizationId
 //   result → { firstArticleId:string|null, firstTitle, totalCreated, ... }
 // content_generate：{ outline, style?(默认professional,自由串), maxLength?(默认2000) } → { content, wordCount, tokensUsed }
@@ -79,10 +79,14 @@ git commit -m "feat(channel): ContentLoopContext 加 hotlistWaitCount（P0 防�
 ### Task 0.2: `hot_list` 空候选时计数 + 超阈值给出口提示
 
 **Files:**
+- Modify: `src/lib/channels/content-loop/intents.ts:23-25`（拓宽 `isRegenerate` 命中"重新获取/重新抓取"）
 - Modify: `src/lib/channels/content-loop/orchestrator.ts:187-217`（`hot_list` case）
+- Test: `src/lib/channels/content-loop/__tests__/intents.test.ts`（追加用例）
 - Test: `src/lib/channels/content-loop/__tests__/orchestrator-hotlist.test.ts`（新建）
 
 当前 :192-194 空候选直接回"热点还在抓取中"。改为：记数，<阈值给"稍等"，≥阈值给明确出口。
+
+⚠️ **前置修正（评审发现）**：出口提示里让用户回的"重新获取"**目前不被 `isRegenerate` 命中**——现有正则 `/(换一?批|换一?个|重新(来|生成|出)|再来|再出|换换)/` 的 `重新` 分支只含 `来|生成|出`，不含"获取"。若不修，用户照提示回"重新获取"会落空（正是本 P0 要消灭的死胡同）。故本任务**先拓宽 `isRegenerate`**，再改 orchestrator。
 
 - [ ] **Step 1: 写失败测试**
 
@@ -128,7 +132,30 @@ describe("hot_list 空候选：计数 + 出口提示", () => {
 Run: `npx vitest run src/lib/channels/content-loop/__tests__/orchestrator-hotlist.test.ts`
 Expected: FAIL（当前无计数逻辑）。
 
-- [ ] **Step 3: 实现**
+- [ ] **Step 3: 拓宽 `isRegenerate` 命中"重新获取"（先做，否则出口提示落空）**
+
+在 `intents.test.ts` 追加用例：
+
+```ts
+it("'重新获取/重新抓取' 命中 isRegenerate", () => {
+  for (const t of ["重新获取", "重新抓取", "重新获取一下", "重新拉取"]) {
+    expect(isRegenerate(t)).toBe(true);
+  }
+});
+```
+
+把 `src/lib/channels/content-loop/intents.ts:24` 的正则改为（仅在 `重新` 分支补 `获取|抓取|拉取`）：
+
+```ts
+export function isRegenerate(text: string): boolean {
+  return /(换一?批|换一?个|重新(来|生成|出|获取|抓取|拉取)|再来|再出|换换)/.test(text.trim());
+}
+```
+
+Run: `npx vitest run src/lib/channels/content-loop/__tests__/intents.test.ts`
+Expected: PASS（含新用例）。
+
+- [ ] **Step 4: 实现 hot_list 计数 + 出口**
 
 把 `orchestrator.ts` `case "hot_list"` 里的空候选分支（:192-195）替换为：
 
@@ -150,18 +177,18 @@ Expected: FAIL（当前无计数逻辑）。
       }
 ```
 
-> 注：`isRegenerate`（"换一批/重新生成/再来…"）已在 :188 处理重抓；本提示里用"重新获取"用户更易懂，且 `isRegenerate` 正则含"重新"前缀，能命中"重新获取"。`isExitLoop` 命中"退出"。
+> 注：`isRegenerate` 在 `hot_list` 分支 :188 已处理"重抓"——经 Step 3 拓宽后，"重新获取"会命中 → `dispatchStep("fetch_topics")` 重新抓榜，出口真正可用。`isExitLoop` 命中"退出"。Task 0.3 的失败回滚走 idle 后，提示用"获取今天的热点"（`isHotTopicIntent` 已命中，见 intents.test.ts），与此处的 hot_list 内提示各自正确。
 
-- [ ] **Step 4: 跑测试确认通过 + 全量**
+- [ ] **Step 5: 跑测试确认通过 + 全量**
 
-Run: `npx vitest run src/lib/channels/content-loop/__tests__/orchestrator-hotlist.test.ts && npx tsc --noEmit`
+Run: `npx vitest run src/lib/channels/content-loop/__tests__/orchestrator-hotlist.test.ts src/lib/channels/content-loop/__tests__/intents.test.ts && npx tsc --noEmit`
 Expected: PASS + 零类型错误。
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/channels/content-loop/orchestrator.ts src/lib/channels/content-loop/__tests__/orchestrator-hotlist.test.ts
-git commit -m "fix(channel): hot_list 空候选计数+超阈值给重试/退出出口（P0 防无声卡死）"
+git add src/lib/channels/content-loop/orchestrator.ts src/lib/channels/content-loop/intents.ts src/lib/channels/content-loop/__tests__/
+git commit -m "fix(channel): hot_list 空候选计数+出口 + 拓宽 isRegenerate 命中'重新获取'（P0 防无声卡死）"
 ```
 
 ### Task 0.3: `fetch_topics` 失败/空 → 回滚 phase 到 idle + 明确出口
@@ -219,7 +246,7 @@ Expected: FAIL（当前不回滚）。
 
 - [ ] **Step 3: 实现**
 
-在 `content-loop-step.ts` `fetch_topics` 分支，失败分支（:317-319）与空分支（:325-328）各加一次回滚 + 出口文案：
+在 `content-loop-step.ts` `fetch_topics` 分支，失败分支（:317-319）与空分支（:325-327）各加一次回滚 + 出口文案：
 
 ```ts
     if (!r.ok) {
@@ -1053,7 +1080,7 @@ import { DraftResultCard, type DraftResultMeta } from "@/components/cowork/draft
 import type { CreationPlan } from "@/lib/cowork/creation-plan";
 ```
 
-> ⚠️ 确认 `MessageBubble` 能拿到 `message.conversationId`（plan_card 需要它调 confirm）。若 `ConversationMessage` 没带 conversationId，则从 `conversation-thread` 的外层 props 透传 `conversationId` 进 `MessageBubble`（与现有 `onMissionFocus` 等 props 同路径）。实施时按实际类型二选一。
+> ✅ `MessageBubble` 能直接拿到 `message.conversationId`：`ConversationMessage = typeof conversationMessages.$inferSelect`（conversations.ts:144），表有非空 `conversation_id` 列（conversations.ts:72-74），故 `message.conversationId` 一定存在，**无需额外透传**。直接传给 `CreationPlanForm` / `DraftResultCard` 即可。
 
 - [ ] **Step 2: 验证 + 全量** — `npx tsc --noEmit && npm run build`
 Expected: 类型零错 + 构建通过。
