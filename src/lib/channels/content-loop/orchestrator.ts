@@ -53,6 +53,9 @@ function loopTtl(): Date {
   return new Date(Date.now() + CONTENT_LOOP_TTL_MS);
 }
 
+/** hot_list 空候选连续次数达到此阈值后，主动给出"重新获取/退出"出口。 */
+const HOTLIST_WAIT_THRESHOLD = 3;
+
 async function dispatchStep(
   step: LoopStep,
   session: ChannelSessionRow,
@@ -191,12 +194,14 @@ export async function handleContentLoopMessage(
       }
       const cands = ctx.topicCandidates ?? [];
       if (cands.length === 0) {
+        // 计数是 poll 驱动而非时间驱动：只有用户再发一条消息撞到这里才 +1，
+        // 不会自行随时间推进（抓榜真正的失败回滚在 content-loop-step 的 fetch_topics 分支）。
         const waited = (ctx.hotlistWaitCount ?? 0) + 1;
         await updateSession(session.id, {
           loopContext: { ...ctx, hotlistWaitCount: waited },
           expiresAt: loopTtl(),
         });
-        if (waited >= 3) {
+        if (waited >= HOTLIST_WAIT_THRESHOLD) {
           return {
             reply:
               "热点抓取似乎没成功（可能热榜服务暂时不可用）。回复「重新获取」再试一次，或回复「退出」结束。",

@@ -11,10 +11,13 @@ vi.mock("@/lib/dal/channels", () => ({ getChannelConfig: vi.fn(async () => null)
 vi.mock("@/lib/channels/outbound", () => ({ sendChannelMessage: vi.fn() }));
 // 其余 import 的 DAL/工具按需 mock 成空实现（appendArticleVersion 等本用例不触达）
 
-import { runContentLoopStep } from "../content-loop-step";
+import { runContentLoopStep, handleContentLoopStepFailure } from "../content-loop-step";
 
 const data = { organizationId: "o1", sessionId: "s1", step: "fetch_topics",
   channelCtx: { organizationId:"o1", configId:"c1", platform:"dingtalk", chatId:"g1", externalUserId:"u1" } } as never;
+
+const failData = (step: string) => ({ organizationId: "o1", sessionId: "s1", step,
+  channelCtx: { organizationId:"o1", configId:"c1", platform:"dingtalk", chatId:"g1", externalUserId:"u1" } } as never);
 
 describe("fetch_topics 失败/空 → 回滚 idle", () => {
   beforeEach(() => { invokeMock.mockReset(); updateSessionMock.mockReset();
@@ -30,5 +33,27 @@ describe("fetch_topics 失败/空 → 回滚 idle", () => {
     invokeMock.mockResolvedValue({ ok: true, result: { topics: [] } });
     await runContentLoopStep(data);
     expect(updateSessionMock).toHaveBeenCalledWith("s1", expect.objectContaining({ scenarioPhase: "idle" }));
+  });
+});
+
+describe("terminal failure（retries 用尽）→ fetch_topics 仍卡 hot_list 时回滚 idle", () => {
+  beforeEach(() => { getSessionMock.mockReset(); updateSessionMock.mockReset(); });
+
+  it("step=fetch_topics 且仍在 hot_list → 回滚 idle", async () => {
+    getSessionMock.mockResolvedValue({ id:"s1", organizationId:"o1", scenarioPhase:"hot_list", loopContext:{} });
+    await handleContentLoopStepFailure(failData("fetch_topics"));
+    expect(updateSessionMock).toHaveBeenCalledWith("s1", { scenarioPhase: "idle" });
+  });
+
+  it("step=fetch_topics 但已不在 hot_list（drafting）→ 不回滚", async () => {
+    getSessionMock.mockResolvedValue({ id:"s1", organizationId:"o1", scenarioPhase:"drafting", loopContext:{} });
+    await handleContentLoopStepFailure(failData("fetch_topics"));
+    expect(updateSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("step 非 fetch_topics（gen_draft）→ 不回滚（不读 session）", async () => {
+    await handleContentLoopStepFailure(failData("gen_draft"));
+    expect(getSessionMock).not.toHaveBeenCalled();
+    expect(updateSessionMock).not.toHaveBeenCalled();
   });
 });

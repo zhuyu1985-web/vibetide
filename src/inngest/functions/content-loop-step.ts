@@ -692,6 +692,20 @@ export const contentLoopStep = inngest.createFunction(
   },
 );
 
+/**
+ * 终态失败核心逻辑（可单测）：fetch_topics 在 retries 用尽后仍卡 hot_list 时回滚 idle，
+ * 否则不动 phase；任何情况都补推失败卡。inngest 包装只负责认领事件 + step 化。
+ */
+export async function handleContentLoopStepFailure(data: StepData): Promise<void> {
+  if (data.step === "fetch_topics") {
+    const s = await getSessionById(data.sessionId);
+    if (s && s.scenarioPhase === "hot_list") {
+      await updateSession(data.sessionId, { scenarioPhase: "idle" });
+    }
+  }
+  await pushCard(data.channelCtx, "内容闭环", "❌ 处理失败，请重试，或说「退出」结束。");
+}
+
 /** 终态失败回执 —— 订阅 inngest/function.failed，仅认领本函数失败。 */
 export const contentLoopStepFailureHandler = inngest.createFunction(
   { id: "content-loop-step-failure-handler", retries: 1 },
@@ -704,14 +718,6 @@ export const contentLoopStepFailureHandler = inngest.createFunction(
       | undefined;
     const data = originalEvent?.data;
     if (!data) return;
-    await step.run("notify-failure", async () => {
-      if (data.step === "fetch_topics") {
-        const s = await getSessionById(data.sessionId);
-        if (s && s.scenarioPhase === "hot_list") {
-          await updateSession(data.sessionId, { scenarioPhase: "idle" });
-        }
-      }
-      await pushCard(data.channelCtx, "内容闭环", "❌ 处理失败，请重试，或说「退出」结束。");
-    });
+    await step.run("notify-failure", () => handleContentLoopStepFailure(data));
   },
 );
