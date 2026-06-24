@@ -1,11 +1,13 @@
 "use server";
 
-// 采集源「内联 Excel 批量导入抖音号」的三个 server action:
+// 采集源「内联 Excel 批量导入社媒账号」的三个 server action:
 //   1. downloadAccountImportTemplate — 生成标准 xlsx 模板(账号清单 + 填写说明)
 //   2. previewAccountImport          — 解析每行 + 自动补 secUid(不写库)
 //   3. confirmAccountImport          — upsert 媒体账号库 + 返回 outletIds 供向导关联
 //
 // 与 bulk-import.ts 平行。所有 action 都 requireAuth() + organizationId 隔离。
+// P1: 支持抖音/微博/快手/微信公众号 4 平台;抖音 v.douyin.com 短链自动展开;
+//     仅抖音支持「只填名称自动搜号」,其余平台需填主页链接或账号 ID。
 
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
@@ -22,28 +24,127 @@ import {
   bumpDictionaryVersion,
   findOutletByChannelIdentifier,
 } from "@/lib/dal/media-outlet-dictionary";
-import { parseDouyinProfileUrl } from "@/lib/media-outlet/url-parsers";
+import {
+  parseDouyinProfileUrl,
+  parseWeiboProfileUrl,
+  parseKuaishouProfileUrl,
+} from "@/lib/media-outlet/url-parsers";
 import { searchDouyinUser } from "@/lib/collection/adapters/tikhub/account-search";
-import type { Channel, DouyinChannel } from "@/lib/media-outlet/channels";
+import {
+  getChannelIdentifier,
+  type Channel,
+} from "@/lib/media-outlet/channels";
 
 const DEFAULT_TIER: OutletTier = "government_self_media";
 const DEFAULT_REGION = "全国";
 const PREVIEW_SEARCH_CONCURRENCY = 5;
+
+// ─── 平台配置 ──────────────────────────────────────────────────────────
+
+export type SupportedPlatform = "douyin" | "weibo" | "kuaishou" | "wechat_oa";
+
+const PLATFORM_LABELS: Record<SupportedPlatform, string> = {
+  douyin: "抖音",
+  weibo: "微博",
+  kuaishou: "快手",
+  wechat_oa: "微信公众号",
+};
+
+/** 各平台的账号识别符字段名(与 channels.ts / findOutletByChannelIdentifier 对齐) */
+const PLATFORM_ID_FIELD: Record<SupportedPlatform, string> = {
+  douyin: "secUid",
+  weibo: "uid",
+  kuaishou: "userId",
+  wechat_oa: "ghid",
+};
+
+function resolvePlatform(raw: string): SupportedPlatform | null {
+  const p = raw.trim();
+  if (!p) return "douyin"; // 平台列留空默认抖音
+  const low = p.toLowerCase();
+  if (p === "抖音" || low === "douyin") return "douyin";
+  if (p === "微博" || low === "weibo") return "weibo";
+  if (p === "快手" || low === "kuaishou") return "kuaishou";
+  if (p === "微信公众号" || p === "公众号" || p === "微信" || low === "wechat_oa" || low === "wechat")
+    return "wechat_oa";
+  return null;
+}
+
+/** 主页链接 → 账号识别符(公众号无标准主页 URL 解析) */
+function parseUrlToId(
+  platform: SupportedPlatform,
+  url: string,
+): { id: string; profileUrl?: string } | null {
+  switch (platform) {
+    case "douyin": {
+      const c = parseDouyinProfileUrl(url);
+      return c ? { id: c.secUid, profileUrl: c.profileUrl } : null;
+    }
+    case "weibo": {
+      const c = parseWeiboProfileUrl(url);
+      return c ? { id: c.uid, profileUrl: c.profileUrl } : null;
+    }
+    case "kuaishou": {
+      const c = parseKuaishouProfileUrl(url);
+      return c ? { id: c.userId, profileUrl: c.profileUrl } : null;
+    }
+    case "wechat_oa":
+      return null;
+  }
+}
+
+/** 直填账号 ID 的基本格式校验,返回错误信息或 null(合法) */
+function validateId(platform: SupportedPlatform, id: string): string | null {
+  switch (platform) {
+    case "weibo":
+      return /^\d+$/.test(id) ? null : "微博 uid 必须是数字";
+    case "wechat_oa":
+      return /^gh_[a-zA-Z0-9]+$/.test(id) ? null : "公众号 ghid 必须以 gh_ 开头";
+    case "douyin":
+    case "kuaishou":
+      return id.trim() ? null : "账号 ID 不能为空";
+  }
+}
+
+/** 抖音 v.douyin.com 短链 → 跟踪重定向拿完整主页 URL(P1) */
+async function expandDouyinShortLink(url: string): Promise<string | null> {
+  try {
+    let current = url.trim();
+    for (let i = 0; i < 5; i++) {
+      const res = await fetch(current, {
+        redirect: "manual",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+        },
+      });
+      const loc = res.headers.get("location");
+      if (!loc) return current;
+      current = new URL(loc, current).toString();
+      if (/douyin\.com\/(?:share\/)?user\//i.test(current)) return current;
+    }
+    return current;
+  } catch {
+    return null;
+  }
+}
 
 // ─── 类型 ────────────────────────────────────────────────────────────
 
 /** Excel 解析后的原始行(中文表头,key 不保证规范,用 readField 容错读取) */
 export type AccountImportRawRow = Record<string, unknown>;
 
-export type PreviewMatchSource = "secuid" | "url" | "auto" | "none";
+export type PreviewMatchSource = "id" | "url" | "auto" | "none";
 export type PreviewStatus = "ok" | "auto" | "error" | "duplicate";
 
 export interface PreviewRow {
   rowIndex: number;
   outletName: string;
-  platform: "douyin";
+  platform: SupportedPlatform;
+  platformLabel: string;
   nickname: string;
-  secUid: string | null;
+  identifier: string | null; // secUid/uid/userId/ghid
+  identifierLabel: string; // 字段名(给前端占位/提示)
   followerCount: number | null;
   verified: boolean | null;
   avatarUrl: string | null;
@@ -86,7 +187,19 @@ const FIELD_KEYS = {
   outletName: ["媒体名称", "名称", "媒体", "outletName", "name"],
   platform: ["平台", "platform"],
   profileUrl: ["主页链接", "链接", "主页", "profileUrl", "url"],
-  secUid: ["secUid", "sec_uid", "secuid", "SecUid", "sec_user_id"],
+  identifier: [
+    "账号ID",
+    "账号id",
+    "账号 ID",
+    "secUid",
+    "sec_uid",
+    "secuid",
+    "sec_user_id",
+    "uid",
+    "userId",
+    "user_id",
+    "ghid",
+  ],
   tier: ["媒体分级", "分级", "tier", "outletTier"],
   region: ["区域", "地区", "region", "outletRegion"],
   groupName: ["集团", "母公司", "groupName"],
@@ -102,12 +215,7 @@ function normalizeTier(raw: string): string {
   return DEFAULT_TIER;
 }
 
-function isDouyinPlatform(raw: string): boolean {
-  const p = raw.trim().toLowerCase();
-  return p === "" || p === "抖音" || p === "douyin";
-}
-
-// ─── 简易并发池(每批 ≤25 行,并发 5 跑搜索) ────────────────────────────
+// ─── 简易并发池(每批 ≤25 行,并发 5 跑搜索/短链展开) ────────────────────
 
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -144,36 +252,49 @@ export async function downloadAccountImportTemplate(): Promise<{
     "媒体名称",
     "平台",
     "主页链接",
-    "secUid",
+    "账号ID",
     "媒体分级",
     "区域",
     "集团",
     "备注",
   ];
-  const example1 = [
-    "中国日报",
-    "抖音",
-    "",
-    "",
-    "",
-    "",
-    "中国日报社",
-    "只填名称即可,系统自动匹配认证号",
+  const examples = [
+    ["中国日报", "抖音", "", "", "", "", "中国日报社", "只填名称即可,系统自动匹配认证号"],
+    [
+      "央视新闻",
+      "抖音",
+      "https://www.douyin.com/user/MS4wLjABAAAA示例",
+      "",
+      "央级媒体",
+      "全国",
+      "中央广播电视总台",
+      "填了主页链接则优先解析,不再自动搜索",
+    ],
+    [
+      "人民日报",
+      "微博",
+      "https://weibo.com/u/2803301701",
+      "",
+      "央级媒体",
+      "全国",
+      "人民日报社",
+      "微博填主页链接或 uid(数字)",
+    ],
+    [
+      "某某号",
+      "微信公众号",
+      "",
+      "gh_abcdef123456",
+      "政务新媒体",
+      "北京",
+      "",
+      "公众号填 ghid(gh_ 开头),不支持名称搜索",
+    ],
   ];
-  const example2 = [
-    "央视新闻",
-    "抖音",
-    "https://www.douyin.com/user/MS4wLjABAAAA示例secUid",
-    "",
-    "央级媒体",
-    "全国",
-    "中央广播电视总台",
-    "填了主页链接则优先解析,不再自动搜索",
-  ];
-  const sheet1 = XLSX.utils.aoa_to_sheet([headers, example1, example2]);
+  const sheet1 = XLSX.utils.aoa_to_sheet([headers, ...examples]);
   sheet1["!cols"] = [
     { wch: 16 },
-    { wch: 8 },
+    { wch: 10 },
     { wch: 50 },
     { wch: 34 },
     { wch: 14 },
@@ -188,35 +309,34 @@ export async function downloadAccountImportTemplate(): Promise<{
     " / ",
   );
   const notes: string[][] = [
-    ["抖音号批量导入 — 填写说明"],
+    ["社媒账号批量导入 — 填写说明"],
     [""],
-    ["1. 【媒体名称】必填,是唯一识别键(同名会合并到同一媒体)。"],
+    ["1. 【媒体名称】必填,是唯一识别键(同名会合并到同一媒体,可在不同行挂多个平台/账号)。"],
+    ["2. 【平台】支持:抖音 / 微博 / 快手 / 微信公众号;留空默认抖音。"],
     [
-      "2. 最省事:只填【媒体名称】一列即可,系统会自动搜索抖音号并匹配“已认证 + 粉丝最高”的账号。",
+      "3. 抖音最省事:只填【媒体名称】即可,系统自动搜索并匹配“已认证 + 粉丝最高”的账号。",
     ],
     [
-      "3. 想精确指定某个号:填【主页链接】(抖音网页版主页地址,形如 https://www.douyin.com/user/MS4w...)或直接填【secUid】,系统不再自动猜测。",
+      "4. 想精确指定:填【主页链接】或【账号ID】。账号ID 各平台含义—— 抖音:secUid;微博:uid(数字);快手:userId;公众号:ghid(gh_ 开头)。",
     ],
     [
-      "   注意:v.douyin.com 短链暂不支持,请用完整 douyin.com/user/... 链接,或留空让系统搜索。",
-    ],
-    ["4. 【平台】目前仅支持“抖音”,其余平台后续开放。"],
-    [`5. 【媒体分级】可选值:${tierLabels};留空默认“政务新媒体”。`],
-    ["6. 【区域】如“全国 / 北京 / 江苏”;留空默认“全国”。"],
-    ["7. 【集团】【备注】选填。"],
-    [
-      "8. 同一媒体有多个抖音号:分多行填写(确认导入时按 secUid 合并到同一媒体)。",
+      "5. 主页链接示例—— 抖音:https://www.douyin.com/user/MS4w...(v.douyin.com 短链系统会自动展开);微博:https://weibo.com/u/数字;快手:https://www.kuaishou.com/profile/xxx。公众号没有主页链接,请填 ghid。",
     ],
     [
-      "9. 上传后进入“预览核对”:自动匹配的行会标“请核对”,可逐行改 secUid 或删除后再确认。",
+      "6. 仅抖音支持“只填名称自动搜号”;微博/快手/公众号必须填主页链接或账号ID。",
+    ],
+    [`7. 【媒体分级】可选值:${tierLabels};留空默认“政务新媒体”。`],
+    ["8. 【区域】如“全国 / 北京 / 江苏”;留空默认“全国”。【集团】【备注】选填。"],
+    [
+      "9. 上传后进入“预览核对”:自动匹配的行会标“请核对”,可逐行改账号ID或删除后再确认。",
     ],
   ];
   const sheet2 = XLSX.utils.aoa_to_sheet(notes);
-  sheet2["!cols"] = [{ wch: 96 }];
+  sheet2["!cols"] = [{ wch: 110 }];
   XLSX.utils.book_append_sheet(wb, sheet2, "填写说明");
 
   const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" }) as string;
-  return { base64, filename: "抖音号批量导入模板.xlsx" };
+  return { base64, filename: "社媒账号批量导入模板.xlsx" };
 }
 
 // ─── 2. 预览解析 + 自动补 secUid ───────────────────────────────────────
@@ -237,13 +357,17 @@ export async function previewAccountImport(
       const region = readField(row, FIELD_KEYS.region) || DEFAULT_REGION;
       const groupName = readField(row, FIELD_KEYS.groupName) || null;
       const description = readField(row, FIELD_KEYS.description) || null;
+      const platform = resolvePlatform(platformRaw);
+      const safePlatform: SupportedPlatform = platform ?? "douyin";
 
       const base: PreviewRow = {
         rowIndex: index,
         outletName,
-        platform: "douyin",
+        platform: safePlatform,
+        platformLabel: PLATFORM_LABELS[safePlatform],
         nickname: outletName,
-        secUid: null,
+        identifier: null,
+        identifierLabel: PLATFORM_ID_FIELD[safePlatform],
         followerCount: null,
         verified: null,
         avatarUrl: null,
@@ -256,77 +380,92 @@ export async function previewAccountImport(
         status: "error",
       };
 
-      if (!outletName) {
-        return { ...base, reason: "缺少媒体名称" };
-      }
-      if (!isDouyinPlatform(platformRaw)) {
-        return { ...base, reason: `暂不支持平台“${platformRaw}”,当前仅支持抖音` };
+      if (!outletName) return { ...base, reason: "缺少媒体名称" };
+      if (!platform) {
+        return {
+          ...base,
+          reason: `无法识别平台“${platformRaw}”(支持:抖音/微博/快手/微信公众号)`,
+        };
       }
 
-      // ① secUid 直填(最高优先级)
-      const secUidRaw = readField(row, FIELD_KEYS.secUid);
-      if (secUidRaw) {
-        return finalizeWithSecUid(base, user.organizationId, {
-          secUid: secUidRaw,
+      // ① 账号 ID 直填(最高优先级)
+      const idRaw = readField(row, FIELD_KEYS.identifier);
+      if (idRaw) {
+        const err = validateId(platform, idRaw);
+        if (err) return { ...base, reason: err };
+        return finalizeWithId(base, user.organizationId, platform, {
+          id: idRaw,
           nickname: outletName,
-          matchSource: "secuid",
+          matchSource: "id",
         });
       }
 
-      // ② 主页链接解析
+      // ② 主页链接解析(抖音含 v.douyin.com 短链展开)
       const urlRaw = readField(row, FIELD_KEYS.profileUrl);
       if (urlRaw) {
-        const parsed = parseDouyinProfileUrl(urlRaw);
+        let parsed = parseUrlToId(platform, urlRaw);
+        if (!parsed && platform === "douyin" && /v\.douyin\.com/i.test(urlRaw)) {
+          const expanded = await expandDouyinShortLink(urlRaw);
+          if (expanded) parsed = parseUrlToId("douyin", expanded);
+        }
         if (parsed) {
-          return finalizeWithSecUid(base, user.organizationId, {
-            secUid: parsed.secUid,
+          return finalizeWithId(base, user.organizationId, platform, {
+            id: parsed.id,
             nickname: outletName,
             profileUrl: parsed.profileUrl ?? urlRaw,
             matchSource: "url",
           });
         }
-        // 链接解析失败 → 若无名称兜底就报错,否则降级到名称搜索
-        // (这里一定有 outletName,继续走 ③)
+        // 解析失败 → 抖音降级名称搜索;其余平台报错(见下)
       }
 
-      // ③ 只有名称 → tikhub 搜索补 secUid
-      try {
-        const { candidate, costUsd } = await searchDouyinUser(outletName);
-        totalSearchCostUsd += costUsd;
-        if (!candidate) {
-          return {
+      // ③ 只有名称:仅抖音支持自动搜索
+      if (platform === "douyin") {
+        try {
+          const { candidate, costUsd } = await searchDouyinUser(outletName);
+          totalSearchCostUsd += costUsd;
+          if (!candidate) {
+            return {
+              ...base,
+              reason: urlRaw
+                ? "主页链接无法解析,且按名称未搜到账号(短链不支持请用完整链接)"
+                : "未搜到匹配的抖音号,请补填主页链接或 secUid",
+            };
+          }
+          const enriched: PreviewRow = {
             ...base,
-            reason: urlRaw
-              ? "主页链接无法解析,且按名称未搜到匹配账号"
-              : "未搜到匹配的抖音号,请补填主页链接或 secUid",
+            nickname: candidate.nickname || outletName,
+            identifier: candidate.secUid,
+            followerCount: candidate.followerCount,
+            verified: candidate.verified,
+            avatarUrl: candidate.avatarUrl ?? null,
+            matchSource: "auto",
+            status: "auto",
           };
+          return applyDuplicateFlag(enriched, user.organizationId, platform);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { ...base, reason: `搜索失败: ${msg}` };
         }
-        const enriched: PreviewRow = {
-          ...base,
-          nickname: candidate.nickname || outletName,
-          secUid: candidate.secUid,
-          followerCount: candidate.followerCount,
-          verified: candidate.verified,
-          avatarUrl: candidate.avatarUrl ?? null,
-          matchSource: "auto",
-          status: "auto",
-        };
-        return applyDuplicateFlag(enriched, user.organizationId);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { ...base, reason: `搜索失败: ${msg}` };
       }
+
+      // 非抖音平台只有名称 → 无法定位
+      return {
+        ...base,
+        reason: `${PLATFORM_LABELS[platform]}暂不支持按名称自动搜索,请填主页链接或 ${PLATFORM_ID_FIELD[platform]}`,
+      };
     },
   );
 
   return { previewRows, totalSearchCostUsd };
 }
 
-async function finalizeWithSecUid(
+async function finalizeWithId(
   base: PreviewRow,
   orgId: string,
+  platform: SupportedPlatform,
   opts: {
-    secUid: string;
+    id: string;
     nickname: string;
     profileUrl?: string;
     matchSource: PreviewMatchSource;
@@ -334,33 +473,34 @@ async function finalizeWithSecUid(
 ): Promise<PreviewRow> {
   const row: PreviewRow = {
     ...base,
-    secUid: opts.secUid,
+    identifier: opts.id,
     nickname: opts.nickname,
     profileUrl: opts.profileUrl ?? null,
     matchSource: opts.matchSource,
     status: "ok",
   };
-  return applyDuplicateFlag(row, orgId);
+  return applyDuplicateFlag(row, orgId, platform);
 }
 
-/** 若该 secUid 已在字典某 outlet 里,标为 duplicate(确认时幂等跳过)。 */
+/** 若该账号 ID 已在媒体账号库某 outlet 里,标为 duplicate(确认时幂等跳过)。 */
 async function applyDuplicateFlag(
   row: PreviewRow,
   orgId: string,
+  platform: SupportedPlatform,
 ): Promise<PreviewRow> {
-  if (!row.secUid) return row;
+  if (!row.identifier) return row;
   try {
     const existing = await findOutletByChannelIdentifier(
       orgId,
-      "douyin",
-      "secUid",
-      row.secUid,
+      platform,
+      PLATFORM_ID_FIELD[platform],
+      row.identifier,
     );
     if (existing) {
       return {
         ...row,
         status: "duplicate",
-        reason: `该抖音号已在媒体账号库“${existing.outletName}”中`,
+        reason: `该账号已在媒体账号库“${existing.outletName}”中`,
       };
     }
   } catch {
@@ -373,8 +513,9 @@ async function applyDuplicateFlag(
 
 const confirmRowSchema = z.object({
   outletName: z.string().min(1),
+  platform: z.enum(["douyin", "weibo", "kuaishou", "wechat_oa"]),
   nickname: z.string().min(1),
-  secUid: z.string().min(1),
+  identifier: z.string().min(1),
   profileUrl: z.string().nullable().optional(),
   outletTier: z.enum(OUTLET_TIER_VALUES),
   outletRegion: z.string().min(1),
@@ -383,6 +524,39 @@ const confirmRowSchema = z.object({
 });
 
 export type ConfirmRow = z.infer<typeof confirmRowSchema>;
+
+function buildChannel(r: ConfirmRow): Channel {
+  const profileUrl = r.profileUrl || undefined;
+  switch (r.platform) {
+    case "douyin":
+      return {
+        type: "douyin",
+        nickname: r.nickname,
+        secUid: r.identifier,
+        ...(profileUrl ? { profileUrl } : {}),
+      };
+    case "weibo":
+      return {
+        type: "weibo",
+        nickname: r.nickname,
+        uid: r.identifier,
+        ...(profileUrl ? { profileUrl } : {}),
+      };
+    case "kuaishou":
+      return {
+        type: "kuaishou",
+        nickname: r.nickname,
+        userId: r.identifier,
+        ...(profileUrl ? { profileUrl } : {}),
+      };
+    case "wechat_oa":
+      return { type: "wechat_oa", name: r.nickname, ghid: r.identifier };
+  }
+}
+
+function channelKey(c: Channel): string {
+  return `${c.type}:${getChannelIdentifier(c) ?? ""}`;
+}
 
 function toWizardChannels(channels: Channel[]): ImportedOutletOption["channels"] {
   return channels.map((c) => ({
@@ -404,7 +578,7 @@ export async function confirmAccountImport(rawRows: ConfirmRow[]): Promise<{
   const user = await requireAuth();
   const rows = z.array(confirmRowSchema).parse(rawRows);
 
-  // 按媒体名称分组(同名多抖音号合并到一个 outlet)
+  // 按媒体名称分组(同名多平台/多账号合并到一个 outlet)
   const grouped = new Map<string, ConfirmRow[]>();
   for (const r of rows) {
     const list = grouped.get(r.outletName);
@@ -432,19 +606,17 @@ export async function confirmAccountImport(rawRows: ConfirmRow[]): Promise<{
 
     if (existing) {
       const channels = [...((existing.channels ?? []) as Channel[])];
-      const existingSecUids = new Set(
-        channels
-          .filter((c): c is DouyinChannel => c.type === "douyin")
-          .map((c) => c.secUid),
-      );
+      const seen = new Set(channels.map(channelKey));
       let addedAny = false;
       for (const r of group) {
-        if (existingSecUids.has(r.secUid)) {
+        const ch = buildChannel(r);
+        const key = channelKey(ch);
+        if (seen.has(key)) {
           skipped++;
           continue;
         }
-        channels.push(buildDouyinChannel(r));
-        existingSecUids.add(r.secUid);
+        channels.push(ch);
+        seen.add(key);
         addedAny = true;
       }
       if (addedAny) {
@@ -470,9 +642,11 @@ export async function confirmAccountImport(rawRows: ConfirmRow[]): Promise<{
       const seen = new Set<string>();
       const newChannels: Channel[] = [];
       for (const r of group) {
-        if (seen.has(r.secUid)) continue;
-        newChannels.push(buildDouyinChannel(r));
-        seen.add(r.secUid);
+        const ch = buildChannel(r);
+        const key = channelKey(ch);
+        if (seen.has(key)) continue;
+        newChannels.push(ch);
+        seen.add(key);
       }
       const head = group[0]!;
       const [inserted] = await db
@@ -502,13 +676,4 @@ export async function confirmAccountImport(rawRows: ConfirmRow[]): Promise<{
   revalidatePath("/data-collection/outlets");
 
   return { outletIds, outlets, created, merged, skipped };
-}
-
-function buildDouyinChannel(r: ConfirmRow): DouyinChannel {
-  return {
-    type: "douyin",
-    nickname: r.nickname,
-    secUid: r.secUid,
-    ...(r.profileUrl ? { profileUrl: r.profileUrl } : {}),
-  };
 }

@@ -146,20 +146,20 @@ export function AccountImportDialog({ open, onClose, onComplete }: Props) {
     }
   }
 
-  function updateSecUid(rowIndex: number, value: string) {
+  function updateIdentifier(rowIndex: number, value: string) {
     const v = value.trim();
     setRows((prev) =>
       prev.map((r) => {
         if (r.rowIndex !== rowIndex) return r;
         if (!v) {
-          return { ...r, secUid: null, status: "error", reason: "secUid 为空" };
+          return { ...r, identifier: null, status: "error", reason: "账号 ID 为空" };
         }
         // 手动改过 → 视为人工确认就绪
         return {
           ...r,
-          secUid: v,
+          identifier: v,
           status: "ok",
-          matchSource: "secuid",
+          matchSource: "id",
           reason: undefined,
         };
       }),
@@ -171,9 +171,9 @@ export function AccountImportDialog({ open, onClose, onComplete }: Props) {
   }
 
   async function handleConfirm() {
-    const importable = rows.filter((r) => r.status !== "error" && r.secUid);
+    const importable = rows.filter((r) => r.status !== "error" && r.identifier);
     if (importable.length === 0) {
-      toast.error("没有可导入的行（请先补全 secUid 或修正错误行）");
+      toast.error("没有可导入的行（请先补全账号 ID 或修正错误行）");
       return;
     }
     setConfirming(true);
@@ -181,8 +181,9 @@ export function AccountImportDialog({ open, onClose, onComplete }: Props) {
       const res = await confirmAccountImport(
         importable.map((r) => ({
           outletName: r.outletName,
+          platform: r.platform,
           nickname: r.nickname || r.outletName,
-          secUid: r.secUid!,
+          identifier: r.identifier!,
           profileUrl: r.profileUrl,
           outletTier: r.outletTier as OutletTier,
           outletRegion: r.outletRegion,
@@ -218,7 +219,7 @@ export function AccountImportDialog({ open, onClose, onComplete }: Props) {
     duplicate: rows.filter((r) => r.status === "duplicate").length,
     error: rows.filter((r) => r.status === "error").length,
   };
-  const importableCount = rows.filter((r) => r.status !== "error" && r.secUid).length;
+  const importableCount = rows.filter((r) => r.status !== "error" && r.identifier).length;
   const previewPercent =
     previewTotal > 0 ? Math.round((previewProgress / previewTotal) * 100) : 0;
 
@@ -325,15 +326,23 @@ export function AccountImportDialog({ open, onClose, onComplete }: Props) {
                       {
                         key: "outletName",
                         header: "媒体名称",
-                        width: "w-32",
+                        width: "w-28",
                         render: (r) => (
                           <span className="truncate font-medium">{r.outletName}</span>
                         ),
                       },
                       {
+                        key: "platform",
+                        header: "平台",
+                        width: "w-16",
+                        render: (r) => (
+                          <span className="text-xs text-muted-foreground">{r.platformLabel}</span>
+                        ),
+                      },
+                      {
                         key: "nickname",
-                        header: "抖音昵称",
-                        width: "w-28",
+                        header: "昵称",
+                        width: "w-24",
                         render: (r) => (
                           <span className="truncate text-muted-foreground">
                             {r.nickname || "—"}
@@ -352,15 +361,15 @@ export function AccountImportDialog({ open, onClose, onComplete }: Props) {
                         ),
                       },
                       {
-                        key: "secUid",
-                        header: "secUid",
+                        key: "identifier",
+                        header: "账号ID",
                         render: (r) => (
                           <Input
-                            value={r.secUid ?? ""}
-                            onChange={(e) => updateSecUid(r.rowIndex, e.target.value)}
-                            placeholder="MS4wLjABAAAA..."
+                            value={r.identifier ?? ""}
+                            onChange={(e) => updateIdentifier(r.rowIndex, e.target.value)}
+                            placeholder={r.identifierLabel}
                             className="h-8 text-xs"
-                            title={r.secUid ?? ""}
+                            title={r.identifier ?? ""}
                           />
                         ),
                       },

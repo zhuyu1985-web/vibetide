@@ -192,8 +192,8 @@ async function resolveAccountPairs(
     }
     const channels = (outlet.channels ?? []) as Channel[];
     for (const platform of cfg.accountPlatforms) {
-      const ch = channels.find((c) => c.type === platform);
-      if (!ch) {
+      const chs = channels.filter((c) => c.type === platform);
+      if (chs.length === 0) {
         skipped.push({
           outletId,
           outletName: outlet.outletName,
@@ -202,12 +202,15 @@ async function resolveAccountPairs(
         });
         continue;
       }
-      pairs.push({
-        outletId,
-        outletName: outlet.outletName,
-        platform,
-        channel: ch,
-      });
+      // 同一 outlet 同平台可能挂多个账号 → 全部展开,每个账号各拉一次 feed
+      for (const ch of chs) {
+        pairs.push({
+          outletId,
+          outletName: outlet.outletName,
+          platform,
+          channel: ch,
+        });
+      }
     }
   }
 
@@ -425,7 +428,6 @@ async function runAccountMode(
   // 3) 按 (配对, 页) 拉取
   for (const pair of pairs) {
     const mapper = ACCOUNT_MAPPERS[pair.platform];
-    const endpoint = TIKHUB_ACCOUNT_PLATFORM_ENDPOINTS[pair.platform];
 
     for (let p = 0; p < config.maxPagesPerRun; p++) {
       try {

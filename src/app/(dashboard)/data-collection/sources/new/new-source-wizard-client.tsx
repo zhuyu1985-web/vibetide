@@ -893,7 +893,7 @@ function TikhubConfigPanel({ config, setConfig, outlets, onImported }: TikhubCon
           {/* 内联批量导入入口 — 无需先去媒体账号库逐个添加 */}
           <div className="rounded-md border border-dashed border-sky-300/60 bg-sky-50/40 dark:bg-sky-950/20 px-3 py-3 flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
-              有一批抖音号?用 Excel 模板批量导入,系统自动建库并选入本采集源,无需先去媒体账号库逐个添加。
+              有一批社媒账号(抖音/微博/快手/公众号)?用 Excel 模板批量导入,系统自动建库并选入本采集源,无需先去媒体账号库逐个添加。抖音可只填名称自动匹配。
             </div>
             <Button
               type="button"
@@ -903,7 +903,7 @@ function TikhubConfigPanel({ config, setConfig, outlets, onImported }: TikhubCon
               onClick={() => setShowImport(true)}
             >
               <Upload className="h-3.5 w-3.5 mr-1" />
-              批量导入抖音号
+              批量导入账号
             </Button>
           </div>
 
