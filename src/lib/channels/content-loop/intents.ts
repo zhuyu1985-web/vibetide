@@ -19,6 +19,18 @@ export function isHotTopicIntent(text: string): boolean {
   return HOT_TOPIC_PATTERNS.some((re) => re.test(t));
 }
 
+// 中文问候允许带轻量语气尾巴（你好啊 / 在吗？），但开头必须是问候词；
+// 英文问候要求整条消息就是问候，避免吃掉 "this is..." 里的 hi。
+const GREETING_CN = /^(你好|您好|哈喽|哈罗|你们好|嗨|嗨喽|在吗|在不在|在不|有人吗|有人在吗)[啊呀哈呢吗？?！!，,。.~\s]*$/;
+const GREETING_EN = /^(hello|hi|hey|yo|hiya)[\s!.,?]*$/i;
+
+/** 通用问候/开场白意图（任何阶段都先友好回应）。保持收紧，不吃正常任务消息。 */
+export function isGreeting(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  return GREETING_CN.test(t) || GREETING_EN.test(t);
+}
+
 /** "换一批 / 重新来 / 再来一批 / 换个" 重出意图。 */
 export function isRegenerate(text: string): boolean {
   return /(换一?批|换一?个|重新(来|生成|出|获取|抓取|拉取)|再来|再出|换换)/.test(text.trim());

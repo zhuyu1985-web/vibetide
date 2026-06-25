@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const updateSessionMock = vi.hoisted(() => vi.fn());
+const inngestSendMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/dal/channel-sessions", () => ({
   updateSession: updateSessionMock,
   CONTENT_LOOP_TTL_MS: 604800000,
 }));
-vi.mock("@/inngest/client", () => ({ inngest: { send: vi.fn() } }));
+vi.mock("@/inngest/client", () => ({ inngest: { send: inngestSendMock } }));
 
 import { handleContentLoopMessage } from "../orchestrator";
 
@@ -14,20 +15,31 @@ const baseSession = (loopContext: Record<string, unknown>) =>
 const msg = { externalMessageId: "m1" } as never;
 const ctx = { organizationId: "o1", configId: "c1", platform: "dingtalk", chatId: "g1", externalUserId: "u1" } as never;
 
-describe("hot_list 空候选：计数 + 出口提示", () => {
-  beforeEach(() => { updateSessionMock.mockReset(); });
+describe("hot_list 空候选：自愈重抓 + 出口提示", () => {
+  beforeEach(() => {
+    updateSessionMock.mockReset();
+    inngestSendMock.mockReset();
+  });
 
-  it("首次空候选：回'稍等'且把 hotlistWaitCount 记为 1", async () => {
+  it("首次空候选：把 hotlistWaitCount 记为 1 且主动重抓 fetch_topics", async () => {
     const r = await handleContentLoopMessage("选第1个", msg, baseSession({}), ctx);
-    expect(r.reply).toContain("还在抓取");
+    expect(r.reply).toContain("重新获取");
     expect(updateSessionMock).toHaveBeenCalledWith("s1", expect.objectContaining({
       loopContext: expect.objectContaining({ hotlistWaitCount: 1 }),
     }));
+    // 自愈：未到阈值时主动重派 fetch_topics 事件（dispatchStep）
+    expect(inngestSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "content-loop/step.requested",
+        data: expect.objectContaining({ step: "fetch_topics" }),
+      }),
+    );
   });
 
-  it("达到阈值(3)：回带'重新获取/退出'出口的提示", async () => {
+  it("达到阈值(3)：回带'重新获取/退出'出口的提示，不再自动重抓", async () => {
     const r = await handleContentLoopMessage("选第1个", msg, baseSession({ hotlistWaitCount: 3 }), ctx);
     expect(r.reply).toContain("重新获取");
     expect(r.reply).toContain("退出");
+    expect(inngestSendMock).not.toHaveBeenCalled();
   });
 });

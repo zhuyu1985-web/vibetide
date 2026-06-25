@@ -352,3 +352,42 @@ describe("gateway 加配图分支", () => {
     expect(inngestSend).not.toHaveBeenCalled();
   });
 });
+
+describe("gateway 问候全局拦截", () => {
+  beforeEach(() => {
+    updateSession.mockResolvedValue(undefined);
+    inngestSend.mockResolvedValue(undefined);
+  });
+
+  it("卡在 hot_list 时发「你好」→ 回友好引导 + 复位 session 到 idle", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", scenarioPhase: "hot_list",
+      loopContext: { topicCandidates: [] }, contextTurns: [], clarifyRounds: 0,
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "你好" });
+
+    // 不再答非所问（不返回"热点还在抓取中"）
+    expect(r.reply).not.toContain("热点还在抓取中");
+    expect(r.reply).toContain("你好");
+    // 复位卡住的阶段到 idle
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({
+      scenarioPhase: "idle",
+      status: "idle",
+      loopContext: null,
+    }));
+    // 问候不应触发任何闭环事件
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it("idle 态发「你好」→ 回友好引导，不复位（无 scenarioPhase 变更）", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", scenarioPhase: "idle", contextTurns: [], clarifyRounds: 0,
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "hi" });
+
+    expect(r.reply).toContain("你好");
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+});

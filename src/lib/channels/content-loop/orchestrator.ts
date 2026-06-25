@@ -207,7 +207,9 @@ export async function handleContentLoopMessage(
               "热点抓取似乎没成功（可能热榜服务暂时不可用）。回复「重新获取」再试一次，或回复「退出」结束。",
           };
         }
-        return { reply: "热点还在抓取中，稍等几秒再选。" };
+        // 候选为空但未到上限：主动重抓一次（自愈丢失的 fetch_topics 事件），而不是干等
+        await dispatchStep("fetch_topics", session, channelCtx, msg.externalMessageId);
+        return { reply: "🔄 正在重新获取今日热点，稍候…" };
       }
       const sel = parseSelection(text, cands.length);
       if (sel == null) {

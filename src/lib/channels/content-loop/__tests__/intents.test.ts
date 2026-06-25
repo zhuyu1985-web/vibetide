@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isHotTopicIntent,
+  isGreeting,
   isRegenerate,
   isExitLoop,
   parseSelection,
@@ -32,6 +33,39 @@ describe("isHotTopicIntent", () => {
       expect(isHotTopicIntent(t)).toBe(false);
     },
   );
+});
+
+describe("isGreeting", () => {
+  it.each([
+    "你好",
+    "您好",
+    "哈喽",
+    "嗨",
+    "在吗",
+    "在不在",
+    "hello",
+    "Hello",
+    "HELLO",
+    "hi",
+    "Hi",
+    "hey",
+    "  你好  ",
+    "你好啊",
+    "在吗？",
+  ])("命中问候：%s", (t) => expect(isGreeting(t)).toBe(true));
+
+  it.each([
+    "帮我写稿",
+    "帮我写一篇关于寒潮的稿子",
+    "获取今天的热点",
+    "发布到新闻",
+    "加配图",
+    "把第二段改短",
+    "提交审核",
+    "选第2个",
+    "高级搜索",
+    "this is a history of the topic",
+  ])("不命中（正常任务消息）：%s", (t) => expect(isGreeting(t)).toBe(false));
 });
 
 describe("isRegenerate / isExitLoop", () => {

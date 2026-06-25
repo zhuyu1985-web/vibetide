@@ -27,7 +27,7 @@ import { resolveCatalogByName, listAllActiveCmsCatalogs } from "@/lib/dal/cms-ca
 import { getArticleById } from "@/lib/dal/articles";
 import { handlePublishConfirm } from "./publish-followup";
 import { handleContentLoopMessage, startContentLoop } from "./content-loop/orchestrator";
-import { isHotTopicIntent } from "./content-loop/intents";
+import { isHotTopicIntent, isGreeting } from "./content-loop/intents";
 import type { IntentStep } from "@/lib/agent/types";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
@@ -288,6 +288,24 @@ async function handleFreeFormMessage(
 
   if (session.status === "confirming") {
     return handleConfirmingMessage(text, msg, session, channelCtx);
+  }
+
+  // 全局问候：任何阶段都先友好回应，并把卡住/进行中的阶段复位到 idle，
+  // 避免问候被某个阶段吞成"答非所问"（如卡在 hot_list 时回"热点还在抓取中"）。
+  if (isGreeting(text)) {
+    if (session.scenarioPhase && session.scenarioPhase !== "idle") {
+      await updateSession(session.id, {
+        scenarioPhase: "idle",
+        status: "idle",
+        loopContext: null,
+        activeTopicId: null,
+        expiresAt: null,
+      });
+    }
+    return {
+      reply:
+        "你好👋 我可以帮你：\n① 说「获取今天的热点」挑个热点写稿\n② 直接说「帮我写一篇关于 XX 的稿子」\n③ 发个链接给我收稿\n需要什么？",
+    };
   }
 
   // 内容生产闭环：阶段感知路由（先于所有 idle 意图分支，避免被发布/AIGC 抢占）
