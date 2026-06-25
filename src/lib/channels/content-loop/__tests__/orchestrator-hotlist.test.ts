@@ -36,6 +36,15 @@ describe("hot_list 空候选：自愈重抓 + 出口提示", () => {
     );
   });
 
+  it("边界：waited 恰好等于阈值(2→3)即走文字出口，不再自动重抓", async () => {
+    // pin >= HOTLIST_WAIT_THRESHOLD 这条最易 off-by-one 的边界：
+    // hotlistWaitCount=2 → waited=3 == 阈值，应只给文字出口、不重派 fetch_topics
+    const r = await handleContentLoopMessage("选第1个", msg, baseSession({ hotlistWaitCount: 2 }), ctx);
+    expect(r.reply).toContain("重新获取");
+    expect(r.reply).toContain("退出");
+    expect(inngestSendMock).not.toHaveBeenCalled();
+  });
+
   it("达到阈值(3)：回带'重新获取/退出'出口的提示，不再自动重抓", async () => {
     const r = await handleContentLoopMessage("选第1个", msg, baseSession({ hotlistWaitCount: 3 }), ctx);
     expect(r.reply).toContain("重新获取");

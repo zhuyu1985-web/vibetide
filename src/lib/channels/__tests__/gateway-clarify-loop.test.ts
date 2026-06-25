@@ -376,6 +376,11 @@ describe("gateway 问候全局拦截", () => {
       status: "idle",
       loopContext: null,
     }));
+    // 复位不得抹掉草稿：lastArticleId 不在复位 patch 里，流程可重新触发
+    expect(updateSession).toHaveBeenCalledWith(
+      "s1",
+      expect.not.objectContaining({ lastArticleId: expect.anything() }),
+    );
     // 问候不应触发任何闭环事件
     expect(inngestSend).not.toHaveBeenCalled();
   });

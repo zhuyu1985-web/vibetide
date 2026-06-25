@@ -292,6 +292,9 @@ async function handleFreeFormMessage(
 
   // 全局问候：任何阶段都先友好回应，并把卡住/进行中的阶段复位到 idle，
   // 避免问候被某个阶段吞成"答非所问"（如卡在 hot_list 时回"热点还在抓取中"）。
+  // 这个中断是「刻意的」——即便处在 publishing / review_pending 等多步流程中途，
+  // 问候也优先于活跃流程把阶段复位。安全前提：复位 patch 不动 lastArticleId，
+  // 草稿仍在，用户随时可重新说「发布」/「提交审核」把流程再触发起来。
   if (isGreeting(text)) {
     if (session.scenarioPhase && session.scenarioPhase !== "idle") {
       await updateSession(session.id, {
