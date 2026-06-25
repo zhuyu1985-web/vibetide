@@ -27,6 +27,8 @@ import {
   type DraftResultMeta,
 } from "@/components/cowork/draft-result-card";
 import { IntentChip, readIntentFromMeta } from "@/components/cowork/intent-chip";
+import { InputSuggestions } from "@/components/cowork/input-suggestions";
+import { suggestInputs } from "@/lib/cowork/input-suggestions";
 import type { CreationPlan } from "@/lib/cowork/creation-plan-types";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
 import type { MessageFeedback } from "@/app/actions/cowork-conversations";
@@ -118,6 +120,13 @@ export function ConversationThread({
 
   const empty = active.messages.length === 0;
 
+  // 输入框语义建议：从会话上下文派生（纯规则、零延迟）
+  const inputSuggestions = suggestInputs({
+    messageCount: active.messages.length,
+    hasDraft: active.messages.some((m) => m.kind === "draft_result"),
+    hasRunningMission: false, // TODO: 接 mission 实时状态后改为真实「未终态」判断
+  });
+
   return (
     <main className="flex flex-1 flex-col bg-background">
       {/* 顶栏 */}
@@ -175,6 +184,13 @@ export function ConversationThread({
       {/* 输入框 —— gemini-border 玻璃容器,与落地页一致 */}
       <div className="px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
+          <InputSuggestions
+            items={inputSuggestions}
+            onPick={(fill) => {
+              setInput(fill);
+              textareaRef.current?.focus();
+            }}
+          />
           <div className="gemini-border rounded-2xl bg-card transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
             <div className="px-4 pb-1.5 pt-3">
               {/* 容器即输入框,故用裸 textarea(透明无边框、JS 自动撑高),与落地页同款 */}
