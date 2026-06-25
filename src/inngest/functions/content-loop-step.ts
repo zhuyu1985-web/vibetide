@@ -387,7 +387,9 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
 
       // 建一条轻量 completed mission + 关联 article，让 IM 出稿在「任务中心」可见
       // （与 PC mission 并列）。尽力而为：任何失败都不影响出稿/回卡。
-      // sourceEntityId=articleId 让 missions_source_dedup_uidx 对 inngest 重试天然去重。
+      // sourceEntityId=articleId：对"同一篇稿件重复落 mission"去重（防同一事件重复投递）。
+      // 注意：inngest 步骤重试会因 archive_to_drafts(dedupBySourceUrl:false) 重建 articleId
+      // 而产生新稿+新 mission——这是 content-loop 单 step.run 设计的既有性质，非本处保证。
       try {
         const { getOrProvisionLeader } = await import("@/app/actions/missions");
         const leader = await getOrProvisionLeader(data.organizationId);
@@ -411,7 +413,9 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
           await db
             .update(articles)
             .set({ missionId: mission.id })
-            .where(eq(articles.id, articleId));
+            .where(
+              and(eq(articles.id, articleId), eq(articles.organizationId, data.organizationId)),
+            );
           await db.insert(missionArtifacts).values({
             missionId: mission.id,
             producedBy: leader.id,
