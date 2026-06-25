@@ -280,6 +280,8 @@ export function InputSuggestions({ items, onPick }: { items: InputSuggestion[]; 
 
 # M3 · 稿件卡内联快速编辑
 
+> **⚠️ 实施期修正（2026-06-25）**：原计划用 `/api/ai/edit` 流式编辑卡片「预览文本」再 `adoptDraftEdit` 回写——但 `DraftResultMeta` 对已入库稿件**只存 200 字 `bodyPreview`、不存完整 body**（`draft-result-card.tsx:14`），编辑预览再回写会用 200 字截断**覆盖整篇文章（数据丢失）**。改为：**三键「润色/改写/扩写」= 预设指令直接调现有 `reviseDraftInConversation(conversationId, articleId, instruction)`**（`cowork-content-creation.ts:118`）——它在服务端对**完整文章**改写、append 一条带新 `bodyPreview` 的 draft 卡、`revalidatePath` 自动刷新（与现有「说一句改一版」同机制）。**故 Task 3.1（use-card-ai-edit hook）与 Task 3.2（adoptDraftEdit/updateMessageMeta）取消，M3 仅保留 Task 3.3（DraftResultCard 加三键）。** 代价：无逐字流式，改稿期显示「改稿中…」loading。
+
 ### Task 3.1: use-card-ai-edit 流式 hook（TDD 流解析）
 
 **Files:**

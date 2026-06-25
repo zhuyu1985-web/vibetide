@@ -2,10 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Sparkles, PenLine, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GlassCard } from "@/components/shared/glass-card";
 import { reviseDraftInConversation } from "@/app/actions/cowork-content-creation";
+
+/** 内联快速改稿的预设指令（走完整文章 reviseDraftInConversation，避免预览截断覆盖整篇）。 */
+const QUICK_EDITS = [
+  { key: "polish", label: "AI 润色", Icon: Sparkles, instruction: "整体润色这篇稿件，提升表达与流畅度，保持事实、口径与结构不变" },
+  { key: "rewrite", label: "AI 改写", Icon: PenLine, instruction: "整体改写得更精炼、更有新闻性，保持事实与核心信息不变" },
+  { key: "expand", label: "AI 扩写", Icon: Plus, instruction: "在保持事实前提下适当扩写，补充必要的背景、细节与数据支撑" },
+] as const;
 
 /**
  * draft_result 消息的瘦身 meta 契约：
@@ -43,16 +51,20 @@ export function DraftResultCard({
   // 仅当确实能内联展开时才补省略号；归档/截断路径无“展开全文”，靠「打开编辑器精修」，不挂悬空的 …
   const truncated = canExpand && !expanded;
 
-  const onRevise = async () => {
-    if (!meta.articleId || !instruction.trim() || revising) return;
+  const [runningKey, setRunningKey] = useState<string | null>(null);
+  const runRevise = async (text: string, key: string) => {
+    if (!meta.articleId || !text.trim() || revising) return;
     setRevising(true);
+    setRunningKey(key);
     try {
-      await reviseDraftInConversation(conversationId, meta.articleId, instruction.trim());
-      setInstruction("");
+      await reviseDraftInConversation(conversationId, meta.articleId, text.trim());
+      if (key === "free") setInstruction("");
     } finally {
       setRevising(false);
+      setRunningKey(null);
     }
   };
+  const onRevise = () => runRevise(instruction, "free");
 
   return (
     <GlassCard className="max-w-md space-y-2 p-4">
@@ -87,6 +99,23 @@ export function DraftResultCard({
           </Button>
         )}
       </div>
+      {/* 一键快速改稿：预设指令走完整文章 reviseDraftInConversation（不截断整篇） */}
+      {meta.articleId && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {QUICK_EDITS.map((q) => (
+            <Button
+              key={q.key}
+              variant="secondary"
+              size="sm"
+              disabled={revising}
+              onClick={() => void runRevise(q.instruction, q.key)}
+            >
+              <q.Icon className="size-3.5" />
+              {runningKey === q.key ? "改稿中…" : q.label}
+            </Button>
+          ))}
+        </div>
+      )}
       {/* 说一句改一版：仅在稿件已入库（有 articleId 可改写）时出现 */}
       {meta.articleId && (
         <div className="flex gap-2 pt-1">
