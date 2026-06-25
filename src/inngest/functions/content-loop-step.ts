@@ -326,6 +326,13 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       return;
     }
     const { content, wordCount } = gen.result as { content: string; wordCount: number };
+    // content_generate 失败时返回 "[生成失败] ..." 哨兵串（ok:true，不抛错）。不拦截会把
+    // 哨兵串当正文落库 + 推一张假"初稿"卡（与 cowork confirmCreationPlan 的 C1 同类）。
+    if (!content?.trim() || wordCount === 0 || content.startsWith("[生成失败]")) {
+      const reason = content?.replace(/^\[生成失败\]\s*/, "") || "生成内容为空";
+      await pushCard(data.channelCtx, "初稿", `写稿失败：${reason}，请说「重写」再试。`);
+      return;
+    }
     const title = deriveTitle(content, angle.label);
 
     const arch = await invokeToolDirectly(

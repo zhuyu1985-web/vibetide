@@ -57,3 +57,21 @@ describe("terminal failure（retries 用尽）→ fetch_topics 仍卡 hot_list �
     expect(updateSessionMock).not.toHaveBeenCalled();
   });
 });
+
+describe("gen_draft：content_generate 失败哨兵 → 不落库", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    updateSessionMock.mockReset();
+    getSessionMock.mockResolvedValue({
+      id: "s1", organizationId: "o1", scenarioPhase: "drafting",
+      loopContext: { selectedTopic: { title: "热点A" }, selectedAngle: { idx: 1, label: "视角" } },
+    });
+  });
+
+  it("返回 '[生成失败] …' 哨兵 → 不调 archive_to_drafts（只调一次 content_generate）", async () => {
+    invokeMock.mockResolvedValue({ ok: true, result: { content: "[生成失败] 模型超时", wordCount: 0 } });
+    await runContentLoopStep(failData("gen_draft"));
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledWith("content_generate", expect.anything(), expect.anything());
+  });
+});
