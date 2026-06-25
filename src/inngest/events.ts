@@ -573,6 +573,12 @@ export type InngestEvents = {
       assigneeName?: string;
       /** publish：选定的渠道编号集合（空=全部） */
       selectedIdx?: number[];
+      /**
+       * 当前用户消息携带的钉钉 sessionWebhook，用于本步异步回执统一走 @ 的 app 机器人身份。
+       * 空/缺省时回落到 config 自定义机器人。每条用户消息有全新的 sessionWebhook，
+       * 故只用于"本步"那一次回执（见 content-loop-step.ts pushCard 的回落逻辑）。
+       */
+      replyWebhook?: string;
     };
   };
 };

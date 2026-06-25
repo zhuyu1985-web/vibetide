@@ -60,7 +60,7 @@ async function dispatchStep(
   step: LoopStep,
   session: ChannelSessionRow,
   channelCtx: ContentLoopChannelCtx,
-  externalMessageId: string,
+  msg: StandardizedMessage,
   extra?: {
     instruction?: string;
     targetLang?: string;
@@ -72,12 +72,14 @@ async function dispatchStep(
 ): Promise<void> {
   await inngest.send({
     name: "content-loop/step.requested",
-    id: `cl:${step}:${session.id}:${externalMessageId}`,
+    id: `cl:${step}:${session.id}:${msg.externalMessageId}`,
     data: {
       organizationId: session.organizationId,
       sessionId: session.id,
       step,
       channelCtx,
+      // 把"本条用户消息"的 sessionWebhook 透传给本步异步回执，统一用 @ 的 app 机器人身份回卡。
+      replyWebhook: msg.replyWebhook,
       ...extra,
     },
   });
@@ -162,7 +164,7 @@ export async function startContentLoop(
     lastArticleId: null,
     expiresAt: loopTtl(),
   });
-  await dispatchStep("fetch_topics", session, channelCtx, msg.externalMessageId);
+  await dispatchStep("fetch_topics", session, channelCtx, msg);
   return { reply: "🔍 正在获取今天的热点，稍候…" };
 }
 
@@ -189,7 +191,7 @@ export async function handleContentLoopMessage(
   switch (session.scenarioPhase) {
     case "hot_list": {
       if (isRegenerate(text)) {
-        await dispatchStep("fetch_topics", session, channelCtx, msg.externalMessageId);
+        await dispatchStep("fetch_topics", session, channelCtx, msg);
         return { reply: "🔄 重新获取今日热点中…" };
       }
       const cands = ctx.topicCandidates ?? [];
@@ -208,7 +210,7 @@ export async function handleContentLoopMessage(
           };
         }
         // 候选为空但未到上限：主动重抓一次（自愈丢失的 fetch_topics 事件），而不是干等
-        await dispatchStep("fetch_topics", session, channelCtx, msg.externalMessageId);
+        await dispatchStep("fetch_topics", session, channelCtx, msg);
         return { reply: "🔄 正在重新获取今日热点，稍候…" };
       }
       const sel = parseSelection(text, cands.length);
@@ -230,13 +232,13 @@ export async function handleContentLoopMessage(
         },
         expiresAt: loopTtl(),
       });
-      await dispatchStep("gen_angles", session, channelCtx, msg.externalMessageId);
+      await dispatchStep("gen_angles", session, channelCtx, msg);
       return { reply: `已选「${chosen.title}」，✍️ 正在生成 3 个不同视角的选题…` };
     }
 
     case "topic_select": {
       if (isRegenerate(text)) {
-        await dispatchStep("gen_angles", session, channelCtx, msg.externalMessageId);
+        await dispatchStep("gen_angles", session, channelCtx, msg);
         return { reply: "🔄 重新生成 3 个视角选题中…" };
       }
       const angles = ctx.angleOptions ?? [];
@@ -259,13 +261,13 @@ export async function handleContentLoopMessage(
         },
         expiresAt: loopTtl(),
       });
-      await dispatchStep("gen_draft", session, channelCtx, msg.externalMessageId);
+      await dispatchStep("gen_draft", session, channelCtx, msg);
       return { reply: `已选视角「${chosen.label}」，📝 正在写 1000 字初稿…` };
     }
 
     case "drafting": {
       if (isRegenerate(text)) {
-        await dispatchStep("gen_draft", session, channelCtx, msg.externalMessageId);
+        await dispatchStep("gen_draft", session, channelCtx, msg);
         return { reply: "🔄 正在重写初稿…" };
       }
       if (isTranslateIntent(text)) {
@@ -275,7 +277,7 @@ export async function handleContentLoopMessage(
           loopContext: { ...ctx, targetLanguage: lang },
           expiresAt: loopTtl(),
         });
-        await dispatchStep("translate", session, channelCtx, msg.externalMessageId, {
+        await dispatchStep("translate", session, channelCtx, msg, {
           targetLang: lang.code,
           targetLangLabel: lang.label,
         });
@@ -291,7 +293,7 @@ export async function handleContentLoopMessage(
         };
       }
       // 其余自由文本 = 改稿指令
-      await dispatchStep("revise", session, channelCtx, msg.externalMessageId, {
+      await dispatchStep("revise", session, channelCtx, msg, {
         instruction: text,
       });
       return { reply: "✏️ 正在按你的要求改稿，稍候…" };
@@ -300,7 +302,7 @@ export async function handleContentLoopMessage(
     case "translating": {
       const lang = ctx.targetLanguage ?? { code: "en", label: "英文" };
       if (isRegenerate(text)) {
-        await dispatchStep("translate", session, channelCtx, msg.externalMessageId, {
+        await dispatchStep("translate", session, channelCtx, msg, {
           targetLang: lang.code,
           targetLangLabel: lang.label,
         });
@@ -312,7 +314,7 @@ export async function handleContentLoopMessage(
           loopContext: { ...ctx, targetLanguage: next },
           expiresAt: loopTtl(),
         });
-        await dispatchStep("translate", session, channelCtx, msg.externalMessageId, {
+        await dispatchStep("translate", session, channelCtx, msg, {
           targetLang: next.code,
           targetLangLabel: next.label,
         });
@@ -325,7 +327,7 @@ export async function handleContentLoopMessage(
         return { reply: "✅ 外文也定了。说「提交审核」送审，或继续提修改要求。" };
       }
       // 其余自由文本 = 改外文稿指令
-      await dispatchStep("revise", session, channelCtx, msg.externalMessageId, {
+      await dispatchStep("revise", session, channelCtx, msg, {
         instruction: text,
       });
       return { reply: `✏️ 正在按你的要求修改${lang.label}稿，稍候…` };
@@ -361,7 +363,7 @@ export async function handleContentLoopMessage(
         return { reply: `只有 ${cands.length} 位候选，请说 1~${cands.length}。` };
       }
       const chosen = cands[sel - 1];
-      await dispatchStep("submit_review", session, channelCtx, msg.externalMessageId, {
+      await dispatchStep("submit_review", session, channelCtx, msg, {
         assigneeUserId: chosen.userId,
         assigneeName: chosen.name,
       });
@@ -405,7 +407,7 @@ export async function handleContentLoopMessage(
       if (chosen.length === 0) {
         return { reply: `编号超出范围，请从 1~${allIdx.length} 选，或说「都发」。` };
       }
-      await dispatchStep("publish", session, channelCtx, msg.externalMessageId, {
+      await dispatchStep("publish", session, channelCtx, msg, {
         selectedIdx: chosen,
       });
       return { reply: "🚀 正在发布，稍候…" };
@@ -413,7 +415,7 @@ export async function handleContentLoopMessage(
 
     case "analytics": {
       if (isAnalyzeIntent(text)) {
-        await dispatchStep("analyze", session, channelCtx, msg.externalMessageId);
+        await dispatchStep("analyze", session, channelCtx, msg);
         return { reply: "📊 正在统计这篇的传播数据，稍候…" };
       }
       return { reply: "说「查这篇传播数据」看复盘，或「退出」结束本次闭环。" };

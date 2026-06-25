@@ -4,6 +4,7 @@ import { generateText } from "ai";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { articles } from "@/db/schema/articles";
+import { missions, missionArtifacts } from "@/db/schema/missions";
 import { externalPublications } from "@/db/schema/external-publications";
 import { publishArticleToCms, CmsConfigError } from "@/lib/cms";
 import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
@@ -11,6 +12,7 @@ import { reviseDraft, splitTitleBody, deriveTitle } from "@/lib/content/revise";
 import { invokeToolDirectly } from "@/lib/agent/tool-registry";
 import { getChannelConfig } from "@/lib/dal/channels";
 import { sendChannelMessage } from "@/lib/channels/outbound";
+import { postToSessionWebhook } from "@/lib/channels/session-webhook";
 import {
   getSessionById,
   updateSession,
@@ -44,12 +46,25 @@ function loopTtl(): Date {
   return new Date(Date.now() + CONTENT_LOOP_TTL_MS);
 }
 
-/** 主动推卡片回 IM（两端通用，照抄 AIGC handler 的回执范式）。失败不抛。 */
+/**
+ * 主动推卡片回 IM。失败不抛。
+ *
+ * 机器人身份统一：优先用「当前用户消息」携带的钉钉 sessionWebhook 回执，
+ * 这样卡片来自被 @ 的 app 机器人（与同步 ack 同一身份），避免双机器人混淆。
+ * sessionWebhook 缺省/过期/POST 失败时回落到 config 自定义机器人（真正延迟很久的
+ * 推送——如几小时后的审核结果、webhook 已过期的传播复盘——走这条兜底，可接受）。
+ */
 async function pushCard(
   channelCtx: ChannelCtx,
   title: string,
   content: string,
+  replyWebhook?: string,
 ): Promise<void> {
+  if (replyWebhook) {
+    const r = await postToSessionWebhook(replyWebhook, { type: "markdown", title, content });
+    if (r.ok) return; // 已用 @ 的 app 机器人身份送达
+    // 失败/过期 → 回落到 config 自定义机器人
+  }
   try {
     const config = await getChannelConfig(channelCtx.configId);
     if (config) {
@@ -258,6 +273,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
         data.channelCtx,
         "热点",
         `获取热点失败：${r.error}\n回复「获取今天的热点」可重试。`,
+        data.replyWebhook,
       );
       return;
     }
@@ -270,7 +286,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
         scenarioPhase: "idle",
         loopContext: { ...ctx, topicCandidates: undefined, hotlistWaitCount: 0 },
       });
-      await pushCard(data.channelCtx, "热点", "没抓到热点，回复「获取今天的热点」可重试。");
+      await pushCard(data.channelCtx, "热点", "没抓到热点，回复「获取今天的热点」可重试。", data.replyWebhook);
       return;
     }
     const candidates = topics.map((t, i) => ({
@@ -283,26 +299,26 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       loopContext: { ...ctx, topicCandidates: candidates, hotlistWaitCount: 0 },
       expiresAt: loopTtl(),
     });
-    await pushCard(data.channelCtx, "今日热点", renderHotListCard(candidates));
+    await pushCard(data.channelCtx, "今日热点", renderHotListCard(candidates), data.replyWebhook);
     return;
   }
 
   if (data.step === "gen_angles") {
     const topic = ctx.selectedTopic?.title;
     if (!topic) {
-      await pushCard(data.channelCtx, "选题", "没找到选定的热点，请重新「获取今天的热点」。");
+      await pushCard(data.channelCtx, "选题", "没找到选定的热点，请重新「获取今天的热点」。", data.replyWebhook);
       return;
     }
     const angles = await generateAngles(topic);
     if (angles.length === 0) {
-      await pushCard(data.channelCtx, "选题", "生成选题失败，请说「换一批」重试。");
+      await pushCard(data.channelCtx, "选题", "生成选题失败，请说「换一批」重试。", data.replyWebhook);
       return;
     }
     await updateSession(session.id, {
       loopContext: { ...ctx, angleOptions: angles },
       expiresAt: loopTtl(),
     });
-    await pushCard(data.channelCtx, "3 个视角选题", renderAngleCard(topic, angles));
+    await pushCard(data.channelCtx, "3 个视角选题", renderAngleCard(topic, angles), data.replyWebhook);
     return;
   }
 
@@ -310,7 +326,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     const topic = ctx.selectedTopic?.title;
     const angle = ctx.selectedAngle;
     if (!topic || !angle) {
-      await pushCard(data.channelCtx, "初稿", "缺少选题或视角，请重新选。");
+      await pushCard(data.channelCtx, "初稿", "缺少选题或视角，请重新选。", data.replyWebhook);
       return;
     }
     const outline =
@@ -322,7 +338,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       { organizationId: data.organizationId },
     );
     if (!gen.ok) {
-      await pushCard(data.channelCtx, "初稿", `写稿失败：${gen.error}`);
+      await pushCard(data.channelCtx, "初稿", `写稿失败：${gen.error}`, data.replyWebhook);
       return;
     }
     const { content, wordCount } = gen.result as { content: string; wordCount: number };
@@ -330,7 +346,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     // 哨兵串当正文落库 + 推一张假"初稿"卡（与 cowork confirmCreationPlan 的 C1 同类）。
     if (!content?.trim() || wordCount === 0 || content.startsWith("[生成失败]")) {
       const reason = content?.replace(/^\[生成失败\]\s*/, "") || "生成内容为空";
-      await pushCard(data.channelCtx, "初稿", `写稿失败：${reason}，请说「重写」再试。`);
+      await pushCard(data.channelCtx, "初稿", `写稿失败：${reason}，请说「重写」再试。`, data.replyWebhook);
       return;
     }
     const title = deriveTitle(content, angle.label);
@@ -368,6 +384,46 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
         wordCount: wordCount ?? content.length,
         changeKind: "initial",
       }).catch((err) => console.error("[content-loop] 初稿版本留痕失败:", err));
+
+      // 建一条轻量 completed mission + 关联 article，让 IM 出稿在「任务中心」可见
+      // （与 PC mission 并列）。尽力而为：任何失败都不影响出稿/回卡。
+      // sourceEntityId=articleId 让 missions_source_dedup_uidx 对 inngest 重试天然去重。
+      try {
+        const { getOrProvisionLeader } = await import("@/app/actions/missions");
+        const leader = await getOrProvisionLeader(data.organizationId);
+        const [mission] = await db
+          .insert(missions)
+          .values({
+            organizationId: data.organizationId,
+            title,
+            scenario: "custom",
+            userInstruction: `钉钉内容闭环：${topic}`,
+            leaderEmployeeId: leader.id,
+            status: "completed",
+            teamMembers: [leader.id],
+            sourceModule: "dingtalk_im",
+            sourceEntityId: articleId,
+            completedAt: new Date(),
+          })
+          .onConflictDoNothing()
+          .returning({ id: missions.id });
+        if (mission?.id) {
+          await db
+            .update(articles)
+            .set({ missionId: mission.id })
+            .where(eq(articles.id, articleId));
+          await db.insert(missionArtifacts).values({
+            missionId: mission.id,
+            producedBy: leader.id,
+            type: "article_draft", // mission 详情页按此 type 渲染长文阅读样式
+            title,
+            content,
+            metadata: { articleId, language: "zh" },
+          });
+        }
+      } catch (err) {
+        console.error("[content-loop] 建轻量任务记录失败（不影响出稿）:", err);
+      }
     }
     await updateSession(session.id, {
       lastArticleId: articleId,
@@ -378,6 +434,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       data.channelCtx,
       "初稿",
       renderDraftCard(title, wordCount ?? content.length, content),
+      data.replyWebhook,
     );
     return;
   }
@@ -385,14 +442,14 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
   if (data.step === "revise") {
     const articleId = session.lastArticleId;
     if (!articleId) {
-      await pushCard(data.channelCtx, "改稿", "没有可改的稿件，请先生成初稿。");
+      await pushCard(data.channelCtx, "改稿", "没有可改的稿件，请先生成初稿。", data.replyWebhook);
       return;
     }
     const article = await db.query.articles.findFirst({
       where: and(eq(articles.id, articleId), eq(articles.organizationId, data.organizationId)),
     });
     if (!article) {
-      await pushCard(data.channelCtx, "改稿", "找不到稿件，请重新发起。");
+      await pushCard(data.channelCtx, "改稿", "找不到稿件，请重新发起。", data.replyWebhook);
       return;
     }
     const instruction = (data.instruction ?? "").trim();
@@ -403,7 +460,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       article.language,
     );
     if (!revised) {
-      await pushCard(data.channelCtx, "改稿", "改稿失败，请重说一次修改要求。");
+      await pushCard(data.channelCtx, "改稿", "改稿失败，请重说一次修改要求。", data.replyWebhook);
       return;
     }
     const newVersion = (article.version ?? 1) + 1;
@@ -433,6 +490,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       data.channelCtx,
       `改稿${langTag}`,
       renderDraftCard(revised.title, revised.body.length, revised.body),
+      data.replyWebhook,
     );
     return;
   }
@@ -441,21 +499,21 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     // 始终从中文母稿转写（避免在 translating 阶段对 en 稿再翻译）
     const srcId = ctx.draftArticleId ?? session.lastArticleId;
     if (!srcId) {
-      await pushCard(data.channelCtx, "转写", "没有可转写的稿件，请先生成初稿。");
+      await pushCard(data.channelCtx, "转写", "没有可转写的稿件，请先生成初稿。", data.replyWebhook);
       return;
     }
     const src = await db.query.articles.findFirst({
       where: and(eq(articles.id, srcId), eq(articles.organizationId, data.organizationId)),
     });
     if (!src) {
-      await pushCard(data.channelCtx, "转写", "找不到母稿，请重新发起。");
+      await pushCard(data.channelCtx, "转写", "找不到母稿，请重新发起。", data.replyWebhook);
       return;
     }
     const langCode = data.targetLang ?? "en";
     const langLabel = data.targetLangLabel ?? "英文";
     const out = await translateDraft(src.body ?? "", src.title, langLabel);
     if (!out) {
-      await pushCard(data.channelCtx, "转写", "转写失败，请说「重新翻译」重试。");
+      await pushCard(data.channelCtx, "转写", "转写失败，请说「重新翻译」重试。", data.replyWebhook);
       return;
     }
     const [created] = await db
@@ -493,6 +551,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       data.channelCtx,
       `${langLabel}版`,
       renderDraftCard(out.title, out.body.length, out.body),
+      data.replyWebhook,
     );
     return;
   }
@@ -501,14 +560,14 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     const articleId = session.lastArticleId;
     const assigneeUserId = data.assigneeUserId;
     if (!articleId || !assigneeUserId) {
-      await pushCard(data.channelCtx, "提交审核", "提交失败，缺少稿件或审核人，请重试。");
+      await pushCard(data.channelCtx, "提交审核", "提交失败，缺少稿件或审核人，请重试。", data.replyWebhook);
       return;
     }
     const article = await db.query.articles.findFirst({
       where: and(eq(articles.id, articleId), eq(articles.organizationId, data.organizationId)),
     });
     if (!article) {
-      await pushCard(data.channelCtx, "提交审核", "找不到稿件，请重新发起。");
+      await pushCard(data.channelCtx, "提交审核", "找不到稿件，请重新发起。", data.replyWebhook);
       return;
     }
     const imThread: ReviewImThread = {
@@ -542,6 +601,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       data.channelCtx,
       "提交审核",
       `✅ 已提交给「${data.assigneeName ?? "审核人"}」审核，结果出来第一时间通知你。`,
+      data.replyWebhook,
     );
     return;
   }
@@ -549,7 +609,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
   if (data.step === "publish") {
     const dist = ctx.pendingDistribution;
     if (!dist) {
-      await pushCard(data.channelCtx, "发布", "没有发布目标，请重新说「发布」。");
+      await pushCard(data.channelCtx, "发布", "没有发布目标，请重新说「发布」。", data.replyWebhook);
       return;
     }
     const selected = new Set(data.selectedIdx ?? []);
@@ -558,7 +618,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     // 国内发中文母稿，海外发英文译稿（若有）
     const zhId = ctx.draftArticleId ?? session.lastArticleId;
     if (!zhId) {
-      await pushCard(data.channelCtx, "发布", "找不到稿件，请重新发起。");
+      await pushCard(data.channelCtx, "发布", "找不到稿件，请重新发起。", data.replyWebhook);
       return;
     }
 
@@ -593,14 +653,14 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       loopContext: { ...ctx, pendingDistribution: undefined },
       expiresAt: loopTtl(),
     });
-    await pushCard(data.channelCtx, "发布", renderPublishReceiptCard(results));
+    await pushCard(data.channelCtx, "发布", renderPublishReceiptCard(results), data.replyWebhook);
     return;
   }
 
   if (data.step === "analyze") {
     const articleId = ctx.draftArticleId ?? session.lastArticleId;
     if (!articleId) {
-      await pushCard(data.channelCtx, "传播复盘", "找不到稿件，无法复盘。");
+      await pushCard(data.channelCtx, "传播复盘", "找不到稿件，无法复盘。", data.replyWebhook);
       return;
     }
     const article = await db.query.articles.findFirst({
@@ -615,6 +675,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
       data.channelCtx,
       "传播复盘",
       renderSpreadCard(article?.title ?? "稿件", spread, insight, syncedAt),
+      data.replyWebhook,
     );
     return;
   }
@@ -645,7 +706,7 @@ export async function handleContentLoopStepFailure(data: StepData): Promise<void
       await updateSession(data.sessionId, { scenarioPhase: "idle" });
     }
   }
-  await pushCard(data.channelCtx, "内容闭环", "❌ 处理失败，请重试，或说「退出」结束。");
+  await pushCard(data.channelCtx, "内容闭环", "❌ 处理失败，请重试，或说「退出」结束。", data.replyWebhook);
 }
 
 /** 终态失败回执 —— 订阅 inngest/function.failed，仅认领本函数失败。 */
