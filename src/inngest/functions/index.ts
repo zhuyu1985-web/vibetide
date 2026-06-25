@@ -57,6 +57,8 @@ import { topicCompareBackfill } from "./topic-compare/backfill";
 import { topicCompareFindMatchesOnNew } from "./topic-compare/find-matches-on-new-mypost";
 import { missedTopicDetectionDaily } from "./topic-compare/missed-topic-cron";
 import { channelLinkIngest, channelLinkIngestFailureHandler } from "./channel-link-ingest";
+import { channelVoiceIngest, channelVoiceIngestFailureHandler } from "./channel-voice-ingest";
+import { contentLoopStep, contentLoopStepFailureHandler } from "./content-loop-step";
 import { channelMissionTerminalNotify } from "./channel-mission-terminal-notify";
 import { aigcIllustrate } from "./aigc-illustrate";
 import { aigcVideo } from "./aigc-video";
@@ -141,6 +143,10 @@ export const functions = [
   // Channel inbound link ingest (2026-06-19)
   channelLinkIngest,
   channelLinkIngestFailureHandler,
+  channelVoiceIngest,
+  channelVoiceIngestFailureHandler,
+  contentLoopStep,
+  contentLoopStepFailureHandler,
   // Channel mission terminal notify (2026-06-21) — 终态→反查 session→回执
   channelMissionTerminalNotify,
   // AIGC Illustrate (2026-06-22) — IM 机器人配图：出图 → TOS 转存 → 写回 articles.coverImageUrl

@@ -516,6 +516,65 @@ export type InngestEvents = {
       replyWebhook: string;
     };
   };
+
+  // ─── Channel Inbound Voice Ingest (2026-06-23) ───
+  /** 钉钉/企微入站语音消息 → 下载媒体 → ASR 转文本 → 当文字喂 gateway。webhook 派发，channelVoiceIngest 消费 */
+  "channel/voice-ingest.requested": {
+    data: {
+      organizationId: string;
+      configId: string;
+      platform: "dingtalk" | "wechat_work";
+      externalMessageId: string;
+      externalUserId: string;
+      chatId: string;
+      /** 钉钉 sessionWebhook，用于回执；空串=无（企微走主动推送 sendChannelMessage） */
+      replyWebhook: string;
+      /** 媒体定位：钉钉优先 downloadCode，企微用 mediaId */
+      media: {
+        downloadCode?: string;
+        mediaId?: string;
+        format: string;
+        durationMs?: number;
+      };
+      /** 平台自带转写（钉钉 audio.recognition），命中则免下载+ASR；空=无 */
+      inlineTranscript: string;
+    };
+  };
+
+  // ─── Content Loop Step (2026-06-24) ───
+  /** 语音内容生产闭环的单步重活（抓热点/出选题/写初稿）。orchestrator 派发，contentLoopStep 消费 */
+  "content-loop/step.requested": {
+    data: {
+      organizationId: string;
+      sessionId: string;
+      step:
+        | "fetch_topics"
+        | "gen_angles"
+        | "gen_draft"
+        | "revise"
+        | "translate"
+        | "submit_review"
+        | "publish"
+        | "analyze";
+      channelCtx: {
+        organizationId: string;
+        configId: string;
+        platform: "dingtalk" | "wechat_work";
+        chatId: string;
+        externalUserId: string;
+      };
+      /** revise / translate：用户的修改要求原文 */
+      instruction?: string;
+      /** translate：目标语种 code（en/ja…）+ 展示名 */
+      targetLang?: string;
+      targetLangLabel?: string;
+      /** submit_review：选定的真人审核人 */
+      assigneeUserId?: string;
+      assigneeName?: string;
+      /** publish：选定的渠道编号集合（空=全部） */
+      selectedIdx?: number[];
+    };
+  };
 };
 
 /** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */

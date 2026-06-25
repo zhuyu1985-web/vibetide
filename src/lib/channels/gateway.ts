@@ -26,6 +26,8 @@ import { isVideoIntent, isPodcastIntent } from "./aigc-intent";
 import { resolveCatalogByName, listAllActiveCmsCatalogs } from "@/lib/dal/cms-catalogs";
 import { getArticleById } from "@/lib/dal/articles";
 import { handlePublishConfirm } from "./publish-followup";
+import { handleContentLoopMessage, startContentLoop } from "./content-loop/orchestrator";
+import { isHotTopicIntent } from "./content-loop/intents";
 import type { IntentStep } from "@/lib/agent/types";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
@@ -44,6 +46,9 @@ export interface StandardizedMessage {
   textContent: string;       // plain text content
   rawMessage: unknown;       // original platform payload for debugging
   replyWebhook?: string;     // 钉钉 sessionWebhook（异步回执用）
+  source?: "text" | "voice"; // 默认 text；voice 表示由语音 ASR 转写而来
+  transcript?: { confidence: number; durationMs?: number }; // 仅 voice
+  skipRecord?: boolean;      // voice 路径已在 Inngest 落库，跳过 gateway 内重复记录
 }
 
 // ---------------------------------------------------------------------------
@@ -103,20 +108,23 @@ export async function handleInboundMessage(msg: StandardizedMessage): Promise<{
   missionId?: string;
 }> {
   // 1. Persist the inbound message (fire-and-forget, do not block reply)
-  recordInboundMessage({
-    organizationId: msg.organizationId,
-    configId: msg.configId,
-    platform: msg.platform,
-    externalMessageId: msg.externalMessageId || undefined,
-    externalUserId: msg.externalUserId || undefined,
-    chatId: msg.chatId || undefined,
-    content: {
-      text: msg.textContent,
-      raw: msg.rawMessage,
-    },
-  }).catch((err) =>
-    console.error("[gateway] recordInboundMessage failed:", err)
-  );
+  //    voice 路径已在 channelVoiceIngest 落库（带原音URL+置信度），此处跳过避免重复
+  if (!msg.skipRecord) {
+    recordInboundMessage({
+      organizationId: msg.organizationId,
+      configId: msg.configId,
+      platform: msg.platform,
+      externalMessageId: msg.externalMessageId || undefined,
+      externalUserId: msg.externalUserId || undefined,
+      chatId: msg.chatId || undefined,
+      content: {
+        text: msg.textContent,
+        raw: msg.rawMessage,
+      },
+    }).catch((err) =>
+      console.error("[gateway] recordInboundMessage failed:", err)
+    );
+  }
 
   const text = msg.textContent.trim();
   if (!text) {
@@ -280,6 +288,15 @@ async function handleFreeFormMessage(
 
   if (session.status === "confirming") {
     return handleConfirmingMessage(text, msg, session, channelCtx);
+  }
+
+  // 内容生产闭环：阶段感知路由（先于所有 idle 意图分支，避免被发布/AIGC 抢占）
+  if (session.scenarioPhase && session.scenarioPhase !== "idle") {
+    return handleContentLoopMessage(text, msg, session, channelCtx);
+  }
+  // idle 态「获取今天的热点」→ 进入闭环
+  if (isHotTopicIntent(text)) {
+    return startContentLoop(msg, session, channelCtx);
   }
 
   // 发布意图（idle 态）：先于 clarifyOrPlan 拦截

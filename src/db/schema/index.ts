@@ -9,6 +9,7 @@ export * from "./knowledge-bases";
 export * from "./categories";
 export * from "./media-assets";
 export * from "./articles";
+export * from "./article-versions";
 export * from "./asset-intelligence";
 export * from "./knowledge-graph";
 export * from "./channel-advisors";

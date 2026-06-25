@@ -1,5 +1,6 @@
 import { handleInboundMessage } from "./gateway";
 import { postToSessionWebhook } from "./session-webhook";
+import { inngest } from "@/inngest/client";
 
 /**
  * 钉钉 Stream 推下来的机器人消息（只声明我们用到的字段，比 SDK 的 RobotTextMessage
@@ -13,6 +14,12 @@ export interface IncomingRobotMessage {
   conversationId?: string;
   sessionWebhook?: string;
   text?: { content?: string };
+  audio?: {
+    duration?: string | number;
+    downloadCode?: string;
+    mediaId?: string;
+    recognition?: string;
+  };
 }
 
 export interface StreamRouteContext {
@@ -31,12 +38,46 @@ export async function handleStreamRobotMessage(
   msg: IncomingRobotMessage,
   ctx: StreamRouteContext,
 ): Promise<void> {
-  // 非文本消息：若有会话地址，回执提示
+  // 语音消息：派异步事件（下载→ASR→喂 gateway），同步回"正在听写"
+  if (msg.msgtype === "audio") {
+    const audio = msg.audio ?? {};
+    const msgId = msg.msgId || `dt_stream_${msg.conversationId ?? "unknown"}`;
+    await inngest.send({
+      id: `voice:${msgId}`,
+      name: "channel/voice-ingest.requested",
+      data: {
+        organizationId: ctx.organizationId,
+        configId: ctx.configId,
+        platform: "dingtalk",
+        externalMessageId: msgId,
+        externalUserId: msg.senderStaffId || msg.senderNick || "unknown",
+        chatId: msg.conversationId || "unknown",
+        replyWebhook: msg.sessionWebhook ?? "",
+        media: {
+          downloadCode: audio.downloadCode ?? "",
+          mediaId: audio.mediaId ?? "",
+          format: "amr",
+          durationMs: Number(audio.duration ?? 0),
+        },
+        inlineTranscript:
+          typeof audio.recognition === "string" ? audio.recognition.trim() : "",
+      },
+    });
+    if (msg.sessionWebhook) {
+      await postToSessionWebhook(msg.sessionWebhook, {
+        type: "text",
+        content: "🎧 收到语音，正在听写…",
+      });
+    }
+    return;
+  }
+
+  // 其余非文本消息：若有会话地址，回执提示
   if (msg.msgtype !== "text") {
     if (msg.sessionWebhook) {
       await postToSessionWebhook(msg.sessionWebhook, {
         type: "text",
-        content: "暂不支持此类型的消息，请发送文字消息。",
+        content: "暂不支持此类型的消息，请发送文字或语音消息。",
       });
     }
     return;

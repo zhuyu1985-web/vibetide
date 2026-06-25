@@ -15,6 +15,11 @@ import {
   parseExplicitTimeRange,
   resolveWebSearchTimeRange,
 } from "@/lib/chat/search-params";
+import { getPendingReviewForAssignee } from "@/lib/dal/review-results";
+import {
+  detectReviewDecision,
+  resolveAndNotify,
+} from "@/lib/channels/content-loop/review-followup";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -116,6 +121,51 @@ export async function POST(req: Request) {
     const orgId = profile?.organizationId;
     if (!orgId) {
       return new Response("Organization not found", { status: 403 });
+    }
+
+    // ── 内容闭环：审核人对话式审核短路（先于 LLM）──
+    // 当前用户若有待审任务，且消息是"通过/驳回" → 直接落库 + 回链作者，
+    // 流式回一句确认，不走正常 LLM 步骤。复用 SSE 事件 shape，不改客户端契约。
+    const reviewDecision = detectReviewDecision(message);
+    if (reviewDecision) {
+      const pending = await getPendingReviewForAssignee(user.id, orgId);
+      if (pending) {
+        const outcome = await resolveAndNotify(
+          pending.id,
+          reviewDecision.decision,
+          reviewDecision.reason,
+          message,
+        );
+        const confirm = outcome.ok
+          ? reviewDecision.decision === "approved"
+            ? `✅ 已通过《${outcome.articleTitle}》，已通知作者可以发布。`
+            : `已驳回《${outcome.articleTitle}》${outcome.reason ? "：" + outcome.reason : ""}，已退回作者修改。`
+          : "没有找到待审核的稿件。";
+        const enc = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            const send = (event: string, data: Record<string, unknown>) =>
+              controller.enqueue(
+                enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+              );
+            send("text-delta", { text: confirm });
+            send("done", {
+              sources: [],
+              referenceCount: 0,
+              skillsUsed: [],
+              finishReason: "stop",
+            });
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
     }
 
     // Resolve employee DB IDs for all steps

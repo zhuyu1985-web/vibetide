@@ -6,6 +6,7 @@ import {
   encryptWechatMessage,
 } from "@/lib/channels/signature";
 import { handleInboundMessage } from "@/lib/channels/gateway";
+import { inngest } from "@/inngest/client";
 
 /**
  * Extract a tag value from simple XML (no external dep).
@@ -157,6 +158,44 @@ export async function POST(
     const textContent = getXmlTag(plaintextXml, "Content") ?? "";
     const msgId = getXmlTag(plaintextXml, "MsgId") ?? `wx_${Date.now()}`;
     const agentId = getXmlTag(plaintextXml, "AgentID") ?? "";
+
+    // 语音消息：同步回"正在听写"（被动回复一次） + 派异步事件，结果走主动推送
+    if (msgType === "voice") {
+      const mediaId = getXmlTag(plaintextXml, "MediaId") ?? "";
+      const format = (getXmlTag(plaintextXml, "Format") ?? "amr").toLowerCase();
+      await inngest.send({
+        id: `voice:${msgId}`,
+        name: "channel/voice-ingest.requested",
+        data: {
+          organizationId: config.organizationId,
+          configId: config.id,
+          platform: "wechat_work",
+          externalMessageId: msgId,
+          externalUserId: fromUser,
+          chatId: agentId || fromUser,
+          replyWebhook: "", // 企微无 sessionWebhook，结果走 sendChannelMessage 主动推送
+          media: { downloadCode: "", mediaId, format, durationMs: 0 },
+          inlineTranscript: "",
+        },
+      });
+      const ackPlaintext = buildReplyPlaintext(
+        toUser,
+        fromUser,
+        "🎧 收到语音，正在听写…",
+      );
+      const ack = encryptWechatMessage(
+        ackPlaintext,
+        config.token,
+        config.encodingAesKey,
+        receiveId,
+        timestamp,
+        nonce,
+      );
+      return new NextResponse(
+        buildEncryptedEnvelope(ack.encrypt, ack.signature, timestamp, nonce),
+        { headers: { "Content-Type": "application/xml" } },
+      );
+    }
 
     if (msgType !== "text" || !textContent.trim()) {
       // Reply politely for unsupported message types
