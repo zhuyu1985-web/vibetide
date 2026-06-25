@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Sparkles, PenLine, Plus } from "lucide-react";
+import { Sparkles, PenLine, Plus, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GlassCard } from "@/components/shared/glass-card";
 import { reviseDraftInConversation } from "@/app/actions/cowork-content-creation";
+import { startMultiVersion } from "@/app/actions/cowork-cards";
 
 /** 内联快速改稿的预设指令（走完整文章 reviseDraftInConversation，避免预览截断覆盖整篇）。 */
 const QUICK_EDITS = [
@@ -66,6 +67,15 @@ export function DraftResultCard({
   };
   const onRevise = () => runRevise(instruction, "free");
 
+  const [multiPending, startMulti] = useTransition();
+  const onMultiVersion = () => {
+    if (!meta.articleId) return;
+    const articleId = meta.articleId;
+    startMulti(async () => {
+      await startMultiVersion(conversationId, articleId);
+    });
+  };
+
   return (
     <GlassCard className="max-w-md space-y-2 p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
@@ -96,6 +106,16 @@ export function DraftResultCard({
         {meta.articleId && (
           <Button asChild>
             <Link href={`/articles/${meta.articleId}`}>📝 打开编辑器精修</Link>
+          </Button>
+        )}
+        {meta.articleId && (
+          <Button
+            variant="secondary"
+            disabled={multiPending}
+            onClick={onMultiVersion}
+          >
+            <Layers className="size-3.5" />
+            {multiPending ? "准备中…" : "多版本"}
           </Button>
         )}
       </div>

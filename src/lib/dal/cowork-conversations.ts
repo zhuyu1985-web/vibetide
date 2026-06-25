@@ -22,7 +22,12 @@ export interface CreateConversationInput {
 export interface AppendMessageInput {
   role: "user" | "assistant" | "system";
   content?: string;
-  kind?: "text" | "mission_card" | "plan_card" | "draft_result";
+  kind?:
+    | "text"
+    | "mission_card"
+    | "plan_card"
+    | "draft_result"
+    | "multi_version_card";
   /** 这条消息承载的 mission(mission_card 用) */
   missionId?: string | null;
   /** 产出这条的员工(替代旧 employeeSlug) */
