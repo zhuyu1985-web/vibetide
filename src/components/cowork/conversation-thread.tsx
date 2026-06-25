@@ -26,6 +26,7 @@ import {
   DraftResultCard,
   type DraftResultMeta,
 } from "@/components/cowork/draft-result-card";
+import { IntentChip, readIntentFromMeta } from "@/components/cowork/intent-chip";
 import type { CreationPlan } from "@/lib/cowork/creation-plan-types";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
 import type { MessageFeedback } from "@/app/actions/cowork-conversations";
@@ -277,10 +278,15 @@ function MessageBubble({
     );
   }
 
+  // 意图识别 chip：所有 assistant 分支顶部展示（旧消息无 meta.intent 则为 null）
+  const intentMeta = readIntentFromMeta(message.meta);
+  const intentChip = intentMeta ? <IntentChip intent={intentMeta} /> : null;
+
   if (message.kind === "mission_card" && message.missionId) {
     const missionId = message.missionId;
     return (
       <div className="space-y-2">
+        {intentChip}
         <div className="flex justify-start">
           <button
             type="button"
@@ -323,7 +329,8 @@ function MessageBubble({
     const plan = (message.meta as { plan?: CreationPlan } | null)?.plan;
     if (!plan) return null;
     return (
-      <div className="flex justify-start">
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
         <CreationPlanForm conversationId={message.conversationId} plan={plan} />
       </div>
     );
@@ -333,7 +340,8 @@ function MessageBubble({
     const meta = message.meta as DraftResultMeta | null;
     if (!meta) return null;
     return (
-      <div className="flex justify-start">
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
         <DraftResultCard meta={meta} conversationId={message.conversationId} />
       </div>
     );
@@ -342,6 +350,7 @@ function MessageBubble({
   // assistant text —— hover 时在气泡下方露出操作工具栏
   return (
     <div className="group flex flex-col items-start gap-1">
+      {intentChip}
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
         {message.content}
       </div>

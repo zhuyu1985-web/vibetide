@@ -69,7 +69,7 @@ export async function submitCoworkMessage(
         ? `已读到今天的热点，帮你拟了份创作计划，确认或改一改 👇`
         : `帮你拟了份创作计划，填一下选题再开始 👇`,
       kind: "plan_card",
-      meta: { plan },
+      meta: { plan, intent },
     });
     revalidatePath(`/cowork/${conversationId}`);
     return { ok: true, kind: "plan" };
@@ -99,7 +99,7 @@ export async function submitCoworkMessage(
       content: intent.summary || "已为你启动任务",
       kind: "mission_card",
       missionId: res.missionId,
-      meta: { intentSummary: intent.summary, confidence: intent.confidence },
+      meta: { intentSummary: intent.summary, confidence: intent.confidence, intent },
     });
     revalidatePath(`/cowork/${conversationId}`);
     return {
@@ -135,6 +135,7 @@ export async function submitCoworkMessage(
     role: "assistant",
     content: reply,
     kind: "text",
+    meta: { intent },
   });
   revalidatePath(`/cowork/${conversationId}`);
   return { ok: true, kind: "chat", reply };
