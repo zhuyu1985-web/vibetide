@@ -365,6 +365,13 @@
       "when": 1782353009336,
       "tag": "0051_flat_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1782492719456,
+      "tag": "0052_supreme_silver_fox",
+      "breakpoints": true
     }
   ]
 }

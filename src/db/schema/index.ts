@@ -111,6 +111,9 @@ export * from "./domains";
 
 // IM ChatOps → Mission (2026-06-19) — channel_sessions 澄清/执行状态机
 export * from "./channel-sessions";
+
+// 外部能力接入 (2026-06-27, M1) — MCP-http 服务器配置
+export * from "./mcp-servers";
 // app-channels schema removed 2026-04-23 (CMS 推送目标改为 article-mapper 硬编码)
 
 // NOTE: `employee_scenarios` schema + table fully removed 2026-04-20
