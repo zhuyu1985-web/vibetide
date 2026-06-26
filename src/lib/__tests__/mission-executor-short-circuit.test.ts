@@ -10,6 +10,7 @@ import {
   shouldForceInjectWorkflowTool,
   shouldUseStrictToolEnforcement,
   shouldShortCircuitForCancel,
+  extractShortCircuitArtifacts,
 } from "../mission-executor";
 
 describe("renderStepParameters", () => {
@@ -416,5 +417,67 @@ describe("buildImplicitTrendingTopicsParams", () => {
       mode: "hot",
       limit: 20,
     });
+  });
+});
+
+describe("extractShortCircuitArtifacts", () => {
+  it("从 cross_language_rewrite 的 articles[].body 每篇产出 article_draft", () => {
+    const arts = extractShortCircuitArtifacts(
+      {
+        articles: [
+          { title: "Chengdu Skewers", body: "A long english body about chengdu food..." },
+          { title_en: "Cat Cafe", body_en: "Another english body about a cat cafe in beijing..." },
+        ],
+      },
+      "深读+翻译改写",
+    );
+    expect(arts).toHaveLength(2);
+    expect(arts[0]).toMatchObject({ type: "article_draft", title: "Chengdu Skewers" });
+    expect(arts[1].title).toBe("Cat Cafe");
+    expect(arts[1].content).toContain("cat cafe");
+  });
+
+  it("无 title 时回退到任务标题", () => {
+    const arts = extractShortCircuitArtifacts(
+      { articles: [{ body: "some sufficiently long body content here" }] },
+      "翻译改写",
+    );
+    expect(arts[0].title).toBe("翻译改写");
+  });
+
+  it("单篇 {title, body}（无 articles[]）产出一个产物", () => {
+    const arts = extractShortCircuitArtifacts(
+      { title: "一篇稿件", body: "这是一篇足够长的稿件正文内容用于测试。" },
+      "撰稿",
+    );
+    expect(arts).toHaveLength(1);
+    expect(arts[0]).toMatchObject({ type: "article_draft", title: "一篇稿件" });
+  });
+
+  it("纯列表/无正文（trending 列表 / classifier 仅 summary）不产出产物", () => {
+    expect(
+      extractShortCircuitArtifacts(
+        { topics: [{ id: "t1", title: "热点1" }, { id: "t2", title: "热点2" }] },
+        "拉取热榜",
+      ),
+    ).toEqual([]);
+    expect(
+      extractShortCircuitArtifacts(
+        { articles: [{ title: "x", summary: "只有摘要没正文" }] },
+        "分类过滤",
+      ),
+    ).toEqual([]);
+  });
+
+  it("body 过短（<10 字符）跳过", () => {
+    expect(
+      extractShortCircuitArtifacts({ articles: [{ title: "x", body: "短" }] }, "t"),
+    ).toEqual([]);
+  });
+
+  it("空/非对象输入安全返回空数组", () => {
+    expect(extractShortCircuitArtifacts(null, "t")).toEqual([]);
+    expect(extractShortCircuitArtifacts(undefined, "t")).toEqual([]);
+    expect(extractShortCircuitArtifacts({}, "t")).toEqual([]);
   });
 });
