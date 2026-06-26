@@ -4,7 +4,6 @@ import { generateText } from "ai";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { articles } from "@/db/schema/articles";
-import { missions, missionArtifacts } from "@/db/schema/missions";
 import { externalPublications } from "@/db/schema/external-publications";
 import { publishArticleToCms, CmsConfigError } from "@/lib/cms";
 import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
@@ -384,50 +383,9 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
         wordCount: wordCount ?? content.length,
         changeKind: "initial",
       }).catch((err) => console.error("[content-loop] 初稿版本留痕失败:", err));
-
-      // 建一条轻量 completed mission + 关联 article，让 IM 出稿在「任务中心」可见
-      // （与 PC mission 并列）。尽力而为：任何失败都不影响出稿/回卡。
-      // sourceEntityId=articleId：对"同一篇稿件重复落 mission"去重（防同一事件重复投递）。
-      // 注意：inngest 步骤重试会因 archive_to_drafts(dedupBySourceUrl:false) 重建 articleId
-      // 而产生新稿+新 mission——这是 content-loop 单 step.run 设计的既有性质，非本处保证。
-      try {
-        const { getOrProvisionLeader } = await import("@/app/actions/missions");
-        const leader = await getOrProvisionLeader(data.organizationId);
-        const [mission] = await db
-          .insert(missions)
-          .values({
-            organizationId: data.organizationId,
-            title,
-            scenario: "custom",
-            userInstruction: `钉钉内容闭环：${topic}`,
-            leaderEmployeeId: leader.id,
-            status: "completed",
-            teamMembers: [leader.id],
-            sourceModule: "dingtalk_im",
-            sourceEntityId: articleId,
-            completedAt: new Date(),
-          })
-          .onConflictDoNothing()
-          .returning({ id: missions.id });
-        if (mission?.id) {
-          await db
-            .update(articles)
-            .set({ missionId: mission.id })
-            .where(
-              and(eq(articles.id, articleId), eq(articles.organizationId, data.organizationId)),
-            );
-          await db.insert(missionArtifacts).values({
-            missionId: mission.id,
-            producedBy: leader.id,
-            type: "article_draft", // mission 详情页按此 type 渲染长文阅读样式
-            title,
-            content,
-            metadata: { articleId, language: "zh" },
-          });
-        }
-      } catch (err) {
-        console.error("[content-loop] 建轻量任务记录失败（不影响出稿）:", err);
-      }
+      // IM 出稿与 PC 计划卡一致：只落稿件库草稿（articles），不建 mission。
+      // 任务中心是给多步 AI 团队 mission 用的；IM「热点→稿件」的真实归宿是稿件库。
+      // 「统一内容产出视图」是独立需求，后续单独做（展示草稿，而非伪造 mission）。
     }
     await updateSession(session.id, {
       lastArticleId: articleId,

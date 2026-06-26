@@ -118,57 +118,21 @@ beforeEach(() => {
   });
 });
 
-describe("Fix ①：gen_draft 出稿 → 建轻量 completed mission + 关联 article", () => {
-  it("成功落稿 → insert(missions) + 回写 article.missionId + insert(missionArtifacts)", async () => {
-    const { artifactValuesMock, setMock } = wireDb("m1");
+// 注：原 Fix ①（IM 出稿建轻量 mission）已按根因撤掉——IM 出稿与 PC 一致，只落稿件库草稿、
+// 不建 mission。相关 mission 断言一并删除；下方 gen_draft 出稿后只验回执身份（Fix ②）。
+// 出稿成功仍会落库+更新 session，故保留 db/leader 等 mock 防真实加载。
 
-    await runContentLoopStep(genDraftData());
-
-    expect(getLeaderMock).toHaveBeenCalledWith("o1");
-    // mission 行用 completed + dingtalk_im 来源 + articleId 去重键
-    expect(insertMock).toHaveBeenCalledWith(MISSIONS_TBL);
-    // article.missionId 被回写
-    expect(setMock).toHaveBeenCalledWith({ missionId: "m1" });
-    // 轻量 article_draft artifact 落库
-    expect(insertMock).toHaveBeenCalledWith(ARTIFACTS_TBL);
-    expect(artifactValuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        missionId: "m1",
-        producedBy: "leader1",
-        type: "article_draft",
-        title: expect.any(String),
-        metadata: expect.objectContaining({ articleId: "art1", language: "zh" }),
-      }),
-    );
-  });
-
-  it("onConflictDoNothing 命中（returning []）→ 不回写 article、不建 artifact", async () => {
-    const { artifactValuesMock, setMock } = wireDb(null); // mission returning 空
-    await runContentLoopStep(genDraftData());
-    expect(insertMock).toHaveBeenCalledWith(MISSIONS_TBL);
-    expect(setMock).not.toHaveBeenCalled(); // 没有 article 回写
-    expect(artifactValuesMock).not.toHaveBeenCalled(); // 没有 artifact
-  });
-
-  it("建档抛错 → 不阻断出稿（不 throw，仍推初稿卡 + 更新 session）", async () => {
-    insertMock.mockImplementation(() => { throw new Error("db down"); });
-    getLeaderMock.mockRejectedValue(new Error("leader fail"));
-
-    await expect(runContentLoopStep(genDraftData("wh"))).resolves.toBeUndefined();
-
-    expect(postWebhookMock).toHaveBeenCalledWith(
-      "wh",
-      expect.objectContaining({ title: "初稿", type: "markdown" }),
-    );
-    expect(updateSessionMock).toHaveBeenCalledWith(
-      "s1",
-      expect.objectContaining({ lastArticleId: "art1" }),
-    );
-  });
-});
-
-describe("Fix ②：pushCard 机器人身份统一 —— sessionWebhook 优先 / 回落 config", () => {
+describe("出稿回执身份统一 —— sessionWebhook 优先 / 回落 config", () => {
   beforeEach(() => { wireDb("m1"); });
+
+  it("出稿不再建 mission（不调 getOrProvisionLeader、不 insert missions）", async () => {
+    await runContentLoopStep(genDraftData("session-wh"));
+    expect(getLeaderMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalledWith(MISSIONS_TBL);
+    // 但稿子照常落库（archive_to_drafts）+ 版本留痕 + 更新 session
+    expect(appendVersionMock).toHaveBeenCalled();
+    expect(updateSessionMock).toHaveBeenCalledWith("s1", expect.objectContaining({ lastArticleId: "art1" }));
+  });
 
   it("replyWebhook 存在且 POST 成功 → 走 postToSessionWebhook，不碰 sendChannelMessage", async () => {
     postWebhookMock.mockResolvedValue({ ok: true });

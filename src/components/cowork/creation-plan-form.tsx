@@ -68,7 +68,7 @@ export function CreationPlanForm({
             value={plan.topic.title}
             onValueChange={(v) => set("topic", { ...plan.topic, title: v })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="选一个热点" />
             </SelectTrigger>
             <SelectContent>
@@ -186,7 +186,7 @@ function ChipRow<T extends string | number>({
         <Button
           key={String(o)}
           size="sm"
-          variant={o === value ? "default" : "ghost"}
+          variant={o === value ? "secondary" : "ghost"}
           onClick={() => onPick(o)}
         >
           {label(o)}
