@@ -445,7 +445,9 @@ async function genOne(platform: string) {
 
 # M5 · 深度编辑器右侧嵌入（最重 · 设 checkpoint）
 
-> **🛑 CHECKPOINT：** 完成 Task 5.1–5.3（编辑器改造为可嵌入并能在隔离容器渲染+保存）后**停下来**，向用户/审阅确认嵌入可行、不破坏整页编辑器，再做 Task 5.4 接入 cowork。若 5.2 store 隔离受阻 → 走兜底（spec §5：精简编辑容器 / 新标签开整页）。
+> **⚠️ 实施期修正（2026-06-26）—— 跳过 Task 5.2 store 工厂化**：原计划担心单例 Zustand store 在嵌入时与整页编辑器冲突，要把 store 工厂化（动 15 处 import）。实测确认：**cowork 与 `/articles/[id]` 是不同路由，永不同时挂载两个编辑器**；cowork Sheet 内只有一个编辑器实例，整页用时 Sheet 不存在。故**单例 store 对单实例嵌入本就安全，无需工厂化重构**（避免动 15 处 import 的高风险面）。改为：① Sheet 关闭时 Radix 卸载内容、重开时 ArticleDetailClient/ArticleEditor 重新挂载（内容刷新）；② 开 Sheet 时在 effect 里重置 store 瞬态（editorInstance/handlers/selectedText）+ mount effect 用 `initialViewMode` 设视图。整页非嵌入路径逻辑完全保留（新行为全 gated 在 `embedded`/`initialViewMode`，整页时 undefined 不生效）。
+
+> **🛑 CHECKPOINT：** Task 5.1/5.3/5.4 完成、tsc+build 绿后，由用户在浏览器验证：① cowork「打开编辑器精修 / 多版本查看」在**右侧 Sheet** 内打开三栏编辑器（不全屏跳）；② 整页编辑器 `/articles/[id]` **不回归**。有问题就地修，受阻则走兜底（spec §5：精简编辑容器 / 新标签开整页）。
 
 ### Task 5.1: getArticleDetailBundle 数据包装 action
 

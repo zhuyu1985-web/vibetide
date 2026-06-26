@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   Loader2,
   Sparkles,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/shared/glass-card";
+import { ArticleEditorSheet } from "@/components/cowork/article-editor-sheet";
 import {
   listVariantsAction,
   generateVariantAction,
@@ -49,6 +49,7 @@ export function MultiVersionCard({
   const [localStatus, setLocalStatus] = useState<
     Record<string, PlatformStatus>
   >({});
+  const [editorOpen, setEditorOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -137,8 +138,12 @@ export function MultiVersionCard({
               <span className="ml-auto flex flex-none items-center gap-1.5">
                 <StatusBadge status={st} />
                 {st === "ready" && (
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href={`/articles/${articleId}`}>查看</Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditorOpen(true)}
+                  >
+                    查看
                   </Button>
                 )}
                 {st === "failed" && (
@@ -167,6 +172,11 @@ export function MultiVersionCard({
       {anyFailed && (
         <p className="text-xs text-destructive">部分平台生成失败，可单独重试。</p>
       )}
+      <ArticleEditorSheet
+        articleId={articleId}
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+      />
     </GlassCard>
   );
 }

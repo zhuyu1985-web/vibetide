@@ -46,6 +46,9 @@ export default function ArticleDetailClient({
   initialAIAnalysis,
   articleLanguage,
   externalPublications,
+  embedded = false,
+  onExitEditor,
+  initialViewMode,
 }: ArticleDetailClientProps) {
   const {
     viewMode,
@@ -99,6 +102,15 @@ export default function ArticleDetailClient({
     }
   }, [searchParams]);
 
+  // 嵌入模式（cowork Sheet）：用 initialViewMode 设初始视图（整页走 ?mode=edit，嵌入无此参数）。
+  // 每次 Sheet 重新挂载（按 articleId key）都会跑一次，顺带把上一篇残留的视图重置。
+  useEffect(() => {
+    if (initialViewMode) {
+      useArticlePageStore.getState().setViewMode(initialViewMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Track scroll progress in center pane
   useEffect(() => {
     const el = centerRef.current;
@@ -135,7 +147,12 @@ export default function ArticleDetailClient({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
+    <div
+      className={cn(
+        "flex flex-col overflow-hidden",
+        embedded ? "h-full" : "h-[calc(100vh-64px)]",
+      )}
+    >
       {/* Reading progress bar */}
       <div className="h-0.5 bg-muted">
         <div
@@ -231,7 +248,11 @@ export default function ArticleDetailClient({
             <ArticleEditor
               article={article}
               appearance={appearance}
-              onExitEdit={() => setViewMode("read")}
+              onExitEdit={
+                embedded && onExitEditor
+                  ? onExitEditor
+                  : () => setViewMode("read")
+              }
             />
           ) : activeView === "preview" ||
             activeView === "immersive" ||
