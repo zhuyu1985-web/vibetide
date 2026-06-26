@@ -34,6 +34,7 @@ vi.mock("@/lib/dal/channel-sessions", () => ({
   getOrCreateSession,
   updateSession,
   resetSession,
+  CONTENT_LOOP_TTL_MS: 604800000,
 }));
 vi.mock("@/lib/channels/clarify-or-plan", () => ({ clarifyOrPlan }));
 vi.mock("@/lib/channels/start-channel-mission", () => ({ startChannelMission }));
@@ -129,6 +130,19 @@ describe("gateway 自由消息澄清循环", () => {
     expect(startChannelMission).not.toHaveBeenCalled();
     expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "confirming" }));
     expect(r.reply).toContain("开始");
+  });
+
+  it("drafting 阶段发「获取最新热点」→ 重启热点线，不被当成改稿吞掉（hoist isHotTopicIntent）", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", scenarioPhase: "drafting",
+      loopContext: { selectedTopic: { title: "旧" } }, contextTurns: [], clarifyRounds: 0, lastArticleId: "a1",
+    });
+    const r = await handleInboundMessage({ ...msg, textContent: "获取当前最新的热点" });
+    // startContentLoop 的回执（"🔍 正在获取今天的热点…"），而不是 drafting 的"改稿"
+    expect(r.reply).toContain("获取今天的热点");
+    expect(r.reply).not.toContain("改稿");
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ scenarioPhase: "hot_list" }));
+    expect(inngestSend).toHaveBeenCalled(); // 派了 fetch_topics
   });
 
   it("confirming + 开始 → 起 mission，running，清 pendingPlan", async () => {

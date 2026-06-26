@@ -311,13 +311,17 @@ async function handleFreeFormMessage(
     };
   }
 
+  // 「获取热点」= 任何阶段（hot_list 除外，那里由 case hot_list 的 isRegenerate 处理重抓）
+  // 都可重启热点线。必须 hoist 到阶段锁之前——否则 drafting/translating 等阶段会把
+  // 「获取最新热点」当成改稿指令吞掉（答非所问）。草稿一直在稿件库，重启不丢稿；
+  // 「回到上一篇」等完整暂存/澄清能力在 IM Phase 1 正式做。
+  if (isHotTopicIntent(text) && session.scenarioPhase !== "hot_list") {
+    return startContentLoop(msg, session, channelCtx);
+  }
+
   // 内容生产闭环：阶段感知路由（先于所有 idle 意图分支，避免被发布/AIGC 抢占）
   if (session.scenarioPhase && session.scenarioPhase !== "idle") {
     return handleContentLoopMessage(text, msg, session, channelCtx);
-  }
-  // idle 态「获取今天的热点」→ 进入闭环
-  if (isHotTopicIntent(text)) {
-    return startContentLoop(msg, session, channelCtx);
   }
 
   // 发布意图（idle 态）：先于 clarifyOrPlan 拦截
