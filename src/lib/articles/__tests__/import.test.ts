@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { fetchViaJinaReader } = vi.hoisted(() => ({ fetchViaJinaReader: vi.fn() }));
 vi.mock("@/lib/web-fetch", () => ({ fetchViaJinaReader }));
 
+const { detectVideoSource } = vi.hoisted(() => ({ detectVideoSource: vi.fn() }));
+vi.mock("@/lib/articles/video-source", () => ({ detectVideoSource }));
+
 const { findFirst, insertValues, insertReturning } = vi.hoisted(() => ({
   findFirst: vi.fn(),
   insertValues: vi.fn(),
@@ -27,10 +30,12 @@ beforeEach(() => {
   findFirst.mockReset();
   insertValues.mockReset();
   insertReturning.mockReset();
+  detectVideoSource.mockReset();
+  detectVideoSource.mockResolvedValue({ kind: "none" }); // 默认无视频
 });
 
 describe("fetchAndClassifyUrl", () => {
-  it("抓取正文 + 标题，P1 一律 mediaType=article", async () => {
+  it("无视频源 → mediaType=article", async () => {
     fetchViaJinaReader.mockResolvedValue({ title: "测试标题", content: "正文内容" });
     const r = await fetchAndClassifyUrl("https://news.example.com/x");
     expect(r.title).toBe("测试标题");
@@ -42,6 +47,19 @@ describe("fetchAndClassifyUrl", () => {
     fetchViaJinaReader.mockResolvedValue({ title: "   ", content: "正文" });
     const r = await fetchAndClassifyUrl("https://news.example.com/x");
     expect(r.title).toBe("news.example.com");
+  });
+
+  it("检出可下载视频源 → mediaType=video + videoSourceHint + 封面", async () => {
+    fetchViaJinaReader.mockResolvedValue({ title: "视频稿", content: "正文" });
+    detectVideoSource.mockResolvedValue({
+      kind: "direct",
+      videoUrl: "https://cdn/v.mp4",
+      thumbnailUrl: "https://cdn/cover.jpg",
+    });
+    const r = await fetchAndClassifyUrl("https://news.example.com/v");
+    expect(r.mediaType).toBe("video");
+    expect(r.videoSourceHint).toBe("https://cdn/v.mp4");
+    expect(r.coverImageUrl).toBe("https://cdn/cover.jpg");
   });
 });
 

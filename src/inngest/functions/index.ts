@@ -71,6 +71,10 @@ import {
   articleAiAnalyze,
   articleAiAnalyzeFailureHandler,
 } from "./article-ai-analyze";
+import {
+  articleVideoIngest,
+  articleVideoIngestFailureHandler,
+} from "./article-video-ingest";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -169,4 +173,7 @@ export const functions = [
   // 稿件结构化分析 (2026-06-26) — 入库后自动出 摘要/标签/分类/要点 写回字段
   articleAiAnalyze,
   articleAiAnalyzeFailureHandler,
+  // 视频稿下载素材库 (2026-06-26) — 解析视频源 → 下载 TOS → article_assets → 派听悟
+  articleVideoIngest,
+  articleVideoIngestFailureHandler,
 ];

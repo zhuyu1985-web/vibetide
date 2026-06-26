@@ -8,6 +8,7 @@ import {
   Clapperboard,
   ScrollText,
   XCircle,
+  CircleSlash,
   ArrowUpRight,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ export interface ImportCardMeta {
     | "ingested"
     | "analyzed"
     | "video_stored"
+    | "video_skipped"
     | "understood"
     | "failed";
   articleId?: string;
@@ -28,6 +30,7 @@ export interface ImportCardMeta {
   summary?: string;
   sourceUrl?: string;
   mediaType?: "article" | "video";
+  platform?: string;
   urls?: string[];
 }
 
@@ -39,6 +42,7 @@ const STAGE_STYLE: Record<
   ingested: { icon: CheckCircle2, tint: "text-emerald-500" },
   analyzed: { icon: Brain, tint: "text-primary" },
   video_stored: { icon: Clapperboard, tint: "text-violet-500" },
+  video_skipped: { icon: CircleSlash, tint: "text-amber-500" },
   understood: { icon: ScrollText, tint: "text-sky-500" },
   failed: { icon: XCircle, tint: "text-destructive" },
 };
@@ -51,7 +55,7 @@ export function ImportCard({
   meta: ImportCardMeta | null;
 }) {
   const stage = meta?.stage ?? "queued";
-  const { icon: Icon, tint, spin } = STAGE_STYLE[stage];
+  const { icon: Icon, tint, spin } = STAGE_STYLE[stage] ?? STAGE_STYLE.queued;
 
   return (
     <div className="flex max-w-[88%] flex-col gap-1.5 rounded-2xl rounded-bl-md bg-card px-3.5 py-2.5 shadow-sm ring-1 ring-inset ring-border/60">

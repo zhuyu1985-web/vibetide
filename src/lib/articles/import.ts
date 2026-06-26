@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { articles } from "@/db/schema";
 import { fetchViaJinaReader } from "@/lib/web-fetch";
+import { detectVideoSource } from "@/lib/articles/video-source";
 
 export type ArticleMediaType = "article" | "video";
 
@@ -41,13 +42,28 @@ export interface IngestArticleResult {
 }
 
 /**
- * 抓取 URL 正文并轻分类。
- * P1：一律判为 article；P3 在此接入 detectVideoSource 升级 mediaType/videoSourceHint/coverImageUrl。
+ * 抓取 URL 正文并分类。检出可下载/可处理视频源（direct/stream）→ 视频稿；否则图文稿。
  */
 export async function fetchAndClassifyUrl(url: string): Promise<ClassifiedContent> {
   const { title, content } = await fetchViaJinaReader(url);
   const safeTitle = title?.trim() || new URL(url).hostname;
-  return { title: safeTitle, body: content, mediaType: "article" };
+
+  const vs = await detectVideoSource(url);
+  if (vs.kind === "direct" || vs.kind === "stream") {
+    return {
+      title: safeTitle,
+      body: content,
+      mediaType: "video",
+      videoSourceHint: vs.videoUrl,
+      coverImageUrl: vs.thumbnailUrl,
+    };
+  }
+  return {
+    title: safeTitle,
+    body: content,
+    mediaType: "article",
+    coverImageUrl: vs.thumbnailUrl,
+  };
 }
 
 /**
