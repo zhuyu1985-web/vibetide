@@ -36,6 +36,9 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/openai": "^3.0.48",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@alicloud/openapi-util": "^0.3.3",
+    "@alicloud/tea-util": "^1.4.11",
     "@e965/xlsx": "^0.20.3",
     "@node-rs/argon2": "^2.0.2",
     "@shikijs/rehype": "^1",

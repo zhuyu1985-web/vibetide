@@ -75,6 +75,10 @@ import {
   articleVideoIngest,
   articleVideoIngestFailureHandler,
 } from "./article-video-ingest";
+import {
+  tingwuAnalyze,
+  tingwuAnalyzeFailureHandler,
+} from "./tingwu-analyze";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -176,4 +180,7 @@ export const functions = [
   // 视频稿下载素材库 (2026-06-26) — 解析视频源 → 下载 TOS → article_assets → 派听悟
   articleVideoIngest,
   articleVideoIngestFailureHandler,
+  // 通义听悟 (2026-06-26) — 提交视频 → 轮询 → 转写/关键词/章节写回 asset_segments/tags/articles
+  tingwuAnalyze,
+  tingwuAnalyzeFailureHandler,
 ];
