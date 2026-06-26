@@ -2128,6 +2128,86 @@ function createToolDefinitions(): ToolSet {
         };
       },
     }),
+
+    // ─── 新闻 URL 导入闭环 复用能力 (2026-06-26) ───
+    // 实现都在 lib/articles/* 与 lib/tingwu/*，这里只做薄暴露层供对话里 LLM 自主调用。
+    video_extract: tool({
+      description:
+        "从一个网页/视频链接抽取可下载的视频源（og:video / 直链 mp4 / 平台识别）。" +
+        "返回视频直链、封面、是否流媒体(m3u8)、识别到的平台。用于判断一条链接是否含视频、拿到视频地址。",
+      inputSchema: z.object({
+        url: z.string().describe("网页或视频页面 URL"),
+      }),
+      execute: async ({ url }) => {
+        try {
+          const { detectVideoSource } = await import("@/lib/articles/video-source");
+          const vs = await detectVideoSource(url);
+          return {
+            success: true,
+            kind: vs.kind,
+            videoUrl: vs.videoUrl,
+            thumbnailUrl: vs.thumbnailUrl,
+            platform: vs.platform,
+          };
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    }),
+    analyze_article: tool({
+      description:
+        "对一段稿件正文做结构化分析提炼：返回 摘要/分类/标签/核心要点。" +
+        "用于'帮我分析/提炼这篇文章'。只返回结果不写库。",
+      inputSchema: z.object({
+        title: z.string().describe("文章标题"),
+        body: z.string().describe("文章正文"),
+        categories: z.array(z.string()).optional().describe("候选分类名（可选）"),
+      }),
+      execute: async ({ title, body, categories }) => {
+        try {
+          const { analyzeArticleStructured } = await import("@/lib/articles/analyze");
+          const digest = await analyzeArticleStructured({ title, body, categories });
+          return { success: true, ...digest };
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    }),
+    tingwu_analyze: tool({
+      description:
+        "对一个素材库视频调用通义听悟做转写/摘要/章节理解。异步任务：仅触发并立即返回 jobId，" +
+        "完成后结果自动回填素材库与稿件，不阻塞对话。需素材已入库(assetId)且有公网可访问视频直链(publicUrl)。",
+      inputSchema: z.object({
+        assetId: z.string().describe("素材库视频 assetId"),
+        publicUrl: z.string().describe("视频的公网可访问直链"),
+        articleId: z.string().optional().describe("关联稿件 id（可选）"),
+        organizationId: z.string().optional(),
+      }),
+      execute: async ({ assetId, publicUrl, articleId, organizationId }) => {
+        try {
+          const { isTingwuEnabled } = await import("@/lib/tingwu/config");
+          if (!isTingwuEnabled()) {
+            return { success: false, error: "通义听悟未配置（VIDEO_ANALYSIS_PROVIDER + 阿里云凭证）" };
+          }
+          if (!organizationId) {
+            return { success: false, error: "缺少 organizationId（执行器未注入）" };
+          }
+          const { inngest } = await import("@/inngest/client");
+          await inngest.send({
+            name: "media/tingwu-analyze.requested",
+            data: { organizationId, assetId, articleId, publicUrl },
+          });
+          return {
+            success: true,
+            status: "submitted",
+            assetId,
+            message: "已提交通义听悟分析，完成后自动回填素材库与稿件",
+          };
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    }),
   };
 }
 
