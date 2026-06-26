@@ -1002,6 +1002,10 @@ export interface ArticleListItem {
   sourceName?: string;
   sourceUrl?: string;
   sourceIconUrl?: string;
+  // 内容来源（派生，见 lib/articles/content-source）：
+  // channel=钉钉/企微 IM 对话或收稿 | workflow=mission 工作流产出 | manual=手动新建
+  contentSource: "channel" | "workflow" | "manual";
+  channelPlatform?: "dingtalk" | "wechat_work";
   // 处理状态徽章
   aiAnalysisStatus?: "processing" | "done" | "failed";
   transcodingStatus?: "processing" | "done" | "failed";

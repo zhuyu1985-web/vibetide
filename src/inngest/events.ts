@@ -581,6 +581,46 @@ export type InngestEvents = {
       replyWebhook?: string;
     };
   };
+
+  // ─── 新闻 URL 导入闭环 (2026-06-26) ───
+  /** cowork 对话粘贴 URL → 抓取入库 articles → 派下游分析/视频。coworkLinkImport 消费 */
+  "cowork/link-import.requested": {
+    data: {
+      organizationId: string;
+      conversationId: string;
+      userId: string;
+      url: string;
+      sourceName: string;
+    };
+  };
+  /** 稿件入库后自动结构化分析（摘要/标签/分类/要点）。articleAiAnalyze 消费 */
+  "article/ai-analysis.requested": {
+    data: {
+      organizationId: string;
+      articleId: string;
+      conversationId?: string;
+    };
+  };
+  /** 视频稿 → 解析视频源 → 下载素材库。articleVideoIngest 消费 */
+  "article/video-ingest.requested": {
+    data: {
+      organizationId: string;
+      articleId: string;
+      conversationId?: string;
+      url: string;
+      videoSourceHint?: string;
+    };
+  };
+  /** 素材入库后 → 通义听悟转写/理解。tingwuAnalyze 消费 */
+  "media/tingwu-analyze.requested": {
+    data: {
+      organizationId: string;
+      assetId: string;
+      articleId?: string;
+      conversationId?: string;
+      publicUrl: string;
+    };
+  };
 };
 
 /** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */

@@ -63,6 +63,10 @@ import { channelMissionTerminalNotify } from "./channel-mission-terminal-notify"
 import { aigcIllustrate } from "./aigc-illustrate";
 import { aigcVideo } from "./aigc-video";
 import { aigcPodcast } from "./aigc-podcast";
+import {
+  coworkLinkImport,
+  coworkLinkImportFailureHandler,
+} from "./cowork-link-import";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -155,4 +159,7 @@ export const functions = [
   aigcVideo,
   // AIGC Podcast (2026-06-22) — IM 机器人播客：LLM 双主持脚本 → elevenlabs 多人对话合成 → TOS 转存 → 写回 article_assets
   aigcPodcast,
+  // 新闻 URL 导入闭环 (2026-06-26) — cowork 粘贴 URL → 抓取入库 articles → fan-out 分析/视频
+  coworkLinkImport,
+  coworkLinkImportFailureHandler,
 ];

@@ -149,20 +149,30 @@ export function renderPublishReceiptCard(
   ].join("\n");
 }
 
-/** 初稿预览卡（drafting 阶段）。 */
+/** 初稿预览卡（drafting 阶段）。
+ *
+ * IM 卡片只放前 220 字预览（钉钉能塞下全文，但 1000+ 字怼进卡片难读）；
+ * 全文与编辑回网页。传 articleUrl 时附「看全文」链接（NEXT_PUBLIC_SITE_URL 未配则不传）。
+ */
 export function renderDraftCard(
   title: string,
   wordCount: number,
   body: string,
+  articleUrl?: string,
 ): string {
   const preview = body.length > 220 ? `${body.slice(0, 220)}…` : body;
-  return [
-    `📄 初稿已生成（${wordCount} 字）`,
+  const lines = [
+    `📄 初稿已生成（${wordCount} 字，下方为前 220 字预览）`,
     "",
     `**${title}**`,
     "",
     preview,
     "",
-    "👉 多轮改稿 / 转外文 / 提交审核 将在后续阶段开放。说「重写」可重新生成。",
-  ].join("\n");
+  ];
+  if (articleUrl) {
+    lines.push(`📄 看全文 / 在网页编辑：${articleUrl}`, "");
+  }
+  // 改稿/转外文/提交审核在 drafting 阶段已可用（早期"后续开放"文案已过时）。
+  lines.push("👉 说修改要求可改稿；「转外文」做多语种；「提交审核」送审；「重写」重新生成。");
+  return lines.join("\n");
 }

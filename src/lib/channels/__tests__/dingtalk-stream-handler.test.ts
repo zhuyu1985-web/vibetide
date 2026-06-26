@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { handleInboundMessage, postToSessionWebhook } = vi.hoisted(() => ({
+const { handleInboundMessage, postToSessionWebhook, inngestSend } = vi.hoisted(() => ({
   handleInboundMessage: vi.fn(),
   postToSessionWebhook: vi.fn(),
+  inngestSend: vi.fn(),
 }));
 vi.mock("../gateway", () => ({ handleInboundMessage }));
 vi.mock("../session-webhook", () => ({ postToSessionWebhook }));
+vi.mock("@/inngest/client", () => ({ inngest: { send: inngestSend } }));
 
 import { handleStreamRobotMessage } from "../dingtalk-stream-handler";
 
@@ -14,6 +16,7 @@ const ctx = { organizationId: "org1", configId: "cfg1" };
 beforeEach(() => {
   handleInboundMessage.mockReset();
   postToSessionWebhook.mockReset();
+  inngestSend.mockReset();
 });
 
 describe("handleStreamRobotMessage", () => {
@@ -58,6 +61,45 @@ describe("handleStreamRobotMessage", () => {
       "https://oapi/s2",
       expect.objectContaining({ content: expect.stringContaining("暂不支持") }),
     );
+  });
+
+  it("语音消息：从 content 读 downloadCode/recognition，派 voice-ingest 事件 + 回「正在听写」", async () => {
+    await handleStreamRobotMessage(
+      {
+        msgtype: "audio",
+        msgId: "v1",
+        senderStaffId: "u1",
+        conversationId: "c1",
+        sessionWebhook: "https://oapi/sv",
+        content: { downloadCode: "DL123", recognition: "重写", duration: 1000 },
+      },
+      ctx,
+    );
+    expect(inngestSend).toHaveBeenCalledTimes(1);
+    const ev = inngestSend.mock.calls[0][0];
+    expect(ev.name).toBe("channel/voice-ingest.requested");
+    expect(ev.data.inlineTranscript).toBe("重写");
+    expect(ev.data.media.downloadCode).toBe("DL123");
+    expect(postToSessionWebhook).toHaveBeenCalledWith("https://oapi/sv", {
+      type: "text",
+      content: "🎧 收到语音，正在听写…",
+    });
+    expect(handleInboundMessage).not.toHaveBeenCalled();
+  });
+
+  it("语音消息无 recognition → inlineTranscript 空（走下载兜底），downloadCode 仍取到", async () => {
+    await handleStreamRobotMessage(
+      {
+        msgtype: "audio",
+        msgId: "v2",
+        sessionWebhook: "https://oapi/sv2",
+        content: { downloadCode: "DL2" },
+      },
+      ctx,
+    );
+    const ev = inngestSend.mock.calls[0][0];
+    expect(ev.data.inlineTranscript).toBe("");
+    expect(ev.data.media.downloadCode).toBe("DL2");
   });
 
   it("空文本 → 不调 gateway 也不回执", async () => {

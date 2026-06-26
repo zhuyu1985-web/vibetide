@@ -1871,6 +1871,17 @@ function createToolDefinitions(): ToolSet {
         operatorId: z.string().optional(),
         missionId: z.string().optional(),
         taskId: z.string().optional(),
+        // 渠道来源标记（钉钉/企微 IM 对话产出走此路落库时带上）。写入每篇
+        // metadata.ingestedFromChannel，供稿件库「来源」筛选区分 IM 产出 vs 工作流/手动。
+        ingestedFromChannel: z
+          .object({
+            platform: z.string(),
+            configId: z.string(),
+            chatId: z.string(),
+            externalUserId: z.string(),
+            externalMessageId: z.string().optional(),
+          })
+          .optional(),
       }),
       execute: async ({
         articles: items,
@@ -1881,6 +1892,7 @@ function createToolDefinitions(): ToolSet {
         operatorId,
         missionId,
         taskId,
+        ingestedFromChannel,
       }) => {
         // 上游 0 条:优雅返回,UI 显示"无可入库稿件",而不是失败。
         if (!items || items.length === 0) {
@@ -2048,6 +2060,10 @@ function createToolDefinitions(): ToolSet {
             organizationId,
             title: item.title,
             body: item.body,
+            // 历史 bug：此前漏写 wordCount → 全库稿件 word_count=0，稿件库看着像空稿
+            // （正文其实都在 body 里）。统一在工具层从 body 计算，一处修复所有调用方
+            // （content-loop / mission / 跨语言搬运）。中文「字数」即字符数，与初稿卡口径一致。
+            wordCount: item.body?.length ?? 0,
             summary: item.summary ?? null,
             sourceUrl: item.sourceUrl ?? null,
             missionId: missionId ?? null,
@@ -2063,7 +2079,9 @@ function createToolDefinitions(): ToolSet {
               category: item.category,
               culturalNotes: item.culturalNotes,
               workflowTaskId: taskId,
-              createdByWorkflow: true,
+              // 渠道产出（IM 对话）标 false：createdByWorkflow 语义是"多步 mission 产出"
+              createdByWorkflow: !ingestedFromChannel,
+              ...(ingestedFromChannel ? { ingestedFromChannel } : {}),
             },
           }).returning({ id: articles.id, title: articles.title });
 

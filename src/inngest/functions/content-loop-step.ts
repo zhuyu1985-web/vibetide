@@ -45,6 +45,13 @@ function loopTtl(): Date {
   return new Date(Date.now() + CONTENT_LOOP_TTL_MS);
 }
 
+/** 稿件网页地址（NEXT_PUBLIC_SITE_URL 未配 / 无 id 则返回 undefined，避免 IM 里出现无效链接）。 */
+function articleWebUrl(articleId: string | null | undefined): string | undefined {
+  const base = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!base || !articleId) return undefined;
+  return `${base.replace(/\/$/, "")}/articles/${articleId}`;
+}
+
 /**
  * 主动推卡片回 IM。失败不抛。
  *
@@ -364,6 +371,13 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
         initialStatus: "draft",
         dedupBySourceUrl: false,
         organizationId: data.organizationId,
+        // 标记 IM 来源，稿件库「来源」筛选据此区分钉钉/企微产出
+        ingestedFromChannel: {
+          platform: data.channelCtx.platform,
+          configId: data.channelCtx.configId,
+          chatId: data.channelCtx.chatId,
+          externalUserId: data.channelCtx.externalUserId,
+        },
       },
       { organizationId: data.organizationId },
     );
@@ -395,7 +409,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     await pushCard(
       data.channelCtx,
       "初稿",
-      renderDraftCard(title, wordCount ?? content.length, content),
+      renderDraftCard(title, wordCount ?? content.length, content, articleWebUrl(articleId)),
       data.replyWebhook,
     );
     return;
@@ -451,7 +465,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     await pushCard(
       data.channelCtx,
       `改稿${langTag}`,
-      renderDraftCard(revised.title, revised.body.length, revised.body),
+      renderDraftCard(revised.title, revised.body.length, revised.body, articleWebUrl(articleId)),
       data.replyWebhook,
     );
     return;
@@ -491,6 +505,16 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
         translatedFromArticleId: src.id,
         translatedFromTopicId: src.translatedFromTopicId,
         version: 1,
+        // 译稿同属 IM 产出，标渠道来源（与中文母稿一致）
+        metadata: {
+          language: langCode,
+          ingestedFromChannel: {
+            platform: data.channelCtx.platform,
+            configId: data.channelCtx.configId,
+            chatId: data.channelCtx.chatId,
+            externalUserId: data.channelCtx.externalUserId,
+          },
+        },
       })
       .returning({ id: articles.id });
     const translatedId = created.id;
@@ -512,7 +536,7 @@ export async function runContentLoopStep(data: StepData): Promise<void> {
     await pushCard(
       data.channelCtx,
       `${langLabel}版`,
-      renderDraftCard(out.title, out.body.length, out.body),
+      renderDraftCard(out.title, out.body.length, out.body, articleWebUrl(translatedId)),
       data.replyWebhook,
     );
     return;

@@ -107,6 +107,64 @@ describe("archive_to_drafts", () => {
     );
   });
 
+  it("入库写入 wordCount = body 字符数（修复历史 word_count=0）", async () => {
+    findFirstMock.mockResolvedValue(null);
+    insertMock.mockResolvedValueOnce([{ id: "a1", title: "T1" }]);
+    const body = "这是一篇有足够长度的正文，用于校验入库时正确写入字数。";
+    const res = await invokeToolDirectly(
+      "archive_to_drafts",
+      { articles: [{ title: "T1", body, language: "zh" }] },
+      { organizationId: "org1" },
+    );
+    expect(res.ok).toBe(true);
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ wordCount: body.length }),
+    );
+  });
+
+  it("带 ingestedFromChannel → 写 metadata.ingestedFromChannel 且 createdByWorkflow=false", async () => {
+    findFirstMock.mockResolvedValue(null);
+    insertMock.mockResolvedValueOnce([{ id: "a1", title: "T1" }]);
+    const res = await invokeToolDirectly(
+      "archive_to_drafts",
+      {
+        articles: [{ title: "T1", body: "Body with enough chars" }],
+        ingestedFromChannel: {
+          platform: "dingtalk",
+          configId: "cfg1",
+          chatId: "chat1",
+          externalUserId: "u1",
+        },
+      },
+      { organizationId: "org1" },
+    );
+    expect(res.ok).toBe(true);
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          ingestedFromChannel: expect.objectContaining({ platform: "dingtalk" }),
+          createdByWorkflow: false,
+        }),
+      }),
+    );
+  });
+
+  it("无渠道标记（普通 mission 入库）→ createdByWorkflow=true", async () => {
+    findFirstMock.mockResolvedValue(null);
+    insertMock.mockResolvedValueOnce([{ id: "a1", title: "T1" }]);
+    const res = await invokeToolDirectly(
+      "archive_to_drafts",
+      { articles: [{ title: "T1", body: "Body with enough chars" }] },
+      { organizationId: "org1" },
+    );
+    expect(res.ok).toBe(true);
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ createdByWorkflow: true }),
+      }),
+    );
+  });
+
   it("sourceUrl 已存在则 skip 不入库", async () => {
     findFirstMock
       .mockResolvedValueOnce({ id: "existing1", title: "Old" })

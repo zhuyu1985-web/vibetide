@@ -1,0 +1,641 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>北京时间 · 融媒工作台 — 记者外勤 App</title>
+<link rel="stylesheet" href="assets/brtv-design.css">
+<style>
+  html,body{height:100%;}
+  body{background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  #root{display:flex;align-items:center;justify-content:center;}
+
+  /* —— 缩放包裹 —— */
+  .scaler{transform-origin:center center;transition:transform .2s ease;}
+
+  /* —— App 内壳：填满 IosFrame content 区 —— */
+  .app{height:100%;display:flex;flex-direction:column;background:var(--paper);font-size:13px;}
+  .app-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+  .app-pad{padding:14px 14px 22px;}
+
+  /* —— 顶部应用条 —— */
+  .appbar{flex:none;padding:8px 14px 10px;background:linear-gradient(160deg,#fff,var(--paper));
+    display:flex;align-items:center;gap:10px;box-shadow:0 1px 0 var(--line);}
+  .appbar .id{display:flex;flex-direction:column;line-height:1.2;}
+  .appbar .id b{font-family:var(--serif);font-size:15px;}
+  .appbar .id small{font-size:10px;color:var(--ink-3);letter-spacing:.04em;}
+  .appbar .net{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;
+    color:var(--ok);font-weight:700;background:rgba(46,158,107,.1);padding:3px 8px;border-radius:99px;}
+  .appbar .net i{width:5px;height:5px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);animation:blink 1.6s infinite;}
+
+  /* —— 底部 TabBar —— */
+  .tabbar{flex:none;display:flex;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);
+    box-shadow:0 -1px 0 var(--line);padding:6px 4px 4px;}
+  .tab{flex:1;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:3px;padding:5px 0 4px;color:var(--ink-3);position:relative;transition:color .2s;}
+  .tab .ti{font-size:19px;line-height:1;filter:grayscale(1) opacity(.55);transition:.2s;}
+  .tab .tl{font-size:10px;font-weight:600;}
+  .tab.on{color:var(--red);}
+  .tab.on .ti{filter:none;transform:translateY(-1px);}
+  .tab.on::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:22px;height:3px;border-radius:99px;background:linear-gradient(90deg,var(--red-bright),var(--red-wall));}
+
+  /* —— 通用小件 —— */
+  .greet{font-family:var(--serif);font-size:20px;font-weight:800;line-height:1.25;}
+  .sec-h{display:flex;align-items:center;justify-content:space-between;margin:18px 0 9px;}
+  .sec-h .lt{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;}
+  .sec-h .lt .bar{width:4px;height:14px;border-radius:3px;background:linear-gradient(var(--red),var(--red-wall));}
+  .sec-h .rt{font-size:11px;color:var(--red);font-weight:600;cursor:pointer;}
+
+  .heatbar{height:5px;border-radius:99px;background:var(--paper-2);overflow:hidden;}
+  .heatbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--red),var(--red-wall));}
+
+  /* 热点行（首页/选题） */
+  .hot{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:var(--r-m);background:#fff;box-shadow:var(--sh-1);}
+  .hot .rk{width:22px;height:22px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;
+    font-family:var(--serif);font-weight:800;font-size:13px;color:#fff;background:var(--ink-3);}
+  .hot .rk.top{background:linear-gradient(135deg,var(--red-bright),var(--red-wall));}
+  .hot .tt{font-size:13px;font-weight:600;line-height:1.35;}
+  .hot .mt{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:11px;color:var(--ink-3);}
+
+  /* 任务卡 */
+  .taskcard{border-radius:var(--r-l);overflow:hidden;background:#fff;box-shadow:var(--sh-2);}
+  .taskcard .hd{padding:13px 15px;color:#fff;background:linear-gradient(135deg,var(--red-bright),var(--red) 55%,var(--red-wall));position:relative;overflow:hidden;}
+  .taskcard .hd::after{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.18),transparent 70%);}
+  .taskcard .bd{padding:13px 15px;}
+  .prog{height:7px;border-radius:99px;background:var(--paper-2);overflow:hidden;}
+  .prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ok),#1f7d52);transition:width 1s cubic-bezier(.2,.7,.2,1);}
+
+  /* 动态流 */
+  .feedline{display:flex;gap:10px;padding:10px 0;}
+  .feedline:not(:last-child){box-shadow:0 1px 0 var(--line);}
+  .feedline .bb{flex:1;}
+  .feedline .tx{font-size:12.5px;line-height:1.5;}
+  .feedline .tm{font-size:10.5px;color:var(--ink-3);margin-top:3px;}
+
+  /* 生产屏区块标 */
+  .prod-h{display:flex;align-items:center;gap:7px;margin:16px 0 9px;font-weight:700;font-size:13.5px;}
+  .prod-h .e{font-size:16px;}
+  .prod-h .n{margin-left:auto;font-size:11px;color:var(--ink-3);font-weight:500;}
+
+  .hscroll{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px;margin:0 -2px;}
+  .hscroll>*{flex:none;}
+
+  .mini-media{width:108px;}
+  .mini-media .media-thumb{aspect-ratio:9/16;}
+  .mini-media .ttl{font-size:10.5px;font-weight:600;line-height:1.35;margin-top:5px;}
+  .mini-media .src{font-size:9.5px;color:var(--ink-3);margin-top:2px;}
+
+  /* 版本 chip 选择 */
+  .vchips{display:flex;gap:7px;flex-wrap:wrap;}
+  .vchip{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:99px;cursor:pointer;
+    background:#fff;box-shadow:var(--sh-1);font-size:12px;font-weight:600;color:var(--ink-2);transition:.18s;}
+  .vchip.on{background:linear-gradient(135deg,var(--red-bright),var(--red-wall));color:#fff;box-shadow:var(--sh-red);}
+  .vchip .e{font-size:14px;}
+
+  /* 立项反馈 toast */
+  .toast{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:60;
+    background:rgba(34,28,26,.92);color:#fff;padding:10px 18px;border-radius:99px;font-size:12.5px;font-weight:600;
+    box-shadow:var(--sh-3);display:flex;align-items:center;gap:8px;backdrop-filter:blur(8px);}
+  .toast .ck{width:18px;height:18px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;}
+
+  /* 发布成功遮罩 */
+  .pubmask{position:absolute;inset:0;z-index:80;background:rgba(20,16,15,.55);backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;}
+  .pubcard{width:240px;background:#fff;border-radius:var(--r-xl);padding:26px 22px;text-align:center;box-shadow:var(--sh-3);}
+  .pubcard .big{width:62px;height:62px;border-radius:50%;margin:0 auto 14px;
+    background:linear-gradient(135deg,var(--ok),#1f7d52);display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:30px;box-shadow:0 10px 26px rgba(46,158,107,.4);}
+  .pub-rays{display:flex;justify-content:center;gap:6px;margin-top:14px;flex-wrap:wrap;}
+  .pub-ray{font-size:11px;padding:3px 9px;border-radius:99px;background:var(--red-soft);color:var(--red-wall);font-weight:600;}
+
+  /* 我的页 */
+  .profcard{border-radius:var(--r-l);background:linear-gradient(150deg,var(--red-wall),var(--red-ink));color:#fff;
+    padding:18px 16px;display:flex;align-items:center;gap:13px;position:relative;overflow:hidden;box-shadow:var(--sh-2);}
+  .profcard::after{content:"";position:absolute;right:-26px;bottom:-30px;width:120px;height:120px;border-radius:50%;
+    background:radial-gradient(circle,rgba(200,168,106,.3),transparent 70%);}
+  .setlist{border-radius:var(--r-l);overflow:hidden;background:#fff;box-shadow:var(--sh-1);}
+  .setrow{display:flex;align-items:center;gap:11px;padding:13px 15px;cursor:pointer;transition:.15s;}
+  .setrow:not(:last-child){box-shadow:0 1px 0 var(--line);}
+  .setrow:active{background:var(--paper-2);}
+  .setrow .se{font-size:17px;width:24px;text-align:center;}
+  .setrow .chev{margin-left:auto;color:var(--ink-3);font-size:14px;}
+
+  .editable{font-size:13px;line-height:1.8;}
+</style>
+</head><body>
+<div id="root"></div>
+<script src="assets/vendor/react.production.min.js"></script>
+<script src="assets/vendor/react-dom.production.min.js"></script>
+<script src="assets/vendor/babel.min.js"></script>
+<script src="assets/brtv-data.js"></script>
+<script src="assets/brtv-icons.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const B = window.BRTV;
+const Icon = ({ n, cls }) => <span className={'ico ' + (cls || '')} dangerouslySetInnerHTML={{ __html: brtvIcon(n) }} />;
+
+/* ============ IosFrame（贴入） ============ */
+const iosFrameStyles = {
+  wrapper:{display:'inline-block',padding:12,background:'#000',borderRadius:60,
+    boxShadow:'0 0 0 2px #1f2937, 0 20px 60px rgba(0,0,0,0.3)',position:'relative'},
+  screen:{position:'relative',borderRadius:48,overflow:'hidden',background:'#fff'},
+  statusBar:{position:'absolute',top:0,left:0,right:0,height:54,display:'flex',alignItems:'center',
+    justifyContent:'space-between',padding:'0 32px',fontSize:16,fontWeight:600,
+    fontFamily:'-apple-system,"SF Pro Text",sans-serif',zIndex:20,pointerEvents:'none'},
+  dynamicIsland:{position:'absolute',top:12,left:'50%',transform:'translateX(-50%)',width:124,height:36,
+    background:'#000',borderRadius:999,zIndex:30},
+  statusIcons:{display:'flex',alignItems:'center',gap:6},
+  signalIcon:{display:'flex',alignItems:'flex-end',gap:2,height:12},
+  signalBar:{width:3,background:'currentColor',borderRadius:1},
+  batteryIcon:{width:26,height:12,border:'1.5px solid currentColor',borderRadius:3,padding:1,position:'relative',opacity:.8},
+  batteryCap:{position:'absolute',top:3,right:-3,width:2,height:6,background:'currentColor',borderRadius:'0 1px 1px 0'},
+  content:{position:'absolute',top:54,left:0,right:0,bottom:0,overflow:'hidden',display:'flex'},
+  homeIndicator:{position:'absolute',bottom:7,left:'50%',transform:'translateX(-50%)',width:120,height:5,
+    background:'rgba(0,0,0,0.22)',borderRadius:999,zIndex:50,pointerEvents:'none'},
+};
+function IosFrame({children,width=393,height=852,time='9:41',battery=100,darkMode=false}){
+  const textColor = darkMode?'#fff':'#000';
+  return (
+    <div style={iosFrameStyles.wrapper}>
+      <div style={{...iosFrameStyles.screen,width,height,background:darkMode?'#000':'#fff'}}>
+        <div style={{...iosFrameStyles.statusBar,color:textColor}}>
+          <span>{time}</span>
+          <div style={iosFrameStyles.statusIcons}>
+            <div style={iosFrameStyles.signalIcon}>
+              <div style={{...iosFrameStyles.signalBar,height:4}}/>
+              <div style={{...iosFrameStyles.signalBar,height:6}}/>
+              <div style={{...iosFrameStyles.signalBar,height:9}}/>
+              <div style={{...iosFrameStyles.signalBar,height:11}}/>
+            </div>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" style={{color:textColor}}>
+              <path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/>
+              <path d="M3 7.5a7 7 0 0110 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
+              <path d="M1 4.5a11 11 0 0114 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7"/>
+            </svg>
+            <div style={iosFrameStyles.batteryIcon}>
+              <div style={{width:battery+'%',height:'100%',background:'currentColor',borderRadius:1,opacity:.9}}/>
+              <div style={iosFrameStyles.batteryCap}/>
+            </div>
+          </div>
+        </div>
+        <div style={iosFrameStyles.dynamicIsland}/>
+        <div style={iosFrameStyles.content}>{children}</div>
+        <div style={iosFrameStyles.homeIndicator}/>
+      </div>
+    </div>
+  );
+}
+
+/* ============ 数字滚动 hook ============ */
+function useCountUp(target, dur=1100, run=true){
+  const [v,setV]=useState(0);
+  useEffect(()=>{
+    if(!run){setV(target);return;}
+    let raf, t0;
+    const tick=(ts)=>{ if(!t0)t0=ts;
+      const p=Math.min(1,(ts-t0)/dur);
+      const e=1-Math.pow(1-p,3);
+      setV(target*e);
+      if(p<1)raf=requestAnimationFrame(tick);
+    };
+    raf=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(raf);
+  },[target,run]);
+  return v;
+}
+
+/* ============ 通用：员工头像 ============ */
+function Av({id,size}){
+  const e=B.emp(id); if(!e)return null;
+  const cls='avatar'+(size==='sm'?' sm':size==='lg'?' lg':'');
+  return (<span className={cls} style={{background:`linear-gradient(135deg,${e.color},${e.color}cc)`}}>
+    {e.short}<span className={'dot '+(e.status==='busy'?'busy':'on')}></span></span>);
+}
+
+/* ============ 屏：首页 ============ */
+function HomeScreen(){
+  const today = B.trending.slice(0,4);
+  const feed = [
+    { id:'topic', tx:'监测到「北京入冬最强寒潮」全网热度飙至 98，已推送立项建议', tm:'06:42' },
+    { id:'writer', tx:'寒潮快讯初稿已生成，38 秒完成，可直接编辑', tm:'07:12' },
+    { id:'cutter', tx:'竖屏 45 秒版粗剪完成，6 个分镜 + 大字幕卡点', tm:'07:16' },
+    { id:'auditor', tx:'稿件涉部门表态，已触发时政多级复核，待你确认', tm:'08:36' },
+  ];
+  return (
+    <div className="app-pad anim-in">
+      <div className="muted" style={{fontSize:12}}>北京 · 今天 08:36 · 多云转晴 -7℃</div>
+      <div className="greet" style={{marginTop:3}}>早上好，记者林晚 <Icon n="sparkle" cls="ico-sm"/></div>
+      <div className="muted" style={{fontSize:12,marginTop:4}}>新闻频道 · 融媒体中心 · 今日有 1 项应急任务在身</div>
+
+      {/* 待办任务 */}
+      <div className="sec-h"><div className="lt"><span className="bar"></span>进行中任务</div></div>
+      <TaskCard/>
+
+      {/* 今日热点 */}
+      <div className="sec-h"><div className="lt"><span className="bar"></span>今日热点榜</div><div className="rt">去选题 ›</div></div>
+      <div className="col gap-8 stagger">
+        {today.map(t=>(
+          <div className="hot elevate" key={t.rank}>
+            <span className={'rk'+(t.rank<=2?' top':'')}>{t.rank}</span>
+            <div className="grow">
+              <div className="tt">{t.title}</div>
+              <div className="mt"><span className="tag-ghost" style={{padding:'1px 7px',borderRadius:99}}>{t.cat}</span>
+                <span className="text-red" style={{fontWeight:700}}>热度 {t.heat}</span>
+                <span className="up" style={{color:'var(--ok)'}}>{t.trend}</span></div>
+              <div className="heatbar" style={{marginTop:6}}><i style={{width:t.heat+'%'}}></i></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* AI 员工动态 */}
+      <div className="sec-h"><div className="lt"><span className="bar"></span>AI 员工动态</div></div>
+      <div className="panel panel-pad">
+        {feed.map((f,i)=>(
+          <div className="feedline" key={i}>
+            <Av id={f.id} size="sm"/>
+            <div className="bb">
+              <div className="row gap-6" style={{alignItems:'baseline'}}>
+                <b style={{fontSize:12.5}}>{B.emp(f.id).name}</b>
+                <span className="faint" style={{fontSize:10.5}}>{B.emp(f.id).role}</span>
+              </div>
+              <div className="tx">{f.tx}</div>
+              <div className="tm">{f.tm}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskCard(){
+  const prog=useCountUp(72,1100);
+  return (
+    <div className="taskcard anim-up">
+      <div className="hd">
+        <div className="row between">
+          <div className="tag" style={{background:'rgba(255,255,255,.2)',color:'#fff'}}>突发 · 民生 · P0</div>
+          <div className="up" style={{color:'rgba(255,255,255,.8)'}}>{B.story.startedAt}</div>
+        </div>
+        <div className="h-serif" style={{fontSize:16,marginTop:8,lineHeight:1.35}}>{B.story.title}</div>
+        <div style={{fontSize:11,opacity:.85,marginTop:5}}>{B.story.reporter} · 值班主编 周屿</div>
+      </div>
+      <div className="bd">
+        <div className="row between" style={{marginBottom:6}}>
+          <span className="muted" style={{fontSize:11.5}}>生产进度 · AI粗剪/撰稿中</span>
+          <b className="text-red t-num" style={{fontSize:13}}>{Math.round(prog)}%</b>
+        </div>
+        <div className="prog"><i style={{width:prog+'%'}}></i></div>
+        <div className="flow" style={{marginTop:11}}>
+          {B.pipeline.slice(0,4).map((p,i)=>(
+            <React.Fragment key={p.id}>
+              <span className="flow-step" style={p.state==='active'?{boxShadow:'var(--sh-red)',color:'var(--red)'}:{}}>
+                <span className="i">{i+1}</span>{p.label}</span>
+              {i<3 && <span className="flow-arrow">›</span>}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ 屏：选题 ============ */
+function PickScreen({onToast}){
+  const [picked,setPicked]=useState(()=>new Set(B.trending.filter(t=>t.picked).map(t=>t.rank)));
+  const doPick=(t)=>{
+    if(picked.has(t.rank))return;
+    setPicked(p=>new Set(p).add(t.rank));
+    onToast('已立项：'+t.title.slice(0,12)+'…');
+  };
+  return (
+    <div className="app-pad anim-in">
+      <div className="greet" style={{fontSize:18}}>选题策划</div>
+      <div className="muted" style={{fontSize:12,marginTop:3}}>7×24 全网热点监测 · AI 传播力预测，从「找选题」到「判选题」</div>
+
+      <div className="kpi-strip" style={{marginTop:13}}>
+        <div className="kpi"><div className="metric"><b className="num plain" style={{fontSize:22}}>分钟级</b><span className="lbl">热点发现</span></div></div>
+        <div className="kpi"><div className="metric"><b className="num" style={{fontSize:22}}>8</b><span className="lbl">在榜选题</span></div></div>
+      </div>
+
+      <div className="sec-h"><div className="lt"><span className="bar"></span>实时热点榜</div><div className="rt">析言 · 在线</div></div>
+      <div className="col gap-8 stagger">
+        {B.trending.map(t=>(
+          <div className="hot" key={t.rank} style={picked.has(t.rank)?{boxShadow:'inset 0 0 0 1.5px var(--red-soft),var(--sh-1)'}:{}}>
+            <span className={'rk'+(t.rank<=3?' top':'')}>{t.rank}</span>
+            <div className="grow">
+              <div className="tt">{t.title}</div>
+              <div className="mt wrap">
+                <span className="tag-ghost" style={{padding:'1px 7px',borderRadius:99}}>{t.cat}</span>
+                <span className="text-red" style={{fontWeight:700}}>{t.heat}</span>
+                <span style={{color:'var(--ok)',fontWeight:700}}>{t.trend}</span>
+                <span className="tag-ai" style={{padding:'1px 8px'}}>传播力 {t.pred}</span>
+              </div>
+            </div>
+            {picked.has(t.rank)
+              ? <span className="pill pill-ok" style={{flex:'none'}}><Icon n="check" cls="ico-sm"/> 已立项</span>
+              : <button className="btn btn-primary btn-sm" style={{flex:'none'}} onClick={()=>doPick(t)}>立项</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============ 屏：生产（hero） ============ */
+function ProduceScreen({onPublish}){
+  const s=B.story;
+  const vids=s.materials.filter(m=>m.type==='video');
+  const [ver,setVer]=useState('vert');
+  const [playing,setPlaying]=useState(false);
+  const [draft,setDraft]=useState(s.draftFlash);
+  return (
+    <div className="app-pad anim-in">
+      <div className="row between">
+        <div>
+          <div className="tag" style={{marginBottom:5}}><Icon n="live" cls="ico-sm"/> 现场速报</div>
+          <div className="greet" style={{fontSize:19}}>寒潮应急 · 现场快产</div>
+        </div>
+      </div>
+      <div className="muted" style={{fontSize:11.5,marginTop:5,lineHeight:1.5}}>
+        现场 → AI 秒出初稿 → 手机精修 → 一键发。{s.reporter}</div>
+
+      {/* 1 · 5G 回传素材 */}
+      <div className="prod-h"><span className="e"><Icon n="live"/></span>5G 回传素材<span className="n">{vids.length} 条 · 已自动打标</span></div>
+      <div className="hscroll">
+        {vids.map(m=>(
+          <div className="mini-media" key={m.id}>
+            <div className={'media-thumb tall '+m.thumb}>
+              <div className="thumb-ico"><Icon n={m.icon} cls="ico-2xl"/></div>
+              <div className="badge">{m.status==='tagged'?'已标引':'打标中'}</div>
+              <div className="dur">{m.dur}</div>
+              <div className="play"></div>
+            </div>
+            <div className="ttl">{m.title}</div>
+            <div className="src">{m.src}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 2 · AI 快讯稿 */}
+      <div className="prod-h"><span className="e"><Icon n="edit"/></span>AI 快讯稿<span className="n">成文 · 38 秒生成</span></div>
+      <div className="ai-working" style={{marginBottom:8}}><span style={{color:'var(--gold)'}}>●</span>
+        <span className="tag-ai" style={{padding:'2px 9px'}}>AI 生成 · 可直接改字</span></div>
+      <div className="editable" contentEditable suppressContentEditableWarning
+        onInput={e=>setDraft(e.currentTarget.textContent)}>{s.draftFlash}</div>
+      <div className="edit-toolbar" style={{marginTop:8,width:'fit-content'}}>
+        <span className="b">B</span><span className="b" style={{fontStyle:'italic'}}>I</span>
+        <span className="b">H</span><span className="b">"</span><span className="b"><Icon n="refresh" cls="ico-sm"/></span>
+        <span className="b" style={{color:'var(--red)'}}><Icon n="sparkle" cls="ico-sm"/></span>
+      </div>
+
+      {/* 3 · 竖屏粗剪 */}
+      <div className="prod-h"><span className="e"><Icon n="film"/></span>竖屏粗剪 00:45<span className="n">快刀 · 6 分镜</span></div>
+      <div className="player tall" style={{maxWidth:200,margin:'0 auto'}} onClick={()=>setPlaying(p=>!p)}>
+        <div className={'stage '+vids[0].thumb}>
+          <div className="scanline"></div>
+          {!playing && <div className="play" style={{position:'absolute',inset:0,margin:'auto',width:48,height:48,borderRadius:'50%',
+            background:'rgba(255,255,255,.92)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span style={{borderLeft:'15px solid var(--red)',borderTop:'9px solid transparent',borderBottom:'9px solid transparent',marginLeft:4}}></span></div>}
+          <div style={{position:'absolute',left:10,top:10,color:'#fff',fontSize:11,fontWeight:700,
+            textShadow:'0 1px 4px rgba(0,0,0,.6)'}}>寒潮橙色预警</div>
+          <div style={{position:'absolute',left:10,right:10,bottom:14,color:'#fff',fontSize:13,fontWeight:800,
+            textAlign:'center',textShadow:'0 1px 6px rgba(0,0,0,.7)'}}>气温骤降 12℃</div>
+        </div>
+        <div className="ctrl">
+          <span className="pp">{playing
+            ? <span style={{display:'flex',gap:3}}><i style={{width:3,height:11,background:'#fff'}}></i><i style={{width:3,height:11,background:'#fff'}}></i></span>
+            : <span style={{borderLeft:'9px solid #fff',borderTop:'6px solid transparent',borderBottom:'6px solid transparent',marginLeft:2}}></span>}</span>
+          <div className="scrub"><div className="fill"></div><div className="head"></div></div>
+          <span className="tc">00:17 / 00:45</span>
+        </div>
+      </div>
+      <div className="timeline" style={{marginTop:8}}>
+        {s.shots.map((sh,i)=>(
+          <div className={'shot '+sh.tone+(i===2?' sel':'')} key={i}><span className="n">{sh.n}</span></div>
+        ))}
+      </div>
+
+      {/* 4 · 配音 / 同期声 */}
+      <div className="prod-h"><span className="e"><Icon n="fm"/></span>配音 / 同期声<span className="n">同声 · ASR 已转写</span></div>
+      <div className="audio-card">
+        <span className="pp"><span style={{borderLeft:'10px solid #fff',borderTop:'6px solid transparent',borderBottom:'6px solid transparent',marginLeft:2}}></span></span>
+        <div className="grow">
+          <div style={{fontSize:12.5,fontWeight:600}}>口播 + 现场同期声 · 01:10</div>
+          <div className="waveform dark" style={{marginTop:6}}>
+            {Array.from({length:34}).map((_,i)=>(
+              <i key={i} style={{height:(20+Math.abs(Math.sin(i*0.9))*22)+'px'}}></i>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 5 · 版本分产 */}
+      <div className="prod-h"><span className="e"><Icon n="swap"/></span>多版本分产<span className="n">一键四版</span></div>
+      <div className="vchips">
+        {s.versions.map(v=>(
+          <div className={'vchip'+(ver===v.id?' on':'')} key={v.id} onClick={()=>setVer(v.id)}>
+            <span className="e"><Icon n={v.icon}/></span>{v.name}<span style={{opacity:.7,fontSize:10.5}}>{v.dur}</span>
+          </div>
+        ))}
+      </div>
+      <div className="card" style={{padding:'11px 13px',marginTop:9,background:'#fff'}}>
+        {(()=>{const v=s.versions.find(x=>x.id===ver);return (
+          <div className="anim-in" key={ver}>
+            <div className="row between"><b style={{fontSize:13}}>{v.name}</b><span className="tag-ghost" style={{padding:'2px 9px'}}>{v.fmt}</span></div>
+            <div className="muted" style={{fontSize:11.5,marginTop:5}}>分发去向 · {v.target}</div>
+            <div className="faint" style={{fontSize:11,marginTop:3}}>{v.note}</div>
+          </div>
+        );})()}
+      </div>
+
+      {/* 6 · 一键发布 */}
+      <button className="btn btn-primary btn-block btn-lg" style={{marginTop:18}} onClick={onPublish}>
+        <Icon n="rocket" cls="ico-sm"/> 一键发布到 {s.versions.find(x=>x.id===ver).target.split(' / ')[0]}
+      </button>
+      <div className="faint center" style={{fontSize:10.5,marginTop:8}}>发布前自动跑敏感 / 版权 / 时政三模态预审</div>
+    </div>
+  );
+}
+
+/* ============ 屏：审核 ============ */
+function AuditScreen(){
+  const q=B.auditQueue;
+  const pend=q.filter(a=>a.status==='待处理'||a.status==='待终审').length;
+  return (
+    <div className="app-pad anim-in">
+      <div className="greet" style={{fontSize:18}}>智能审核</div>
+      <div className="muted" style={{fontSize:12,marginTop:3}}>守正 AI 预筛标记，人工终审不可跳过</div>
+
+      <div className="card anim-up" style={{marginTop:13,padding:'12px 14px',
+        background:'linear-gradient(120deg,rgba(209,26,42,.08),#fff 60%)',display:'flex',alignItems:'center',gap:11}}>
+        <span style={{fontSize:22,color:'var(--red-wall)'}}><Icon n="flag"/></span>
+        <div className="grow"><b style={{fontSize:13.5,color:'var(--red-wall)'}}>{pend} 项待处理</b>
+          <div className="muted" style={{fontSize:11.5}}>含 1 项时政复核 · 不可跳过终审</div></div>
+        <button className="btn btn-primary btn-sm">去终审</button>
+      </div>
+
+      <div className="sec-h"><div className="lt"><span className="bar"></span>风险标记队列</div></div>
+      <div className="col gap-8 stagger">
+        {q.map(a=>(
+          <div className={'risk-row r-'+a.level} key={a.id}>
+            <span className={'risk-flag '+(a.level==='high'?'pill-danger':a.level==='mid'?'pill-warn':a.level==='low'?'pill-info':'pill-ok')}>{a.flag}</span>
+            <div className="grow">
+              <div style={{fontSize:13,fontWeight:600,lineHeight:1.35}}>{a.title}</div>
+              <div className="muted" style={{fontSize:11.5,marginTop:3,lineHeight:1.45}}>{a.detail}</div>
+              <div className="row between" style={{marginTop:6}}>
+                <span className="faint" style={{fontSize:10.5}}>{a.who} · {a.at}</span>
+                <span className={'pill '+(a.status==='通过'||a.status==='已修正'?'pill-ok':a.level==='high'?'pill-danger':'pill-warn')}
+                  style={{padding:'2px 9px'}}>{a.status}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============ 屏：我的 ============ */
+function MineScreen(){
+  const stats=[
+    { k:'今日产出', v:37, unit:'条', plain:false },
+    { k:'过审率', v:96, unit:'%', plain:true },
+    { k:'快讯响应', v:5, unit:'min', plain:true },
+    { k:'本月发稿', v:214, unit:'条', plain:false },
+  ];
+  const sets=[
+    { e:'bell', t:'消息与提醒', s:'热点预警 / 审核回执' },
+    { e:'live', t:'5G 回传设置', s:'码率 720P · 自动入库' },
+    { e:'operate', t:'我的协作团队', s:'融媒生产群 · 9 位 AI 员工' },
+    { e:'settings', t:'AI 偏好', s:'撰稿语气 · 字幕风格' },
+    { e:'lock', t:'账号与安全', s:'记者工牌 · 权限组' },
+  ];
+  return (
+    <div className="app-pad anim-in">
+      <div className="profcard anim-up">
+        <span className="avatar lg" style={{background:'linear-gradient(135deg,#dcc086,var(--gold))',color:'#4a3a18',fontSize:18}}>晚
+          <span className="dot on"></span></span>
+        <div className="grow" style={{position:'relative',zIndex:1}}>
+          <div className="h-serif" style={{fontSize:18}}>记者 · 林晚</div>
+          <div style={{fontSize:11.5,opacity:.85,marginTop:2}}>新闻频道 · 融媒体中心 · 前方外勤</div>
+          <div className="row gap-6" style={{marginTop:7}}>
+            <span className="tag" style={{background:'rgba(255,255,255,.18)',color:'#fff'}}>金牌记者</span>
+            <span className="tag" style={{background:'rgba(255,255,255,.18)',color:'#fff'}}>突发条线</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="sec-h"><div className="lt"><span className="bar"></span>今日产出</div></div>
+      <div className="kpi-strip">
+        {stats.map((m,i)=>(
+          <div className="kpi" key={i}><div className="metric">
+            <b className={'num'+(m.plain?' plain':'')} style={{fontSize:24}}>{m.v}<span style={{fontSize:12}}>{m.unit}</span></b>
+            <span className="lbl">{m.k}</span></div></div>
+        ))}
+      </div>
+
+      <div className="sec-h"><div className="lt"><span className="bar"></span>设置</div></div>
+      <div className="setlist">
+        {sets.map((r,i)=>(
+          <div className="setrow" key={i}>
+            <span className="se"><Icon n={r.e}/></span>
+            <div className="grow"><div style={{fontSize:13,fontWeight:600}}>{r.t}</div>
+              <div className="faint" style={{fontSize:11}}>{r.s}</div></div>
+            <span className="chev">›</span>
+          </div>
+        ))}
+      </div>
+      <button className="btn btn-ghost btn-block" style={{marginTop:14,color:'var(--red)'}}>退出登录</button>
+    </div>
+  );
+}
+
+/* ============ App 主壳 ============ */
+const TABS=[
+  { id:'home', e:'home', l:'首页' },
+  { id:'pick', e:'target', l:'选题' },
+  { id:'prod', e:'film', l:'生产' },
+  { id:'audit',e:'shield', l:'审核' },
+  { id:'mine', e:'user', l:'我的' },
+];
+function App(){
+  const [tab,setTab]=useState('prod');
+  const [scale,setScale]=useState(1);
+  const [toast,setToast]=useState(null);
+  const [published,setPublished]=useState(false);
+  const scrollRef=useRef(null);
+
+  // 自适应缩放
+  useEffect(()=>{
+    const fit=()=>{ const total=852+24; // 机身 height + padding*2
+      setScale(Math.min(1,(window.innerHeight-40)/total)); };
+    fit(); window.addEventListener('resize',fit);
+    return ()=>window.removeEventListener('resize',fit);
+  },[]);
+
+  // 切 tab 回到顶部
+  useEffect(()=>{ if(scrollRef.current)scrollRef.current.scrollTop=0; },[tab]);
+
+  const showToast=(msg)=>{ setToast(msg); setTimeout(()=>setToast(null),1900); };
+  const doPublish=()=>{ setPublished(true); setTimeout(()=>setPublished(false),2600); };
+
+  const screens={
+    home:<HomeScreen/>,
+    pick:<PickScreen onToast={showToast}/>,
+    prod:<ProduceScreen onPublish={doPublish}/>,
+    audit:<AuditScreen/>,
+    mine:<MineScreen/>,
+  };
+  const titles={ home:'北京时间', pick:'选题策划', prod:'融媒工作台', audit:'智能审核', mine:'我的' };
+
+  return (
+    <div className="scaler" style={{transform:`scale(${scale})`}}>
+      <IosFrame time="08:36" battery={76}>
+        <div className="app" style={{position:'relative'}}>
+          {/* 应用条 */}
+          <div className="appbar">
+            <span className="brtv-mark sm">BRTV</span>
+            <div className="id"><b>{titles[tab]}</b><small>记者外勤 · 融媒生产</small></div>
+            <span className="net"><i></i>5G 已连</span>
+          </div>
+
+          {/* 内容 */}
+          <div className="app-scroll" ref={scrollRef} key={tab}>{screens[tab]}</div>
+
+          {/* TabBar */}
+          <div className="tabbar">
+            {TABS.map(t=>(
+              <button className={'tab'+(tab===t.id?' on':'')} key={t.id} onClick={()=>setTab(t.id)}>
+                <span className="ti"><Icon n={t.e}/></span><span className="tl">{t.l}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* 立项 toast */}
+          {toast && <div className="toast anim-pop"><span className="ck"><Icon n="check" cls="ico-sm"/></span>{toast}</div>}
+
+          {/* 发布成功 */}
+          {published && (
+            <div className="pubmask anim-in">
+              <div className="pubcard anim-pop">
+                <div className="big"><Icon n="check"/></div>
+                <div className="h-serif" style={{fontSize:17}}>发布成功</div>
+                <div className="muted" style={{fontSize:12,marginTop:6,lineHeight:1.5}}>寒潮应急稿件已推送至目标平台，分发官「通达」开始回流统计</div>
+                <div className="pub-rays">
+                  <span className="pub-ray"><Icon n="app" cls="ico-sm"/> 北京时间</span>
+                  <span className="pub-ray"><Icon n="shortvid" cls="ico-sm"/> 抖音</span>
+                  <span className="pub-ray"><Icon n="channel" cls="ico-sm"/> 视频号</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </IosFrame>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body></html>

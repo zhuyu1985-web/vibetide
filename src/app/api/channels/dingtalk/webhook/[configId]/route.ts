@@ -65,7 +65,9 @@ export async function POST(
     // 语音消息：同步回"正在听写" + 派异步事件（下载→ASR→喂 gateway）。
     // 重活进 Inngest 避免 webhook 超时（钉钉约 3s）导致平台重试。
     if (msgtype === "audio") {
-      const audio = (body.audio ?? {}) as {
+      // 钉钉语音字段在 content 下（{msgtype:'audio', content:{downloadCode, recognition}}）；
+      // body.audio 仅作兜底。读错字段会导致 downloadCode/recognition 全空 → 下载失败。
+      const audio = (body.content ?? body.audio ?? {}) as {
         duration?: string | number;
         downloadCode?: string;
         mediaId?: string;

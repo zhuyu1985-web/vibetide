@@ -27,7 +27,8 @@ export interface AppendMessageInput {
     | "mission_card"
     | "plan_card"
     | "draft_result"
-    | "multi_version_card";
+    | "multi_version_card"
+    | "import_card";
   /** 这条消息承载的 mission(mission_card 用) */
   missionId?: string | null;
   /** 产出这条的员工(替代旧 employeeSlug) */

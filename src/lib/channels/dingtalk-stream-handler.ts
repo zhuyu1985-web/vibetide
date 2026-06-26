@@ -14,6 +14,18 @@ export interface IncomingRobotMessage {
   conversationId?: string;
   sessionWebhook?: string;
   text?: { content?: string };
+  /**
+   * 语音/富媒体消息字段 —— 钉钉官方格式放在 **content** 下
+   * （`{msgtype:'audio', content:{downloadCode, recognition}}`），不是 audio。
+   * recognition = 平台自带语音转文字；downloadCode = 下载原始音频用的临时码。
+   */
+  content?: {
+    duration?: string | number;
+    downloadCode?: string;
+    mediaId?: string;
+    recognition?: string;
+  };
+  /** @deprecated 早期误用的字段名；保留作兜底，钉钉真实下发在 content 下。 */
   audio?: {
     duration?: string | number;
     downloadCode?: string;
@@ -40,7 +52,9 @@ export async function handleStreamRobotMessage(
 ): Promise<void> {
   // 语音消息：派异步事件（下载→ASR→喂 gateway），同步回"正在听写"
   if (msg.msgtype === "audio") {
-    const audio = msg.audio ?? {};
+    // 钉钉语音字段在 content 下（downloadCode/recognition）；老代码误读 msg.audio
+    // 导致两者全空 → 既拿不到自带转写又下载失败。msg.audio 仅作兜底。
+    const audio = msg.content ?? msg.audio ?? {};
     const msgId = msg.msgId || `dt_stream_${msg.conversationId ?? "unknown"}`;
     await inngest.send({
       id: `voice:${msgId}`,

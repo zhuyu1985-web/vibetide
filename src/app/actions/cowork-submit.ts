@@ -56,6 +56,24 @@ export async function submitCoworkMessage(
     kind: "text",
   });
 
+  // 1.5 URL 导入意图短路（确定性最高 → 绕过 LLM 意图分类，直接异步抓取入库）
+  const { extractUrls } = await import("@/lib/channels/link-extract");
+  const urls = extractUrls(text);
+  if (urls.length > 0) {
+    const { dispatchCoworkLinkImport } = await import(
+      "@/lib/cowork/link-import-dispatch"
+    );
+    await dispatchCoworkLinkImport({
+      organizationId: orgId,
+      conversationId,
+      userId: user.id,
+      urls,
+      userName: user.displayName || undefined,
+    });
+    revalidatePath(`/cowork/${conversationId}`);
+    return { ok: true, kind: "chat", reply: "已开始导入稿件" };
+  }
+
   // 2. 意图识别
   const intent = await recognizeIntentForOrg(orgId, user.id, text);
 

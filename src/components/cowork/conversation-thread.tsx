@@ -29,6 +29,7 @@ import {
 import { IntentChip, readIntentFromMeta } from "@/components/cowork/intent-chip";
 import { InputSuggestions } from "@/components/cowork/input-suggestions";
 import { MultiVersionCard } from "@/components/cowork/multi-version-card";
+import { ImportCard, type ImportCardMeta } from "@/components/cowork/import-card";
 import { suggestInputs } from "@/lib/cowork/input-suggestions";
 import type { CreationPlan } from "@/lib/cowork/creation-plan-types";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
@@ -360,6 +361,18 @@ function MessageBubble({
       <div className="flex flex-col items-start gap-1.5">
         {intentChip}
         <DraftResultCard meta={meta} conversationId={message.conversationId} />
+      </div>
+    );
+  }
+
+  if (message.kind === "import_card") {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
+        <ImportCard
+          content={message.content}
+          meta={message.meta as ImportCardMeta | null}
+        />
       </div>
     );
   }

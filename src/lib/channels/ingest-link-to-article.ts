@@ -1,8 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { articles } from "@/db/schema";
-import { fetchViaJinaReader } from "@/lib/web-fetch";
+import { ingestArticleFromUrl } from "@/lib/articles/import";
 
 export interface IngestLinkInput {
   organizationId: string;
@@ -24,43 +21,19 @@ export interface IngestLinkResult {
 }
 
 /**
- * 抓取链接正文并存为 articles 草稿。无 requireAuth —— 供 Inngest/webhook 上下文调用。
- * 按 (organizationId, sourceUrl) 查重，命中即跳过。
+ * 抓取链接正文并存为 articles 草稿（IM 渠道入口）。
+ *
+ * 已解耦：核心抓取/去重/入库逻辑迁至 `@/lib/articles/import` 的 `ingestArticleFromUrl`，
+ * 供 cowork 对话导入与 IM 收稿共用。本函数保留原签名作薄包装，钉钉/企微链路零改动。
  */
 export async function ingestLinkToArticle(
-  input: IngestLinkInput
+  input: IngestLinkInput,
 ): Promise<IngestLinkResult> {
-  const existing = await db.query.articles.findFirst({
-    where: and(
-      eq(articles.organizationId, input.organizationId),
-      eq(articles.sourceUrl, input.url)
-    ),
-    columns: { id: true, title: true },
+  const r = await ingestArticleFromUrl({
+    organizationId: input.organizationId,
+    url: input.url,
+    sourceName: input.sourceName,
+    channelContext: input.channelContext,
   });
-  if (existing) {
-    return { skipped: true, articleId: existing.id, title: existing.title };
-  }
-
-  const { title, content } = await fetchViaJinaReader(input.url);
-  const safeTitle = title?.trim() || new URL(input.url).hostname;
-
-  const [row] = await db
-    .insert(articles)
-    .values({
-      organizationId: input.organizationId,
-      title: safeTitle,
-      body: content,
-      content: { headline: safeTitle, body: content, imageNotes: [] },
-      mediaType: "article",
-      status: "draft",
-      sourceType: "repost",
-      sourceUrl: input.url,
-      sourceName: input.sourceName,
-      createdBy: null,
-      wordCount: content.length,
-      metadata: { ingestedFromChannel: input.channelContext },
-    })
-    .returning({ id: articles.id });
-
-  return { skipped: false, articleId: row.id, title: safeTitle };
+  return { skipped: r.skipped, articleId: r.articleId, title: r.title };
 }

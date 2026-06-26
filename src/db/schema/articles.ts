@@ -124,7 +124,22 @@ export const articles = pgTable("articles", {
       configId: string;
       chatId: string;
       externalUserId: string;
-      externalMessageId: string;
+      externalMessageId?: string;
+    };
+    /** cowork URL 导入：AI 结构化分析提炼产物（摘要/分类/标签/要点） */
+    aiDigest?: {
+      summary: string;
+      category: string;
+      tags: string[];
+      keyPoints: string[];
+    };
+    /** AI 建议分类（org categories 无匹配项时落此，categoryId 留空） */
+    suggestedCategory?: string;
+    /** cowork 对话导入溯源 */
+    importedFrom?: {
+      channel: "cowork";
+      conversationId: string;
+      userId: string;
     };
   }>(),
 

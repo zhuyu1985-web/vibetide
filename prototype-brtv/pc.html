@@ -1,0 +1,1015 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRTV · 智能生产工作台</title>
+<link rel="stylesheet" href="assets/brtv-design.css">
+<style>
+  html,body{height:100%;overflow:hidden;}
+  #root{height:100vh;}
+  .wb{display:flex;flex-direction:column;height:100vh;background:var(--paper);}
+  .wb::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(720px 380px at 8% -6%,rgba(209,26,42,.07),transparent 60%),
+      radial-gradient(560px 320px at 98% 2%,rgba(200,168,106,.06),transparent 60%);}
+  .wb>*{position:relative;z-index:1;}
+
+  /* —— 顶栏 —— */
+  .topbar{flex:none;height:56px;display:flex;align-items:center;gap:16px;padding:0 18px;
+    background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);border-bottom:1px solid var(--line);}
+  .tb-task{display:flex;align-items:center;gap:9px;min-width:0;}
+  .tb-task b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;}
+  .tb-search{flex:1;max-width:480px;margin:0 auto;position:relative;}
+  .tb-search input{width:100%;height:36px;border:0;border-radius:99px;background:rgba(34,28,26,.05);
+    padding:0 14px 0 38px;font-size:13px;font-family:inherit;color:var(--ink);outline:none;transition:.2s;}
+  .tb-search input:focus{background:#fff;box-shadow:inset 0 0 0 1.5px var(--red),0 4px 14px rgba(209,26,42,.1);}
+  .tb-search .mag{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:14px;}
+  .tb-metrics{display:flex;gap:18px;}
+  .tbm{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;}
+  .tbm b{font-family:var(--serif);font-size:16px;font-variant-numeric:tabular-nums;color:var(--red-wall);}
+  .tbm span{font-size:10px;color:var(--ink-3);}
+  .tb-avatars{display:flex;}
+  .tb-avatars .avatar{margin-left:-8px;border:2px solid var(--card);}
+  .tb-avatars .avatar:first-child{margin-left:0;}
+
+  /* —— 主体三栏 —— */
+  .body{flex:1;display:flex;min-height:0;}
+  .side{flex:none;width:232px;background:rgba(255,255,255,.5);border-right:1px solid var(--line);
+    overflow-y:auto;padding:14px 12px;}
+  .side .sec-lbl{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--ink-3);
+    text-transform:uppercase;margin:6px 6px 8px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;cursor:pointer;
+    transition:.15s;margin-bottom:2px;}
+  .nav-item:hover{background:rgba(140,43,34,.06);}
+  .nav-item.on{background:#fff;box-shadow:var(--sh-1);}
+  .nav-item.on .ni-name{color:var(--red-wall);}
+  .ni-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;flex:none;background:var(--red-soft);}
+  .nav-item.on .ni-ico{background:linear-gradient(135deg,var(--red-bright),var(--red-wall));}
+  .ni-tx{min-width:0;flex:1;}
+  .ni-name{font-size:13px;font-weight:600;line-height:1.2;}
+  .ni-sub{font-size:10.5px;color:var(--ink-3);}
+  .ni-pri{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;background:rgba(140,43,34,.08);
+    color:var(--red-wall);flex:none;}
+  .emp-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:9px;cursor:pointer;transition:.15s;}
+  .emp-item:hover{background:rgba(140,43,34,.05);}
+  .emp-tx{min-width:0;line-height:1.25;}
+  .emp-tx b{font-size:12px;font-weight:600;display:block;}
+  .emp-tx span{font-size:10px;color:var(--ink-3);}
+
+  /* —— 主区 —— */
+  .main{flex:1;min-width:0;overflow-y:auto;padding:16px 18px 24px;}
+  .rail{flex:none;width:300px;border-left:1px solid var(--line);background:rgba(255,255,255,.5);
+    overflow-y:auto;padding:16px 14px;}
+
+  .kpi .kpi-top{display:flex;align-items:baseline;gap:5px;}
+  .kpi .kp-num{font-family:var(--serif);font-weight:800;font-size:26px;line-height:1;
+    background:linear-gradient(135deg,var(--red),var(--red-wall));-webkit-background-clip:text;background-clip:text;color:transparent;
+    font-variant-numeric:tabular-nums;}
+  .kpi .kp-pre{font-size:12px;color:var(--ink-2);font-weight:600;}
+  .kpi .kp-unit{font-size:13px;color:var(--red-wall);font-weight:700;}
+  .kpi .kp-lbl{font-size:11.5px;color:var(--ink-2);margin-top:3px;}
+  .kpi .kp-delta{font-size:10.5px;font-weight:700;color:var(--ok);margin-top:1px;}
+
+  .grid-mat{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .grid-ver{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  .create-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+  .ver-card{border-radius:var(--r-m);background:#fff;box-shadow:var(--sh-1);overflow:hidden;transition:.2s;}
+  .ver-card:hover{box-shadow:var(--sh-2);transform:translateY(-2px);}
+  .ver-prev{height:78px;position:relative;}
+  .ver-prev .vp-ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;opacity:.6;color:#fff;}
+  .ver-prev .vp-fmt{position:absolute;left:8px;bottom:7px;background:rgba(0,0,0,.5);color:#fff;font-size:10px;padding:1px 7px;border-radius:5px;backdrop-filter:blur(4px);}
+  .ver-prev .vp-dur{position:absolute;right:8px;bottom:7px;background:rgba(0,0,0,.5);color:#fff;font-size:10px;padding:1px 7px;border-radius:5px;font-variant-numeric:tabular-nums;}
+  .ver-body{padding:10px 12px;}
+
+  .chan-row{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:var(--r-m);background:#fff;
+    box-shadow:var(--sh-1);margin-bottom:8px;cursor:pointer;transition:.15s;}
+  .chan-row:hover{box-shadow:var(--sh-2);}
+  .chan-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:18px;background:var(--paper-2);flex:none;}
+  .sw{width:42px;height:24px;border-radius:99px;background:var(--line-2);position:relative;flex:none;transition:.22s;cursor:pointer;}
+  .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;
+    box-shadow:var(--sh-1);transition:.22s;}
+  .sw.on{background:linear-gradient(135deg,var(--red-bright),var(--red-wall));}
+  .sw.on::after{left:21px;}
+
+  .qbar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;}
+  .qbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ok),#1f7d52);transition:width .8s cubic-bezier(.2,.7,.2,1);}
+  .qbar.warn i{background:linear-gradient(90deg,var(--warn),#c8861e);}
+
+  .sugg{background:#fff;border-radius:var(--r-m);box-shadow:var(--sh-1);padding:10px 12px;margin-bottom:9px;
+    display:flex;gap:9px;align-items:flex-start;}
+  .sugg .sg-dot{width:7px;height:7px;border-radius:50%;background:var(--red);margin-top:5px;flex:none;}
+  .feed-line{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px;}
+  .feed-line:last-child{border-bottom:0;}
+
+  .ov-hero{padding:4px 0 2px;}
+  .ov-metrics{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0 20px;}
+  .ov-metric{flex:1;min-width:150px;padding:18px 20px;border-radius:var(--r-l);background:#fff;box-shadow:var(--sh-2);position:relative;overflow:hidden;}
+  .ov-metric::after{content:"";position:absolute;right:-22px;top:-22px;width:80px;height:80px;border-radius:50%;
+    background:radial-gradient(circle,rgba(209,26,42,.1),transparent 70%);}
+  .ov-metric .om-n{font-family:var(--serif);font-weight:800;font-size:34px;line-height:1;
+    background:linear-gradient(135deg,var(--red),var(--red-wall));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .ov-metric .om-l{font-size:12.5px;color:var(--ink-2);margin-top:6px;}
+
+  .dark-box{border-radius:var(--r-l);padding:18px;overflow:hidden;}
+  .bar-h{height:10px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;flex:1;}
+  .bar-h i{display:block;height:100%;border-radius:99px;}
+  .pf-row{display:flex;align-items:center;gap:12px;padding:9px 0;}
+  .reco-tabs{display:flex;flex-direction:column;gap:10px;}
+
+  .ai-overlay{position:absolute;inset:0;background:rgba(255,255,255,.82);backdrop-filter:blur(3px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border-radius:var(--r-l);z-index:5;}
+  .pos-rel{position:relative;}
+  .interest-bar{height:7px;border-radius:99px;background:var(--paper-2);overflow:hidden;}
+  .interest-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--red),var(--red-wall));transition:width .9s ease;}
+</style>
+</head><body>
+<div id="root"></div>
+<script src="assets/vendor/react.production.min.js"></script>
+<script src="assets/vendor/react-dom.production.min.js"></script>
+<script src="assets/vendor/babel.min.js"></script>
+<script src="assets/brtv-data.js"></script>
+<script src="assets/brtv-icons.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const B = window.BRTV;
+const Icon = ({ n, cls }) => <span className={'ico ' + (cls || '')} dangerouslySetInnerHTML={{ __html: brtvIcon(n) }} />;
+
+/* —— 数字滚动 hook —— */
+function useCountUp(target, dur = 1100, deps = []) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    let raf, start;
+    const from = 0, to = Number(target) || 0;
+    const step = (t) => {
+      if (!start) start = t;
+      const p = Math.min((t - start) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      setV(from + (to - from) * e);
+      if (p < 1) raf = requestAnimationFrame(step);
+      else setV(to);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, deps.length ? deps : [target]);
+  return v;
+}
+const fmt = (v, dec = 0) => Number(v).toLocaleString('zh-CN', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+
+/* ========================================================================== */
+/* 顶栏                                                                        */
+/* ========================================================================== */
+function TopBar() {
+  const online = B.employees.filter(e => e.status === 'on' || e.status === 'busy').slice(0, 5);
+  return (
+    <header className="topbar">
+      <div className="tb-task">
+        <span className="brtv-mark">BRTV</span>
+        <b>智能生产 · 寒潮应急</b>
+        <span className="pill pill-danger">突发</span>
+        <span className="faint" style={{ fontSize: 11 }}>{B.story.startedAt} 起</span>
+      </div>
+      <div className="tb-search">
+        <span className="mag"><Icon n="search" /></span>
+        <input placeholder="跨模态检索：寒潮 应急 长安街…" />
+      </div>
+      <div className="tb-metrics">
+        {B.metrics.slice(0, 4).map((m, i) => <TopMetric key={i} m={m} />)}
+      </div>
+      <div className="row gap-10">
+        <div className="tb-avatars">
+          {online.map(e => (
+            <span key={e.id} className="avatar sm" style={{ background: e.color }} title={e.name}>
+              {e.short}<i className={'dot ' + (e.status === 'busy' ? 'busy' : 'on')} />
+            </span>
+          ))}
+        </div>
+        <div className="col" style={{ lineHeight: 1.15 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>值班主编</span>
+          <b style={{ fontSize: 12.5 }}>周屿</b>
+        </div>
+      </div>
+    </header>
+  );
+}
+function TopMetric({ m }) {
+  const v = useCountUp(m.val, 1100);
+  return (
+    <div className="tbm">
+      <b>{fmt(v)}<span style={{ fontSize: 11 }}>{m.unit}</span></b>
+      <span>{m.k}</span>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* 左侧栏                                                                      */
+/* ========================================================================== */
+function SideBar({ active, onPick }) {
+  return (
+    <aside className="side">
+      <div className="sec-lbl">场景</div>
+      {B.scenarios.map(s => (
+        <div key={s.id} className={'nav-item' + (active === s.id ? ' on' : '')} onClick={() => onPick(s.id)}>
+          <div className="ni-ico"><Icon n={s.icon} cls="ico-lg" /></div>
+          <div className="ni-tx">
+            <div className="ni-name">{s.name}</div>
+            <div className="ni-sub">占比 {s.share}</div>
+          </div>
+          <span className="ni-pri">{s.priority}</span>
+        </div>
+      ))}
+      <div className="sec-lbl" style={{ marginTop: 16 }}>AI 数字员工</div>
+      {B.employees.map(e => (
+        <div key={e.id} className="emp-item">
+          <span className="avatar sm" style={{ background: e.color }}>
+            {e.short}<i className={'dot ' + (e.status === 'busy' ? 'busy' : 'on')} />
+          </span>
+          <div className="emp-tx">
+            <b>{e.name}</b>
+            <span>{e.role}</span>
+          </div>
+        </div>
+      ))}
+    </aside>
+  );
+}
+
+/* ========================================================================== */
+/* KPI 指标条                                                                   */
+/* ========================================================================== */
+function KpiStrip() {
+  return (
+    <div className="kpi-strip" style={{ marginBottom: 16 }}>
+      {B.metrics.map((m, i) => <KpiCard key={i} m={m} />)}
+    </div>
+  );
+}
+function KpiCard({ m }) {
+  const v = useCountUp(m.val, 1150);
+  return (
+    <div className="kpi anim-up">
+      <div className="kpi-top">
+        {m.prefix && <span className="kp-pre">{m.prefix}</span>}
+        <span className="kp-num">{fmt(v)}</span>
+        <span className="kp-unit">{m.unit}</span>
+      </div>
+      <div className="kp-lbl">{m.k}</div>
+      <div className="kp-delta" style={{ color: m.good ? 'var(--ok)' : 'var(--danger)' }}>
+        {m.delta.startsWith('+') ? '▲' : m.delta.startsWith('−') ? '▼' : '◆'} {m.delta}
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* 流水线                                                                      */
+/* ========================================================================== */
+function Pipeline({ step, onPick }) {
+  return (
+    <div className="card panel-pad" style={{ marginBottom: 16 }}>
+      <div className="between" style={{ display: 'flex', marginBottom: 12 }}>
+        <div className="section-title"><span className="bar" />智能生产流水线 · 7 步闭环</div>
+        <span className="tag tag-ai">AI 完成 80% · 人工精修 20%</span>
+      </div>
+      <div className="pipeline">
+        {B.pipeline.map((p, i) => (
+          <div key={p.id} className={'pipe-node ' + p.state + (step === p.id ? ' active' : '')}
+            onClick={() => onPick(p.id)}>
+            <div className="pipe-dot">{p.state === 'done' ? <Icon n="check" /> : i + 1}</div>
+            <div className="pipe-label">{p.label}</div>
+            <div className="pipe-sub">{p.sub}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* 媒体卡                                                                      */
+/* ========================================================================== */
+function MediaCard({ m }) {
+  const badge = m.type === 'video' ? '视频' : m.type === 'image' ? '图片' : '音频';
+  return (
+    <div className="media-card">
+      <div className={'media-thumb ' + m.thumb}>
+        <span className="badge">{badge}</span>
+        <span className="thumb-ico"><Icon n={m.icon} cls="ico-2xl" /></span>
+        <span className="dur">{m.dur}</span>
+        {m.type === 'video' && <span className="play" />}
+      </div>
+      <div className="media-meta">
+        <div className="media-title">{m.title}</div>
+        <div className="media-foot"><span>{m.src}</span>
+          <span className={'pill ' + (m.status === 'tagging' ? 'pill-warn' : 'pill-ok')} style={{ padding: '1px 7px', fontSize: 10 }}>
+            {m.status === 'tagging' ? '打标中' : '已入库'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* 步骤面板                                                                    */
+/* ========================================================================== */
+function StepPanel({ step }) {
+  switch (step) {
+    case 'ingest': return <StepIngest />;
+    case 'tag': return <StepTag />;
+    case 'search': return <StepSearch />;
+    case 'create': return <StepCreate />;
+    case 'multi': return <StepMulti />;
+    case 'refine': return <StepRefine />;
+    case 'publish': return <StepPublish />;
+    default: return <StepCreate />;
+  }
+}
+
+/* ① 素材入库 */
+function StepIngest() {
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 12 }}>
+        <div className="section-title"><span className="bar" />素材入库 · 采集源 / 5G 回传</div>
+        <span className="tag tag-ghost">已入库 {B.story.materials.length} 条</span>
+      </div>
+      <div className="row gap-8 wrap" style={{ marginBottom: 14 }}>
+        <span className="pill pill-info"><Icon n="live" /> 前方 5G 回传 · 2 路</span>
+        <span className="pill pill-ok"><Icon n="upload" /> 供稿采集 · 3 条</span>
+        <span className="pill pill-warn"><Icon n="mic" /> 电话连线 · 1 条</span>
+      </div>
+      <div className="grid-mat stagger">
+        {B.story.materials.map(m => <MediaCard key={m.id} m={m} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ② AI 自动打标 */
+function StepTag() {
+  const m = B.story.materials[0];
+  const [tags, setTags] = useState(B.story.autoTags);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const del = (t) => setTags(tags.filter(x => x !== t));
+  const add = () => { if (draft.trim()) { setTags([...tags, draft.trim()]); setDraft(''); } setAdding(false); };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="section-title" style={{ marginBottom: 12 }}><span className="bar" />AI 自动打标 · 标签 / 人物 / 字幕</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16 }}>
+        <div className={'media-thumb ' + m.thumb} style={{ borderRadius: 'var(--r-m)' }}>
+          <span className="badge">视频 · 已识别</span>
+          <span className="thumb-ico"><Icon n={m.icon} cls="ico-2xl" /></span>
+          <span className="dur">{m.dur}</span>
+          <span className="play" />
+        </div>
+        <div className="col gap-12">
+          <div>
+            <div className="faint" style={{ fontSize: 11, marginBottom: 6 }}>AI 自动标签</div>
+            <div className="row gap-6 wrap">
+              {tags.map(t => (
+                <span key={t} className="tag tag-ai">{t}<span className="x" onClick={() => del(t)}>×</span></span>
+              ))}
+              {adding
+                ? <input autoFocus value={draft} onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && add()} onBlur={add}
+                    style={{ border: 0, borderRadius: 99, background: 'var(--red-soft)', padding: '3px 10px', fontSize: 12, outline: 'none', width: 80, fontFamily: 'inherit' }} />
+                : <span className="tag-add tag" onClick={() => setAdding(true)} style={{ background: 'transparent' }}>+ 加标签</span>}
+            </div>
+          </div>
+          <div className="panel" style={{ background: 'var(--paper-2)', boxShadow: 'none', padding: '10px 12px' }}>
+            <div className="row gap-8" style={{ marginBottom: 6 }}><b style={{ fontSize: 12.5 }} className="row gap-6"><Icon n="user" /> 人物识别</b>
+              <span className="pill pill-ok" style={{ fontSize: 10, padding: '1px 7px' }}>1 位出镜</span></div>
+            <div className="muted" style={{ fontSize: 12 }}>出镜记者 · 林晚（前方）· 置信度 96%</div>
+          </div>
+          <div className="panel" style={{ background: 'var(--paper-2)', boxShadow: 'none', padding: '10px 12px' }}>
+            <div className="row gap-8" style={{ marginBottom: 6 }}><b style={{ fontSize: 12.5 }} className="row gap-6"><Icon n="text" /> 字幕转写</b>
+              <span className="ai-working" style={{ fontSize: 11 }}><i className="spin" />ASR 进行中</span></div>
+            <div className="muted" style={{ fontSize: 12, lineHeight: 1.7 }}>「……凌晨三点，长安街上的除雪车队已经连续作业了五个小时，确保早高峰主干道畅通……」</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ③ 跨模态检索 */
+function StepSearch() {
+  const hits = B.story.materials.slice(0, 5);
+  const hi = (txt) => {
+    const kw = ['寒潮', '应急', '长安街', '除雪'];
+    let parts = [txt];
+    kw.forEach(k => {
+      parts = parts.flatMap(p => typeof p === 'string'
+        ? p.split(k).flatMap((s, i) => i === 0 ? [s] : [<mark key={k + i} style={{ background: 'var(--red-soft)', color: 'var(--red-wall)', borderRadius: 3, padding: '0 2px' }}>{k}</mark>, s]) : [p]);
+    });
+    return parts;
+  };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="section-title" style={{ marginBottom: 12 }}><span className="bar" />跨模态检索 · 文字 / 画面 / 语音统一语义</div>
+      <div className="tb-search" style={{ maxWidth: '100%', margin: '0 0 12px' }}>
+        <span className="mag" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }}><Icon n="search" /></span>
+        <input defaultValue="寒潮 应急 长安街" style={{ width: '100%', height: 40, border: 0, borderRadius: 12, background: '#fff', boxShadow: 'inset 0 0 0 1.5px var(--red)', padding: '0 14px 0 38px', fontSize: 14, outline: 'none', fontFamily: 'inherit' }} />
+      </div>
+      <div className="row gap-8 wrap" style={{ marginBottom: 14 }}>
+        <span className="pill pill-ok"><Icon n="bolt" /> 0.3s 命中 5 条</span>
+        <span className="pill pill-info">检索效率 100×</span>
+        <span className="tag tag-ghost">命中维度：字幕 · 画面物体 · 标签</span>
+      </div>
+      <div className="grid-mat stagger">
+        {hits.map(m => (
+          <div key={m.id} className="media-card">
+            <div className={'media-thumb ' + m.thumb}>
+              <span className="badge">{m.type === 'video' ? '视频' : m.type === 'image' ? '图片' : '音频'}</span>
+              <span className="thumb-ico"><Icon n={m.icon} cls="ico-2xl" /></span><span className="dur">{m.dur}</span>
+            </div>
+            <div className="media-meta"><div className="media-title">{hi(m.title)}</div>
+              <div className="media-foot"><span>{m.src}</span><span className="match"><Icon n="target" /> 命中</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ④ AI 粗剪 · 撰稿（HERO） */
+function StepCreate() {
+  const [working, setWorking] = useState(false);
+  const [shot, setShot] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const trigger = () => { setWorking(true); setTimeout(() => setWorking(false), 900); };
+  return (
+    <div className="create-cols anim-up">
+      {/* 左 · 文稿 */}
+      <div className="card panel-pad pos-rel">
+        {working && <div className="ai-overlay"><span className="ai-working" style={{ fontSize: 14 }}><i className="spin" />AI 正在改写润色…</span></div>}
+        <div className="between" style={{ display: 'flex', marginBottom: 10 }}>
+          <div className="section-title"><span className="bar" />文稿</div>
+          <span className="ai-working"><i className="spin" />AI 初稿 · 38 秒生成</span>
+        </div>
+        <div className="edit-toolbar" style={{ marginBottom: 10 }}>
+          {['B', 'I', 'H', '“”', '∙'].map((b, i) => <div key={i} className="b">{b}</div>)}
+          <div className="b"><Icon n="globe" /></div>
+        </div>
+        <div className="editable" contentEditable suppressContentEditableWarning>
+          {B.story.draftFull.map((blk, i) => (
+            <React.Fragment key={i}>
+              <h4>{blk.h}</h4>
+              <p className={i === 0 ? 'ai-mark' : ''}>{blk.p}</p>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="row gap-8" style={{ marginTop: 12 }}>
+          <button className="btn btn-sm" onClick={trigger}><Icon n="edit" /> AI 改写</button>
+          <button className="btn btn-sm" onClick={trigger}><Icon n="sparkle" /> 润色</button>
+          <button className="btn btn-sm" onClick={trigger}><Icon n="expand" /> 扩写</button>
+          <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}>一键成片 →</button>
+        </div>
+      </div>
+      {/* 右 · 粗剪 */}
+      <div className="card panel-pad">
+        <div className="between" style={{ display: 'flex', marginBottom: 10 }}>
+          <div className="section-title"><span className="bar" />AI 粗剪 · 时间轴</div>
+          <span className="tag tag-ai">7 分镜 · 自动套片头</span>
+        </div>
+        <div className="player">
+          <div className={'stage ' + B.story.shots[shot].tone} style={{ display: 'flex' }}>
+            <div className="scanline" />
+            <span className="thumb-ico" style={{ fontSize: 46 }}><Icon n="play" /></span>
+            <span className="tc" style={{ position: 'absolute', right: 10, top: 8, background: 'rgba(0,0,0,.5)', padding: '2px 7px', borderRadius: 5 }}>00:{String(shot * 6 + 4).padStart(2, '0')} / 02:30</span>
+          </div>
+          <div className="ctrl">
+            <div className="pp" onClick={() => setPlaying(!playing)}>{playing ? <Icon n="pause" /> : <Icon n="play" />}</div>
+            <div className="scrub"><div className="fill" /><div className="head" /></div>
+            <span className="tc">分镜 {String(shot + 1).padStart(2, '0')}/07</span>
+          </div>
+        </div>
+        <div className="timeline" style={{ marginTop: 10 }}>
+          {B.story.shots.map((s, i) => (
+            <div key={i} className={'shot ' + s.tone + (shot === i ? ' sel' : '')} onClick={() => setShot(i)}>
+              <span className="n">{s.n}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div className="track"><span className="lab">视频</span>
+            <div className="clip clip-v" style={{ width: '46%' }} /><div className="clip clip-v" style={{ width: '30%' }} /><div className="clip clip-v" style={{ width: '18%' }} /></div>
+          <div className="track"><span className="lab">音频</span>
+            <div className="clip clip-a" style={{ width: '70%' }} /><div className="clip clip-a" style={{ width: '24%' }} /></div>
+          <div className="track"><span className="lab">字幕</span>
+            <div className="clip clip-t" style={{ width: '22%' }} /><div className="clip clip-t" style={{ width: '30%' }} /><div className="clip clip-t" style={{ width: '38%' }} /></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ⑤ 多版本分产 */
+function StepMulti() {
+  const [done, setDone] = useState(false);
+  const [working, setWorking] = useState(false);
+  const run = () => { setWorking(true); setTimeout(() => { setWorking(false); setDone(true); }, 800); };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 14 }}>
+        <div className="section-title"><span className="bar" />多版本分产 · 一稿多发</div>
+        {done && <span className="pill pill-ok"><Icon n="check" /> 已生成 4 版</span>}
+      </div>
+      {!done ? (
+        <div className="col center" style={{ padding: '36px 0', gap: 16 }}>
+          {working
+            ? <span className="ai-working" style={{ fontSize: 15 }}><i className="spin" />AI 正在分产 4 个版本…</span>
+            : <>
+                <div className="faint" style={{ fontSize: 13 }}>一条主线素材 · 自动适配电视 / 客户端 / 音频 / 国际传播</div>
+                <button className="btn btn-primary btn-lg" onClick={run}><Icon n="bolt" /> 一键分产 4 个版本</button>
+              </>}
+        </div>
+      ) : (
+        <div className="grid-ver stagger">
+          {B.story.versions.map(v => (
+            <div key={v.id} className="ver-card anim-pop">
+              <div className={'ver-prev ' + v.tone}>
+                <span className="vp-ico"><Icon n={v.icon} cls="ico-xl" /></span>
+                <span className="vp-fmt">{v.fmt}</span>
+                <span className="vp-dur">{v.dur}</span>
+              </div>
+              <div className="ver-body">
+                <div className="row between" style={{ display: 'flex', marginBottom: 4 }}>
+                  <b style={{ fontSize: 13 }}>{v.name}</b>
+                  <button className="btn btn-sm btn-ghost">编辑</button>
+                </div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>{v.note}</div>
+                <div className="faint" style={{ fontSize: 11 }}>分发：{v.target}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ⑥ 人工精修终审 */
+function StepRefine() {
+  const [cover, setCover] = useState('thumb-snow');
+  const [regen, setRegen] = useState(false);
+  const covers = ['thumb-snow', 'thumb-road', 'thumb-gov', 'thumb-city'];
+  const swap = () => {
+    setRegen(true);
+    setTimeout(() => {
+      setCover(c => covers[(covers.indexOf(c) + 1) % covers.length]);
+      setRegen(false);
+    }, 900);
+  };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 14 }}>
+        <div className="section-title"><span className="bar" />人工精修 · 终审</div>
+        <span className="pill pill-warn">待时政终审</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: 18 }}>
+        <div className="col gap-12">
+          <div>
+            <div className="faint" style={{ fontSize: 11, marginBottom: 6 }}>标题（可编辑）</div>
+            <div className="editable" contentEditable suppressContentEditableWarning style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 700 }}>
+              {B.story.title}
+            </div>
+          </div>
+          <div>
+            <div className="between" style={{ display: 'flex', marginBottom: 6 }}>
+              <span className="faint" style={{ fontSize: 11 }}>题图</span>
+              <button className="btn btn-sm" onClick={swap}><Icon n="refresh" /> 换题图</button>
+            </div>
+            <div className="pos-rel" style={{ borderRadius: 'var(--r-m)', overflow: 'hidden', height: 130 }}>
+              {regen
+                ? <div className="skeleton" style={{ width: '100%', height: '100%' }} />
+                : <div className={cover} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 40, opacity: .5, color: '#fff' }}><Icon n="image" /></span>
+                  </div>}
+            </div>
+          </div>
+        </div>
+        <div className="col gap-10">
+          <div className="faint" style={{ fontSize: 11 }}>质量自检 · AI 评分</div>
+          {B.story.quality.map(q => (
+            <div key={q.k} className="panel" style={{ background: 'var(--paper-2)', boxShadow: 'none', padding: '10px 12px' }}>
+              <div className="between" style={{ display: 'flex', marginBottom: 6 }}>
+                <b style={{ fontSize: 12.5 }}>{q.k}</b>
+                <b style={{ fontSize: 14, color: q.v >= 95 ? 'var(--ok)' : q.v >= 90 ? 'var(--red-wall)' : 'var(--warn)' }}>{q.v}</b>
+              </div>
+              <div className={'qbar' + (q.v < 90 ? ' warn' : '')}><i style={{ width: q.v + '%' }} /></div>
+              <div className="faint" style={{ fontSize: 11, marginTop: 5 }}>{q.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ⑦ 一键分发 */
+function StepPublish() {
+  const [sel, setSel] = useState(B.channels.slice(0, 5).map(c => c.id));
+  const [pub, setPub] = useState(false);
+  const toggle = (id) => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 14 }}>
+        <div className="section-title"><span className="bar" />一键分发 · 多平台同步</div>
+        <span className="tag tag-ghost">已选 {sel.length} / {B.channels.length}</span>
+      </div>
+      {pub ? (
+        <div className="col center anim-pop" style={{ padding: '40px 0', gap: 14 }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg,var(--ok),#1f7d52)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: '#fff', boxShadow: '0 10px 30px rgba(46,158,107,.4)' }}><Icon n="check" /></div>
+          <b style={{ fontSize: 18 }} className="h-serif">已分发至 {sel.length} 个平台</b>
+          <div className="muted" style={{ fontSize: 13 }}>预计回流统计 5 分钟后更新 · 通达 正在监测各平台播放</div>
+          <button className="btn" onClick={() => setPub(false)}>← 返回渠道清单</button>
+        </div>
+      ) : (
+        <>
+          <div className="stagger">
+            {B.channels.map(c => (
+              <div key={c.id} className="chan-row" onClick={() => toggle(c.id)}>
+                <div className="chan-ico"><Icon n={c.icon} cls="ico-lg" /></div>
+                <div className="grow">
+                  <b style={{ fontSize: 13 }}>{c.name}</b>
+                  <div className="faint" style={{ fontSize: 11 }}>{c.kind} · 覆盖 {c.users}</div>
+                </div>
+                <div className={'sw' + (sel.includes(c.id) ? ' on' : '')} />
+              </div>
+            ))}
+          </div>
+          <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 14 }} onClick={() => setPub(true)}><Icon n="rocket" /> 一键分发至 {sel.length} 个平台</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* 右栏 · 协同 / AI 建议                                                        */
+/* ========================================================================== */
+function RightRail() {
+  const daoyan = B.emp('daoyan');
+  const suggestions = [
+    '建议给客户端竖屏版加大字幕、卡点配《北京时间》片头音。',
+    '稿件引用市交通委表态，时政内容需多级复核，勿跳审。',
+    '八达岭风口素材体感强，适合做短视频开篇前 3 秒抓眼。',
+  ];
+  const feed = [
+    { e: 'tagger', t: '已为长安街除雪素材生成 8 个标签', at: '07:01' },
+    { e: 'writer', t: '快讯初稿生成完成 · 耗时 38 秒', at: '07:12' },
+    { e: 'cutter', t: '竖屏 45 秒版粗剪完成', at: '07:16' },
+    { e: 'auditor', t: '检出 1 项需时政复核', at: '08:36' },
+  ];
+  return (
+    <aside className="rail">
+      <div className="section-title" style={{ marginBottom: 12 }}><span className="bar" />协同 · AI 建议</div>
+      <div className="row gap-10" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
+        <span className="avatar ring" style={{ background: daoyan.color }}>{daoyan.short}<i className="dot busy" /></span>
+        <div className="grow">
+          <b style={{ fontSize: 13 }}>{daoyan.name}</b>
+          <div className="faint" style={{ fontSize: 11 }}>{daoyan.desc}</div>
+        </div>
+      </div>
+      {suggestions.map((s, i) => (
+        <div key={i} className="sugg anim-up" style={{ animationDelay: (i * .08) + 's' }}>
+          <span className="sg-dot" /><div style={{ fontSize: 12.5, lineHeight: 1.55 }}>{s}</div>
+        </div>
+      ))}
+
+      <div className="section-title" style={{ margin: '18px 0 10px' }}><span className="bar" />团队动态</div>
+      <div className="panel panel-pad" style={{ boxShadow: 'var(--sh-1)' }}>
+        {feed.map((f, i) => {
+          const e = B.emp(f.e);
+          return (
+            <div key={i} className="feed-line">
+              <span className="avatar sm" style={{ background: e.color }}>{e.short}</span>
+              <div className="grow"><b style={{ fontSize: 12 }}>{e.name}</b>
+                <div className="muted" style={{ fontSize: 11.5 }}>{f.t}</div></div>
+              <span className="faint t-mono" style={{ fontSize: 10 }}>{f.at}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="section-title" style={{ margin: '18px 0 10px' }}><span className="bar" />质量自检</div>
+      <div className="panel panel-pad" style={{ boxShadow: 'var(--sh-1)' }}>
+        {B.story.quality.map(q => (
+          <div key={q.k} style={{ marginBottom: 10 }}>
+            <div className="between" style={{ display: 'flex', marginBottom: 4 }}>
+              <span style={{ fontSize: 12 }}>{q.k}</span>
+              <b style={{ fontSize: 12.5, color: q.v >= 95 ? 'var(--ok)' : q.v >= 90 ? 'var(--red-wall)' : 'var(--warn)' }}>{q.v}</b>
+            </div>
+            <div className={'qbar' + (q.v < 90 ? ' warn' : '')}><i style={{ width: q.v + '%' }} /></div>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+/* ========================================================================== */
+/* 概览页（非智能生产场景）                                                      */
+/* ========================================================================== */
+function OverviewPage({ sc, onBack }) {
+  return (
+    <div className="main" style={{ width: '100%' }} key={sc.id}>
+      <button className="btn btn-ghost btn-sm anim-in" onClick={onBack} style={{ marginBottom: 12 }}>← 智能生产</button>
+      <div className="ov-hero anim-up">
+        <div className="row gap-10" style={{ marginBottom: 6 }}>
+          <span className="ni-ico" style={{ width: 38, height: 38, fontSize: 19 }}><Icon n={sc.icon} cls="ico-lg" /></span>
+          <div>
+            <div className="h-serif" style={{ fontSize: 24 }}>{sc.name}</div>
+            <span className="pill pill-danger" style={{ marginTop: 2 }}>{sc.priority} · 工时占比 {sc.share}</span>
+          </div>
+        </div>
+        <div className="h-serif muted" style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.5, maxWidth: 720, marginTop: 8 }}>{sc.tagline}</div>
+      </div>
+
+      <div className="ov-metrics stagger">
+        {sc.metrics.map((m, i) => <OvMetric key={i} m={m} />)}
+      </div>
+
+      <div className="card panel-pad anim-up" style={{ marginBottom: 18 }}>
+        <div className="section-title" style={{ marginBottom: 12 }}><span className="bar" />核心流程</div>
+        <div className="flow">
+          {sc.flow.map((f, i) => (
+            <React.Fragment key={i}>
+              <div className="flow-step"><span className="i">{i + 1}</span>{f}</div>
+              {i < sc.flow.length - 1 && <span className="flow-arrow">→</span>}
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="row gap-16 wrap" style={{ marginTop: 14 }}>
+          <span className="tag tag-ghost">参与角色：{sc.roles}</span>
+          <span className="tag tag-ghost">覆盖 {sc.centers}</span>
+        </div>
+      </div>
+
+      <OverviewOutput sc={sc} />
+
+      <div className="faint center" style={{ textAlign: 'center', fontSize: 11.5, marginTop: 20 }}>
+        概览演示 · 完整深度流程见〔智能生产〕
+      </div>
+    </div>
+  );
+}
+function OvMetric({ m }) {
+  const num = parseFloat(m.n);
+  const isNum = !isNaN(num) && /^[\d.]/.test(m.n);
+  const v = useCountUp(isNum ? num : 0, 1100);
+  const suffix = isNum ? m.n.replace(/^[\d.]+/, '') : '';
+  return (
+    <div className="ov-metric">
+      <div className="om-n">{isNum ? fmt(v, (m.n.includes('.') ? 1 : 0)) + suffix : m.n}</div>
+      <div className="om-l">{m.l}</div>
+    </div>
+  );
+}
+
+/* 各场景代表输出 */
+function OverviewOutput({ sc }) {
+  if (sc.id === 'audit') return <OutAudit />;
+  if (sc.id === 'live') return <OutLive />;
+  if (sc.id === 'plan') return <OutPlan />;
+  if (sc.id === 'feedback') return <OutFeedback />;
+  if (sc.id === 'operate') return <OutOperate />;
+  return null;
+}
+
+function OutAudit() {
+  const flagColor = { high: 'pill-danger', mid: 'pill-warn', low: 'pill-info', pass: 'pill-ok' };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 12 }}>
+        <div className="section-title"><span className="bar" />风险标记审核台</div>
+        <span className="tag tag-ai"><Icon n="search" /> 多模态实时巡检 · 文字 / 画面 / 音频 / 直播流</span>
+      </div>
+      <div className="row gap-8 wrap" style={{ marginBottom: 14 }}>
+        <span className="pill pill-danger">高危 1</span>
+        <span className="pill pill-warn">中危 2</span>
+        <span className="pill pill-info">低危 1</span>
+        <span className="pill pill-ok">通过 1</span>
+      </div>
+      <div className="col gap-10 stagger">
+        {B.auditQueue.map(a => (
+          <div key={a.id} className={'risk-row r-' + a.level}>
+            <span className={'risk-flag pill ' + flagColor[a.level]}>{a.flag}</span>
+            <div className="grow">
+              <b style={{ fontSize: 13 }}>{a.title}</b>
+              <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{a.detail}</div>
+              <div className="faint" style={{ fontSize: 11, marginTop: 3 }}>{a.who} · {a.at} · {a.status}</div>
+            </div>
+            {a.level !== 'pass' && <button className="btn btn-sm">处理</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OutLive() {
+  return (
+    <div className="dark-box dark-screen anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 14 }}>
+        <div className="section-title"><span className="bar" />多画面导播监看台</div>
+        <div className="row gap-8">
+          <button className="btn btn-dark btn-sm"><Icon n="swap" /> 导播切换</button>
+          <button className="btn btn-gold btn-sm"><Icon n="sparkle" /> AI 自动集锦</button>
+        </div>
+      </div>
+      <div className="mvw">
+        {B.liveSignals.map(s => (
+          <div key={s.id} className={'cell ' + s.tone + (s.live ? ' live' : '')}>
+            <div className={s.tone} style={{ position: 'absolute', inset: 0 }} />
+            {s.live && <span className="tag-live"><i />LIVE</span>}
+            <span style={{ position: 'absolute', left: 6, bottom: 5, fontSize: 10, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{s.name}</span>
+          </div>
+        ))}
+      </div>
+      <div className="row gap-16 wrap" style={{ marginTop: 14 }}>
+        <span className="muted" style={{ fontSize: 12 }}>● 主信号：演播室 · 在播</span>
+        <span className="muted" style={{ fontSize: 12 }}>● 备播：长安街 5G 前方</span>
+        <span className="muted" style={{ fontSize: 12 }}>OPC 全流程 · 1 人值守</span>
+      </div>
+    </div>
+  );
+}
+
+function OutPlan() {
+  const [picked, setPicked] = useState(B.trending.filter(t => t.picked).map(t => t.rank));
+  const predColor = { '极高': 'pill-danger', '高': 'pill-warn', '中': 'pill-info' };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 12 }}>
+        <div className="section-title"><span className="bar" />热点榜 + 传播力预测</div>
+        <span className="tag tag-ai">7×24 全网监测 · NLP 聚类</span>
+      </div>
+      <div className="col gap-8 stagger">
+        {B.trending.map(t => (
+          <div key={t.rank} className="chan-row" style={{ cursor: 'default', background: picked.includes(t.rank) ? 'linear-gradient(90deg,var(--red-soft),#fff 60%)' : '#fff' }}>
+            <span className="h-serif" style={{ fontSize: 18, width: 26, textAlign: 'center', color: t.rank <= 3 ? 'var(--red)' : 'var(--ink-3)' }}>{t.rank}</span>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <b style={{ fontSize: 13 }}>{t.title}</b>
+              <div className="row gap-6" style={{ marginTop: 4 }}>
+                <div className="bar-h" style={{ background: 'var(--line)', maxWidth: 120 }}><i style={{ width: t.heat + '%', background: 'linear-gradient(90deg,var(--red),var(--red-wall))' }} /></div>
+                <span className="delta-up" style={{ fontSize: 11, fontWeight: 700 }}>{t.trend}</span>
+                <span className="faint" style={{ fontSize: 11 }}>{t.cat} · {t.src}</span>
+              </div>
+            </div>
+            <span className={'pill ' + predColor[t.pred]} style={{ flex: 'none' }}>预测 {t.pred}</span>
+            {picked.includes(t.rank)
+              ? <span className="pill pill-ok" style={{ flex: 'none' }}><Icon n="check" /> 已立项</span>
+              : <button className="btn btn-sm btn-primary" onClick={() => setPicked([...picked, t.rank])}>一键立项</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OutFeedback() {
+  const curve = B.ratingCurve;
+  const max = Math.max(...curve);
+  const W = 640, H = 170;
+  const pts = curve.map((v, i) => [i / (curve.length - 1) * W, H - (v / max) * (H - 20) - 8]);
+  const line = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = 'M0 ' + H + ' ' + line.replace('M', 'L') + ' L' + W + ' ' + H + ' Z';
+  const maxPlay = Math.max(...B.platformPerf.map(p => parseFloat(p.play.replace(/[^\d.]/g, ''))));
+  return (
+    <div className="dark-box dark-screen anim-up">
+      <div className="between" style={{ display: 'flex', marginBottom: 14 }}>
+        <div className="section-title"><span className="bar" />分钟级收视效能大屏</div>
+        <span className="tag tag-ai" style={{ background: 'rgba(200,168,106,.18)', color: 'var(--gold)' }}>● 实时采集中</span>
+      </div>
+      <div className="row gap-16 wrap" style={{ marginBottom: 16 }}>
+        {B.briefStats.map((s, i) => <FbStat key={i} s={s} />)}
+      </div>
+      <div style={{ background: 'rgba(255,255,255,.03)', borderRadius: 'var(--r-m)', padding: '14px 10px 6px', marginBottom: 14 }}>
+        <div className="muted" style={{ fontSize: 11, marginBottom: 6, paddingLeft: 6 }}>分钟级收视曲线 · 近 22 分钟</div>
+        <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" height="170" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="fbGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--red)" stopOpacity=".45" />
+              <stop offset="100%" stopColor="var(--red)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={area} fill="url(#fbGrad)" />
+          <path d={line} fill="none" stroke="var(--red-bright)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+          {pts.map((p, i) => i % 3 === 0 && <circle key={i} cx={p[0]} cy={p[1]} r="3" fill="var(--red-bright)" />)}
+        </svg>
+      </div>
+      <div className="muted" style={{ fontSize: 11, marginBottom: 8 }}>平台播放对比</div>
+      {B.platformPerf.map(p => (
+        <div key={p.id} className="pf-row">
+          <span style={{ fontSize: 12.5, width: 130 }}>{p.name}</span>
+          <div className="bar-h"><i style={{ width: (parseFloat(p.play) / maxPlay * 100) + '%', background: p.tone }} /></div>
+          <span className="t-num" style={{ fontSize: 12.5, width: 64, textAlign: 'right' }}>{p.play}</span>
+          <span className="delta-up" style={{ fontSize: 11, fontWeight: 700, width: 48, textAlign: 'right' }}>{p.rate}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function FbStat({ s }) {
+  const num = parseFloat(s.v.replace(/,/g, ''));
+  const v = useCountUp(num, 1200);
+  const dec = s.v.includes('.') ? 1 : 0;
+  return (
+    <div style={{ flex: 1, minWidth: 130 }}>
+      <div className="h-serif" style={{ fontSize: 30, color: 'var(--gold)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+        {fmt(v, dec)}<span style={{ fontSize: 14 }}> {s.unit}</span>
+      </div>
+      <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{s.k}</div>
+    </div>
+  );
+}
+
+function OutOperate() {
+  const up = B.userProfile;
+  const kindColor = { '图文': 'tag-ghost', '音频': 'tag-ai', '竖屏': 'tag', '图集': 'tag-ghost' };
+  return (
+    <div className="card panel-pad anim-up">
+      <div className="section-title" style={{ marginBottom: 14 }}><span className="bar" />千人千面推荐流</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: 18 }}>
+        <div>
+          <div className="row gap-10" style={{ marginBottom: 10 }}>
+            <span className="avatar lg" style={{ background: 'linear-gradient(135deg,var(--red),var(--red-wall))' }}><Icon n="user" /></span>
+            <div><b style={{ fontSize: 14 }}>{up.name}</b><div className="faint" style={{ fontSize: 11 }}>用户画像 · 实时更新</div></div>
+          </div>
+          <div className="row gap-6 wrap" style={{ marginBottom: 14 }}>
+            {up.tags.map(t => <span key={t} className="tag tag-ghost">{t}</span>)}
+          </div>
+          <div className="faint" style={{ fontSize: 11, marginBottom: 8 }}>兴趣图谱</div>
+          {up.interests.map(it => (
+            <div key={it.k} style={{ marginBottom: 10 }}>
+              <div className="between" style={{ display: 'flex', marginBottom: 4 }}>
+                <span style={{ fontSize: 12 }}>{it.k}</span>
+                <b className="t-num" style={{ fontSize: 12, color: 'var(--red-wall)' }}>{it.v}</b>
+              </div>
+              <div className="interest-bar"><i style={{ width: it.v + '%' }} /></div>
+            </div>
+          ))}
+        </div>
+        <div className="col gap-10 reco-tabs">
+          <div className="faint" style={{ fontSize: 11 }}>为该用户精选 · 匹配度排序</div>
+          {B.recoFeed.map(r => (
+            <div key={r.id} className="feed-card">
+              <div className={'pic ' + r.tone} />
+              <div className="grow">
+                <div className="row gap-6" style={{ marginBottom: 4 }}>
+                  <span className={'tag ' + (kindColor[r.kind] || 'tag-ghost')} style={{ fontSize: 10, padding: '1px 8px' }}>{r.kind}</span>
+                  <span className="match"><Icon n="target" /> {r.match}%</span>
+                </div>
+                <b style={{ fontSize: 13, lineHeight: 1.4 }}>{r.title}</b>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* 智能生产主视图                                                              */
+/* ========================================================================== */
+function ProduceView() {
+  const [step, setStep] = useState('create');
+  return (
+    <>
+      <div className="main">
+        <KpiStrip />
+        <Pipeline step={step} onPick={setStep} />
+        <StepPanel step={step} key={step} />
+      </div>
+      <RightRail />
+    </>
+  );
+}
+
+/* ========================================================================== */
+/* App                                                                        */
+/* ========================================================================== */
+function App() {
+  const [scene, setScene] = useState('produce');
+  const sc = B.scenarios.find(s => s.id === scene);
+  return (
+    <div className="wb">
+      <TopBar />
+      <div className="body">
+        <SideBar active={scene} onPick={setScene} />
+        {scene === 'produce'
+          ? <ProduceView />
+          : <OverviewPage sc={sc} onBack={() => setScene('produce')} />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body></html>
