@@ -67,6 +67,10 @@ import {
   coworkLinkImport,
   coworkLinkImportFailureHandler,
 } from "./cowork-link-import";
+import {
+  articleAiAnalyze,
+  articleAiAnalyzeFailureHandler,
+} from "./article-ai-analyze";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -162,4 +166,7 @@ export const functions = [
   // 新闻 URL 导入闭环 (2026-06-26) — cowork 粘贴 URL → 抓取入库 articles → fan-out 分析/视频
   coworkLinkImport,
   coworkLinkImportFailureHandler,
+  // 稿件结构化分析 (2026-06-26) — 入库后自动出 摘要/标签/分类/要点 写回字段
+  articleAiAnalyze,
+  articleAiAnalyzeFailureHandler,
 ];

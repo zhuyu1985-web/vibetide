@@ -461,9 +461,9 @@ export const coworkLinkImportFailureHandler = inngest.createFunction(
 - Create: `src/lib/articles/analyze.ts`
 - Test: `src/lib/articles/__tests__/analyze.test.ts`
 
-> **`generateObject` 已确认可用**：本仓 `ai@6.0.116` 导出 `generateObject`，且已在 `src/lib/agent/skills/topic-classifier.ts`、`research-query-builder.ts`、`data-pivoter.ts`、`src/inngest/functions/research/report-generate.ts` 等多处实战使用——这是项目结构化输出的既定范式，照抄其用法即可（**勿听信"v6 移除 generateObject"的误报**，已核实 installed 包导出该函数）。
+> **结构化输出用 `generateText({ output: Output.object({ schema }) })`**（项目既定范式，见 `src/lib/agent/skills/topic-classifier.ts:16,172-179`）。`z` 从 `"zod/v4"` 导入；模型配置走 `resolveModelConfig(["content_analysis"], {temperature,maxTokens})` + `getLanguageModel`。注：`ai@6.0.116` 其实仍导出 `generateObject`（所以校验 hook "已移除" 的措辞不准），但团队统一迁向 `Output.object`，照 topic-classifier 抄即可、不要用 generateObject。
 
-- [ ] **Step 1（失败测试）：** 参照 `src/lib/agent/skills/topic-classifier.ts` 现有 `generateObject` 用法。mock `ai` 的 `generateObject` 返回固定对象，断言 `analyzeArticleStructured({title,body,categories})` 返回 `{summary,category,tags,keyPoints}` 且 tags 长度落在 3–8。
+- [ ] **Step 1（失败测试）：** 参照 `topic-classifier.ts` 的 `generateText + Output.object` 用法。mock `ai`（`generateText` 返回 `{output:{...}}`、`Output.object` 直通）+ mock `model-router`，断言 `analyzeArticleStructured({title,body,categories})` 返回 `{summary,category,tags,keyPoints}`。
 - [ ] **Step 2:** vitest → FAIL。
 - [ ] **Step 3（实现）：** 用 AI SDK v6 `generateObject` + zod（`z` 从 `zod`）。**只返回不写库**：
 
