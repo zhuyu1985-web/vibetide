@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { cliTools, cliToolRuns } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { InferInsertModel } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -18,10 +18,27 @@ export async function listEnabledCliTools(orgId: string) {
   });
 }
 
+/** 返回指定 org 下所有 CLI 工具配置（不过滤 enabled，管理 UI 用）。 */
+export async function listCliToolsByOrg(orgId: string) {
+  return db.query.cliTools.findMany({
+    where: eq(cliTools.organizationId, orgId),
+    orderBy: [desc(cliTools.createdAt)],
+  });
+}
+
 /** 按 id 查单条 CLI 工具配置（含 org 隔离校验）。 */
 export async function getCliToolById(orgId: string, id: string) {
   return db.query.cliTools.findFirst({
     where: and(eq(cliTools.id, id), eq(cliTools.organizationId, orgId)),
+  });
+}
+
+/** 返回指定 org 下最近 N 条执行记录（管理 UI 用，默认 50）。 */
+export async function listRecentCliToolRunsByOrg(orgId: string, limit = 50) {
+  return db.query.cliToolRuns.findMany({
+    where: eq(cliToolRuns.organizationId, orgId),
+    orderBy: [desc(cliToolRuns.createdAt)],
+    limit,
   });
 }
 
