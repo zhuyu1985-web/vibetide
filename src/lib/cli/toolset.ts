@@ -38,6 +38,25 @@ type CliToolRow = Awaited<ReturnType<typeof listEnabledCliTools>>[number];
 
 const WRITE_AUTHORITY = new Set(["executor", "coordinator"]);
 
+/**
+ * toVercelTools 的 wrapToolExecuteWithContext（tool-registry.ts ~:2900-2916）会把
+ * 这些上下文键**合并进**传给 execute 的 args。CLI 的 execute 随后调用
+ * validateParams——它会拒绝任何不在 argsSchema 里的键。若不先剥离这些注入键，
+ * 经 4 个真实调用点调用 CLI 工具必报 "未知参数 organizationId" → 端到端跑不通。
+ *
+ * 这里列全 wrap 实际写入的键（organizationId / operatorId / missionId / taskId /
+ * includeDomains，即 authorityDomains 写入时用的键名），再加 authorityDomains 本身
+ * 做防御性冗余——execute 已闭包持有 orgId，不依赖任何注入键。
+ */
+const RESERVED_CONTEXT_KEYS = new Set([
+  "organizationId",
+  "operatorId",
+  "missionId",
+  "taskId",
+  "authorityDomains",
+  "includeDomains",
+]);
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -207,8 +226,14 @@ function buildCliTool(orgId: string, row: CliToolRow) {
     execute: async (rawArgs: Record<string, unknown>) => {
       let runId: string | undefined;
       try {
+        // 0. 剥离 wrapToolExecuteWithContext 注入的上下文键 —— 否则 validateParams
+        //    会因 "未知参数 organizationId" 拒掉每一次真实调用（见 RESERVED_CONTEXT_KEYS）。
+        const cliArgs = Object.fromEntries(
+          Object.entries(rawArgs).filter(([k]) => !RESERVED_CONTEXT_KEYS.has(k)),
+        );
+
         // 1. 服务端再校验（拒绝未知参数 / 类型 / 范围 / 正则）
-        const params = validateParams(argsSchema, rawArgs);
+        const params = validateParams(argsSchema, cliArgs);
 
         // 2. async 模式 → 占位返回，不实际运行（M3.8 替换此分支）
         if (row.executionMode === "async") {
