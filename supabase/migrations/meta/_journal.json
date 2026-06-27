@@ -372,6 +372,13 @@
       "when": 1782492719456,
       "tag": "0052_supreme_silver_fox",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1782548316920,
+      "tag": "0053_closed_norman_osborn",
+      "breakpoints": true
     }
   ]
 }
