@@ -296,6 +296,40 @@ describe("createCliToolset — async enqueue", () => {
     expect(sentData.data.resolvedParams).not.toHaveProperty("organizationId");
     expect(sentData.data.resolvedParams).not.toHaveProperty("missionId");
   });
+
+  test("async 工具从 rawArgs 读注入的 conversationId 填进 run 行与事件", async () => {
+    mockInsertRun.mockResolvedValue({ id: "run-async-3" });
+    mockList.mockResolvedValue([makeRow({ executionMode: "async" })]);
+    const ts = await createCliToolset("org-1", { authorityLevel: "executor" });
+    const exec = getExecute(ts, "cli__ffmpeg-transcode");
+
+    // 模拟 wrapToolExecuteWithContext 把 conversationId 合并进 args（M3.9+ 路径）
+    await exec({
+      source: "asset-1",
+      ext: "mp4",
+      organizationId: "org-1",
+      conversationId: "conv-88",
+    });
+
+    // (a) run 行写入 conversationId
+    expect(mockInsertRun).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-88" }),
+    );
+
+    // (b) cli/run.requested 事件携带 conversationId
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ conversationId: "conv-88" }),
+      }),
+    );
+
+    // (c) conversationId 被 RESERVED_CONTEXT_KEYS 剥离，不污染 resolvedParams
+    const sentData = mockSend.mock.calls[0][0] as {
+      data: { resolvedParams: Record<string, unknown> };
+    };
+    expect(sentData.data.resolvedParams).not.toHaveProperty("conversationId");
+    expect(sentData.data.resolvedParams).not.toHaveProperty("organizationId");
+  });
 });
 
 // ---------------------------------------------------------------------------

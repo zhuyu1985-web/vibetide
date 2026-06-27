@@ -2873,6 +2873,9 @@ export interface ToolContext {
   operatorId?: string;
   missionId?: string;
   taskId?: string;
+  /** cowork 会话 id — 注入后 CLI async execute 可把 conversationId 写入 run 行
+   * 与 cli/run.requested 事件，surfaceCliOutput 据此生成 cowork import_card。 */
+  conversationId?: string;
   /** 领域权威源 → 注入 web_search 的 includeDomains（仅对有该入参的工具生效）。 */
   authorityDomains?: string[];
 }
@@ -2889,7 +2892,7 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
 ): T {
   if (
     !context ||
-    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId && !context.authorityDomains?.length)
+    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId && !context.conversationId && !context.authorityDomains?.length)
   ) {
     return toolDef;
   }
@@ -2910,6 +2913,9 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
       }
       if (context.taskId && merged.taskId === undefined) {
         merged.taskId = context.taskId;
+      }
+      if (context.conversationId && merged.conversationId === undefined) {
+        merged.conversationId = context.conversationId;
       }
       if (context.authorityDomains?.length && merged.includeDomains === undefined) {
         merged.includeDomains = context.authorityDomains;

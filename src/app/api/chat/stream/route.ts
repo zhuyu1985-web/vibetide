@@ -75,9 +75,10 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { employeeSlug, conversationHistory } = body as {
+    const { employeeSlug, conversationHistory, conversationId } = body as {
       employeeSlug: string;
       conversationHistory: { role: "user" | "assistant"; content: string }[];
+      conversationId?: string;
     };
 
     if (!employeeSlug || !conversationHistory?.length) {
@@ -174,7 +175,7 @@ export async function POST(req: Request) {
       agent.pluginConfigs,
       undefined, // missionTools
       undefined, // knowledgeBaseTools
-      { organizationId, operatorId: user.id },
+      { organizationId, operatorId: user.id, conversationId },
       mcp?.tools,
       cliTools,
     );

@@ -107,11 +107,12 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { message, intent, conversationHistory, userEdited } = body as {
+    const { message, intent, conversationHistory, userEdited, conversationId } = body as {
       message: string;
       intent: IntentResult;
       conversationHistory?: { role: "user" | "assistant"; content: string }[];
       userEdited?: boolean;
+      conversationId?: string;
     };
 
     if (!message || !intent?.steps?.length) {
@@ -278,7 +279,7 @@ export async function POST(req: Request) {
               agent.pluginConfigs,
               undefined, // missionTools
               undefined, // knowledgeBaseTools
-              { organizationId: orgId, operatorId: user.id },
+              { organizationId: orgId, operatorId: user.id, conversationId },
               mcp?.tools,
               cliTools,
             );

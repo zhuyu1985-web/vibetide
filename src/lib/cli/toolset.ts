@@ -38,14 +38,15 @@ const WRITE_AUTHORITY = new Set(["executor", "coordinator"]);
  * 经 4 个真实调用点调用 CLI 工具必报 "未知参数 organizationId" → 端到端跑不通。
  *
  * 这里列全 wrap 实际写入的键（organizationId / operatorId / missionId / taskId /
- * includeDomains，即 authorityDomains 写入时用的键名），再加 authorityDomains 本身
- * 做防御性冗余——execute 已闭包持有 orgId，不依赖任何注入键。
+ * conversationId / includeDomains，即 authorityDomains 写入时用的键名），再加
+ * authorityDomains 本身做防御性冗余——execute 已闭包持有 orgId，不依赖任何注入键。
  */
 const RESERVED_CONTEXT_KEYS = new Set([
   "organizationId",
   "operatorId",
   "missionId",
   "taskId",
+  "conversationId",
   "authorityDomains",
   "includeDomains",
 ]);
@@ -154,8 +155,8 @@ function buildCliTool(orgId: string, row: CliToolRow) {
       try {
         // 0. 剥离 wrapToolExecuteWithContext 注入的上下文键 —— 否则 validateParams
         //    会因 "未知参数 organizationId" 拒掉每一次真实调用（见 RESERVED_CONTEXT_KEYS）。
-        //    注意：execute 仍能从 rawArgs **读** missionId/taskId/operatorId 供异步路径
-        //    填进 run 行 + 事件（conversationId 不在注入键里，见下方说明）。
+        //    注意：execute 仍能从 rawArgs **读** missionId/taskId/operatorId/conversationId
+        //    供异步路径填进 run 行 + 事件（均由 wrap 注入，在此被剥离出 cliArgs）。
         const cliArgs = Object.fromEntries(
           Object.entries(rawArgs).filter(([k]) => !RESERVED_CONTEXT_KEYS.has(k)),
         );
@@ -170,8 +171,8 @@ function buildCliTool(orgId: string, row: CliToolRow) {
           // wrap 注入的上下文键（已被剥离出 cliArgs，但仍可从 rawArgs 读原值）。
           const missionId = readContextString(rawArgs, "missionId");
           const taskId = readContextString(rawArgs, "taskId");
-          // conversationId 当前不由 wrap 注入 → 异步路径拿不到。mission 控制台呈现走
-          // missionId 仍可用；cowork 卡片需 conversationId，v1 不串接（可接受，见 spec）。
+          // conversationId 由 wrapToolExecuteWithContext 注入（ToolContext.conversationId）。
+          // surfaceCliOutput 据此把产物呈现为 cowork import_card（纯会话路径）。
           const conversationId = readContextString(rawArgs, "conversationId");
 
           const created = await insertCliToolRun({

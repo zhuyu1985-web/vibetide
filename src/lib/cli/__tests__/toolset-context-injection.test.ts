@@ -34,6 +34,10 @@ vi.mock("@/lib/dal/cli-tools", () => ({
 }));
 vi.mock("../allowlist", () => ({ assertAllowedBinary: vi.fn() }));
 vi.mock("../spawn", () => ({ runCli: vi.fn() }));
+// inngest client — async 路径动态 import
+vi.mock("@/inngest/client", () => ({
+  inngest: { send: vi.fn().mockResolvedValue(undefined) },
+}));
 vi.mock("../scratch", () => ({
   withScratchDir: vi.fn(async (fn: (dir: string) => Promise<unknown>) => fn("/tmp/scratch-xyz")),
 }));
@@ -69,6 +73,7 @@ import {
   storeBufferAsAsset,
   probeMedia,
 } from "@/lib/media/asset-io";
+import { inngest } from "@/inngest/client";
 import { createCliToolset } from "../toolset";
 import { toVercelTools } from "@/lib/agent/tool-registry";
 
@@ -80,6 +85,7 @@ const mockResolveAsset = vi.mocked(resolveOrgAsset);
 const mockDownload = vi.mocked(downloadObjectToFile);
 const mockStore = vi.mocked(storeBufferAsAsset);
 const mockProbe = vi.mocked(probeMedia);
+const mockSend = vi.mocked(inngest.send);
 
 type Row = Awaited<ReturnType<typeof listEnabledCliTools>>[number];
 
@@ -199,5 +205,96 @@ describe("createCliToolset — context 注入 + 真实 validateParams 回归（M
     expect(joined).not.toContain("m-1");
     expect(joined).not.toContain("t-1");
     expect(argv[0]).toBe("-i");
+  });
+});
+
+describe("createCliToolset — conversationId threading（M3.9+ cowork import_card）", () => {
+  test("wrap 注入 conversationId → RESERVED 剥离 → validateParams 不拒 → async execute 写入 run 行与事件", async () => {
+    // async 工具行：用 makeRow + executionMode 覆盖
+    mockList.mockResolvedValue([makeRow({ executionMode: "async" })]);
+    mockInsertRun.mockResolvedValue({ id: "run-conv-1" });
+
+    const cliToolset = await createCliToolset("org-1", { authorityLevel: "executor" });
+
+    // wrap 注入所有 context 键，包含 conversationId
+    const wrapped = toVercelTools(
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        organizationId: "org-1",
+        operatorId: "op-1",
+        missionId: "m-5",
+        taskId: "t-5",
+        conversationId: "conv-99",
+      },
+      undefined,
+      cliToolset,
+    );
+
+    const exec = wrapped["cli__ffmpeg-transcode"].execute as (
+      a: Record<string, unknown>,
+      o: unknown,
+    ) => Promise<unknown>;
+
+    // AI SDK 仅传业务参数；wrap 把 context（含 conversationId）注入进去
+    const out = (await exec(
+      { source: "asset-1", ext: "mp4" },
+      { toolCallId: "tc-conv", messages: [] },
+    )) as { success: boolean; status?: string; runId?: string };
+
+    // async 路径立即返回 queued（不进同步管道）
+    expect(out.success).toBe(true);
+    expect(out.status).toBe("queued");
+
+    // (a) run 行写入 conversationId — RESERVED 只剥离 cliArgs，rawArgs 读取仍可用
+    expect(mockInsertRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org-1",
+        missionId: "m-5",
+        taskId: "t-5",
+        conversationId: "conv-99",
+      }),
+    );
+
+    // (b) cli/run.requested 事件携带 conversationId
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ conversationId: "conv-99" }),
+      }),
+    );
+
+    // (c) conversationId 被 RESERVED 剥离，不污染 resolvedParams（validateParams 不报错）
+    const sentData = mockSend.mock.calls[0][0] as {
+      data: { resolvedParams: Record<string, unknown> };
+    };
+    expect(sentData.data.resolvedParams).not.toHaveProperty("conversationId");
+  });
+
+  test("conversationId 未设时 run 行的 conversationId 为 null（不破坏现有路径）", async () => {
+    mockList.mockResolvedValue([makeRow({ executionMode: "async" })]);
+    mockInsertRun.mockResolvedValue({ id: "run-conv-2" });
+
+    const cliToolset = await createCliToolset("org-1", { authorityLevel: "executor" });
+    const wrapped = toVercelTools(
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { organizationId: "org-1", operatorId: "op-1" }, // no conversationId
+      undefined,
+      cliToolset,
+    );
+
+    const exec = wrapped["cli__ffmpeg-transcode"].execute as (
+      a: Record<string, unknown>,
+      o: unknown,
+    ) => Promise<unknown>;
+    await exec({ source: "asset-1", ext: "mp4" }, { toolCallId: "tc", messages: [] });
+
+    expect(mockInsertRun).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: null }),
+    );
   });
 });

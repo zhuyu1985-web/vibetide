@@ -75,6 +75,62 @@ describe("toVercelTools — cliTools (M3.6)", () => {
     );
   });
 
+  it("wrapToolExecuteWithContext 注入 conversationId — 与 missionId 行为一致", async () => {
+    const executeMock = vi.fn().mockResolvedValue({ success: true });
+    const tools = toVercelTools(
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { organizationId: "org-1", operatorId: "op-1", conversationId: "conv-42" },
+      undefined,
+      {
+        "cli__y": {
+          execute: executeMock,
+        },
+      } as never,
+    );
+
+    await (
+      tools["cli__y"].execute as (
+        args: Record<string, unknown>,
+        opts: unknown,
+      ) => Promise<unknown>
+    )({}, { toolCallId: "tc-2", messages: [] });
+
+    expect(executeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org-1",
+        operatorId: "op-1",
+        conversationId: "conv-42",
+      }),
+      { toolCallId: "tc-2", messages: [] },
+    );
+  });
+
+  it("conversationId 未设时不注入（graceful）", async () => {
+    const executeMock = vi.fn().mockResolvedValue({ success: true });
+    const tools = toVercelTools(
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { organizationId: "org-1", operatorId: "op-1" }, // no conversationId
+      undefined,
+      { "cli__z": { execute: executeMock } } as never,
+    );
+
+    await (
+      tools["cli__z"].execute as (
+        args: Record<string, unknown>,
+        opts: unknown,
+      ) => Promise<unknown>
+    )({}, { toolCallId: "tc-3", messages: [] });
+
+    const calledArgs = executeMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(calledArgs).not.toHaveProperty("conversationId");
+  });
+
   it("cliTools 与 mcpTools 同传 → 两者的 key 都在结果里", () => {
     const tools = toVercelTools(
       [],
