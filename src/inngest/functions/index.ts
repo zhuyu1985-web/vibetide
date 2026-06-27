@@ -79,6 +79,7 @@ import {
   tingwuAnalyze,
   tingwuAnalyzeFailureHandler,
 } from "./tingwu-analyze";
+import { cliRun, cliRunFailureHandler } from "./cli-run";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -183,4 +184,7 @@ export const functions = [
   // 通义听悟 (2026-06-26) — 提交视频 → 轮询 → 转写/关键词/章节写回 asset_segments/tags/articles
   tingwuAnalyze,
   tingwuAnalyzeFailureHandler,
+  // 异步 CLI 工具执行 (M3.8, 2026-06-27) — async cli_tools 后台跑共享管道 → 落产物 + 呈现
+  cliRun,
+  cliRunFailureHandler,
 ];

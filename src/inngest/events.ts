@@ -621,6 +621,22 @@ export type InngestEvents = {
       publicUrl: string;
     };
   };
+  /**
+   * 异步 CLI 工具执行（如 ffmpeg 转码）→ 后台跑共享管道 → 落产物 + 呈现。
+   * cliRun 消费（M3.8）。resolvedParams 是已 validateParams 校验过的业务参数。
+   */
+  "cli/run.requested": {
+    data: {
+      organizationId: string;
+      cliToolId: string;
+      runId: string;
+      resolvedParams: Record<string, unknown>;
+      inputAssetId?: string;
+      missionId?: string;
+      taskId?: string;
+      conversationId?: string;
+    };
+  };
 };
 
 /** scheduled-jobs runner 派发事件时附加的元数据,业务函数可用可不用 */

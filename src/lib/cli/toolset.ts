@@ -9,26 +9,19 @@
  * - 权限闸门：write 类工具仅对 executor / coordinator 暴露；read 类始终暴露。
  * - 单条 cli_tools 行构建失败不阻塞整组（per-tool try/catch）。
  * - execute 永不向外抛：失败一律 return { success:false, error } 并落 run 行。
- * - async 模式工具走占位返回（M3b/M3.8 才真正异步执行）。
+ * - async 模式工具落 queued run 行 + 派 cli/run.requested 事件 → 立即返回（fire-and-return）。
  */
 
 import { tool, type ToolSet } from "ai";
 import { z } from "zod/v4";
 import { listEnabledCliTools, insertCliToolRun, updateCliToolRun } from "@/lib/dal/cli-tools";
-import type { ArgsSchema, FieldSpec, ArgvTemplate, ValidatedParams } from "./argv";
-import { validateParams, resolveArgv } from "./argv";
-import { assertAllowedBinary } from "./allowlist";
-import { runCli } from "./spawn";
-import { withScratchDir } from "./scratch";
+import type { ArgsSchema, FieldSpec, ArgvTemplate } from "./argv";
+import { validateParams } from "./argv";
 import {
-  resolveOrgAsset,
-  downloadObjectToFile,
-  storeBufferAsAsset,
-  probeMedia,
-  type AssetMediaType,
-} from "@/lib/media/asset-io";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+  executeCliPipeline,
+  firstAssetParamValue,
+  CliPipelineError,
+} from "./pipeline";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,73 +94,7 @@ function buildInputSchema(argsSchema: ArgsSchema) {
   return z.object(shape);
 }
 
-/** 从输出扩展名推断 media_assets.type 与 contentType。 */
-function deriveOutputMeta(ext: string): {
-  type: AssetMediaType;
-  contentType: string;
-} {
-  const e = ext.toLowerCase();
-  const video = new Set(["mp4", "mov", "mkv", "webm", "avi", "flv", "m4v"]);
-  const image = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"]);
-  const audio = new Set(["mp3", "wav", "aac", "flac", "ogg", "m4a"]);
-  const CONTENT_TYPES: Record<string, string> = {
-    mp4: "video/mp4",
-    mov: "video/quicktime",
-    webm: "video/webm",
-    mkv: "video/x-matroska",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    mp3: "audio/mpeg",
-    wav: "audio/wav",
-    aac: "audio/aac",
-    flac: "audio/flac",
-    ogg: "audio/ogg",
-    srt: "application/x-subrip",
-    vtt: "text/vtt",
-    txt: "text/plain",
-    pdf: "application/pdf",
-  };
-  const type: AssetMediaType = video.has(e)
-    ? "video"
-    : image.has(e)
-      ? "image"
-      : audio.has(e)
-        ? "audio"
-        : "document";
-  return { type, contentType: CONTENT_TYPES[e] ?? "application/octet-stream" };
-}
-
-/**
- * 从 argsSchema + validatedParams 推断输出文件扩展名。
- * 优先取名为 `ext` / `format` / `outputFormat` 的字符串/枚举参数；否则按工具名兜底。
- */
-function deriveOutputExt(
-  argsSchema: ArgsSchema,
-  validatedParams: ValidatedParams,
-): string {
-  for (const key of ["ext", "format", "outputFormat", "output_ext"]) {
-    const v = validatedParams[key];
-    if (typeof v === "string" && /^[a-zA-Z0-9]{1,8}$/.test(v)) return v.toLowerCase();
-  }
-  // 若 schema 声明了某个枚举字段且其值像扩展名，也接受
-  for (const [key, spec] of Object.entries(argsSchema)) {
-    if (spec.type === "enum") {
-      const v = validatedParams[key];
-      if (typeof v === "string" && /^[a-zA-Z0-9]{1,8}$/.test(v)) return v.toLowerCase();
-    }
-  }
-  return "bin";
-}
-
-/** 从 asset 文件 url / objectKey 推断输入扩展名。 */
-function extFromKey(key: string, fallback = "bin"): string {
-  const base = key.split("?")[0];
-  const m = base.match(/\.([a-zA-Z0-9]{1,8})$/);
-  return m ? m[1].toLowerCase() : fallback;
-}
+// 输出/输入扩展名推断、media type 映射、scratch run 管道均已抽到 ./pipeline（M3.8 DRY）。
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -217,7 +144,6 @@ export async function createCliToolset(
 
 function buildCliTool(orgId: string, row: CliToolRow) {
   const argsSchema = row.argsSchema as ArgsSchema;
-  const argvTemplate = row.argvTemplate as ArgvTemplate;
   const inputSchema = buildInputSchema(argsSchema);
 
   return tool({
@@ -228,24 +154,63 @@ function buildCliTool(orgId: string, row: CliToolRow) {
       try {
         // 0. 剥离 wrapToolExecuteWithContext 注入的上下文键 —— 否则 validateParams
         //    会因 "未知参数 organizationId" 拒掉每一次真实调用（见 RESERVED_CONTEXT_KEYS）。
+        //    注意：execute 仍能从 rawArgs **读** missionId/taskId/operatorId 供异步路径
+        //    填进 run 行 + 事件（conversationId 不在注入键里，见下方说明）。
         const cliArgs = Object.fromEntries(
           Object.entries(rawArgs).filter(([k]) => !RESERVED_CONTEXT_KEYS.has(k)),
         );
 
         // 1. 服务端再校验（拒绝未知参数 / 类型 / 范围 / 正则）
         const params = validateParams(argsSchema, cliArgs);
+        const inputAssetId = firstAssetParamValue(argsSchema, params);
 
-        // 2. async 模式 → 占位返回，不实际运行（M3.8 替换此分支）
+        // 2. async 模式 → 落 queued run 行 + 派 cli/run.requested 事件 → 立即返回。
+        //    重活（下载/转码/落库/呈现）全由 cliRun Inngest 函数后台跑，绝不在此 await。
         if (row.executionMode === "async") {
+          // wrap 注入的上下文键（已被剥离出 cliArgs，但仍可从 rawArgs 读原值）。
+          const missionId = readContextString(rawArgs, "missionId");
+          const taskId = readContextString(rawArgs, "taskId");
+          // conversationId 当前不由 wrap 注入 → 异步路径拿不到。mission 控制台呈现走
+          // missionId 仍可用；cowork 卡片需 conversationId，v1 不串接（可接受，见 spec）。
+          const conversationId = readContextString(rawArgs, "conversationId");
+
+          const created = await insertCliToolRun({
+            organizationId: orgId,
+            cliToolId: row.id,
+            status: "queued",
+            inputAssetId: inputAssetId ?? null,
+            missionId: missionId ?? null,
+            taskId: taskId ?? null,
+            conversationId: conversationId ?? null,
+          });
+          runId = created.id;
+
+          const { inngest } = await import("@/inngest/client");
+          await inngest.send({
+            // 去重 id：同 run 行只派一次（Inngest event dedup）。
+            id: runId,
+            name: "cli/run.requested",
+            data: {
+              organizationId: orgId,
+              cliToolId: row.id,
+              runId,
+              resolvedParams: params as Record<string, unknown>,
+              inputAssetId: inputAssetId ?? undefined,
+              missionId: missionId ?? undefined,
+              taskId: taskId ?? undefined,
+              conversationId: conversationId ?? undefined,
+            },
+          });
+
           return {
-            success: false,
-            status: "pending",
-            message: "该工具为异步执行，将在后续版本启用",
+            success: true,
+            status: "queued",
+            runId,
+            message: "已提交，完成后产物会出现在任务产出区",
           };
         }
 
         // 3. 同步路径 —— 先建 run 行（processing）
-        const inputAssetId = firstAssetParamValue(argsSchema, params);
         const created = await insertCliToolRun({
           organizationId: orgId,
           cliToolId: row.id,
@@ -254,84 +219,43 @@ function buildCliTool(orgId: string, row: CliToolRow) {
         });
         runId = created.id;
 
-        return await withScratchDir(async (dir) => {
-          // 3a. 解析 + 下载所有 asset 类参数，替换为本地 scratch 输入路径
-          const resolvedParams: ValidatedParams = { ...params };
-          for (const [pKey, spec] of Object.entries(argsSchema)) {
-            if (spec.type !== "asset") continue;
-            const assetId = params[pKey];
-            if (typeof assetId !== "string" || !assetId) continue;
-            const asset = await resolveOrgAsset(orgId, assetId);
-            if (!asset || !asset.tosObjectKey) {
-              throw new Error("资产不存在或无权访问");
-            }
-            const inExt = extFromKey(asset.tosObjectKey);
-            const inPath = path.join(dir, `in_${sanitize(pKey)}.${inExt}`);
-            await downloadObjectToFile(asset.tosObjectKey, inPath);
-            resolvedParams[pKey] = inPath;
-          }
+        // 4. 跑共享管道（下载 → 白名单 → spawn → 落 asset）。
+        //    row.argsSchema/argvTemplate 是 jsonb（unknown），收窄到管道契约类型。
+        const out = await executeCliPipeline(orgId, {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          command: row.command,
+          argsSchema,
+          argvTemplate: row.argvTemplate as ArgvTemplate,
+          syncTimeoutMs: row.syncTimeoutMs,
+        }, params);
 
-          // 3b. 白名单闸门
-          assertAllowedBinary(row.command);
-
-          // 3c. 输出 scratch 路径
-          const outExt = deriveOutputExt(argsSchema, params);
-          const outputPath = path.join(dir, `out.${outExt}`);
-
-          // 3d. 解析 argv（每个 token → 恰好一个 argv 元素，零注入）
-          const argv = resolveArgv(argvTemplate, resolvedParams, outputPath);
-
-          // 3e. spawn（shell:false）
-          const { exitCode, stderrTail } = await runCli(row.command, argv, {
-            cwd: dir,
-            timeoutMs: row.syncTimeoutMs,
-          });
-
-          if (exitCode !== 0) {
-            await updateCliToolRun(runId!, {
-              status: "failed",
-              exitCode,
-              stderrTail,
-              argvResolved: argv,
-              finishedAt: new Date(),
-            });
-            return {
-              success: false,
-              error: `CLI 退出码 ${exitCode}`,
-              stderrTail,
-            };
-          }
-
-          // 3f. 读输出 → 探测元数据 → 落 media_assets
-          const buf = await fs.readFile(outputPath);
-          const meta = await probeMedia(outputPath);
-          const { type, contentType } = deriveOutputMeta(outExt);
-          const { assetId, publicUrl } = await storeBufferAsAsset(buf, {
-            organizationId: orgId,
-            slug: row.slug,
-            ext: outExt,
-            contentType,
-            type,
-            title: `${row.name} 输出`,
-            inputAssetId: inputAssetId ?? undefined,
-            durationSeconds: meta.durationSeconds,
-            width: meta.width,
-            height: meta.height,
-          });
-
-          await updateCliToolRun(runId!, {
-            status: "done",
-            outputAssetId: assetId,
-            argvResolved: argv,
-            exitCode,
-            finishedAt: new Date(),
-          });
-
-          return { success: true, assetId, publicUrl };
+        await updateCliToolRun(runId, {
+          status: "done",
+          outputAssetId: out.assetId,
+          argvResolved: out.argvResolved,
+          exitCode: out.exitCode,
+          finishedAt: new Date(),
         });
+
+        return { success: true, assetId: out.assetId, publicUrl: out.publicUrl };
       } catch (e) {
         // execute 永不抛 —— 落 run 行后返回 {success:false,error}
+        // CLI 非零退出码（CliPipelineError）额外回传 exitCode/stderrTail。
         const errMsg = e instanceof Error ? e.message : String(e);
+        if (e instanceof CliPipelineError) {
+          if (runId) {
+            await updateCliToolRun(runId, {
+              status: "failed",
+              exitCode: e.exitCode,
+              stderrTail: e.stderrTail,
+              argvResolved: e.argvResolved,
+              finishedAt: new Date(),
+            }).catch(() => {});
+          }
+          return { success: false, error: errMsg, stderrTail: e.stderrTail };
+        }
         if (runId) {
           await updateCliToolRun(runId, {
             status: "failed",
@@ -347,17 +271,13 @@ function buildCliTool(orgId: string, row: CliToolRow) {
   });
 }
 
-/** 取第一个 asset 类参数的值（用于 run 行的 inputAssetId 记录）。 */
-function firstAssetParamValue(
-  argsSchema: ArgsSchema,
-  params: ValidatedParams,
+/** 从 rawArgs 读注入的上下文字符串值（非空字符串才返回）。 */
+function readContextString(
+  rawArgs: Record<string, unknown>,
+  key: string,
 ): string | undefined {
-  for (const [key, spec] of Object.entries(argsSchema)) {
-    if (spec.type === "asset" && typeof params[key] === "string") {
-      return params[key] as string;
-    }
-  }
-  return undefined;
+  const v = rawArgs[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 // re-export for downstream typing convenience

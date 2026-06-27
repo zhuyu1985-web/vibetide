@@ -30,6 +30,11 @@ vi.mock("@/lib/media/asset-io", () => ({
   probeMedia: vi.fn(),
 }));
 
+// inngest client — async 路径 fire-and-return（动态 import）
+vi.mock("@/inngest/client", () => ({
+  inngest: { send: vi.fn().mockResolvedValue(undefined) },
+}));
+
 // argv: keep real validateParams/resolveArgv? We mock to isolate the pipeline,
 // but validateParams must still reject unknown — so use lightweight fakes that
 // preserve the contract used by the toolset.
@@ -65,6 +70,7 @@ import {
   storeBufferAsAsset,
   probeMedia,
 } from "@/lib/media/asset-io";
+import { inngest } from "@/inngest/client";
 import { createCliToolset } from "../toolset";
 
 const mockList = vi.mocked(listEnabledCliTools);
@@ -77,6 +83,7 @@ const mockResolveAsset = vi.mocked(resolveOrgAsset);
 const mockDownload = vi.mocked(downloadObjectToFile);
 const mockStore = vi.mocked(storeBufferAsAsset);
 const mockProbe = vi.mocked(probeMedia);
+const mockSend = vi.mocked(inngest.send);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -208,11 +215,12 @@ describe("createCliToolset — sync execute pipeline", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ③ Async-mode placeholder
+// ③ Async-mode enqueue（M3.8 替换占位）
 // ---------------------------------------------------------------------------
 
-describe("createCliToolset — async placeholder", () => {
-  test("async 工具返回 pending 占位且不运行管道", async () => {
+describe("createCliToolset — async enqueue", () => {
+  test("async 工具落 queued run 行 + 派 cli/run.requested + 返回 {status:queued,runId}，不跑同步管道", async () => {
+    mockInsertRun.mockResolvedValue({ id: "run-async-1" });
     mockList.mockResolvedValue([makeRow({ executionMode: "async" })]);
     const ts = await createCliToolset("org-1", { authorityLevel: "executor" });
     const exec = getExecute(ts, "cli__ffmpeg-transcode");
@@ -220,14 +228,73 @@ describe("createCliToolset — async placeholder", () => {
     const out = (await exec({ source: "asset-1", ext: "mp4" })) as {
       success: boolean;
       status?: string;
+      runId?: string;
     };
 
-    expect(out.success).toBe(false);
-    expect(out.status).toBe("pending");
-    // 没有真正运行
-    expect(mockInsertRun).not.toHaveBeenCalled();
+    expect(out.success).toBe(true);
+    expect(out.status).toBe("queued");
+    expect(out.runId).toBe("run-async-1");
+
+    // 落 queued run 行（带 inputAssetId）
+    expect(mockInsertRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org-1",
+        cliToolId: "tool-1",
+        status: "queued",
+        inputAssetId: "asset-1",
+      }),
+    );
+
+    // 派 cli/run.requested 事件，dedup id = runId，携带 resolvedParams
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "run-async-1",
+        name: "cli/run.requested",
+        data: expect.objectContaining({
+          organizationId: "org-1",
+          cliToolId: "tool-1",
+          runId: "run-async-1",
+          inputAssetId: "asset-1",
+          resolvedParams: expect.objectContaining({ source: "asset-1", ext: "mp4" }),
+        }),
+      }),
+    );
+
+    // 绝不在 execute 内跑同步管道
     expect(mockRunCli).not.toHaveBeenCalled();
     expect(mockStore).not.toHaveBeenCalled();
+    expect(mockUpdateRun).not.toHaveBeenCalled();
+  });
+
+  test("async 工具从 rawArgs 读注入的 missionId/taskId 填进 run 行与事件", async () => {
+    mockInsertRun.mockResolvedValue({ id: "run-async-2" });
+    mockList.mockResolvedValue([makeRow({ executionMode: "async" })]);
+    const ts = await createCliToolset("org-1", { authorityLevel: "executor" });
+    const exec = getExecute(ts, "cli__ffmpeg-transcode");
+
+    // 模拟 wrap 把上下文键合并进 args
+    await exec({
+      source: "asset-1",
+      ext: "mp4",
+      organizationId: "org-1",
+      missionId: "m-9",
+      taskId: "t-9",
+    });
+
+    expect(mockInsertRun).toHaveBeenCalledWith(
+      expect.objectContaining({ missionId: "m-9", taskId: "t-9" }),
+    );
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ missionId: "m-9", taskId: "t-9" }),
+      }),
+    );
+    // 注入键不会污染 resolvedParams（被 RESERVED_CONTEXT_KEYS 剥离）
+    const sentData = mockSend.mock.calls[0][0] as {
+      data: { resolvedParams: Record<string, unknown> };
+    };
+    expect(sentData.data.resolvedParams).not.toHaveProperty("organizationId");
+    expect(sentData.data.resolvedParams).not.toHaveProperty("missionId");
   });
 });
 
