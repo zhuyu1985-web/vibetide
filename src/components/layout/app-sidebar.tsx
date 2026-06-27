@@ -13,6 +13,8 @@ import {
   ChevronDown,
   Clock,
   Tags,
+  Server,
+  Terminal,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -79,6 +81,8 @@ const ADMIN_ITEMS: DashboardSubItem[] = [
   { label: "组织管理", href: "/admin/organizations", icon: Building2 },
   { label: "定时任务", href: "/settings/scheduled-jobs", icon: Clock },
   { label: "领域", href: "/settings/domains", icon: Tags },
+  { label: "MCP 服务器", href: "/settings/mcp", icon: Server },
+  { label: "CLI 工具", href: "/settings/cli-tools", icon: Terminal },
 ];
 
 /* ─── Helpers ─── */
