@@ -3,6 +3,17 @@
  */
 
 /**
+ * Human-readable file size.
+ * Examples: "1.2 GB" / "500.0 MB" / "42 KB" / "512 B"
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+/**
  * Relative time in Chinese, falls back to absolute date for old entries.
  * Example: "刚刚" / "3 分钟前" / "2 小时前" / "昨天 14:32" / "2026-04-10"
  */

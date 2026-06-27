@@ -8,19 +8,13 @@ import { revalidatePath } from "next/cache";
 import { deleteObject } from "@/lib/storage";
 import { getAssetsByLibrary } from "@/lib/dal/assets";
 import type { MediaAssetType, SecurityLevel, MediaLibraryType } from "@/lib/types";
+import { formatFileSize } from "@/lib/format";
 async function getProfile(authUserId: string) {
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, authUserId),
   });
   if (!profile) throw new Error("Profile not found");
   return profile;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${bytes} B`;
 }
 
 const REVALIDATE_PATHS = ["/media-assets", "/asset-intelligence"];
