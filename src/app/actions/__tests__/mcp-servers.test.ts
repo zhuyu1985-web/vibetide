@@ -22,6 +22,12 @@ vi.mock("@/lib/mcp/crypto-headers", () => ({
   encryptHeaders: vi.fn((h: Record<string, string>) =>
     Buffer.from(JSON.stringify(h)).toString("base64")
   ),
+  decryptHeaders: vi.fn(() => ({})),
+}));
+
+const connectMcpServerMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/mcp/toolset", () => ({
+  connectMcpServer: connectMcpServerMock,
 }));
 
 vi.mock("@/lib/dal/mcp-servers", () => ({
@@ -74,9 +80,15 @@ beforeEach(() => {
     id: "server-1",
     organizationId: "org1",
     url: "https://mcp.example.com/sse",
+    encryptedHeaders: null,
     connectTimeoutMs: 8000,
     lastConnectedAt: null,
     lastError: null,
+  });
+  connectMcpServerMock.mockReset();
+  connectMcpServerMock.mockResolvedValue({
+    toolNames: ["tool1", "tool2"],
+    close: vi.fn().mockResolvedValue(undefined),
   });
 });
 
@@ -240,45 +252,36 @@ describe("testMcpServer", () => {
     });
   });
 
-  it("returns ok:true on reachable server (2xx)", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValue({ ok: true, status: 200 } as Response);
-
+  it("returns ok:true and toolCount on successful MCP connect", async () => {
     const result = await testMcpServer("server-1");
     expect(result.ok).toBe(true);
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://mcp.example.com/sse",
-      expect.objectContaining({ method: "HEAD" })
-    );
+    expect(result.toolCount).toBe(2);
+    expect(connectMcpServerMock).toHaveBeenCalledTimes(1);
   });
 
-  it("returns ok:false on 5xx server error", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 503 } as Response);
-
-    const result = await testMcpServer("server-1");
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("503");
+  it("writes lastConnectedAt and toolCount to DB on success", async () => {
+    await testMcpServer("server-1");
+    expect(updateSetCalls.length).toBeGreaterThan(0);
+    const lastSet = updateSetCalls[updateSetCalls.length - 1].values;
+    expect(lastSet.toolCount).toBe(2);
+    expect(lastSet.lastError).toBeNull();
+    expect(lastSet.lastConnectedAt).toBeInstanceOf(Date);
   });
 
-  it("returns ok:false and error message on network error", async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
+  it("returns ok:false and error message when connectMcpServer throws", async () => {
+    connectMcpServerMock.mockRejectedValue(new Error("ECONNREFUSED"));
 
     const result = await testMcpServer("server-1");
     expect(result.ok).toBe(false);
     expect(result.error).toBe("ECONNREFUSED");
   });
 
-  it("uses AbortSignal.timeout with connectTimeoutMs from config", async () => {
-    const spy = vi.spyOn(AbortSignal, "timeout");
-    global.fetch = vi
-      .fn()
-      .mockResolvedValue({ ok: true, status: 200 } as Response);
+  it("writes lastError to DB when connectMcpServer throws", async () => {
+    connectMcpServerMock.mockRejectedValue(new Error("timeout"));
 
     await testMcpServer("server-1");
-    expect(spy).toHaveBeenCalledWith(8000);
-    spy.mockRestore();
+    expect(updateSetCalls.length).toBeGreaterThan(0);
+    const lastSet = updateSetCalls[updateSetCalls.length - 1].values;
+    expect(lastSet.lastError).toBe("timeout");
   });
 });

@@ -8,6 +8,7 @@ import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import { validatePluginUrl } from "@/lib/plugin-security";
 import { encryptHeaders } from "@/lib/mcp/crypto-headers";
+import { connectMcpServer } from "@/lib/mcp/toolset";
 import { getMcpServerById } from "@/lib/dal/mcp-servers";
 
 // ---------------------------------------------------------------------------
@@ -160,15 +161,14 @@ export async function deleteMcpServer(serverId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// 5. testMcpServer — 轻量可达性检测（M1 scope: HEAD 探测）
+// 5. testMcpServer — 完整 MCP 连接测试（M2: 使用 connectMcpServer 真实联通）
 //
-// NOTE: M2 将引入 createMcpToolset（@ai-sdk/mcp）做完整工具列表联通测试；
-// 此处仅做 HTTP HEAD 探测，确认端点可达即可。届时把这里的 fetch 替换为
-// createMcpToolset({ url, headers }) 并把 toolCount 写回数据库。
+// 连接 MCP 服务器、列出工具列表，把 toolCount / lastConnectedAt / lastError
+// 写回数据库。不抛出异常，始终返回 { ok, toolCount?, error? }。
 // ---------------------------------------------------------------------------
 export async function testMcpServer(
   serverId: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; toolCount?: number; error?: string }> {
   const orgId = await requireOrg();
 
   const existing = await getMcpServerById(orgId, serverId);
@@ -179,33 +179,28 @@ export async function testMcpServer(
   if (!check.valid) return { ok: false, error: check.error };
 
   try {
-    const resp = await fetch(existing.url, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(existing.connectTimeoutMs),
-    });
+    const handle = await connectMcpServer(existing);
+    const toolCount = handle.toolNames.length;
 
-    if (resp.ok || resp.status < 500) {
-      // 2xx / 3xx / 4xx all mean the server is reachable
-      await db
-        .update(mcpServers)
-        .set({ lastConnectedAt: new Date(), lastError: null })
-        .where(
-          and(eq(mcpServers.id, serverId), eq(mcpServers.organizationId, orgId))
-        );
-      return { ok: true };
-    }
-
-    const errMsg = `服务器返回 ${resp.status}`;
+    // Write success metrics back to DB
     await db
       .update(mcpServers)
-      .set({ lastError: errMsg })
+      .set({
+        lastConnectedAt: new Date(),
+        toolCount,
+        lastError: null,
+      })
       .where(
         and(eq(mcpServers.id, serverId), eq(mcpServers.organizationId, orgId))
       );
-    return { ok: false, error: errMsg };
+
+    // Close the test connection
+    await handle.close().catch(() => {});
+
+    revalidatePath("/settings/mcp");
+    return { ok: true, toolCount };
   } catch (err) {
-    const errMsg =
-      err instanceof Error ? err.message : "连接失败";
+    const errMsg = err instanceof Error ? err.message : "连接失败";
     await db
       .update(mcpServers)
       .set({ lastError: errMsg })
