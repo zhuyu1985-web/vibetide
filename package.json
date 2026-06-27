@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/mcp": "^2.0.2",
     "@ai-sdk/openai": "^3.0.48",
     "@alicloud/openapi-client": "^0.4.15",
     "@alicloud/openapi-util": "^0.3.3",
