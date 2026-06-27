@@ -573,14 +573,15 @@ export function CliToolsClient({
 
       {/* ── 执行记录 ── */}
       <GlassCard className="overflow-hidden">
-        <button
+        <Button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/30 transition-colors"
+          variant="ghost"
+          className="w-full flex items-center justify-between px-4 py-3 h-auto text-sm font-medium"
           onClick={() => setRunsCollapsed((c) => !c)}
         >
           <span>执行记录（最近 {runs.length} 条）</span>
           {runsCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-        </button>
+        </Button>
         {!runsCollapsed && (
           <div className="border-t border-border">
             {runs.length === 0 ? (
