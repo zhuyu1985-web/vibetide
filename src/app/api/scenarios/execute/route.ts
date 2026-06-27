@@ -13,6 +13,8 @@ import { assembleAgent } from "@/lib/agent/assembly";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import { renderScenarioTemplate } from "@/lib/scenario-template";
 import { notifyChatMessage } from "@/lib/channels/chat-notifier";
+import { createMcpToolset } from "@/lib/mcp/toolset";
+import { isMcpEnabled } from "@/lib/mcp/feature-flags";
 
 const TOOL_LABELS: Record<string, string> = {
   web_search: "正在搜索互联网资料",
@@ -158,12 +160,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // MCP toolset: connect org-enabled MCP servers (feature-flagged, degrades on failure)
+    const mcp = isMcpEnabled() ? await createMcpToolset(organizationId) : null;
+
     const vercelTools = toVercelTools(
       agent.tools,
       agent.pluginConfigs,
       undefined, // missionTools
       undefined, // knowledgeBaseTools
       { organizationId, operatorId: user.id },
+      mcp?.tools,
     );
 
     const result = streamText({
@@ -255,6 +261,7 @@ export async function POST(req: Request) {
           } catch {
             // Already closed
           }
+          await mcp?.close();
 
           if (assistantText.trim()) {
             void notifyChatMessage({

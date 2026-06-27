@@ -20,6 +20,8 @@ import {
   detectReviewDecision,
   resolveAndNotify,
 } from "@/lib/channels/content-loop/review-followup";
+import { createMcpToolset } from "@/lib/mcp/toolset";
+import { isMcpEnabled } from "@/lib/mcp/feature-flags";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -212,6 +214,9 @@ export async function POST(req: Request) {
         console.error("[intent-execute] Failed to log intent:", err)
       );
 
+    // MCP toolset: connect org-enabled MCP servers once for this request (feature-flagged)
+    const mcp = isMcpEnabled() ? await createMcpToolset(orgId) : null;
+
     // Build SSE stream
     const encoder = new TextEncoder();
     const allSources: string[] = [];
@@ -267,6 +272,7 @@ export async function POST(req: Request) {
               undefined, // missionTools
               undefined, // knowledgeBaseTools
               { organizationId: orgId, operatorId: user.id },
+              mcp?.tools,
             );
 
             // ── Server-side tool pre-execution (anti-hallucination) ─────────
@@ -1043,6 +1049,7 @@ ${formattedTopics}
           } catch {
             // Already closed
           }
+          await mcp?.close();
 
           // Fire-and-forget channel sync
           if (fullAssistantOutput.trim() && message) {
