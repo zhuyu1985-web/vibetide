@@ -189,6 +189,59 @@ describe("createMcpToolset", () => {
     expect(clientA.close).toHaveBeenCalled();
     expect(clientB.close).toHaveBeenCalled();
   });
+
+  test("⑥ server whose tools() hangs is timed out & skipped — timeout covers tools(), not just handshake", async () => {
+    // Server A: handshake succeeds but tools() NEVER resolves (hangs).
+    //   The only way this server can be skipped is if the per-server timeout
+    //   gates the tools() call as well as the handshake.
+    // Server B: fully healthy → its tool must still be returned.
+    const serverA = makeServer({
+      id: "srv-a",
+      slug: "server-a",
+      connectTimeoutMs: 50, // short timeout so the test stays fast
+    });
+    const serverB = makeServer({
+      id: "srv-b",
+      slug: "server-b",
+      connectTimeoutMs: 50,
+    });
+    mockListEnabledMcpServers.mockResolvedValue([serverA, serverB]);
+
+    const hangingClient = {
+      close: vi.fn().mockResolvedValue(undefined),
+      // tools() resolves only if/when the abort signal fires; otherwise hangs.
+      tools: vi.fn().mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            // Listen for the controller abort that the timeout triggers.
+            // We can't see the controller directly, so we just never resolve;
+            // the implementation must reject the race when the timer fires.
+            void reject;
+          })
+      ),
+    } as unknown as MCPClient;
+    const healthyClient = makeClient({ ok: { execute: vi.fn() } });
+
+    mockCreateMCPClient
+      .mockResolvedValueOnce(hangingClient)
+      .mockResolvedValueOnce(healthyClient);
+
+    const start = Date.now();
+    // Must resolve well within a reasonable bound (timeout is 50ms, not ∞).
+    const { tools, close } = await createMcpToolset("org-1");
+    const elapsed = Date.now() - start;
+
+    // The hanging server was timed out and skipped.
+    expect(
+      Object.keys(tools).some((k) => k.startsWith("mcp__server-a__"))
+    ).toBe(false);
+    // The healthy server still returned its tool — degrade-don't-block held.
+    expect(tools["mcp__server-b__ok"]).toBeDefined();
+    // createMcpToolset did NOT hang on the bad server.
+    expect(elapsed).toBeLessThan(2000);
+
+    await close();
+  });
 });
 
 describe("connectMcpServer (helper)", () => {

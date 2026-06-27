@@ -24,6 +24,8 @@ type McpServerRow = Awaited<ReturnType<typeof listEnabledMcpServers>>[number];
 
 /** 连接单台服务器后返回的 handle */
 export interface McpServerHandle {
+  /** 服务器返回的原始 ToolSet（键为服务器侧原始工具名，未命名空间化） */
+  rawTools: ToolSet;
   /** 服务器返回的原始工具名列表 */
   toolNames: string[];
   /** 关闭连接 */
@@ -43,6 +45,11 @@ function sanitize(s: string): string {
  * 连接单台 MCP 服务器，列出工具，返回 handle。
  * 超时通过 AbortController + setTimeout 实现（@ai-sdk/mcp 无内置超时选项）。
  *
+ * 关键：超时同时 gate「握手 createMCPClient」与「列举 client.tools()」两步。
+ * timeoutPromise 与 connect+tools() 的整个序列 race；自定义 fetch 把同一个
+ * abort signal 注入两步的 HTTP 请求，所以超时触发时 tools() 的网络请求也会
+ * 被 abort 抛错。clearTimeout 只在两步都完成后才执行，绝不提前解除定时器。
+ *
  * 失败时抛出异常（由调用方 createMcpToolset 捕获并降级处理）。
  */
 export async function connectMcpServer(
@@ -58,44 +65,51 @@ export async function connectMcpServer(
 
   let client: Awaited<ReturnType<typeof createMCPClient>> | undefined;
 
+  // Rejects when the timer fires (abort). Raced against the FULL connect+list
+  // sequence so a hanging handshake OR a hanging tools() both trip the timeout.
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener("abort", () =>
+      reject(new Error(`MCP 服务器连接超时（${timeoutMs}ms）：${server.url}`))
+    );
+  });
+
   try {
-    // Use Promise.race so a hanging createMCPClient call is also covered
-    const connectPromise = createMCPClient({
-      transport: {
-        type: "http",
-        url: server.url,
-        headers,
-        fetch: (input, init) => {
-          // Merge our abort signal with any signal already present in init
-          const existingSignal = (init as RequestInit | undefined)?.signal;
-          const signal = existingSignal
-            ? AbortSignal.any([controller.signal, existingSignal])
-            : controller.signal;
-          return fetch(input, { ...(init as RequestInit), signal });
-        },
-      },
-    });
+    // Single async sequence: handshake THEN list tools. clearTimeout happens
+    // only at the very end of this block — after BOTH steps complete — so the
+    // abort signal remains armed throughout tools().
+    const handle = await Promise.race([
+      (async () => {
+        client = await createMCPClient({
+          transport: {
+            type: "http",
+            url: server.url,
+            headers,
+            fetch: (input, init) => {
+              // Merge our abort signal with any signal already present in init
+              const existingSignal = (init as RequestInit | undefined)?.signal;
+              const signal = existingSignal
+                ? AbortSignal.any([controller.signal, existingSignal])
+                : controller.signal;
+              return fetch(input, { ...(init as RequestInit), signal });
+            },
+          },
+        });
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      // Reuse the same controller — if timer fires it aborts and this rejects
-      controller.signal.addEventListener("abort", () =>
-        reject(new Error(`MCP 服务器连接超时（${timeoutMs}ms）：${server.url}`))
-      );
-    });
+        const rawTools = (await client.tools()) as ToolSet;
+        return {
+          rawTools,
+          toolNames: Object.keys(rawTools),
+          close: () => client!.close(),
+        } satisfies McpServerHandle;
+      })(),
+      timeoutPromise,
+    ]);
 
-    client = await Promise.race([connectPromise, timeoutPromise]);
     clearTimeout(timer);
-
-    const rawTools = await client.tools();
-    const toolNames = Object.keys(rawTools);
-
-    return {
-      toolNames,
-      close: () => client!.close(),
-    };
+    return handle;
   } catch (err) {
     clearTimeout(timer);
-    // If client was opened before error, close it best-effort
+    // If client was opened before error/timeout, close it best-effort
     if (client) {
       client.close().catch(() => {});
     }
@@ -127,54 +141,14 @@ export async function createMcpToolset(organizationId: string): Promise<{
   await Promise.all(
     servers.map(async (server) => {
       try {
-        // Connect + list — single-server helper handles timeout
-        const timeoutMs = server.connectTimeoutMs ?? 8000;
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-        const headers = decryptHeaders(server.encryptedHeaders);
-        let client: Awaited<ReturnType<typeof createMCPClient>> | undefined;
-
-        try {
-          const connectPromise = createMCPClient({
-            transport: {
-              type: "http",
-              url: server.url,
-              headers,
-              fetch: (input, init) => {
-                const existingSignal = (init as RequestInit | undefined)
-                  ?.signal;
-                const signal = existingSignal
-                  ? AbortSignal.any([controller.signal, existingSignal])
-                  : controller.signal;
-                return fetch(input, { ...(init as RequestInit), signal });
-              },
-            },
-          });
-
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            controller.signal.addEventListener("abort", () =>
-              reject(
-                new Error(
-                  `MCP 服务器连接超时（${timeoutMs}ms）：${server.url}`
-                )
-              )
-            );
-          });
-
-          client = await Promise.race([connectPromise, timeoutPromise]);
-          clearTimeout(timer);
-        } catch (err) {
-          clearTimeout(timer);
-          throw err;
-        }
-
-        // List tools from server
-        const rawTools = await client.tools();
-        closers.push(() => client!.close());
+        // Connect + list via shared helper. Its timeout gates BOTH the
+        // handshake and tools() — a hanging server trips connectTimeoutMs
+        // and lands in the catch below (degrade), never stalling Promise.all.
+        const handle = await connectMcpServer(server);
+        closers.push(handle.close);
 
         // Merge into combined toolset with namespaced, sanitized keys
-        for (const [name, def] of Object.entries(rawTools)) {
+        for (const [name, def] of Object.entries(handle.rawTools)) {
           const key = sanitize(`mcp__${server.slug}__${name}`);
           tools[key] = def as ToolSet[string];
         }
@@ -184,7 +158,7 @@ export async function createMcpToolset(organizationId: string): Promise<{
           .update(mcpServers)
           .set({
             lastConnectedAt: new Date(),
-            toolCount: Object.keys(rawTools).length,
+            toolCount: handle.toolNames.length,
             lastError: null,
           })
           .where(eq(mcpServers.id, server.id));
