@@ -66,8 +66,10 @@ export function validateParams(
   params: Record<string, unknown>
 ): ValidatedParams {
   // 1. 拒绝未知字段——防止 LLM 注入 schema 以外的参数
+  //    必须用 hasOwnProperty（不是 `in`）：`in` 会走原型链，
+  //    使 `toString`/`constructor`/`__proto__` 等原型键被误判为"已声明"从而走私通过。
   for (const key of Object.keys(params)) {
-    if (!(key in argsSchema)) {
+    if (!Object.prototype.hasOwnProperty.call(argsSchema, key)) {
       throw new Error(`未知参数 "${key}"，不在 schema 中声明`);
     }
   }
@@ -142,7 +144,9 @@ export function validateParams(
           );
         }
         if (spec.regex !== undefined) {
-          const pattern = new RegExp(spec.regex);
+          // 自动全串锚定：包裹 ^(?:...)$ 使运营写的 regex 默认必须匹配整个值，
+          // 消除"regex:'mp4' 误放行 'mp4; rm -rf /'"这类非锚定尖角。
+          const pattern = new RegExp(`^(?:${spec.regex})$`);
           if (!pattern.test(raw)) {
             throw new Error(
               `参数 "${key}" 的值 "${raw}" 不匹配正则 /${spec.regex}/`
@@ -204,13 +208,21 @@ export function resolveArgv(
     // {param} token — 替换为校验后的参数值（单个元素，String 强制转型）
     if ("param" in token) {
       const name = token.param;
-      if (!(name in validatedParams)) {
+      if (!Object.prototype.hasOwnProperty.call(validatedParams, name)) {
         throw new Error(
           `argv 模板引用了未知参数 "${name}"，validatedParams 中无此键`
         );
       }
+      const value = validatedParams[name];
+      // 防御纵深：即使上游 validateParams 被绕过或事后改动 params，
+      // 也拒绝非 string/number 值，避免静默产出 "[object Object]" 等损坏 argv。
+      if (typeof value !== "string" && typeof value !== "number") {
+        throw new Error(
+          `参数 "${name}" 的值类型非法（${typeof value}），只允许 string | number`
+        );
+      }
       // String() 转型确保数字也能正确输出，且绝不分割
-      return String(validatedParams[name]);
+      return String(value);
     }
 
     // TypeScript 穷举检查

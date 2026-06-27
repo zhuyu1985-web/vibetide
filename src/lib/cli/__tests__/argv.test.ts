@@ -43,6 +43,33 @@ describe("validateParams() — 安全边界", () => {
     ).toThrow();
   });
 
+  it("原型键 toString 走私被拒绝（不能用 in 绕过未知字段门）", () => {
+    expect(() =>
+      validateParams(
+        schema,
+        JSON.parse('{"input":"a","fmt":"mp4","toString":"x"}')
+      )
+    ).toThrow();
+  });
+
+  it("原型键 __proto__ 走私被拒绝", () => {
+    expect(() =>
+      validateParams(
+        schema,
+        JSON.parse('{"input":"a","fmt":"mp4","__proto__":"x"}')
+      )
+    ).toThrow();
+  });
+
+  it("原型键 constructor 走私被拒绝", () => {
+    expect(() =>
+      validateParams(
+        schema,
+        JSON.parse('{"input":"a","fmt":"mp4","constructor":"x"}')
+      )
+    ).toThrow();
+  });
+
   it("空字符串 asset id 被拒绝", () => {
     expect(() => validateParams(schema, { input: "" })).toThrow();
   });
@@ -135,6 +162,40 @@ describe("validateParams() — string 类型 + regex", () => {
   });
 });
 
+describe("validateParams() — regex 自动全串锚定", () => {
+  // 非锚定 regex "mp4" 不应放行 "mp4; rm -rf /"——引擎须自动包裹 ^(?:...)$
+  const anchorSchema: ArgsSchema = {
+    fmt: { type: "string", regex: "mp4" },
+  };
+
+  it("非锚定模式下尾部注入被拒绝（^(?:...)$ 生效）", () => {
+    expect(() =>
+      validateParams(anchorSchema, { fmt: "mp4; rm -rf /" })
+    ).toThrow();
+  });
+
+  it("头部注入被拒绝", () => {
+    expect(() =>
+      validateParams(anchorSchema, { fmt: "; mp4" })
+    ).toThrow();
+  });
+
+  it("整串精确匹配通过", () => {
+    const result = validateParams(anchorSchema, { fmt: "mp4" });
+    expect(result.fmt).toBe("mp4");
+  });
+
+  it("交替分组 regex 仍被整体锚定（不会因 | 拆裂）", () => {
+    const altSchema: ArgsSchema = {
+      fmt: { type: "string", regex: "mp4|gif" },
+    };
+    expect(() => validateParams(altSchema, { fmt: "mp4" })).not.toThrow();
+    expect(() => validateParams(altSchema, { fmt: "gif" })).not.toThrow();
+    // "mp4x" 不应通过：若未用 (?:...) 包裹，^mp4|gif$ 会因 | 优先级匹配 "mp4x" 前缀而误放行
+    expect(() => validateParams(altSchema, { fmt: "mp4x" })).toThrow();
+  });
+});
+
 describe("validateParams() — asset 类型", () => {
   it("asset id 是非空字符串时通过", () => {
     const result = validateParams(schema, { input: "uuid-123", fmt: "mp4" });
@@ -186,7 +247,6 @@ describe("resolveArgv() — 基础映射", () => {
 
 describe("resolveArgv() — 安全注入测试（核心）", () => {
   it("含空格和 shell 元字符的 string 值保持为单个 argv 元素", () => {
-    const s2: ArgsSchema = { note: { type: "string" } };
     const argv = resolveArgv(
       [{ param: "note" }],
       { note: "a b; $(whoami) `id`" },
@@ -198,7 +258,6 @@ describe("resolveArgv() — 安全注入测试（核心）", () => {
   });
 
   it("含换行符的值保持为单个 argv 元素", () => {
-    const s2: ArgsSchema = { note: { type: "string" } };
     const argv = resolveArgv(
       [{ param: "note" }],
       { note: "line1\nline2\n--injected-flag" },
@@ -209,7 +268,6 @@ describe("resolveArgv() — 安全注入测试（核心）", () => {
   });
 
   it("含 null byte 的值保持为单个 argv 元素（不截断）", () => {
-    const s2: ArgsSchema = { note: { type: "string" } };
     const argv = resolveArgv(
       [{ param: "note" }],
       { note: "safe\x00evil" },
@@ -251,6 +309,44 @@ describe("resolveArgv() — 模板中无 {output} 时 outputPath 被忽略", () 
       "/ignored.mp4"
     );
     expect(argv).toEqual(["-y", "/in.mov"]);
+  });
+});
+
+describe("resolveArgv() — 防御纵深守卫", () => {
+  it("{param} 取到非 string/number 值（array）应 throw", () => {
+    expect(() =>
+      resolveArgv(
+        [{ param: "x" }],
+        { x: ["a", "b"] as unknown as string },
+        ""
+      )
+    ).toThrow();
+  });
+
+  it("{param} 取到非 string/number 值（object）应 throw", () => {
+    expect(() =>
+      resolveArgv(
+        [{ param: "x" }],
+        { x: { evil: 1 } as unknown as string },
+        ""
+      )
+    ).toThrow();
+  });
+
+  it("{param} 取到 undefined 值应 throw", () => {
+    expect(() =>
+      resolveArgv(
+        [{ param: "x" }],
+        { x: undefined as unknown as string },
+        ""
+      )
+    ).toThrow();
+  });
+
+  it("模板引用 validatedParams 中不存在的 param 应 throw", () => {
+    expect(() =>
+      resolveArgv([{ param: "missing" }], { input: "/in.mov" }, "")
+    ).toThrow();
   });
 });
 
