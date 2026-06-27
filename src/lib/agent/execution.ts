@@ -3,6 +3,8 @@ import { getLanguageModel, applySkillOverride } from "./model-router";
 import { toVercelTools, createKnowledgeBaseTools, type ToolContext } from "./tool-registry";
 import { createMcpToolset } from "@/lib/mcp/toolset";
 import { isMcpEnabled } from "@/lib/mcp/feature-flags";
+import { createCliToolset } from "@/lib/cli/toolset";
+import { isCliToolsEnabled } from "@/lib/cli/feature-flags";
 import {
   buildStepInstruction,
   formatPreviousStepContext,
@@ -243,6 +245,14 @@ export async function executeAgent(
     ? await createMcpToolset(context.organizationId)
     : null;
 
+  // CLI 工具：把 org 下启用的 cli_tools 暴露为同步执行工具（feature-flagged）。
+  // 普通 in-process ToolSet，无连接，无需 close。
+  const cliTools = isCliToolsEnabled() && context?.organizationId
+    ? await createCliToolset(context.organizationId, {
+        authorityLevel: agent.authorityLevel,
+      })
+    : undefined;
+
   const vercelTools = toVercelTools(
     agent.tools,
     agent.pluginConfigs,
@@ -253,6 +263,7 @@ export async function executeAgent(
       authorityDomains: agent.domainAuthoritySources,
     },
     mcp?.tools,
+    cliTools,
   );
 
   let toolCallCount = 0;

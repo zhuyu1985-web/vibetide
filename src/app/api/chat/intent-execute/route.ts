@@ -22,6 +22,8 @@ import {
 } from "@/lib/channels/content-loop/review-followup";
 import { createMcpToolset } from "@/lib/mcp/toolset";
 import { isMcpEnabled } from "@/lib/mcp/feature-flags";
+import { createCliToolset } from "@/lib/cli/toolset";
+import { isCliToolsEnabled } from "@/lib/cli/feature-flags";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -266,6 +268,11 @@ export async function POST(req: Request) {
             });
 
             const model = getLanguageModel(agent.modelConfig);
+            // CLI toolset: per-step (authorityLevel is per-assembled-agent).
+            // Plain in-process ToolSet, no close needed.
+            const cliTools = isCliToolsEnabled()
+              ? await createCliToolset(orgId, { authorityLevel: agent.authorityLevel })
+              : undefined;
             const vercelTools = toVercelTools(
               agent.tools,
               agent.pluginConfigs,
@@ -273,6 +280,7 @@ export async function POST(req: Request) {
               undefined, // knowledgeBaseTools
               { organizationId: orgId, operatorId: user.id },
               mcp?.tools,
+              cliTools,
             );
 
             // ── Server-side tool pre-execution (anti-hallucination) ─────────
