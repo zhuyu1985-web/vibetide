@@ -2928,6 +2928,7 @@ export function toVercelTools(
   missionTools?: ToolSet,
   knowledgeBaseTools?: ToolSet,
   context?: ToolContext,
+  mcpTools?: ToolSet,
 ): ToolSet {
   const result: ToolSet = {};
 
@@ -2969,6 +2970,16 @@ export function toVercelTools(
   // Merge knowledge base retrieval tools if provided
   if (knowledgeBaseTools) {
     for (const [name, def] of Object.entries(knowledgeBaseTools)) {
+      result[name] = wrapToolExecuteWithContext(
+        def as { execute?: unknown },
+        context,
+      ) as ToolSet[string];
+    }
+  }
+
+  // Merge MCP-derived tools if provided
+  if (mcpTools) {
+    for (const [name, def] of Object.entries(mcpTools)) {
       result[name] = wrapToolExecuteWithContext(
         def as { execute?: unknown },
         context,
