@@ -57,10 +57,29 @@ import { topicCompareBackfill } from "./topic-compare/backfill";
 import { topicCompareFindMatchesOnNew } from "./topic-compare/find-matches-on-new-mypost";
 import { missedTopicDetectionDaily } from "./topic-compare/missed-topic-cron";
 import { channelLinkIngest, channelLinkIngestFailureHandler } from "./channel-link-ingest";
+import { channelVoiceIngest, channelVoiceIngestFailureHandler } from "./channel-voice-ingest";
+import { contentLoopStep, contentLoopStepFailureHandler } from "./content-loop-step";
 import { channelMissionTerminalNotify } from "./channel-mission-terminal-notify";
 import { aigcIllustrate } from "./aigc-illustrate";
 import { aigcVideo } from "./aigc-video";
 import { aigcPodcast } from "./aigc-podcast";
+import {
+  coworkLinkImport,
+  coworkLinkImportFailureHandler,
+} from "./cowork-link-import";
+import {
+  articleAiAnalyze,
+  articleAiAnalyzeFailureHandler,
+} from "./article-ai-analyze";
+import {
+  articleVideoIngest,
+  articleVideoIngestFailureHandler,
+} from "./article-video-ingest";
+import {
+  tingwuAnalyze,
+  tingwuAnalyzeFailureHandler,
+} from "./tingwu-analyze";
+import { cliRun, cliRunFailureHandler } from "./cli-run";
 
 export const functions = [
   // Mission-based multi-agent collaboration
@@ -141,6 +160,10 @@ export const functions = [
   // Channel inbound link ingest (2026-06-19)
   channelLinkIngest,
   channelLinkIngestFailureHandler,
+  channelVoiceIngest,
+  channelVoiceIngestFailureHandler,
+  contentLoopStep,
+  contentLoopStepFailureHandler,
   // Channel mission terminal notify (2026-06-21) — 终态→反查 session→回执
   channelMissionTerminalNotify,
   // AIGC Illustrate (2026-06-22) — IM 机器人配图：出图 → TOS 转存 → 写回 articles.coverImageUrl
@@ -149,4 +172,19 @@ export const functions = [
   aigcVideo,
   // AIGC Podcast (2026-06-22) — IM 机器人播客：LLM 双主持脚本 → elevenlabs 多人对话合成 → TOS 转存 → 写回 article_assets
   aigcPodcast,
+  // 新闻 URL 导入闭环 (2026-06-26) — cowork 粘贴 URL → 抓取入库 articles → fan-out 分析/视频
+  coworkLinkImport,
+  coworkLinkImportFailureHandler,
+  // 稿件结构化分析 (2026-06-26) — 入库后自动出 摘要/标签/分类/要点 写回字段
+  articleAiAnalyze,
+  articleAiAnalyzeFailureHandler,
+  // 视频稿下载素材库 (2026-06-26) — 解析视频源 → 下载 TOS → article_assets → 派听悟
+  articleVideoIngest,
+  articleVideoIngestFailureHandler,
+  // 通义听悟 (2026-06-26) — 提交视频 → 轮询 → 转写/关键词/章节写回 asset_segments/tags/articles
+  tingwuAnalyze,
+  tingwuAnalyzeFailureHandler,
+  // 异步 CLI 工具执行 (M3.8, 2026-06-27) — async cli_tools 后台跑共享管道 → 落产物 + 呈现
+  cliRun,
+  cliRunFailureHandler,
 ];

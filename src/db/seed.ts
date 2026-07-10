@@ -6,6 +6,10 @@ import { EMPLOYEE_CORE_SKILLS } from "../lib/constants";
 import { getAllBuiltinSkills } from "../lib/skill-loader";
 import { seedBuiltinTemplatesForOrg } from "../lib/dal/workflow-templates";
 import { buildBuiltinScenarioSeeds } from "./seed-builtin-workflows";
+import {
+  compatibleRolesFor,
+  isUniversalTool,
+} from "../lib/agent/tool-kinds";
 
 // Load env manually for standalone script (.env.local takes priority)
 import { config } from "dotenv";
@@ -206,6 +210,12 @@ async function seed() {
 
   let skillsUpdated = 0;
   for (const skillDef of builtinSkills) {
+    const skillKind = isUniversalTool(skillDef.slug) ? "tool" : "skill";
+    const compatibleRoles =
+      skillKind === "tool"
+        ? []
+        : skillDef.compatibleRoles ?? compatibleRolesFor(skillDef.slug);
+
     // Match by slug first (preferred), fallback to name for pre-migration data
     const existing = await db.query.skills.findFirst({
       where: (s, { eq, and, or }) =>
@@ -220,12 +230,15 @@ async function seed() {
         .update(schema.skills)
         .set({
           slug: skillDef.slug,
+          category: skillDef.category,
+          type: "builtin",
+          kind: skillKind,
           version: skillDef.version,
           description: skillDef.description,
           inputSchema: skillDef.inputSchema ?? null,
           outputSchema: skillDef.outputSchema ?? null,
           runtimeConfig: skillDef.runtimeConfig ?? null,
-          compatibleRoles: skillDef.compatibleRoles ?? [],
+          compatibleRoles,
           updatedAt: new Date(),
         })
         .where(eq(schema.skills.id, existing.id));
@@ -241,13 +254,14 @@ async function seed() {
         slug: skillDef.slug,
         category: skillDef.category,
         type: "builtin",
+        kind: skillKind,
         version: skillDef.version,
         description: skillDef.description,
         content: "",
         inputSchema: skillDef.inputSchema,
         outputSchema: skillDef.outputSchema,
         runtimeConfig: skillDef.runtimeConfig,
-        compatibleRoles: skillDef.compatibleRoles,
+        compatibleRoles,
       })
       .returning();
     skillMap.set(skillDef.slug, skill.id);

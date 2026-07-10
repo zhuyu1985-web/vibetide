@@ -239,3 +239,30 @@ describe("runIllustrate — 错误路径", () => {
     expect(sendChannelMessage).not.toHaveBeenCalled();
   });
 });
+
+describe("runIllustrate — 无渠道上下文（cowork PC）", () => {
+  it("缺省 channelCtx：仍写回 cover，但跳过 IM 回执（不查 config、不发消息）", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: "art1",
+      title: "PC 出稿标题",
+      summary: "摘要",
+      organizationId: "org1",
+    });
+    kieGenerateImage.mockResolvedValue(["https://kie.example.com/cowork.png"]);
+    storeRemoteImageToTos.mockResolvedValue({
+      assetId: "asset9",
+      publicUrl: "https://tos.example.com/cowork.png",
+    });
+
+    // 注意：不带 channelCtx
+    await runIllustrate({ organizationId: "org1", articleId: "art1" });
+
+    // 封面仍写回
+    expect(kieGenerateImage).toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalled();
+    expect(mockInsert).toHaveBeenCalled();
+    // 无渠道 → 不查 config、不发 IM 回执
+    expect(getChannelConfig).not.toHaveBeenCalled();
+    expect(sendChannelMessage).not.toHaveBeenCalled();
+  });
+});

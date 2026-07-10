@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 const ENCRYPTION_KEY =
-  process.env.PLUGIN_ENCRYPTION_KEY || "default-32-byte-key-for-dev-000";
+  process.env.PLUGIN_ENCRYPTION_KEY || "default-32-byte-key-for-dev-0000";
 const ALGORITHM = "aes-256-cbc";
 
 export function encrypt(text: string): string {

@@ -21,7 +21,7 @@ export default async function SourcesPage() {
     <>
       <PageHeader
         title="采集配置"
-        description="管理采集源、调度规则和媒体字典，统一配置内容入库来源。"
+        description="「源管理」配置采集任务（用什么方式、多久抓一次）；「媒体账号库」维护媒体在各平台的账号名单，供采集源「按账号抓」时引用。"
       />
       <ConfigSubtabs />
       <SourcesClient

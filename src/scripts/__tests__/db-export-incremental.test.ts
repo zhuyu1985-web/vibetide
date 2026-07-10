@@ -8,6 +8,25 @@ import { describe, expect, it } from "vitest";
 const repoRoot = path.resolve(__dirname, "../../..");
 const sourceScript = path.join(repoRoot, "scripts/db-export-incremental.sh");
 
+// Hermetic git 环境：删掉所有会让 git 跳过 cwd-based 发现、改去 auto-discover
+// 外部仓库的环境变量。husky / lint-staged 钩子以及 git worktree 上下文会注入
+// GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE 等；一旦被 git 子进程继承，cwd 会
+// 被忽略，本测试的 git init / config 就会落到真实仓库——曾把共享 .git/config 的
+// core.bare 改成 true，瘫痪主工作树和所有 worktree。设为 undefined 会让 Node
+// 在拼 child env 时跳过这些 key（而非传成字符串 "undefined"），等价于删除。
+const HERMETIC_GIT_ENV: NodeJS.ProcessEnv = {
+  ...process.env,
+  GIT_DIR: undefined,
+  GIT_WORK_TREE: undefined,
+  GIT_INDEX_FILE: undefined,
+  GIT_OBJECT_DIRECTORY: undefined,
+  GIT_ALTERNATE_OBJECT_DIRECTORIES: undefined,
+  GIT_COMMON_DIR: undefined,
+  GIT_NAMESPACE: undefined,
+  GIT_CEILING_DIRECTORIES: undefined,
+  GIT_PREFIX: undefined,
+};
+
 describe("scripts/db-export-incremental.sh", () => {
   it("appends data-only pg_dump output for tables created by included migrations", () => {
     const workspace = path.join(
@@ -48,23 +67,21 @@ describe("scripts/db-export-incremental.sh", () => {
       'DATABASE_URL="postgres://user:pass@example.test:5432/vibetide"\n',
     );
 
-    execFileSync("git", ["init"], { cwd: workspace, stdio: "pipe" });
-    execFileSync("git", ["config", "user.email", "test@example.test"], {
-      cwd: workspace,
-      stdio: "pipe",
-    });
-    execFileSync("git", ["config", "user.name", "Test User"], {
-      cwd: workspace,
-      stdio: "pipe",
-    });
-    execFileSync("git", ["add", "backups/MANIFEST.md"], {
-      cwd: workspace,
-      stdio: "pipe",
-    });
-    execFileSync("git", ["commit", "-m", "baseline"], {
-      cwd: workspace,
-      stdio: "pipe",
-    });
+    // 所有 git 子进程都用绝对路径 cwd + 隔离 env，确保只操作这个临时仓库，
+    // 绝不触碰 ambient 仓库。
+    const absWorkspace = path.resolve(workspace);
+    const git = (args: string[]) =>
+      execFileSync("git", args, {
+        cwd: absWorkspace,
+        stdio: "pipe",
+        env: HERMETIC_GIT_ENV,
+      });
+
+    git(["init"]);
+    git(["config", "user.email", "test@example.test"]);
+    git(["config", "user.name", "Test User"]);
+    git(["add", "backups/MANIFEST.md"]);
+    git(["commit", "-m", "baseline"]);
 
     const fakePgDump = path.join(workspace, "bin/pg_dump");
     const pgDumpArgs = path.join(workspace, "pg-dump-args.txt");
@@ -95,10 +112,12 @@ describe("scripts/db-export-incremental.sh", () => {
     );
     chmodSync(fakePgDump, 0o755);
 
+    // 脚本内部也会跑 `git log`（拿 migration 首次提交时间），同样必须用隔离 env，
+    // 否则它会查到真实仓库的 git 历史。
     execFileSync("bash", [scriptPath, "2026-01-03", "v1"], {
-      cwd: workspace,
+      cwd: absWorkspace,
       env: {
-        ...process.env,
+        ...HERMETIC_GIT_ENV,
         PG_DUMP: fakePgDump,
       },
       stdio: "pipe",

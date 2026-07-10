@@ -75,7 +75,7 @@ export const conversationMessages = pgTable(
 
     role: text("role").notNull(), // user | assistant | system
     content: text("content").notNull().default(""),
-    // text(纯文本/自由聊天) | mission_card(承载一个 mission) | plan_card(意图计划卡)
+    // text(纯文本/自由聊天) | mission_card(承载一个 mission) | plan_card(创作计划卡) | draft_result(出稿结果卡)
     kind: text("kind").notNull().default("text"),
 
     // 这条消息承载/触发的 mission;右栏即渲染它(一条消息 ↔ 0..1 mission)

@@ -61,6 +61,12 @@ export interface ArticleDetailClientProps {
   articleLanguage: string;
   /** 该文章已有的外站发布记录（按 submittedAt desc）。 */
   externalPublications: ExternalPublicationView[];
+  /** 嵌入模式（在 cowork 右侧 Sheet 内挂载）：用相对高度而非视口高度。 */
+  embedded?: boolean;
+  /** 嵌入模式下「退出编辑」回调（关闭 Sheet，不跳路由）。 */
+  onExitEditor?: () => void;
+  /** 嵌入模式初始视图（替代整页的 ?mode=edit）。 */
+  initialViewMode?: ViewMode;
 }
 
 export type ViewMode = "read" | "edit";

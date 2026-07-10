@@ -10,6 +10,10 @@ import { detectMentionSwitch } from "@/lib/agent/mention-switch";
 import { getBuiltinSkillSlugToName } from "@/lib/skill-loader";
 import { notifyChatMessage } from "@/lib/channels/chat-notifier";
 import { EMPLOYEE_META, type EmployeeId } from "@/lib/constants";
+import { createMcpToolset } from "@/lib/mcp/toolset";
+import { isMcpEnabled } from "@/lib/mcp/feature-flags";
+import { createCliToolset } from "@/lib/cli/toolset";
+import { isCliToolsEnabled } from "@/lib/cli/feature-flags";
 
 /** Friendly Chinese labels for tool names */
 const TOOL_LABELS: Record<string, string> = {
@@ -71,9 +75,10 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { employeeSlug, conversationHistory } = body as {
+    const { employeeSlug, conversationHistory, conversationId } = body as {
       employeeSlug: string;
       conversationHistory: { role: "user" | "assistant"; content: string }[];
+      conversationId?: string;
     };
 
     if (!employeeSlug || !conversationHistory?.length) {
@@ -156,13 +161,23 @@ export async function POST(req: Request) {
       );
     }
 
+    // MCP toolset: connect org-enabled MCP servers (feature-flagged, degrades on failure)
+    const mcp = isMcpEnabled() ? await createMcpToolset(organizationId) : null;
+
+    // CLI toolset: expose org-enabled cli_tools as sync tools (feature-flagged, plain ToolSet, no close)
+    const cliTools = isCliToolsEnabled()
+      ? await createCliToolset(organizationId, { authorityLevel: agent.authorityLevel })
+      : undefined;
+
     // Free chat: use agent's own tools (no scenario-specific toolsHint)
     const baseTools = toVercelTools(
       agent.tools,
       agent.pluginConfigs,
       undefined, // missionTools
       undefined, // knowledgeBaseTools
-      { organizationId, operatorId: user.id },
+      { organizationId, operatorId: user.id, conversationId },
+      mcp?.tools,
+      cliTools,
     );
     // xiaoyan / xiaolei / xiaoshu chat tools — research_query_builder + data_pivoter（A6 Phase 3+4）
     // 仅当 employee 已通过 employee_skills 绑了对应 skill 时才合并真实 execute。
@@ -309,6 +324,7 @@ export async function POST(req: Request) {
           } catch {
             // Already closed
           }
+          await mcp?.close();
 
           // Fire-and-forget channel sync. Don't await — response stream has
           // already closed to the client; external webhook latency shouldn't

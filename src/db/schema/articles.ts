@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations, userProfiles } from "./users";
@@ -65,6 +66,10 @@ export const articles = pgTable("articles", {
   translatedFromTopicId: uuid("translated_from_topic_id").references(
     () => hotTopics.id,
   ),
+  /** 外文子稿指回中文母稿（内容闭环多语种，2026-06-24）。 */
+  translatedFromArticleId: uuid("translated_from_article_id").references(
+    (): AnyPgColumn => articles.id,
+  ),
   externalPublishStatus: text("external_publish_status"),
 
   // 卡片来源区 + 处理状态徽章（2026-05-22 新增）
@@ -83,11 +88,20 @@ export const articles = pgTable("articles", {
 
   spreadData: jsonb("spread_data").$type<{
     views?: number;
+    impressions?: number;
     likes?: number;
     shares?: number;
     comments?: number;
     lastSyncedAt?: string;
     source?: "manual" | "api_sync";
+    /** 单篇跨渠道流量拆分（内容闭环复盘，2026-06-24）。 */
+    byChannel?: {
+      channel: string;
+      platform: string;
+      views: number;
+      pct?: number;
+      status?: string;
+    }[];
   }>().default({}),
 
   // News reader / detail page fields
@@ -110,7 +124,22 @@ export const articles = pgTable("articles", {
       configId: string;
       chatId: string;
       externalUserId: string;
-      externalMessageId: string;
+      externalMessageId?: string;
+    };
+    /** cowork URL 导入：AI 结构化分析提炼产物（摘要/分类/标签/要点） */
+    aiDigest?: {
+      summary: string;
+      category: string;
+      tags: string[];
+      keyPoints: string[];
+    };
+    /** AI 建议分类（org categories 无匹配项时落此，categoryId 留空） */
+    suggestedCategory?: string;
+    /** cowork 对话导入溯源 */
+    importedFrom?: {
+      channel: "cowork";
+      conversationId: string;
+      userId: string;
     };
   }>(),
 

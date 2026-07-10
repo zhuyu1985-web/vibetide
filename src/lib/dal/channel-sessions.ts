@@ -4,6 +4,56 @@ import { and, eq } from "drizzle-orm";
 
 export type ChannelSessionRow = typeof channelSessions.$inferSelect;
 
+/**
+ * 内容生产闭环会话的长 TTL（7 天）。
+ * 普通 ad-hoc 会话用 30min（SESSION_TTL_MS / FOLLOWUP_WINDOW_MS）；
+ * 闭环会话因审核可能隔天回流，必须用长窗口，且过期也不清产出/上下文（见 computeExpiredResetPatch）。
+ */
+export const CONTENT_LOOP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type ExpiredResetPatch = Partial<typeof channelSessions.$inferInsert>;
+
+/**
+ * 计算"过期会话"的复位 patch（纯函数，便于单测）。
+ * - 未过期（或无 expiresAt）→ 返回 null（不动）。
+ * - 闭环会话（scenarioPhase !== 'idle'）→ 只清瞬时 ad-hoc 字段，**保留**
+ *   lastArticleId / loopContext / scenarioPhase / activeTopicId，并续一个长 TTL 窗口。
+ * - 普通会话 → 维持原行为：全清回干净 idle。
+ */
+export function computeExpiredResetPatch(
+  session: Pick<ChannelSessionRow, "expiresAt" | "scenarioPhase">,
+  now: number = Date.now(),
+): ExpiredResetPatch | null {
+  if (!session.expiresAt || new Date(session.expiresAt).getTime() >= now) {
+    return null;
+  }
+  const isLoop = Boolean(session.scenarioPhase && session.scenarioPhase !== "idle");
+  if (isLoop) {
+    return {
+      status: "idle",
+      activeMissionId: null,
+      clarifyRounds: 0,
+      contextTurns: [],
+      pendingPlan: null,
+      pendingPublish: null,
+      expiresAt: new Date(now + CONTENT_LOOP_TTL_MS),
+      updatedAt: new Date(now),
+      // 刻意不含 lastArticleId / loopContext / scenarioPhase / activeTopicId → 保留闭环产出
+    };
+  }
+  return {
+    status: "idle",
+    activeMissionId: null,
+    clarifyRounds: 0,
+    contextTurns: [],
+    pendingPlan: null,
+    lastArticleId: null,
+    pendingPublish: null,
+    expiresAt: null,
+    updatedAt: new Date(now),
+  };
+}
+
 export interface SessionKey {
   organizationId: string;
   configId: string;
@@ -27,10 +77,11 @@ export async function getOrCreateSession(
     ),
   });
   if (existing) {
-    if (existing.expiresAt && new Date(existing.expiresAt).getTime() < Date.now()) {
+    const resetPatch = computeExpiredResetPatch(existing);
+    if (resetPatch) {
       const [refreshed] = await db
         .update(channelSessions)
-        .set({ status: "idle", activeMissionId: null, clarifyRounds: 0, contextTurns: [], pendingPlan: null, lastArticleId: null, pendingPublish: null, expiresAt: null, updatedAt: new Date() })
+        .set(resetPatch)
         .where(eq(channelSessions.id, existing.id))
         .returning();
       return refreshed;
@@ -67,6 +118,9 @@ export async function updateSession(
       | "pendingPlan"
       | "lastArticleId"
       | "pendingPublish"
+      | "scenarioPhase"
+      | "activeTopicId"
+      | "loopContext"
     >
   >
 ): Promise<void> {
@@ -74,6 +128,16 @@ export async function updateSession(
     .update(channelSessions)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(channelSessions.id, id));
+}
+
+/** 按主键 id 查会话（content-loop 异步 handler 用，回写前读最新 loopContext）。 */
+export async function getSessionById(
+  id: string,
+): Promise<ChannelSessionRow | null> {
+  const row = await db.query.channelSessions.findFirst({
+    where: eq(channelSessions.id, id),
+  });
+  return row ?? null;
 }
 
 /**

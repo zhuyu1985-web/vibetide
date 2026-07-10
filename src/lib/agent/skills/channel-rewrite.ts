@@ -34,16 +34,21 @@ export const CHANNEL_PLATFORMS = [
 ] as const;
 export type ChannelPlatform = (typeof CHANNEL_PLATFORMS)[number];
 
+// 注意：extraFields 不进 LLM 结构化输出 schema。z.record(...) 会生成
+// patternProperties / propertyNames，部分模型的 response_format.json_schema
+// 不支持（报 400 InvalidParameter，导致所有平台改写失败）。平台特定提示由
+// 代码侧补 {}（如需可后续用「字符串字段 + 解析」或分平台固定结构重新引入）。
 const ChannelRewriteOutputSchema = z.object({
   title: z.string().min(1).max(120),
   body: z.string().min(10),
   summary: z.string().max(300).optional(),
   hashtags: z.array(z.string().min(2).max(40)).min(0).max(10),
-  /** 平台特定提示（如微信封面建议 / 抖音 challenge / 微博话题） */
-  extraFields: z.record(z.string(), z.unknown()).optional(),
 });
 
-export type ChannelRewriteResult = z.infer<typeof ChannelRewriteOutputSchema>;
+export type ChannelRewriteResult = z.infer<typeof ChannelRewriteOutputSchema> & {
+  /** 平台特定提示（不由 LLM 结构化输出产出，代码侧补） */
+  extraFields?: Record<string, unknown>;
+};
 
 export interface ChannelRewriteInput {
   article: {
@@ -176,9 +181,6 @@ ${p.bodyConstraints}
 **hashtags：**
 ${p.hashtagAdvice}
 
-**extraFields：**
-${p.extraFieldsHint}
-
 **通用要求：**
 - 不许新增原稿没有的事实。数字 / 时间 / 地点必须保留准确。
 - 模糊表达（如「很多人」「最近」）不要瞎写成「千万级 / 上百万」等具体数字。
@@ -229,5 +231,6 @@ export async function channelRewriteArticle(
     maxOutputTokens: modelConfig.maxTokens,
   });
 
-  return output;
+  // extraFields 不在 LLM schema 内，代码侧补空对象（保留类型契约 / 后续可扩展）
+  return { ...output, extraFields: {} };
 }

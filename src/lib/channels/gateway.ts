@@ -26,6 +26,8 @@ import { isVideoIntent, isPodcastIntent } from "./aigc-intent";
 import { resolveCatalogByName, listAllActiveCmsCatalogs } from "@/lib/dal/cms-catalogs";
 import { getArticleById } from "@/lib/dal/articles";
 import { handlePublishConfirm } from "./publish-followup";
+import { handleContentLoopMessage, startContentLoop } from "./content-loop/orchestrator";
+import { isHotTopicIntent, isGreeting } from "./content-loop/intents";
 import type { IntentStep } from "@/lib/agent/types";
 
 export { formatForPlatform, type OutboundPayload } from "./format";
@@ -44,6 +46,9 @@ export interface StandardizedMessage {
   textContent: string;       // plain text content
   rawMessage: unknown;       // original platform payload for debugging
   replyWebhook?: string;     // 钉钉 sessionWebhook（异步回执用）
+  source?: "text" | "voice"; // 默认 text；voice 表示由语音 ASR 转写而来
+  transcript?: { confidence: number; durationMs?: number }; // 仅 voice
+  skipRecord?: boolean;      // voice 路径已在 Inngest 落库，跳过 gateway 内重复记录
 }
 
 // ---------------------------------------------------------------------------
@@ -103,20 +108,23 @@ export async function handleInboundMessage(msg: StandardizedMessage): Promise<{
   missionId?: string;
 }> {
   // 1. Persist the inbound message (fire-and-forget, do not block reply)
-  recordInboundMessage({
-    organizationId: msg.organizationId,
-    configId: msg.configId,
-    platform: msg.platform,
-    externalMessageId: msg.externalMessageId || undefined,
-    externalUserId: msg.externalUserId || undefined,
-    chatId: msg.chatId || undefined,
-    content: {
-      text: msg.textContent,
-      raw: msg.rawMessage,
-    },
-  }).catch((err) =>
-    console.error("[gateway] recordInboundMessage failed:", err)
-  );
+  //    voice 路径已在 channelVoiceIngest 落库（带原音URL+置信度），此处跳过避免重复
+  if (!msg.skipRecord) {
+    recordInboundMessage({
+      organizationId: msg.organizationId,
+      configId: msg.configId,
+      platform: msg.platform,
+      externalMessageId: msg.externalMessageId || undefined,
+      externalUserId: msg.externalUserId || undefined,
+      chatId: msg.chatId || undefined,
+      content: {
+        text: msg.textContent,
+        raw: msg.rawMessage,
+      },
+    }).catch((err) =>
+      console.error("[gateway] recordInboundMessage failed:", err)
+    );
+  }
 
   const text = msg.textContent.trim();
   if (!text) {
@@ -280,6 +288,40 @@ async function handleFreeFormMessage(
 
   if (session.status === "confirming") {
     return handleConfirmingMessage(text, msg, session, channelCtx);
+  }
+
+  // 全局问候：任何阶段都先友好回应，并把卡住/进行中的阶段复位到 idle，
+  // 避免问候被某个阶段吞成"答非所问"（如卡在 hot_list 时回"热点还在抓取中"）。
+  // 这个中断是「刻意的」——即便处在 publishing / review_pending 等多步流程中途，
+  // 问候也优先于活跃流程把阶段复位。安全前提：复位 patch 不动 lastArticleId，
+  // 草稿仍在，用户随时可重新说「发布」/「提交审核」把流程再触发起来。
+  if (isGreeting(text)) {
+    if (session.scenarioPhase && session.scenarioPhase !== "idle") {
+      await updateSession(session.id, {
+        scenarioPhase: "idle",
+        status: "idle",
+        loopContext: null,
+        activeTopicId: null,
+        expiresAt: null,
+      });
+    }
+    return {
+      reply:
+        "你好👋 我可以帮你：\n① 说「获取今天的热点」挑个热点写稿\n② 直接说「帮我写一篇关于 XX 的稿子」\n③ 发个链接给我收稿\n需要什么？",
+    };
+  }
+
+  // 「获取热点」= 任何阶段（hot_list 除外，那里由 case hot_list 的 isRegenerate 处理重抓）
+  // 都可重启热点线。必须 hoist 到阶段锁之前——否则 drafting/translating 等阶段会把
+  // 「获取最新热点」当成改稿指令吞掉（答非所问）。草稿一直在稿件库，重启不丢稿；
+  // 「回到上一篇」等完整暂存/澄清能力在 IM Phase 1 正式做。
+  if (isHotTopicIntent(text) && session.scenarioPhase !== "hot_list") {
+    return startContentLoop(msg, session, channelCtx);
+  }
+
+  // 内容生产闭环：阶段感知路由（先于所有 idle 意图分支，避免被发布/AIGC 抢占）
+  if (session.scenarioPhase && session.scenarioPhase !== "idle") {
+    return handleContentLoopMessage(text, msg, session, channelCtx);
   }
 
   // 发布意图（idle 态）：先于 clarifyOrPlan 拦截

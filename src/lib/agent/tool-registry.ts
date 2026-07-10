@@ -1871,6 +1871,17 @@ function createToolDefinitions(): ToolSet {
         operatorId: z.string().optional(),
         missionId: z.string().optional(),
         taskId: z.string().optional(),
+        // 渠道来源标记（钉钉/企微 IM 对话产出走此路落库时带上）。写入每篇
+        // metadata.ingestedFromChannel，供稿件库「来源」筛选区分 IM 产出 vs 工作流/手动。
+        ingestedFromChannel: z
+          .object({
+            platform: z.string(),
+            configId: z.string(),
+            chatId: z.string(),
+            externalUserId: z.string(),
+            externalMessageId: z.string().optional(),
+          })
+          .optional(),
       }),
       execute: async ({
         articles: items,
@@ -1881,6 +1892,7 @@ function createToolDefinitions(): ToolSet {
         operatorId,
         missionId,
         taskId,
+        ingestedFromChannel,
       }) => {
         // 上游 0 条:优雅返回,UI 显示"无可入库稿件",而不是失败。
         if (!items || items.length === 0) {
@@ -2048,6 +2060,10 @@ function createToolDefinitions(): ToolSet {
             organizationId,
             title: item.title,
             body: item.body,
+            // 历史 bug：此前漏写 wordCount → 全库稿件 word_count=0，稿件库看着像空稿
+            // （正文其实都在 body 里）。统一在工具层从 body 计算，一处修复所有调用方
+            // （content-loop / mission / 跨语言搬运）。中文「字数」即字符数，与初稿卡口径一致。
+            wordCount: item.body?.length ?? 0,
             summary: item.summary ?? null,
             sourceUrl: item.sourceUrl ?? null,
             missionId: missionId ?? null,
@@ -2063,7 +2079,9 @@ function createToolDefinitions(): ToolSet {
               category: item.category,
               culturalNotes: item.culturalNotes,
               workflowTaskId: taskId,
-              createdByWorkflow: true,
+              // 渠道产出（IM 对话）标 false：createdByWorkflow 语义是"多步 mission 产出"
+              createdByWorkflow: !ingestedFromChannel,
+              ...(ingestedFromChannel ? { ingestedFromChannel } : {}),
             },
           }).returning({ id: articles.id, title: articles.title });
 
@@ -2108,6 +2126,86 @@ function createToolDefinitions(): ToolSet {
               }
             : {}),
         };
+      },
+    }),
+
+    // ─── 新闻 URL 导入闭环 复用能力 (2026-06-26) ───
+    // 实现都在 lib/articles/* 与 lib/tingwu/*，这里只做薄暴露层供对话里 LLM 自主调用。
+    video_extract: tool({
+      description:
+        "从一个网页/视频链接抽取可下载的视频源（og:video / 直链 mp4 / 平台识别）。" +
+        "返回视频直链、封面、是否流媒体(m3u8)、识别到的平台。用于判断一条链接是否含视频、拿到视频地址。",
+      inputSchema: z.object({
+        url: z.string().describe("网页或视频页面 URL"),
+      }),
+      execute: async ({ url }) => {
+        try {
+          const { detectVideoSource } = await import("@/lib/articles/video-source");
+          const vs = await detectVideoSource(url);
+          return {
+            success: true,
+            kind: vs.kind,
+            videoUrl: vs.videoUrl,
+            thumbnailUrl: vs.thumbnailUrl,
+            platform: vs.platform,
+          };
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    }),
+    analyze_article: tool({
+      description:
+        "对一段稿件正文做结构化分析提炼：返回 摘要/分类/标签/核心要点。" +
+        "用于'帮我分析/提炼这篇文章'。只返回结果不写库。",
+      inputSchema: z.object({
+        title: z.string().describe("文章标题"),
+        body: z.string().describe("文章正文"),
+        categories: z.array(z.string()).optional().describe("候选分类名（可选）"),
+      }),
+      execute: async ({ title, body, categories }) => {
+        try {
+          const { analyzeArticleStructured } = await import("@/lib/articles/analyze");
+          const digest = await analyzeArticleStructured({ title, body, categories });
+          return { success: true, ...digest };
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      },
+    }),
+    tingwu_analyze: tool({
+      description:
+        "对一个素材库视频调用通义听悟做转写/摘要/章节理解。异步任务：仅触发并立即返回 jobId，" +
+        "完成后结果自动回填素材库与稿件，不阻塞对话。需素材已入库(assetId)且有公网可访问视频直链(publicUrl)。",
+      inputSchema: z.object({
+        assetId: z.string().describe("素材库视频 assetId"),
+        publicUrl: z.string().describe("视频的公网可访问直链"),
+        articleId: z.string().optional().describe("关联稿件 id（可选）"),
+        organizationId: z.string().optional(),
+      }),
+      execute: async ({ assetId, publicUrl, articleId, organizationId }) => {
+        try {
+          const { isTingwuEnabled } = await import("@/lib/tingwu/config");
+          if (!isTingwuEnabled()) {
+            return { success: false, error: "通义听悟未配置（VIDEO_ANALYSIS_PROVIDER + 阿里云凭证）" };
+          }
+          if (!organizationId) {
+            return { success: false, error: "缺少 organizationId（执行器未注入）" };
+          }
+          const { inngest } = await import("@/inngest/client");
+          await inngest.send({
+            name: "media/tingwu-analyze.requested",
+            data: { organizationId, assetId, articleId, publicUrl },
+          });
+          return {
+            success: true,
+            status: "submitted",
+            assetId,
+            message: "已提交通义听悟分析，完成后自动回填素材库与稿件",
+          };
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
+        }
       },
     }),
   };
@@ -2775,6 +2873,9 @@ export interface ToolContext {
   operatorId?: string;
   missionId?: string;
   taskId?: string;
+  /** cowork 会话 id — 注入后 CLI async execute 可把 conversationId 写入 run 行
+   * 与 cli/run.requested 事件，surfaceCliOutput 据此生成 cowork import_card。 */
+  conversationId?: string;
   /** 领域权威源 → 注入 web_search 的 includeDomains（仅对有该入参的工具生效）。 */
   authorityDomains?: string[];
 }
@@ -2791,7 +2892,7 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
 ): T {
   if (
     !context ||
-    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId && !context.authorityDomains?.length)
+    (!context.organizationId && !context.operatorId && !context.missionId && !context.taskId && !context.conversationId && !context.authorityDomains?.length)
   ) {
     return toolDef;
   }
@@ -2813,6 +2914,9 @@ function wrapToolExecuteWithContext<T extends { execute?: unknown }>(
       if (context.taskId && merged.taskId === undefined) {
         merged.taskId = context.taskId;
       }
+      if (context.conversationId && merged.conversationId === undefined) {
+        merged.conversationId = context.conversationId;
+      }
       if (context.authorityDomains?.length && merged.includeDomains === undefined) {
         merged.includeDomains = context.authorityDomains;
       }
@@ -2830,6 +2934,8 @@ export function toVercelTools(
   missionTools?: ToolSet,
   knowledgeBaseTools?: ToolSet,
   context?: ToolContext,
+  mcpTools?: ToolSet,
+  cliTools?: ToolSet,
 ): ToolSet {
   const result: ToolSet = {};
 
@@ -2871,6 +2977,26 @@ export function toVercelTools(
   // Merge knowledge base retrieval tools if provided
   if (knowledgeBaseTools) {
     for (const [name, def] of Object.entries(knowledgeBaseTools)) {
+      result[name] = wrapToolExecuteWithContext(
+        def as { execute?: unknown },
+        context,
+      ) as ToolSet[string];
+    }
+  }
+
+  // Merge MCP-derived tools if provided
+  if (mcpTools) {
+    for (const [name, def] of Object.entries(mcpTools)) {
+      result[name] = wrapToolExecuteWithContext(
+        def as { execute?: unknown },
+        context,
+      ) as ToolSet[string];
+    }
+  }
+
+  // Merge CLI-derived tools if provided (M3.6 — plain in-process ToolSet, no close)
+  if (cliTools) {
+    for (const [name, def] of Object.entries(cliTools)) {
       result[name] = wrapToolExecuteWithContext(
         def as { execute?: unknown },
         context,

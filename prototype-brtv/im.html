@@ -1,0 +1,485 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRTV · 移动 IM · 融媒生产群</title>
+<link rel="stylesheet" href="assets/brtv-design.css">
+<style>
+  html,body{height:100%;}
+  body{
+    background:transparent;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #root{display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
+  .im-scale{transform-origin:center center;}
+
+  /* —— IM 应用容器 —— */
+  .im-app{display:flex;flex-direction:column;height:100%;background:var(--paper-2);}
+
+  /* 顶部群导航条 */
+  .im-nav{flex:none;background:#fff;display:flex;align-items:center;gap:10px;
+    padding:8px 14px 10px;border-bottom:1px solid var(--line);}
+  .im-nav .back{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--ink);font-size:20px;transition:.15s;background:transparent;border:0;}
+  .im-nav .back:hover{background:rgba(34,28,26,.05);}
+  .im-nav .gname{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;}
+  .im-nav .gname b{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .im-nav .gname small{font-size:11px;color:var(--ink-3);}
+  .im-nav .gcount{color:var(--ink-3);font-weight:500;}
+
+  /* 群顶部当前任务条 */
+  .task-strip{flex:none;background:linear-gradient(135deg,rgba(209,26,42,.07),rgba(200,168,106,.08));
+    padding:7px 14px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--red-wall);
+    border-bottom:1px solid var(--line);}
+  .task-strip .ls-dot{width:6px;height:6px;border-radius:50%;background:var(--red);
+    box-shadow:0 0 6px var(--red);animation:blink 1.6s infinite;flex:none;}
+
+  /* 聊天流容器 */
+  .im-chat{flex:1;min-height:0;overflow-y:auto;padding:14px 12px 6px;}
+  .im-chat .chat{padding:0;gap:16px;}
+
+  /* 时间分割 */
+  .time-sep{align-self:center;font-size:10.5px;color:var(--ink-3);background:rgba(34,28,26,.05);
+    padding:2px 10px;border-radius:99px;margin:2px auto;}
+
+  /* 消息时间戳 */
+  .msg .stamp{font-size:10px;color:var(--ink-3);margin-top:3px;}
+  .msg.me .stamp{text-align:right;}
+
+  /* 卡片消息（带头像左侧布局） */
+  .card-line{display:flex;gap:9px;align-items:flex-start;max-width:88%;}
+  .card-line .who-name{font-size:11px;color:var(--ink-3);margin:0 0 4px 2px;}
+
+  /* 卡片内热度小条 */
+  .heat-bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 2px;}
+  .heat-bar i{display:block;height:100%;border-radius:99px;
+    background:linear-gradient(90deg,var(--gold),var(--red));}
+
+  /* 卡片内迷你媒体 */
+  .mini-media{display:flex;gap:9px;align-items:center;margin:8px 0 4px;
+    background:var(--paper-2);border-radius:10px;padding:7px;}
+  .mini-thumb{width:66px;height:42px;border-radius:7px;position:relative;flex:none;overflow:hidden;}
+  .mini-thumb .ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:20px;opacity:.85;}
+  .mini-thumb .d{position:absolute;right:3px;bottom:2px;background:rgba(0,0,0,.6);color:#fff;
+    font-size:9px;padding:0 4px;border-radius:3px;}
+
+  /* 卡片内稿件预览 */
+  .draft-prev{margin:8px 0 4px;padding:9px 11px;background:var(--paper-2);border-radius:10px;
+    border-left:3px solid var(--gold);font-size:12px;line-height:1.6;color:var(--ink-2);}
+  .draft-prev .lead{font-weight:700;color:var(--ink);font-family:var(--serif);}
+
+  /* 卡片内迷你视频预览 */
+  .mini-player{margin:8px 0 4px;border-radius:10px;overflow:hidden;width:108px;}
+  .mini-player .stage{aspect-ratio:9/16;position:relative;display:flex;align-items:center;justify-content:center;}
+  .mini-player .ico{font-size:26px;opacity:.85;}
+  .mini-player .play{position:absolute;inset:0;margin:auto;width:30px;height:30px;border-radius:50%;
+    background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;}
+  .mini-player .play::after{content:"";border-left:10px solid var(--red);border-top:6px solid transparent;
+    border-bottom:6px solid transparent;margin-left:2px;}
+  .mini-player .cap{position:absolute;left:5px;bottom:4px;color:#fff;font-size:9px;
+    background:rgba(0,0,0,.5);padding:1px 5px;border-radius:4px;}
+
+  /* 卡片内审核标记 */
+  .audit-flag{margin:8px 0 4px;}
+
+  /* 卡片动作按钮排 */
+  .card-acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;}
+
+  /* 就地编辑展开 */
+  .inline-edit{margin-top:10px;animation:fadeUp .35s ease both;}
+  .inline-edit .editable{font-size:12.5px;line-height:1.7;padding:11px 12px;}
+  .inline-edit .ed-foot{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  .saved-tip{font-size:11px;color:var(--ok);font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+
+  /* 预览展开 */
+  .prev-expand{margin-top:10px;animation:popIn .4s cubic-bezier(.2,.8,.2,1) both;}
+  .prev-thumb{aspect-ratio:9/16;width:130px;border-radius:12px;position:relative;overflow:hidden;
+    box-shadow:var(--sh-2);}
+  .prev-thumb .ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:34px;opacity:.85;}
+  .prev-thumb .scanline{position:absolute;inset:0;
+    background:linear-gradient(transparent 0%,rgba(255,255,255,.12) 50%,transparent 100%);
+    background-size:100% 8px;animation:scan 5s linear infinite;}
+  .prev-thumb .cap{position:absolute;left:7px;bottom:8px;color:#fff;font-size:11px;font-weight:600;
+    text-shadow:0 1px 4px rgba(0,0,0,.6);}
+  .prev-thumb .play{position:absolute;inset:0;margin:auto;width:40px;height:40px;border-radius:50%;
+    background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.3);}
+  .prev-thumb .play::after{content:"";border-left:12px solid var(--red);border-top:8px solid transparent;
+    border-bottom:8px solid transparent;margin-left:3px;}
+
+  /* 底部输入区 */
+  .im-foot{flex:none;background:#fff;border-top:1px solid var(--line);}
+  .im-foot .quick-cmds{padding:9px 12px 4px;}
+  .quick-cmd.qc-gold{background:var(--gold-soft);color:#7a5a1a;}
+  .quick-cmd.qc-gold:hover{background:var(--gold);color:#3a2a08;}
+  .im-input{display:flex;align-items:center;gap:8px;padding:8px 12px 12px;}
+  .im-input .plus{width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--ink-2);font-size:22px;background:rgba(34,28,26,.05);border:0;transition:.15s;}
+  .im-input .plus:hover{background:rgba(34,28,26,.09);color:var(--red);}
+  .im-input .field{flex:1;height:36px;border-radius:18px;background:var(--paper-2);
+    display:flex;align-items:center;padding:0 14px;font-size:13px;color:var(--ink-3);cursor:text;}
+  .im-input .field.has{color:var(--ink);}
+
+  /* 入场动效给最新卡片 */
+  .anim-slide-late{animation:slideInR .5s cubic-bezier(.2,.7,.2,1) both;}
+</style>
+</head><body>
+<div id="root"></div>
+<script src="assets/vendor/react.production.min.js"></script>
+<script src="assets/vendor/react-dom.production.min.js"></script>
+<script src="assets/vendor/babel.min.js"></script>
+<script src="assets/brtv-data.js"></script>
+<script src="assets/brtv-icons.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const B = window.BRTV;
+const Icon = ({ n, cls, style }) => <span className={'ico ' + (cls || '')} style={style} dangerouslySetInnerHTML={{ __html: brtvIcon(n) }} />;
+
+/* ===== IosFrame（来自 huashu-design skill）===== */
+const iosFrameStyles = {
+  wrapper:{display:'inline-block',padding:12,background:'#000',borderRadius:60,
+    boxShadow:'0 0 0 2px #2a2320, 0 24px 70px rgba(0,0,0,.5)',position:'relative'},
+  screen:{position:'relative',borderRadius:48,overflow:'hidden',background:'#fff'},
+  statusBar:{position:'absolute',top:0,left:0,right:0,height:54,display:'flex',alignItems:'center',
+    justifyContent:'space-between',padding:'0 32px',fontSize:16,fontWeight:600,
+    fontFamily:'-apple-system,"SF Pro Text",sans-serif',zIndex:20,pointerEvents:'none'},
+  dynamicIsland:{position:'absolute',top:12,left:'50%',transform:'translateX(-50%)',width:124,height:36,
+    background:'#000',borderRadius:999,zIndex:30},
+  statusIcons:{display:'flex',alignItems:'center',gap:6},
+  signalIcon:{display:'flex',alignItems:'flex-end',gap:2,height:12},
+  signalBar:{width:3,background:'currentColor',borderRadius:1},
+  batteryIcon:{width:26,height:12,border:'1.5px solid currentColor',borderRadius:3,padding:1,
+    position:'relative',opacity:.8},
+  batteryCap:{position:'absolute',top:3,right:-3,width:2,height:6,background:'currentColor',borderRadius:'0 1px 1px 0'},
+  content:{position:'absolute',top:54,left:0,right:0,bottom:0,overflow:'hidden'},
+};
+function IosFrame({children,width=393,height=852,time='9:41',battery=100}){
+  const textColor='#000';
+  return (
+    <div style={iosFrameStyles.wrapper}>
+      <div style={{...iosFrameStyles.screen,width,height,background:'#fff'}}>
+        <div style={{...iosFrameStyles.statusBar,color:textColor}}>
+          <span>{time}</span>
+          <div style={iosFrameStyles.statusIcons}>
+            <div style={iosFrameStyles.signalIcon}>
+              <div style={{...iosFrameStyles.signalBar,height:4}}/>
+              <div style={{...iosFrameStyles.signalBar,height:6}}/>
+              <div style={{...iosFrameStyles.signalBar,height:9}}/>
+              <div style={{...iosFrameStyles.signalBar,height:11}}/>
+            </div>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" style={{color:textColor}}>
+              <path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/>
+              <path d="M3 7.5a7 7 0 0110 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
+              <path d="M1 4.5a11 11 0 0114 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7"/>
+            </svg>
+            <div style={iosFrameStyles.batteryIcon}>
+              <div style={{width:`${battery}%`,height:'100%',background:'currentColor',borderRadius:1,opacity:.9}}/>
+              <div style={iosFrameStyles.batteryCap}/>
+            </div>
+          </div>
+        </div>
+        <div style={iosFrameStyles.dynamicIsland}/>
+        <div style={iosFrameStyles.content}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 员工头像 ===== */
+function Avatar({id,sm}){
+  const e = B.emp(id);
+  if(!e) return null;
+  return (
+    <div className={"avatar"+(sm?" sm":"")} style={{background:`linear-gradient(135deg,${e.color},${shade(e.color)})`}}>
+      {e.short}
+      <span className={"dot "+(e.status==='on'?'on':'busy')}></span>
+    </div>
+  );
+}
+function shade(hex){
+  // 简单加深，给头像渐变
+  const m = hex.replace('#','');
+  const r=Math.max(0,parseInt(m.slice(0,2),16)-40);
+  const g=Math.max(0,parseInt(m.slice(2,4),16)-40);
+  const b=Math.max(0,parseInt(m.slice(4,6),16)-40);
+  return `rgb(${r},${g},${b})`;
+}
+
+/* ===== 文本气泡消息 ===== */
+function TextMsg({m}){
+  const me = m.who==='me';
+  return (
+    <div className={"msg"+(me?" me":"")+" anim-up"}>
+      {!me && <Avatar id={m.who} sm/>}
+      <div className="col">
+        {!me && <div className="who">{B.emp(m.who)?.name}</div>}
+        <div className="bubble">
+          {m.working ? <span className="dots-typing"><i></i><i></i><i></i></span> : m.text}
+        </div>
+        <div className="stamp">{m.t}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 卡片消息 ===== */
+function CardMsg({m}){
+  const e = B.emp(m.who);
+  const me = m.who==='me';
+  const [editing,setEditing] = useState(false);
+  const [saved,setSaved] = useState(false);
+  const [preview,setPreview] = useState(false);
+
+  const onAct = (label) => {
+    if(label==='编辑稿件'){ setEditing(v=>!v); setSaved(false); }
+    else if(label==='预览' || label==='一键成片'){ setPreview(v=>!v); }
+    // 其余 action 仅作视觉点击反馈
+  };
+
+  return (
+    <div className={"card-line "+(me?"":"")+ (m._late?" anim-slide-late":" anim-up")}>
+      {!me && <Avatar id={m.who} sm/>}
+      <div className="grow" style={{minWidth:0}}>
+        {!me && <div className="who-name">{e?.name}</div>}
+        <div className="card-msg">
+          <div className="top" style={{background:`linear-gradient(135deg,${e.color},${shade(e.color)})`}}>
+            <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+              <Icon n={({topic:'fire',material:'upload',draft:'edit',video:'film',audit:'shield'})[m.cardKind] || 'chat'} cls="ico-sm"/>
+              {m.title}
+            </span>
+          </div>
+          <div className="body">
+            {m.lines.map((l,i)=><div key={i} style={{fontSize:13,color:'var(--ink-2)',marginBottom:4,lineHeight:1.5}}>{l}</div>)}
+
+            {/* 各卡片类型的额外内容 */}
+            {m.cardKind==='topic' &&
+              <div style={{marginTop:8}}>
+                <div className="row between" style={{fontSize:11,color:'var(--ink-3)'}}>
+                  <span>全网热度</span><span className="t-num text-red" style={{fontWeight:700}}>98</span>
+                </div>
+                <div className="heat-bar"><i style={{width:'98%'}}></i></div>
+              </div>}
+
+            {m.cardKind==='material' &&
+              <div className="mini-media">
+                <div className="mini-thumb thumb-snow">
+                  <Icon n="snow" cls="ico-lg"/><span className="d">02:14</span>
+                </div>
+                <div style={{fontSize:11.5,color:'var(--ink-2)',lineHeight:1.45}}>
+                  长安街连夜除雪 5G回传<br/><span style={{color:'var(--ink-3)'}}>8 标签 · 1 出镜记者</span>
+                </div>
+              </div>}
+
+            {m.cardKind==='draft' &&
+              <div className="draft-prev">
+                <span className="lead">【快讯】</span>北京升级发布寒潮橙色预警，今晨气温较昨日同期下降 12℃…… <Icon n="edit" style={{color:'var(--gold)'}}/>
+              </div>}
+
+            {m.cardKind==='video' &&
+              <div className="mini-player thumb-road">
+                <div className="stage">
+                  <Icon n="wind" cls="ico-xl"/>
+                  <div className="play"></div>
+                  <span className="cap">00:45 · 9:16</span>
+                </div>
+              </div>}
+
+            {m.cardKind==='audit' &&
+              <div className="audit-flag">
+                <span className="risk-flag" style={{background:'rgba(209,26,42,.1)',color:'var(--danger)'}}>时政复核 · 高</span>
+              </div>}
+
+            {/* 动作按钮 */}
+            <div className="card-acts">
+              {m.actions.map((a,i)=>(
+                <button key={i}
+                  className={"btn btn-sm"+(i===0?" btn-primary":"")+((editing&&a==='编辑稿件')||(preview&&(a==='预览'||a==='一键成片'))?" ":"")}
+                  onClick={()=>onAct(a)}>
+                  {a}
+                </button>
+              ))}
+            </div>
+
+            {/* 就地编辑稿件 */}
+            {editing &&
+              <div className="inline-edit">
+                <div className="editable" contentEditable suppressContentEditableWarning
+                  dangerouslySetInnerHTML={{__html:'<b>【快讯】</b>北京升级发布寒潮橙色预警。受强冷空气影响，今晨本市气温较昨日同期下降 <mark class="ai-mark">12℃</mark>，预计明晨平原地区最低气温降至 -9℃。请市民注意防寒保暖、错峰出行。'}}>
+                </div>
+                <div className="ed-foot">
+                  <button className="btn btn-primary btn-sm" onClick={()=>{setSaved(true);setTimeout(()=>setEditing(false),900);}}>保存</button>
+                  <button className="btn btn-sm" onClick={()=>setEditing(false)}>取消</button>
+                  {saved && <span className="saved-tip"><Icon n="check"/> 已保存</span>}
+                </div>
+              </div>}
+
+            {/* 预览展开 */}
+            {preview &&
+              <div className="prev-expand">
+                <div className="prev-thumb thumb-road">
+                  <Icon n="wind" cls="ico-2xl"/>
+                  <div className="scanline"></div>
+                  <div className="play"></div>
+                  <span className="cap">竖屏版 · 00:45</span>
+                </div>
+              </div>}
+          </div>
+        </div>
+        <div className="stamp" style={{marginLeft:2}}>{m.t}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 快捷指令回复脚本 ===== */
+function buildReply(cmd){
+  if(cmd==='出竖屏版'){
+    return { who:'cutter', type:'card', cardKind:'video', t:nowT(), _late:true,
+      title:'竖屏版粗剪完成 00:45',
+      lines:['9:16 · 大字幕 · 6 个分镜','配《北京时间》片头 · 适配抖音/视频号'],
+      actions:['预览','送审'] };
+  }
+  if(cmd==='送审'){
+    return { who:'auditor', type:'card', cardKind:'audit', t:nowT(), _late:true,
+      title:'已进入审核队列',
+      lines:['多模态预审完成 · 敏感/版权通过','1 项涉部门表态需时政复核'],
+      actions:['去终审','看报告'] };
+  }
+  if(cmd==='看传播数据'){
+    return { who:'data', type:'card', cardKind:'topic', t:nowT(), _late:true,
+      title:'实时传播简报',
+      lines:['全网总播放 3,041 万 · 传播力指数 92.6','抖音播放 1,286 万 · 环比 +182%'],
+      actions:['看大屏','导出简报'] };
+  }
+  if(cmd==='换题图'){
+    return { who:'cutter', type:'card', cardKind:'material', t:nowT(), _late:true,
+      title:'已生成 3 张候选题图',
+      lines:['长安街除雪 / 红墙白雪 / 风口实测','建议用「红墙白雪」契合民生情绪'],
+      actions:['采用','再生成'] };
+  }
+  // @编导 排期
+  return { who:'daoyan', type:'text', t:nowT(), _late:true,
+    text:'收到，已把竖屏版排进 09:30 推送档，电视长版走《北京新闻》午间档。' };
+}
+function nowT(){
+  const d=new Date();
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+/* ===== 主 App ===== */
+function ImApp(){
+  const [msgs,setMsgs] = useState(B.imThread.map(m=>({...m})));
+  const [typing,setTyping] = useState(false);
+  const chatRef = useRef(null);
+
+  // 自动滚到底
+  useEffect(()=>{
+    const el = chatRef.current;
+    if(el) el.scrollTop = el.scrollHeight;
+  },[msgs,typing]);
+
+  const quicks = ['出竖屏版','送审','看传播数据','@编导 排期','换题图'];
+
+  const sendCmd = (cmd) => {
+    // 追加用户消息
+    setMsgs(prev=>[...prev,{ who:'me', type:'text', t:nowT(), text:cmd, _late:true }]);
+    // 模拟对方输入
+    const reply = buildReply(cmd);
+    if(reply.type==='text'){
+      setTyping(reply.who);
+      setTimeout(()=>{
+        setTyping(false);
+        setMsgs(prev=>[...prev,reply]);
+      },800);
+    }else{
+      setTyping(reply.who);
+      setTimeout(()=>{
+        setTyping(false);
+        setMsgs(prev=>[...prev,reply]);
+      },800);
+    }
+  };
+
+  return (
+    <IosFrame time="08:36" battery={70}>
+      <div className="im-app">
+        {/* 群导航条 */}
+        <div className="im-nav">
+          <button className="back"><Icon n="back"/></button>
+          <div className="gname">
+            <b>BRTV 融媒生产群<span className="gcount">(28)</span></b>
+            <small>9 位 AI 数字员工 · 19 位编辑记者在线</small>
+          </div>
+          <button className="back" style={{fontSize:18,fontWeight:700}}><Icon n="more"/></button>
+        </div>
+
+        {/* 当前任务条 */}
+        <div className="task-strip">
+          <span className="ls-dot"></span>
+          <span>当前任务 · <b>寒潮应急</b> 智能生产中 · 已完成 4/7 节点</span>
+        </div>
+
+        {/* 聊天流 */}
+        <div className="im-chat" ref={chatRef}>
+          <div className="chat">
+            <div className="time-sep">今天 06:42</div>
+            {msgs.map((m,i)=>(
+              m.type==='card'
+                ? <CardMsg key={i} m={m}/>
+                : <TextMsg key={i} m={m}/>
+            ))}
+            {typing &&
+              <div className="msg anim-in">
+                <Avatar id={typing} sm/>
+                <div className="col">
+                  <div className="who">{B.emp(typing)?.name}</div>
+                  <div className="bubble"><span className="dots-typing"><i></i><i></i><i></i></span></div>
+                </div>
+              </div>}
+          </div>
+        </div>
+
+        {/* 底部 */}
+        <div className="im-foot">
+          <div className="quick-cmds fade-edge">
+            {quicks.map((q,i)=>(
+              <div key={i} className={"quick-cmd"+(q==='换题图'?' qc-gold':'')} onClick={()=>sendCmd(q)}>{q}</div>
+            ))}
+          </div>
+          <div className="im-input">
+            <button className="plus"><Icon n="plus"/></button>
+            <button className="plus"><Icon n="mic"/></button>
+            <div className="field">输入消息，或 @AI 员工下指令…</div>
+            <button className="btn btn-primary btn-sm" style={{borderRadius:18,height:36,padding:'0 16px'}}><Icon n="sendarrow"/>发送</button>
+          </div>
+        </div>
+      </div>
+    </IosFrame>
+  );
+}
+
+/* ===== 自适应缩放 ===== */
+function App(){
+  const wrapRef = useRef(null);
+  const [scale,setScale] = useState(1);
+  useEffect(()=>{
+    const fit = () => {
+      const fw = 393+24, fh = 852+24; // 设备外框含 padding
+      const mw = window.innerWidth, mh = window.innerHeight;
+      const s = Math.min(mw/fw, mh/fh, 1) * 0.985;
+      setScale(s);
+    };
+    fit();
+    window.addEventListener('resize',fit);
+    return ()=>window.removeEventListener('resize',fit);
+  },[]);
+  return (
+    <div className="im-scale" style={{transform:`scale(${scale})`}} ref={wrapRef}>
+      <ImApp/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body></html>

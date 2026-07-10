@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRTV · 智能对话工作台</title>
+<link rel="stylesheet" href="assets/brtv-design.css">
+<style>
+  html,body{height:100%;}
+  body{background:var(--paper);overflow:hidden;}
+  .cw{display:grid;grid-template-columns:236px 1fr 340px;grid-template-rows:minmax(0,1fr);height:100vh;}
+  .cw-left,.cw-center,.cw-right{min-height:0;}   /* 关键：让各栏内部 overflow 能滚动，而非撑破容器 */
+
+  /* —— 左栏：项目 / 会话 —— */
+  .cw-left{background:linear-gradient(180deg,#fff,#fbf6f1);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .cw-brand{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line);}
+  .cw-brand .id{display:flex;flex-direction:column;line-height:1.2;}
+  .cw-brand .id b{font-family:var(--serif);font-size:14px;}
+  .cw-brand .id small{font-size:10.5px;color:var(--ink-3);letter-spacing:.06em;}
+  .sec-lbl{font-size:11px;color:var(--ink-3);letter-spacing:.12em;padding:14px 16px 6px;font-weight:700;}
+  .new-conv{margin:10px 14px 4px;}
+  .proj-item{display:flex;gap:9px;align-items:flex-start;padding:9px 14px;cursor:pointer;position:relative;transition:.15s;}
+  .proj-item:hover{background:rgba(140,43,34,.05);}
+  .proj-item.on{background:linear-gradient(90deg,rgba(209,26,42,.1),transparent);}
+  .proj-item.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--red);}
+  .proj-item .ic{width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;
+    font-size:15px;background:var(--red-soft);}
+  .proj-item .tx{min-width:0;}
+  .proj-item .tx b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .proj-item .tx span{font-size:11px;color:var(--ink-3);}
+  .cw-team{padding:4px 8px 12px;overflow-y:auto;flex:1;min-height:0;}
+  .team-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:9px;}
+  .team-row .tx{line-height:1.25;min-width:0;}
+  .team-row .tx b{font-size:12px;display:block;}
+  .team-row .tx span{font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+
+  /* —— 中栏：对话 —— */
+  .cw-center{display:flex;flex-direction:column;min-width:0;background:var(--paper);}
+  .ctx-bar{display:flex;align-items:center;gap:12px;padding:11px 22px;background:var(--glass);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--line);flex:none;z-index:5;}
+  .ctx-bar .ttl{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .ctx-bar .stack{display:flex;}
+  .ctx-bar .stack .avatar{margin-left:-8px;box-shadow:0 0 0 2px #fff;}
+  .conv{flex:1;min-height:0;overflow-y:auto;padding:22px 22px 8px;display:flex;flex-direction:column;gap:18px;}
+  .conv-inner{max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:18px;}
+
+  .m{display:flex;gap:11px;align-items:flex-start;animation:fadeUp .45s cubic-bezier(.2,.7,.2,1) both;}
+  .m.me{flex-direction:row-reverse;}
+  .m .body{min-width:0;max-width:88%;display:flex;flex-direction:column;gap:8px;}
+  .m.me .body{align-items:flex-end;}
+  .m .name{font-size:11.5px;color:var(--ink-2);font-weight:600;display:flex;align-items:center;gap:7px;}
+  .m .txt{background:#fff;border-radius:4px 14px 14px 14px;padding:11px 15px;box-shadow:var(--sh-1);font-size:14px;line-height:1.6;}
+  .m.me .txt{background:linear-gradient(135deg,var(--red),var(--red-wall));color:#fff;border-radius:14px 4px 14px 14px;}
+
+  /* 意图识别 chip */
+  .intent{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;
+    background:linear-gradient(120deg,rgba(209,26,42,.1),rgba(200,168,106,.16));
+    color:var(--red-wall);border-radius:99px;padding:5px 13px;font-size:12px;font-weight:600;
+    animation:popIn .4s cubic-bezier(.2,.8,.2,1) both;}
+  .intent .rt{opacity:.55;}
+  .intent .who{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.65);border-radius:99px;padding:1px 8px 1px 3px;}
+
+  .out-card{width:100%;max-width:560px;}
+
+  /* —— 输入区 —— */
+  .composer{flex:none;border-top:1px solid var(--line);background:var(--glass);backdrop-filter:blur(12px);padding:10px 22px 14px;}
+  .composer-inner{max-width:760px;margin:0 auto;}
+  .intents-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:9px;}
+  .qi{flex:none;display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--red-wall);
+    border-radius:99px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:var(--sh-1);
+    transition:.15s;white-space:nowrap;}
+  .qi:hover{background:var(--red);color:#fff;transform:translateY(-1px);}
+  .qi.next{background:linear-gradient(135deg,var(--red-bright),var(--red-wall));color:#fff;box-shadow:var(--sh-red);}
+  .qi.next .ico{font-size:11px;}
+  .input-box{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:8px 8px 8px 16px;box-shadow:var(--sh-1);}
+  .input-box .ph{flex:1;color:var(--ink-3);font-size:13.5px;}
+  .input-box .tools{display:flex;align-items:center;gap:4px;color:var(--ink-3);}
+
+  /* —— 右栏：任务面板 —— */
+  .cw-right{background:linear-gradient(180deg,#fff,#fbf6f1);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;overflow-y:auto;}
+  .rp-head{padding:16px 18px 8px;}
+  .rp-head .k{font-size:11px;color:var(--ink-3);letter-spacing:.1em;font-weight:700;}
+  .rp-head .v{font-family:var(--serif);font-size:17px;font-weight:700;margin-top:2px;}
+  .rp-sec{padding:12px 18px;border-top:1px solid var(--line);}
+  .rp-sec .h{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+  .prog{display:flex;flex-direction:column;gap:0;}
+  .prog-step{display:flex;align-items:center;gap:10px;padding:5px 0;position:relative;}
+  .prog-step .pdot{width:20px;height:20px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:#fff;background:#cfc6bf;transition:.3s;z-index:2;}
+  .prog-step.done .pdot{background:linear-gradient(135deg,var(--ok),#1f7d52);}
+  .prog-step.active .pdot{background:linear-gradient(135deg,var(--red-bright),var(--red-wall));animation:nodePulse 1.8s infinite;}
+  .prog-step:not(:last-child)::before{content:"";position:absolute;left:9px;top:22px;height:14px;width:2px;background:var(--line-2);z-index:1;}
+  .prog-step.done:not(:last-child)::before{background:var(--ok);}
+  .prog-step .pl{font-size:12.5px;color:var(--ink);}
+  .prog-step.pending .pl{color:var(--ink-3);}
+  .arti-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:#fff;box-shadow:var(--sh-1);
+    margin-bottom:8px;cursor:pointer;transition:.15s;animation:slideInR .4s cubic-bezier(.2,.7,.2,1) both;}
+  .arti-item:hover{box-shadow:var(--sh-2);transform:translateX(2px);}
+  .arti-item .ai{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+  .arti-item .tx{min-width:0;flex:1;}
+  .arti-item .tx b{font-size:12.5px;display:block;}
+  .arti-item .tx span{font-size:11px;color:var(--ink-3);}
+  .empty-arti{font-size:12px;color:var(--ink-3);text-align:center;padding:18px 8px;line-height:1.6;}
+  .qbar{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+  .qbar .ql{width:62px;font-size:11.5px;color:var(--ink-2);flex:none;}
+  .qbar .qt{flex:1;height:6px;border-radius:99px;background:var(--line);overflow:hidden;}
+  .qbar .qf{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--red),var(--gold));}
+  .qbar .qv{font-size:11px;font-weight:700;color:var(--red-wall);width:30px;text-align:right;}
+
+  /* —— 视频裁剪剪辑器（对话内）—— */
+  .trim-track{position:relative;height:48px;border-radius:8px;background:#1a1310;display:flex;gap:2px;padding:4px;user-select:none;}
+  .trim-track .sh{flex:1;border-radius:4px;}
+  .trim-mask{position:absolute;top:4px;bottom:4px;background:rgba(16,10,9,.66);z-index:2;pointer-events:none;border-radius:4px;}
+  .trim-sel{position:absolute;top:0;bottom:0;border:2px solid var(--red);border-radius:8px;z-index:3;pointer-events:none;
+    box-shadow:0 0 0 3px rgba(200,19,42,.16);}
+  .trim-h{position:absolute;top:0;bottom:0;width:16px;z-index:4;cursor:ew-resize;display:flex;align-items:center;justify-content:center;}
+  .trim-h::before{content:"";position:absolute;top:0;bottom:0;width:7px;background:var(--red);border-radius:4px;transition:background .15s;}
+  .trim-h::after{content:"";position:relative;width:2px;height:18px;background:#fff;border-radius:2px;}
+  .trim-h:hover::before,.trim-h:active::before{background:var(--red-bright);}
+  .trim-tc{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-2);margin-top:8px;font-variant-numeric:tabular-nums;}
+  .trim-tc b{color:var(--red-wall);font-family:var(--mono);}
+
+  /* —— AIGC 题图卡 —— */
+  .gen-img{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:16/10;box-shadow:var(--sh-1);}
+  .gen-img .ai-badge{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.42);color:#fff;font-size:10px;
+    padding:2px 9px;border-radius:99px;backdrop-filter:blur(6px);display:inline-flex;align-items:center;gap:5px;}
+  .gen-img .lbl{position:absolute;left:11px;bottom:10px;color:#fff;font-size:13px;font-weight:600;text-shadow:0 1px 5px rgba(0,0,0,.55);}
+  .gen-img.skeleton-art{background:linear-gradient(90deg,#e9ddd0,#f6efe5,#e9ddd0);background-size:600px 100%;animation:shimmer 1.2s linear infinite;}
+
+  /* —— 选题角度卡 —— */
+  .angle-opt{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:10px;background:var(--paper-2);
+    cursor:pointer;transition:.15s;margin-bottom:7px;}
+  .angle-opt:hover{background:var(--red-soft);transform:translateX(2px);}
+  .angle-opt.sel{background:var(--red-soft);box-shadow:inset 0 0 0 1.5px var(--red);}
+  .angle-opt .no{width:22px;height:22px;border-radius:6px;background:#fff;color:var(--red-wall);font-weight:700;
+    font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;}
+
+  /* —— 多语种卡 —— */
+  .lang-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:var(--paper-2);margin-bottom:7px;}
+  .lang-flag{width:32px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:11px;font-weight:700;flex:none;font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="assets/vendor/react.production.min.js"></script>
+<script src="assets/vendor/react-dom.production.min.js"></script>
+<script src="assets/vendor/babel.min.js"></script>
+<script src="assets/brtv-data.js"></script>
+<script src="assets/brtv-icons.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const B = window.BRTV;
+const S = B.story;
+const Icon = ({ n, cls }) => <span className={'ico ' + (cls || '')} dangerouslySetInnerHTML={{ __html: brtvIcon(n) }} />;
+
+/* ===== 头像 ===== */
+function Av({ id, size }) {
+  const e = B.emp(id) || { color: '#8C2B22', short: 'AI', status: 'on' };
+  return (
+    <span className={'avatar' + (size ? ' ' + size : '')} style={{ background: e.color }}>
+      {e.short}<i className={'dot ' + (e.status === 'busy' ? 'busy' : 'on')} />
+    </span>
+  );
+}
+
+/* ===== 输出卡片（对话内可编辑产物） ===== */
+function DraftCard({ data }) {
+  const d = data || {};
+  const titleTx = d.title || '快讯稿 · AI 初稿 38 秒';
+  const eh = d.editHtml || { base: '<span class="ai-mark">' + S.draftFlash.slice(0, 24) + '</span>' + S.draftFlash.slice(24),
+    polish: '<span class="ai-mark">北京今晨升级发布寒潮橙色预警。</span>受强冷空气影响，气温较昨日同期骤降 12℃，预计明晨平原地区最低降至 -9℃。市交通、城管、供热等部门<span class="ai-mark">连夜启动应急响应</span>，主干道除雪保畅、供暖保障同步推进。<span class="ai-mark">提醒市民防寒保暖、错峰出行。</span>',
+    rewrite: '<span class="ai-mark">除雪车彻夜奔忙，暖气管网满负荷运转——</span>面对入冬以来最强寒潮，北京今晨升级发布橙色预警，多部门连夜联动，一场保畅通、保供暖的城市应急行动就此展开。' };
+  const expand = d.expand || '<p style="margin:.6em 0 0">截至发稿，全市已出动除雪人员 1.2 万人次、作业车辆 2300 余台，重点路段通行正常；12345 热线增设防寒咨询专席。</p>';
+  const adopt = d.adopt || '采用 · 进粗剪';
+  const [html, setHtml] = useState(eh.base);
+  const [ver, setVer] = useState(0);
+  const [working, setWorking] = useState(null);
+  function aiEdit(kind) {
+    if (working) return;
+    setWorking(kind);
+    setTimeout(() => {
+      if (kind === '润色' && eh.polish) setHtml(eh.polish);
+      else if (kind === '改写' && eh.rewrite) setHtml(eh.rewrite);
+      else if (kind === '扩写') setHtml(h => h + expand);
+      setVer(v => v + 1);
+      setWorking(null);
+    }, 750);
+  }
+  return (
+    <div className="card-msg out-card anim-pop">
+      <div className="top" style={{ background: 'linear-gradient(135deg,var(--red),var(--red-wall))' }}>
+        <Icon n="edit" /> {titleTx}
+        <span className="grow" /><span className="pill" style={{ background: 'rgba(255,255,255,.2)', color: '#fff' }}>可编辑</span>
+      </div>
+      <div className="body">
+        <div className="edit-toolbar" style={{ marginBottom: 8 }}>
+          {['B', 'H', '“”'].map((b, i) => <span key={i} className="b">{b}</span>)}
+          <span className="b"><Icon n="refresh" /></span>
+          <span className="grow" />
+          <span className="faint" style={{ fontSize: 11 }}>点正文可直接改字</span>
+        </div>
+        <div className="editable" key={ver} contentEditable suppressContentEditableWarning
+          dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="row gap-8 wrap" style={{ marginTop: 10 }}>
+          {['润色', '改写', '扩写'].map(k => (
+            <button key={k} className="btn btn-sm" onClick={() => aiEdit(k)} disabled={!!working}>
+              {working === k
+                ? <span className="ai-working"><span className="spin" />{k}中</span>
+                : <><Icon n={k === '扩写' ? 'expand' : 'sparkle'} /> AI {k}</>}
+            </button>
+          ))}
+          <span className="grow" />
+          <button className="btn btn-primary btn-sm"><Icon n="check" /> {adopt}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function VideoCard({ data }) {
+  const d = data || {};
+  const title0 = d.title || '竖屏版粗剪';
+  const tone = d.tone || 'thumb-road';
+  const meta = d.meta || '9:16 · 大字幕 · 6 个分镜';
+  const note = d.note || '配《北京时间》片头，卡点节奏已对齐口播。';
+  const BASE = d.baseSec || 45;                       // 原片秒数
+  const pad = n => String(Math.round(n)).padStart(2, '0');
+  const fmt = s => pad(Math.floor(s / 60)) + ':' + pad(Math.round(s % 60));
+  const [play, setPlay] = useState(false);
+  const [crop, setCrop] = useState(false);
+  const [range, setRange] = useState({ in: 8, out: 80 });
+  const [dur, setDur] = useState(fmt(BASE));
+  const [saved, setSaved] = useState(false);
+  const [smooth, setSmooth] = useState(false);
+  const [smartHint, setSmartHint] = useState(false);
+  const trackRef = useRef(null);
+  const tc = pct => fmt(BASE * pct / 100);
+  const selSec = BASE * (range.out - range.in) / 100;
+  const tr = smooth ? 'left .42s cubic-bezier(.4,1.3,.4,1), width .42s cubic-bezier(.4,1.3,.4,1)' : 'none';
+
+  function startDrag(which, e) {
+    e.preventDefault();
+    setSmooth(false);
+    const move = ev => {
+      const r = trackRef.current.getBoundingClientRect();
+      let p = ((ev.clientX - r.left) / r.width) * 100;
+      p = Math.max(0, Math.min(100, p));
+      setRange(prev => which === 'in'
+        ? { ...prev, in: Math.min(p, prev.out - 8) }
+        : { ...prev, out: Math.max(p, prev.in + 8) });
+    };
+    const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+  function smartTrim() {                              // AI 一键快速剪辑：剔除冗余镜头
+    setSmooth(true); setSmartHint(true);
+    setRange({ in: 14, out: 64 });
+    setTimeout(() => setSmooth(false), 460);
+  }
+  function apply() { setDur(fmt(selSec)); setCrop(false); setSaved(true); }
+
+  return (
+    <div className="card-msg out-card anim-pop" style={{ maxWidth: crop ? 440 : 360 }}>
+      <div className="top" style={{ background: 'linear-gradient(135deg,#C8102E,var(--red))' }}>
+        <Icon n="film" /> {title0} {dur}
+        <span className="grow" />
+        {crop
+          ? <span className="pill" style={{ background: 'rgba(255,255,255,.2)', color: '#fff' }}>剪辑中</span>
+          : saved && <span className="pill" style={{ background: 'rgba(255,255,255,.2)', color: '#fff' }}><Icon n="check" cls="ico-xs" /> 已裁剪</span>}
+      </div>
+      <div className="body">
+        {!crop ? (
+          <div className="row gap-12 items-start">
+            <div className="player tall" style={{ width: 132, flex: 'none' }}>
+              <div className={'stage ' + tone} onClick={() => setPlay(p => !p)} style={{ cursor: 'pointer' }}>
+                <div className="scanline" />
+                <div className="thumb-ico"><Icon n={play ? 'pause' : 'play'} cls="ico-2xl" /></div>
+                <span className="dur" style={{ position: 'absolute', right: 6, bottom: 6 }}>{dur}</span>
+              </div>
+            </div>
+            <div className="col gap-8 grow">
+              <div className="faint" style={{ fontSize: 12 }}>{meta}</div>
+              <div style={{ fontSize: 12.5 }}>{note}</div>
+              <div className="timeline" style={{ padding: 5, cursor: 'pointer' }} onClick={() => setCrop(true)}>
+                {S.shots.slice(0, 6).map((s, i) => <div key={i} className={'shot ' + s.tone} style={{ width: 34, height: 26 }} />)}
+              </div>
+              <div className="row gap-8">
+                <button className="btn btn-sm" onClick={() => setCrop(true)}><Icon n="scissors" /> 快速剪辑</button>
+                <button className="btn btn-primary btn-sm">送审</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="anim-in">
+            <div className="row gap-12 items-start" style={{ marginBottom: 12 }}>
+              <div className="player tall" style={{ width: 92, flex: 'none' }}>
+                <div className={'stage ' + tone}><div className="scanline" /><div className="thumb-ico"><Icon n="play" cls="ico-xl" /></div></div>
+              </div>
+              <div className="col gap-6 grow">
+                <b style={{ fontSize: 13 }}>快速剪辑 · 拖两端裁掉头尾</b>
+                <span className="faint" style={{ fontSize: 11.5, lineHeight: 1.5 }}>原片 {fmt(BASE)} · 拖红色手柄设入点 / 出点，或点「智能去冗」一键剔除冗余镜头。</span>
+                {smartHint && <span className="tag tag-ai" style={{ alignSelf: 'flex-start' }}><Icon n="sparkle" cls="ico-xs" /> AI 已优化选段</span>}
+              </div>
+            </div>
+            <div className="trim-track" ref={trackRef}>
+              {S.shots.slice(0, 6).map((s, i) => <div key={i} className={'sh ' + s.tone} />)}
+              <div className="trim-mask" style={{ left: 0, width: range.in + '%', transition: tr }} />
+              <div className="trim-mask" style={{ left: range.out + '%', right: 0, transition: tr }} />
+              <div className="trim-sel" style={{ left: range.in + '%', width: (range.out - range.in) + '%', transition: tr }} />
+              <div className="trim-h" style={{ left: range.in + '%', transform: 'translateX(-50%)', transition: tr }} onMouseDown={e => startDrag('in', e)} />
+              <div className="trim-h" style={{ left: range.out + '%', transform: 'translateX(-50%)', transition: tr }} onMouseDown={e => startDrag('out', e)} />
+            </div>
+            <div className="trim-tc">
+              <span>入点 <b>{tc(range.in)}</b></span>
+              <span>选段 <b>{fmt(selSec)}</b></span>
+              <span>出点 <b>{tc(range.out)}</b></span>
+            </div>
+            <div className="row gap-8" style={{ marginTop: 12 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setCrop(false)}>取消</button>
+              <span className="grow" />
+              <button className="btn btn-sm" onClick={smartTrim}><Icon n="sparkle" /> 智能去冗</button>
+              <button className="btn btn-primary btn-sm" onClick={apply}><Icon n="check" /> 应用裁剪</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function VersionsCard() {
+  return (
+    <div className="card-msg out-card anim-pop">
+      <div className="top" style={{ background: 'linear-gradient(135deg,var(--gold),#b8923e)', color: '#3a2c10' }}><Icon n="bolt" /> 多版本一键分产 · 4 版</div>
+      <div className="body">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }} className="stagger">
+          {S.versions.map(v => (
+            <div key={v.id} className="row gap-8 items-start elevate" style={{ padding: 8, borderRadius: 10, background: 'var(--paper-2)' }}>
+              <div className={'media-thumb ' + v.tone} style={{ width: 46, height: 30, borderRadius: 6, flex: 'none' }}>
+                <div className="thumb-ico" style={{ fontSize: 16 }}><Icon n={v.icon} /></div>
+              </div>
+              <div className="col" style={{ minWidth: 0, lineHeight: 1.3 }}>
+                <b style={{ fontSize: 12.5 }}>{v.name}</b>
+                <span className="faint" style={{ fontSize: 11 }}>{v.fmt} · {v.dur}</span>
+                <span className="faint" style={{ fontSize: 10.5 }}>{v.target}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+function MaterialsCard() {
+  const vids = S.materials.filter(m => m.type === 'video').slice(0, 3);
+  return (
+    <div className="card-msg out-card anim-pop">
+      <div className="top" style={{ background: 'linear-gradient(135deg,#9D5A2A,var(--red))' }}><Icon n="upload" /> 5G 回传素材 · 已自动打标</div>
+      <div className="body">
+        <div className="row gap-8 scroll-x">
+          {vids.map(m => (
+            <div key={m.id} className="media-card" style={{ width: 130, flex: 'none' }}>
+              <div className={'media-thumb ' + m.thumb}>
+                <span className="badge">{m.status === 'tagging' ? '打标中' : '已标引'}</span>
+                <div className="thumb-ico"><Icon n={m.icon} cls="ico-2xl" /></div>
+                <span className="dur">{m.dur}</span>
+              </div>
+              <div className="media-meta"><div className="media-title" style={{ fontSize: 11.5 }}>{m.title}</div></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+function AuditCard() {
+  return (
+    <div className="card-msg out-card anim-pop" style={{ maxWidth: 460 }}>
+      <div className="top" style={{ background: 'linear-gradient(135deg,var(--red),var(--red-wall))' }}><Icon n="shield" /> 多模态预审 · 1 项需时政复核</div>
+      <div className="body col gap-8">
+        {B.auditQueue.slice(0, 3).map(a => (
+          <div key={a.id} className={'risk-row r-' + a.level}>
+            <span className={'risk-flag pill-' + (a.level === 'high' ? 'danger' : a.level === 'mid' ? 'warn' : a.level === 'pass' ? 'ok' : 'info')}>{a.flag}</span>
+            <div className="col" style={{ minWidth: 0 }}>
+              <b style={{ fontSize: 12.5 }}>{a.title}</b>
+              <span className="faint" style={{ fontSize: 11 }}>{a.detail}</span>
+            </div>
+          </div>
+        ))}
+        <div className="row gap-8"><span className="grow" /><button className="btn btn-primary btn-sm">去终审</button></div>
+      </div>
+    </div>
+  );
+}
+function PublishCard({ data }) {
+  const d = data || {};
+  const ids = d.chIds || ['bjtime', 'dy', 'sph'];
+  const note = d.note || '通达已生成分发回执，见微将于 5 分钟后回流首批传播数据（播放 / 互动 / 收视）。';
+  const ch = B.channels.filter(c => ids.includes(c.id));
+  return (
+    <div className="card-msg out-card anim-pop" style={{ maxWidth: 420 }}>
+      <div className="top" style={{ background: 'linear-gradient(135deg,var(--ok),#1f7d52)' }}><Icon n="check" /> 已分发至 {ch.length} 个平台</div>
+      <div className="body">
+        <div className="row gap-8 wrap" style={{ marginBottom: 8 }}>
+          {ch.map(c => <span key={c.id} className="tag"><Icon n={c.icon} /> {c.name}</span>)}
+        </div>
+        <div className="faint" style={{ fontSize: 12 }}>{note}</div>
+      </div>
+    </div>
+  );
+}
+function AngleCard({ data }) {
+  const angles = (data && data.angles) || [];
+  const [sel, setSel] = useState(null);
+  return (
+    <div className="card-msg out-card anim-pop">
+      <div className="top" style={{ background: 'linear-gradient(135deg,#8C2B22,var(--red-wall))' }}><Icon n="target" /> 选题研判 · {angles.length} 个深度角度</div>
+      <div className="body">
+        {angles.map((a, i) => (
+          <div key={i} className={'angle-opt' + (sel === i ? ' sel' : '')} onClick={() => setSel(i)}>
+            <span className="no">{i + 1}</span>
+            <div className="col" style={{ minWidth: 0 }}>
+              <b style={{ fontSize: 12.5 }}>{a.t}</b>
+              <span className="faint" style={{ fontSize: 11 }}>{a.desc}</span>
+            </div>
+            <span className="grow" />
+            {a.heat && <span className="tag tag-ai" style={{ flex: 'none', alignSelf: 'center' }}>{a.heat}</span>}
+          </div>
+        ))}
+        <div className="faint" style={{ fontSize: 11.5, marginTop: 2 }}>点选一个角度，或直接告诉我你的想法。</div>
+      </div>
+    </div>
+  );
+}
+function ImageCard({ data }) {
+  const variants = (data && data.variants) || [{ tone: 'thumb-gov', label: 'AI 题图' }];
+  const [idx, setIdx] = useState(0);
+  const [gen, setGen] = useState(false);
+  const [chosen, setChosen] = useState(false);
+  function regen() { if (gen) return; setGen(true); setChosen(false); setTimeout(() => { setIdx(i => (i + 1) % variants.length); setGen(false); }, 850); }
+  const v = variants[idx];
+  return (
+    <div className="card-msg out-card anim-pop" style={{ maxWidth: 380 }}>
+      <div className="top" style={{ background: 'linear-gradient(135deg,var(--gold),#b8923e)', color: '#3a2c10' }}>
+        <Icon n="image" /> AIGC 题图 · 第 {idx + 1}/{variants.length} 版
+        <span className="grow" />
+        {chosen && <span className="pill" style={{ background: 'rgba(255,255,255,.28)', color: '#3a2c10' }}><Icon n="check" cls="ico-xs" /> 已选用</span>}
+      </div>
+      <div className="body">
+        <div className={'gen-img ' + (gen ? 'skeleton-art' : v.tone)}>
+          {!gen && <>
+            <span className="ai-badge"><Icon n="sparkle" cls="ico-xs" /> AI 生成</span>
+            <span className="lbl">{v.label}</span>
+          </>}
+          {gen && <div className="center" style={{ position: 'absolute', inset: 0 }}><span className="ai-working"><span className="spin" />正在生成…</span></div>}
+        </div>
+        <div className="row gap-8" style={{ marginTop: 10 }}>
+          <button className="btn btn-sm" onClick={regen} disabled={gen}><Icon n="refresh" /> 换一张</button>
+          <button className="btn btn-sm"><Icon n="wand" /> 调风格</button>
+          <span className="grow" />
+          <button className="btn btn-primary btn-sm" onClick={() => setChosen(true)}><Icon n="check" /> 选用</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function MultiLangCard({ data }) {
+  const langs = (data && data.langs) || [];
+  return (
+    <div className="card-msg out-card anim-pop" style={{ maxWidth: 420 }}>
+      <div className="top" style={{ background: 'linear-gradient(135deg,#3B72C4,#1f3f73)' }}><Icon n="globe" /> 多语种国际传播 · {langs.length} 语</div>
+      <div className="body">
+        {langs.map((l, i) => (
+          <div key={i} className="lang-row">
+            <span className="lang-flag" style={{ background: l.color }}>{l.code}</span>
+            <div className="col grow" style={{ minWidth: 0 }}><b style={{ fontSize: 12.5 }}>{l.name}</b><span className="faint" style={{ fontSize: 11 }}>{l.note}</span></div>
+            <button className="btn btn-sm"><Icon n="eye" /> 预览</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+const CARDS = { materials: MaterialsCard, draft: DraftCard, video: VideoCard, versions: VersionsCard, audit: AuditCard, publish: PublishCard, angle: AngleCard, image: ImageCard, multilang: MultiLangCard };
+
+/* ===== 深度特稿 / 简报文本 ===== */
+const axisBase = '<span class="ai-mark">从永定门到钟鼓楼，7.8 公里的北京中轴线串起 15 处遗产点。</span>申遗成功一周年，这条「老城之脊」正以新的方式融入市民生活——晨练的太极、修缮一新的古建、夜色里被点亮的钟鼓楼，古都的庄严与烟火气在此交汇。';
+const axisPolish = '<span class="ai-mark">7.8 公里，15 处遗产点，一条贯通古今的「老城之脊」。</span>北京中轴线申遗成功一周年，从永定门到钟鼓楼，晨练的太极、焕新的古建、夜色中的钟鼓楼……<span class="ai-mark">庄严与烟火，在这条轴线上交汇生长。</span>';
+const axisRewrite = '<span class="ai-mark">清晨六点，永定门城楼的轮廓在薄雾中显现。</span>一年前，北京中轴线列入《世界遗产名录》；一年后，这条 7.8 公里的轴线如何被守护、被激活、被讲述？我们沿着它，从南到北走了一遍。';
+const axisExpand = '<p style="margin:.6em 0 0">一年来，沿线完成文物修缮 11 项，新增公众开放点位 6 处，举办主题展览与研学活动逾 200 场，「云上中轴」数字平台访问量突破 800 万人次。</p>';
+const ciftisBase = '<span class="ai-mark">一、主题主线：</span>聚焦「开放 · 合作 · 共赢」，突出服务贸易新业态、新场景。<br>二、重点板块：数字贸易、文旅服务、绿色低碳、健康医疗。<br>三、产品矩阵：电视专题 + 客户端直播 + 短视频 + 海外多语种。<br>四、时间节点：会前预热、会中直播、会后复盘三阶段。';
+const ciftisPolish = '<span class="ai-mark">一、主题主线：</span>紧扣「开放引领 · 合作共赢」，讲好服务贸易的北京故事与中国机遇。<br><span class="ai-mark">二、重点板块：</span>数字贸易、文旅服务、绿色低碳、健康医疗四大赛道。<br>三、产品矩阵：大屏专题 + 客户端慢直播 + 竖屏短视频 + 海外多语种联动。<br>四、时间节点：会前 7 天预热、会中全程直播、会后数据复盘。';
+const ciftisExpand = '<p style="margin:.6em 0 0">五、传播目标：全网话题阅读量超 5000 万，海外社交平台覆盖 20 个国家和地区。</p>';
+const rushBase = '<span class="ai-mark">一、传播概览：</span>全网播放 386 万，互动 4.2 万，整体口碑正向。<br>二、平台分布：抖音 62%、视频号 21%、客户端 17%。<br>三、用户反馈：高频词「限流」「绕行」「准点」，对出行提示认可度高。<br>四、优化建议：早高峰前 30 分钟推送，增加可视化绕行图。';
+const rushPolish = '<span class="ai-mark">一、传播概览：</span>全网播放 386 万、互动 4.2 万，峰值出现在 7:40–8:10，<span class="ai-mark">为同类民生提示近一月最佳。</span><br>二、平台分布：抖音 62%、视频号 21%、客户端 17%。<br>三、用户反馈：高频词「限流 / 绕行 / 准点」，提示类内容认可度显著高于均值。<br>四、优化建议：早高峰前 30 分钟定点推送，叠加可视化绕行示意图。';
+const rushExpand = '<p style="margin:.6em 0 0">五、可复用结论：民生提示类「短平快 + 可视化 + 定时推送」组合，点击率提升约 35%，建议沉淀为模板。</p>';
+
+/* ===== 多项目脚本化对话 ===== */
+const PROJECTS = [
+  {
+    id: 'coldwave', icon: 'snow', name: '寒潮应急', sub: '智能生产 · 进行中',
+    tag: { label: '突发', bg: 'rgba(200,19,42,.12)', color: 'var(--danger)' },
+    scenario: '智能生产', priority: 'P0 智能生产', startedAt: '今天 06:42',
+    welcome: { emp: 'daoyan', text: '我是编导 Agent。今天「北京入冬最强寒潮」全网热度已 98，析言判定传播力极高、建议立即立项。你来下指令，我和团队来执行。' },
+    collab: ['daoyan', 'writer', 'cutter', 'auditor', 'pub'],
+    pipeline: B.pipeline.map(p => ({ id: p.id, label: p.label })),
+    quality: S.quality,
+    script: [
+      { user: '今天寒潮这条，立项做快讯+成片，把前方素材拉进来', emp: 'daoyan', intent: '立项 · 智能生产',
+        reply: '已建项目「寒潮应急」。析言完成全网研判（热度 98，传播力极高）；前方记者林晚 / 赵峻 5G 素材入库中，识万已自动打标。',
+        card: 'materials', pipe: ['ingest', 'tag', 'search'], arti: { k: '素材包 · 6 条', emp: 'tagger', ic: 'upload' } },
+      { user: '先出一条快讯稿', emp: 'writer', intent: '智能撰稿 · 消息',
+        reply: '快讯初稿已生成，38 秒成稿。点正文可直接改字，或用 AI 一键润色 / 改写 / 扩写快速改稿。',
+        card: 'draft', pipe: ['create'], arti: { k: '快讯稿', emp: 'writer', ic: 'edit' } },
+      { user: '出个竖屏 45 秒版，大字幕卡点', emp: 'cutter', intent: 'AI 粗剪 · 竖屏分产',
+        reply: '竖屏版粗剪完成 00:45。可在卡片里拖两端快速剪辑，或点「智能去冗」一键剔除冗余镜头。',
+        card: 'video', pipe: [], arti: { k: '竖屏成片 00:45', emp: 'cutter', ic: 'film' } },
+      { user: '电视长版、听听FM音频版、国际传播英文版一起出', emp: 'daoyan', intent: '多版本一键分产',
+        reply: '已一键分产 4 个版本：电视长版 / 客户端竖屏 / 听听FM 音频 / 国际传播英文版，同源同稿、各端适配。',
+        card: 'versions', pipe: ['multi'], arti: { k: '多版本 · 4 版', emp: 'cutter', ic: 'bolt' } },
+      { user: '送审', emp: 'auditor', intent: 'AI 预审 · 多模态巡检',
+        reply: '文字 / 画面 / 音频三模态巡检完成：1 项涉部门表态触发时政强制复核，其余通过，需人工终审。',
+        card: 'audit', pipe: ['refine'], arti: { k: '审核报告', emp: 'auditor', ic: 'shield' } },
+      { user: '终审已过，分发北京时间 + 抖音 + 视频号', emp: 'pub', intent: '多平台一键分发',
+        reply: '已分发至 3 个平台，生成分发回执。见微将于 5 分钟后回流首批传播数据并自动更新效能看板。',
+        card: 'publish', pipe: ['publish'], arti: { k: '分发回执', emp: 'pub', ic: 'rocket' } },
+    ],
+  },
+  {
+    id: 'axis', icon: 'gov', name: '中轴线申遗周年', sub: '选题策划 · 待研判',
+    tag: { label: '文化', bg: 'rgba(193,154,82,.18)', color: '#b8923e' },
+    scenario: '选题策划', priority: 'P1 选题策划', startedAt: '今天 09:20',
+    welcome: { emp: 'daoyan', text: '中轴线申遗成功一周年临近，析言监测到相关话题正升温（近 7 天 +64%）。这是个适合做深度精品 + 国际传播的选题，你想从哪个角度切入？' },
+    collab: ['daoyan', 'topic', 'writer', 'cutter', 'caption'],
+    pipeline: [{ id: 'monitor', label: '全网监测' }, { id: 'cluster', label: 'AI 聚类' }, { id: 'predict', label: '热度预测' }, { id: 'judge', label: '选题研判' }, { id: 'write', label: '深度撰稿' }, { id: 'aigc', label: 'AIGC 配图' }, { id: 'multi', label: '多版本分产' }, { id: 'dist', label: '多平台分发' }],
+    quality: [{ k: '史实核验', v: 98 }, { k: '文化表述', v: 94 }, { k: '画面合规', v: 96 }, { k: '多语准确', v: 90 }],
+    script: [
+      { user: '中轴线申遗周年，做个深度策划，先给我几个角度', emp: 'topic', intent: '选题研判 · 深度策划',
+        reply: '已聚合全网中轴线相关内容 1.2 万条，按传播力排序给你 3 个深度角度（含数据可视化建议），点选一个我来展开。',
+        card: 'angle', data: { angles: [
+          { t: '15 处遗产点 · 一年回望', desc: '深度图文 + 数据可视化，串联永定门到钟鼓楼', heat: '传播力极高' },
+          { t: '中轴线上的一天', desc: '纪实短片，跟拍晨练 / 修缮 / 讲解 4 组人物', heat: '传播力高' },
+          { t: '申遗一年 · 焕新工程', desc: '古建修缮探访，对比修缮前后', heat: '传播力中' },
+        ] }, pipe: ['monitor', 'cluster', 'predict'], arti: { k: '选题研判', emp: 'topic', ic: 'target' } },
+      { user: '用「15 处遗产点 · 一年回望」这个角度，写深度特稿', emp: 'writer', intent: '智能撰稿 · 深度特稿',
+        reply: '深度特稿初稿已生成，结构含「总览—遗产点巡礼—市民故事—焕新数据」。点正文可直接改字，或用 AI 一键润色 / 改写 / 扩写。',
+        card: 'draft', data: { title: '深度特稿 · 《中轴线上的一年》', adopt: '采用 · 进配图', editHtml: { base: axisBase, polish: axisPolish, rewrite: axisRewrite }, expand: axisExpand },
+        pipe: ['judge', 'write'], arti: { k: '深度特稿', emp: 'writer', ic: 'edit' } },
+      { user: '配一张大气的题图', emp: 'cutter', intent: 'AIGC 文生图 · 题图',
+        reply: 'AI 已生成 4 版题图候选，点「换一张」切换风格、「选用」定稿，也可继续调风格。',
+        card: 'image', data: { variants: [
+          { tone: 'thumb-gov', label: '中轴线 · 宫墙晨曦' }, { tone: 'thumb-city', label: '永定门 · 金辉' },
+          { tone: 'thumb-night', label: '钟鼓楼 · 夜色' }, { tone: 'thumb-snow', label: '万宁桥 · 初雪' },
+        ] }, pipe: ['aigc'], arti: { k: 'AI 题图', emp: 'cutter', ic: 'image' } },
+      { user: '出个 3 分钟精品短片', emp: 'cutter', intent: '精品成片 · 剪辑',
+        reply: '精品短片粗剪完成 03:00。可在卡片里拖两端快速裁剪，或用「智能去冗」一键剔除冗余镜头。',
+        card: 'video', data: { title: '中轴线纪实短片', tone: 'thumb-gov', baseSec: 180, meta: '16:9 · 4K · 12 个分镜', note: '航拍 + 实拍，配原创交响配乐。' },
+        pipe: ['multi'], arti: { k: '精品短片 03:00', emp: 'cutter', ic: 'film' } },
+      { user: '国际传播出英 / 法 / 西三语种', emp: 'caption', intent: '多语种国际传播',
+        reply: '已生成英 / 法 / 西三语种版本（字幕 + AI 配音），适配国际传播中心海外分发。',
+        card: 'multilang', data: { langs: [
+          { code: 'EN', name: '英文版', note: '字幕 + AI 配音 · 03:00', color: '#8C2B22' },
+          { code: 'FR', name: '法文版', note: '字幕 + AI 配音 · 03:00', color: '#3B72C4' },
+          { code: 'ES', name: '西文版', note: '字幕 + AI 配音 · 03:00', color: '#2E9E6B' },
+        ] }, pipe: [], arti: { k: '多语种 · 3 语', emp: 'caption', ic: 'globe' } },
+      { user: '分发北京卫视 + 视频号 + 国际传播中心', emp: 'pub', intent: '多平台分发',
+        reply: '已分发至 3 个渠道并生成回执，国际传播中心将同步推送多语种版本。',
+        card: 'publish', data: { chIds: ['btv1', 'sph', 'intl'], note: '国际传播中心将面向海外平台推送英 / 法 / 西版本，见微持续跟踪跨境传播效能。' },
+        pipe: ['dist'], arti: { k: '分发回执', emp: 'pub', ic: 'rocket' } },
+    ],
+  },
+  {
+    id: 'ciftis', icon: 'operate', name: '服贸会筹备', sub: '深度策划 · 草拟', softBg: 'rgba(59,114,196,.1)',
+    tag: { label: '经济', bg: 'rgba(59,114,196,.12)', color: 'var(--info)' },
+    scenario: '深度策划', priority: 'P1 选题策划', startedAt: '今天 10:05',
+    welcome: { emp: 'daoyan', text: '服贸会还在筹备期，目前在做选题储备。可让我先拉一版报道策划框架，或采集相关素材。也可切到「寒潮应急 / 中轴线申遗周年」体验完整对话流程。' },
+    collab: ['daoyan', 'topic', 'writer'],
+    pipeline: [{ id: 'judge', label: '选题研判' }, { id: 'plan', label: '策划框架' }, { id: 'ingest', label: '素材采集' }, { id: 'create', label: '撰稿成片' }],
+    quality: [{ k: '框架完整', v: 86 }, { k: '数据支撑', v: 78 }, { k: '时效把握', v: 90 }],
+    script: [
+      { user: '给个服贸会报道策划框架', emp: 'writer', intent: '选题策划 · 框架',
+        reply: '已生成报道策划框架：含「主题主线 / 重点板块 / 产品矩阵 / 时间节点」四部分，点正文可直接编辑，或用 AI 润色 / 扩写。',
+        card: 'draft', data: { title: '服贸会报道策划框架', adopt: '采用 · 进采集', editHtml: { base: ciftisBase, polish: ciftisPolish }, expand: ciftisExpand },
+        pipe: ['judge', 'plan'], arti: { k: '策划框架', emp: 'writer', ic: 'edit' } },
+      { user: '把相关素材也拉进来', emp: 'tagger', intent: '素材采集 · 打标',
+        reply: '已采集服贸会往届及筹备相关素材 18 条并自动打标，可检索调用。', card: null,
+        pipe: ['ingest'], arti: { k: '素材包 · 18 条', emp: 'tagger', ic: 'upload' } },
+    ],
+  },
+  {
+    id: 'rush', icon: 'subway', name: '早高峰交通', sub: '已分发 · 复盘中', softBg: 'rgba(46,158,107,.1)',
+    tag: { label: '民生', bg: 'rgba(46,158,107,.12)', color: 'var(--ok)' },
+    scenario: '传播反馈', priority: 'P1 传播反馈', startedAt: '今天 07:30',
+    welcome: { emp: 'data', text: '「早高峰交通提示」这条已分发，正在做传播复盘。要看这条的传播数据，还是生成一份复盘简报？' },
+    collab: ['data', 'pub', 'topic'],
+    pipeline: [{ id: 'collect', label: '数据采集' }, { id: 'analyze', label: '自动分析' }, { id: 'board', label: '效能看板' }, { id: 'brief', label: '简报生成' }],
+    quality: [{ k: '数据完整', v: 97 }, { k: '归因合理', v: 88 }, { k: '结论可用', v: 90 }],
+    script: [
+      { user: '看这条早高峰的传播复盘', emp: 'data', intent: '传播反馈 · 复盘',
+        reply: '这条全网播放 386 万，抖音占比 62%，峰值出现在 7:40–8:10；评论高频词为「限流」「绕行」「准点」，整体口碑正向。', card: null,
+        pipe: ['collect', 'analyze'], arti: { k: '传播数据', emp: 'data', ic: 'feedback' } },
+      { user: '生成一份复盘简报', emp: 'data', intent: '简报生成',
+        reply: '复盘简报已生成，含「传播概览 / 平台分布 / 用户反馈 / 优化建议」，点正文可编辑，或用 AI 润色 / 扩写后发部门。',
+        card: 'draft', data: { title: '早高峰交通 · 传播复盘简报', adopt: '采用 · 发部门', editHtml: { base: rushBase, polish: rushPolish }, expand: rushExpand },
+        pipe: ['board', 'brief'], arti: { k: '复盘简报', emp: 'data', ic: 'edit' } },
+    ],
+  },
+];
+const projById = id => PROJECTS.find(p => p.id === id);
+
+/* ===== 主应用 ===== */
+function App() {
+  const [activeProj, setActiveProj] = useState('coldwave');
+  const P = projById(activeProj);
+  const [msgs, setMsgs] = useState([{ role: 'ai', emp: P.welcome.emp, text: P.welcome.text }]);
+  const [step, setStep] = useState(0);
+  const [done, setDone] = useState([]);          // 已完成流水线节点
+  const [artis, setArtis] = useState([]);        // 产物
+  const [busy, setBusy] = useState(false);
+  const convRef = useRef(null);
+
+  // 等卡片布局稳定后再滚到底（双 rAF，避免卡片渲染后高度再增长导致滚不到最新消息）
+  useEffect(() => {
+    const el = convRef.current;
+    if (!el) return;
+    let r2;
+    const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); });
+    return () => { cancelAnimationFrame(r1); if (r2) cancelAnimationFrame(r2); };
+  }, [msgs]);
+
+  function selectProject(p) {                       // 切换项目 = 切换一段对话
+    if (p.id === activeProj) return;
+    setActiveProj(p.id);
+    setMsgs([{ role: 'ai', emp: p.welcome.emp, text: p.welcome.text }]);
+    setStep(0); setDone([]); setArtis([]); setBusy(false);
+  }
+
+  function advance() {
+    if (busy || step >= P.script.length) return;
+    const s = P.script[step];
+    setBusy(true);
+    setMsgs(m => [...m, { role: 'me', text: s.user }]);
+    setMsgs(m => [...m, { role: 'ai', emp: s.emp, typing: true }]);
+    setTimeout(() => {
+      setMsgs(m => {
+        const c = m.slice(0, -1);
+        return [...c, { role: 'ai', emp: s.emp, intent: s.intent, text: s.reply, card: s.card, cardData: s.data }];
+      });
+      setDone(d => [...new Set([...d, ...(s.pipe || [])])]);
+      if (s.arti) setArtis(a => [...a, s.arti]);
+      setStep(step + 1);
+      setBusy(false);
+    }, 900);
+  }
+
+  const quality = P.quality;
+
+  return (
+    <div className="cw">
+      {/* 左栏 */}
+      <aside className="cw-left">
+        <div className="cw-brand">
+          <span className="brtv-mark">BRTV</span>
+          <div className="id"><b>智能对话工作台</b><small>AI COWORK</small></div>
+        </div>
+        <div className="new-conv"><button className="btn btn-primary btn-block btn-sm"><Icon n="plus" /> 新建对话</button></div>
+        <div className="sec-lbl">项目 / 会话</div>
+        {PROJECTS.map(p => (
+          <div key={p.id} className={'proj-item' + (p.id === activeProj ? ' on' : '')} onClick={() => selectProject(p)}>
+            <div className="ic" style={{ background: p.softBg || 'var(--red-soft)' }}><Icon n={p.icon} cls="ico-lg" /></div>
+            <div className="tx"><b>{p.name}</b><span>{p.sub}</span></div>
+          </div>
+        ))}
+        <div className="sec-lbl">协作团队 · 9 在线</div>
+        <div className="cw-team">
+          {B.employees.map(e => (
+            <div key={e.id} className="team-row">
+              <Av id={e.id} size="sm" />
+              <div className="tx"><b>{e.name}</b><span>{e.role}</span></div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* 中栏 */}
+      <main className="cw-center">
+        <div className="ctx-bar">
+          <span className="ic" style={{ fontSize: 18 }}><Icon n={P.icon} cls="ico-lg" /></span>
+          <div className="ttl">{P.name} <span className="pill" style={{ background: P.tag.bg, color: P.tag.color }}>{P.tag.label}</span> <span className="tag tag-ai">{P.scenario}</span></div>
+          <span className="grow" />
+          <span className="faint" style={{ fontSize: 12 }}>协作</span>
+          <div className="stack">{P.collab.map(id => <Av key={id} id={id} size="sm" />)}</div>
+        </div>
+
+        <div className="conv" ref={convRef}>
+          <div className="conv-inner">
+            {msgs.map((m, i) => <Message key={i} m={m} />)}
+          </div>
+        </div>
+
+        <div className="composer">
+          <div className="composer-inner">
+            <div className="intents-row">
+              {step < P.script.length
+                ? <span className="qi next" onClick={advance}><Icon n="play" />{P.script[step].user}</span>
+                : <span className="qi" style={{ pointerEvents: 'none', opacity: .6 }}><Icon n="check" /> 本条已走完全流程</span>}
+              {['查素材', '@守正 审一下', '看传播数据', '换题图'].map((q, i) => (
+                <span key={i} className="qi" onClick={advance}>{q}</span>
+              ))}
+            </div>
+            <div className="input-box">
+              <span className="tools" style={{ fontSize: 18 }}><Icon n="plus" /></span>
+              <span className="ph">和 AI 员工对话，或 @ 指定数字员工下指令…{busy ? ' （执行中）' : ''}</span>
+              <span className="tools" style={{ fontSize: 16 }}><Icon n="mic" /></span>
+              <button className="btn btn-primary btn-icon" onClick={advance} disabled={busy}><Icon n="sendarrow" /></button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* 右栏 */}
+      <aside className="cw-right">
+        <div className="rp-head">
+          <div className="k">当前项目</div>
+          <div className="v">{P.name}</div>
+          <div className="row gap-8" style={{ marginTop: 6 }}>
+            <span className="pill" style={{ background: 'rgba(140,43,34,.1)', color: 'var(--red-wall)' }}>{P.priority}</span>
+            <span className="faint" style={{ fontSize: 11.5 }}>开始 {P.startedAt}</span>
+          </div>
+        </div>
+
+        <div className="rp-sec">
+          <div className="h">{P.scenario}流水线 <span className="faint" style={{ fontWeight: 400 }}>{done.length}/{P.pipeline.length}</span></div>
+          <div className="prog">
+            {P.pipeline.map(p => {
+              const st = done.includes(p.id) ? 'done' : (done.length && P.pipeline.find(x => !done.includes(x.id))?.id === p.id ? 'active' : 'pending');
+              return (
+                <div key={p.id} className={'prog-step ' + st}>
+                  <span className="pdot">{st === 'done' ? <Icon n="check" /> : ''}</span>
+                  <span className="pl">{p.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rp-sec">
+          <div className="h">产物 <span className="faint" style={{ fontWeight: 400 }}>{artis.length} 项</span></div>
+          {artis.length === 0
+            ? <div className="empty-arti">还没有产物。<br />下达指令后，AI 产出的稿件 / 视频 / 多版本会汇集到这里。</div>
+            : artis.map((a, i) => (
+              <div key={i} className="arti-item">
+                <span className="ai" style={{ background: (B.emp(a.emp) || {}).color || 'var(--red)' }}><Icon n={a.ic} /></span>
+                <div className="tx"><b>{a.k}</b><span>{(B.emp(a.emp) || {}).name} · 可编辑</span></div>
+                <span className="faint" style={{ fontSize: 11 }}><Icon n="sendarrow" /></span>
+              </div>
+            ))}
+        </div>
+
+        <div className="rp-sec">
+          <div className="h">质量自检</div>
+          {quality.map((q, i) => (
+            <div key={i} className="qbar">
+              <span className="ql">{q.k}</span>
+              <span className="qt"><span className="qf" style={{ width: q.v + '%' }} /></span>
+              <span className="qv">{q.v}</span>
+            </div>
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function Message({ m }) {
+  if (m.role === 'me') {
+    return (
+      <div className="m me">
+        <span className="avatar sm" style={{ background: 'linear-gradient(135deg,#5C534F,#221C1A)' }}>我</span>
+        <div className="body"><div className="txt">{m.text}</div></div>
+      </div>
+    );
+  }
+  const e = B.emp(m.emp) || {};
+  const Card = m.card ? CARDS[m.card] : null;
+  return (
+    <div className="m">
+      <Av id={m.emp} size="sm" />
+      <div className="body">
+        <div className="name">{e.name} <span className="faint" style={{ fontWeight: 400 }}>· {e.role}</span></div>
+        {m.intent && <span className="intent">意图识别 <span className="rt"><Icon n="sendarrow" /></span> {m.intent} <span className="who"><Av id={m.emp} size="sm" />{e.name}</span></span>}
+        {m.typing
+          ? <div className="txt"><span className="dots-typing"><i /><i /><i /></span></div>
+          : <div className="txt">{m.text}</div>}
+        {Card && <Card data={m.cardData} />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

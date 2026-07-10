@@ -59,7 +59,10 @@ export async function materializeAdHocMission(
       leaderEmployeeId: leader.id,
       status: "queued",
       teamMembers: teamMemberIds,
-      inputParams: input.summary ? { intentSummary: input.summary } : {},
+      inputParams: {
+        query: input.message,
+        ...(input.summary ? { intentSummary: input.summary } : {}),
+      },
       projectId: input.projectId ?? null,
       conversationId: input.conversationId ?? null,
       ...(input.sourceModule ? { sourceModule: input.sourceModule } : {}),

@@ -1,5 +1,5 @@
 {
-  "_comment": "5 个 platform endpoint 的实测单价（calculate_price API 实测，2026-05-05）。注：小红书 + 微信视频号 是 $0.01（10x 基础价），抖音 + 微博 + 知乎 是 $0.001。知乎含阶梯折扣最高 50%。",
+  "_comment": "tikhub endpoint 单价。keyword 5 平台为 calculate_price API 实测（2026-05-05）：小红书+视频号 $0.01，抖音+微博+知乎 $0.001（知乎含阶梯折扣最高 50%）。account 模式 4 endpoint + 抖音用户搜索为估计值（按同平台 keyword 同价推断），⚠️ 上线前用 calculate_price API 实测校正；未列出的 endpoint 走 http-client 的 $0.005 兜底。",
   "/api/v1/douyin/app/v3/fetch_general_search_result": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": true },
   "/api/v1/weibo/web/fetch_search": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": false },
   "/api/v1/xiaohongshu/web/search_notes": { "basePrice": 0.01, "allowDiscount": false, "allowFreeCredit": false },
@@ -16,5 +16,10 @@
       { "minRpd": 20000, "maxRpd": 30000, "discountPct": 40 },
       { "minRpd": 30000, "discountPct": 50 }
     ]
-  }
+  },
+  "/api/v1/douyin/web/fetch_user_post_videos": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": true, "_estimated": true },
+  "/api/v1/weibo/web_v2/fetch_user_posts": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": false, "_estimated": true },
+  "/api/v1/kuaishou/web/fetch_user_post": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": false, "_estimated": true },
+  "/api/v1/wechat_mp/web/fetch_mp_article_list": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": false, "_estimated": true },
+  "/api/v1/douyin/web/fetch_user_search_result_v2": { "basePrice": 0.001, "allowDiscount": false, "allowFreeCredit": true, "_estimated": true }
 }

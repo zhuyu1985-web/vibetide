@@ -445,13 +445,18 @@ export type InngestEvents = {
   };
 
   // ─── AIGC Illustrate (2026-06-22) ───
-  /** IM 机器人配图请求 → kieGenerateImage → TOS 转存 → 写回 articles.coverImageUrl。由 gateway 派发，aigcIllustrate 消费 */
+  /**
+   * 配图请求 → kieGenerateImage → TOS 转存 → 写回 articles.coverImageUrl。
+   * 由 IM gateway（钉钉/企微）或 PC cowork（confirmCreationPlan）派发，aigcIllustrate 消费。
+   * channelCtx 可选：IM 侧传入用于回执；cowork（PC 对话）侧无渠道，省略后跳过 IM 回执，
+   * 封面写回 article 后用户直接在编辑器里看到（2026-06-24 配图开关接 AIGC）。
+   */
   "aigc/illustrate.requested": {
     data: {
       organizationId: string;
       articleId: string;
       userHint?: string;
-      channelCtx: {
+      channelCtx?: {
         organizationId: string;
         configId: string;
         platform: "dingtalk" | "wechat_work";
@@ -509,6 +514,127 @@ export type InngestEvents = {
       externalMessageId: string;
       /** 钉钉回调自带的 sessionWebhook，用于异步回执；空串表示无 */
       replyWebhook: string;
+    };
+  };
+
+  // ─── Channel Inbound Voice Ingest (2026-06-23) ───
+  /** 钉钉/企微入站语音消息 → 下载媒体 → ASR 转文本 → 当文字喂 gateway。webhook 派发，channelVoiceIngest 消费 */
+  "channel/voice-ingest.requested": {
+    data: {
+      organizationId: string;
+      configId: string;
+      platform: "dingtalk" | "wechat_work";
+      externalMessageId: string;
+      externalUserId: string;
+      chatId: string;
+      /** 钉钉 sessionWebhook，用于回执；空串=无（企微走主动推送 sendChannelMessage） */
+      replyWebhook: string;
+      /** 媒体定位：钉钉优先 downloadCode，企微用 mediaId */
+      media: {
+        downloadCode?: string;
+        mediaId?: string;
+        format: string;
+        durationMs?: number;
+      };
+      /** 平台自带转写（钉钉 audio.recognition），命中则免下载+ASR；空=无 */
+      inlineTranscript: string;
+    };
+  };
+
+  // ─── Content Loop Step (2026-06-24) ───
+  /** 语音内容生产闭环的单步重活（抓热点/出选题/写初稿）。orchestrator 派发，contentLoopStep 消费 */
+  "content-loop/step.requested": {
+    data: {
+      organizationId: string;
+      sessionId: string;
+      step:
+        | "fetch_topics"
+        | "gen_angles"
+        | "gen_draft"
+        | "revise"
+        | "translate"
+        | "submit_review"
+        | "publish"
+        | "analyze";
+      channelCtx: {
+        organizationId: string;
+        configId: string;
+        platform: "dingtalk" | "wechat_work";
+        chatId: string;
+        externalUserId: string;
+      };
+      /** revise / translate：用户的修改要求原文 */
+      instruction?: string;
+      /** translate：目标语种 code（en/ja…）+ 展示名 */
+      targetLang?: string;
+      targetLangLabel?: string;
+      /** submit_review：选定的真人审核人 */
+      assigneeUserId?: string;
+      assigneeName?: string;
+      /** publish：选定的渠道编号集合（空=全部） */
+      selectedIdx?: number[];
+      /**
+       * 当前用户消息携带的钉钉 sessionWebhook，用于本步异步回执统一走 @ 的 app 机器人身份。
+       * 空/缺省时回落到 config 自定义机器人。每条用户消息有全新的 sessionWebhook，
+       * 故只用于"本步"那一次回执（见 content-loop-step.ts pushCard 的回落逻辑）。
+       */
+      replyWebhook?: string;
+    };
+  };
+
+  // ─── 新闻 URL 导入闭环 (2026-06-26) ───
+  /** cowork 对话粘贴 URL → 抓取入库 articles → 派下游分析/视频。coworkLinkImport 消费 */
+  "cowork/link-import.requested": {
+    data: {
+      organizationId: string;
+      conversationId: string;
+      userId: string;
+      url: string;
+      sourceName: string;
+    };
+  };
+  /** 稿件入库后自动结构化分析（摘要/标签/分类/要点）。articleAiAnalyze 消费 */
+  "article/ai-analysis.requested": {
+    data: {
+      organizationId: string;
+      articleId: string;
+      conversationId?: string;
+    };
+  };
+  /** 视频稿 → 解析视频源 → 下载素材库。articleVideoIngest 消费 */
+  "article/video-ingest.requested": {
+    data: {
+      organizationId: string;
+      articleId: string;
+      conversationId?: string;
+      url: string;
+      videoSourceHint?: string;
+    };
+  };
+  /** 素材入库后 → 通义听悟转写/理解。tingwuAnalyze 消费 */
+  "media/tingwu-analyze.requested": {
+    data: {
+      organizationId: string;
+      assetId: string;
+      articleId?: string;
+      conversationId?: string;
+      publicUrl: string;
+    };
+  };
+  /**
+   * 异步 CLI 工具执行（如 ffmpeg 转码）→ 后台跑共享管道 → 落产物 + 呈现。
+   * cliRun 消费（M3.8）。resolvedParams 是已 validateParams 校验过的业务参数。
+   */
+  "cli/run.requested": {
+    data: {
+      organizationId: string;
+      cliToolId: string;
+      runId: string;
+      resolvedParams: Record<string, unknown>;
+      inputAssetId?: string;
+      missionId?: string;
+      taskId?: string;
+      conversationId?: string;
     };
   };
 };

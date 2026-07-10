@@ -3,6 +3,7 @@ import { articles, categories, aiEmployees, missionTasks } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { getCurrentUserOrg } from "./auth";
 import type { ArticleListItem, ArticleDetail, ArticleStats } from "@/lib/types";
+import { deriveContentSource } from "@/lib/articles/content-source";
 
 /**
  * 面向 CMS 发布流程的文章视图（读模型）。
@@ -117,6 +118,11 @@ export async function getArticles(): Promise<ArticleListItem[]> {
     sourceName: r.sourceName ?? undefined,
     sourceUrl: r.sourceUrl ?? undefined,
     sourceIconUrl: r.sourceIconUrl ?? undefined,
+    contentSource: deriveContentSource({ missionId: r.missionId, metadata: r.metadata }),
+    channelPlatform: r.metadata?.ingestedFromChannel?.platform as
+      | "dingtalk"
+      | "wechat_work"
+      | undefined,
     aiAnalysisStatus: r.aiAnalysisStatus ?? undefined,
     transcodingStatus: r.transcodingStatus ?? undefined,
     keywords: (r.keywords as string[] | null) ?? undefined,
@@ -177,6 +183,11 @@ export async function getArticle(id: string): Promise<ArticleDetail | undefined>
     sourceName: row.sourceName ?? undefined,
     sourceUrl: row.sourceUrl ?? undefined,
     sourceIconUrl: row.sourceIconUrl ?? undefined,
+    contentSource: deriveContentSource({ missionId: row.missionId, metadata: row.metadata }),
+    channelPlatform: row.metadata?.ingestedFromChannel?.platform as
+      | "dingtalk"
+      | "wechat_work"
+      | undefined,
     aiAnalysisStatus: row.aiAnalysisStatus ?? undefined,
     transcodingStatus: row.transcodingStatus ?? undefined,
     keywords: (row.keywords as string[] | null) ?? undefined,
@@ -276,6 +287,11 @@ export async function getArticlesByCategory(categoryId: string): Promise<Article
     sourceName: r.sourceName ?? undefined,
     sourceUrl: r.sourceUrl ?? undefined,
     sourceIconUrl: r.sourceIconUrl ?? undefined,
+    contentSource: deriveContentSource({ missionId: r.missionId, metadata: r.metadata }),
+    channelPlatform: r.metadata?.ingestedFromChannel?.platform as
+      | "dingtalk"
+      | "wechat_work"
+      | undefined,
     aiAnalysisStatus: r.aiAnalysisStatus ?? undefined,
     transcodingStatus: r.transcodingStatus ?? undefined,
     keywords: (r.keywords as string[] | null) ?? undefined,

@@ -18,7 +18,12 @@ export async function runIllustrate(data: IllustrateData): Promise<void> {
 
   // 回执包 try/catch：出图非幂等且贵，回执失败绝不能把 handler 炸出未捕获异常
   // 触发 Inngest 重试 → 重复出图烧额度（配合 retries:0 双保险）。
+  // channelCtx 缺省（PC cowork 派发，无 IM 渠道）→ 跳过 IM 回执，封面写回后用户在编辑器看到。
   const reply = async (content: string) => {
+    if (!channelCtx) {
+      console.info("[aigc-illustrate] 无渠道上下文（cowork），跳过 IM 回执:", content);
+      return;
+    }
     try {
       const config = await getChannelConfig(channelCtx.configId);
       if (config) {

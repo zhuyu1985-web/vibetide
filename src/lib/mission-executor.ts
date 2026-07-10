@@ -718,6 +718,48 @@ export function buildImplicitTrendingTopicsParams(
   return { mode: "hot", limit: 20 };
 }
 
+export function buildImplicitWebSearchParams(
+  missionTitle: string,
+  missionInputParams: Record<string, unknown> | null | undefined,
+  userInstruction?: string | null,
+): Record<string, unknown> {
+  const explicitQuery =
+    (typeof missionInputParams?.query === "string"
+      ? missionInputParams.query.trim()
+      : "") ||
+    (typeof missionInputParams?.topic === "string"
+      ? missionInputParams.topic.trim()
+      : "") ||
+    (userInstruction?.trim() ?? "") ||
+    (typeof missionInputParams?.intentSummary === "string"
+      ? missionInputParams.intentSummary.trim()
+      : "") ||
+    missionTitle.trim();
+
+  if (!explicitQuery) return {};
+
+  const msg = `${explicitQuery} ${missionTitle}`;
+  let timeRange: "1h" | "24h" | "7d" | "30d" | undefined;
+  if (/1\s*h|1小时|一小时|刚刚|实时|突发|breaking/i.test(msg)) {
+    timeRange = "1h";
+  } else if (/今日|每日|今天|24\s*h|24小时|最新|recent/i.test(msg)) {
+    timeRange = "24h";
+  } else if (/本周|最近一周|7\s*d|7天|weekly/i.test(msg)) {
+    timeRange = "7d";
+  } else if (/本月|近一月|30\s*d|30天|monthly/i.test(msg)) {
+    timeRange = "30d";
+  }
+
+  return {
+    query: explicitQuery,
+    maxResults: 8,
+    topic: /股|股票|A股|美股|港股|市场|金融|财报|上市|证券|finance/i.test(msg)
+      ? "finance"
+      : "news",
+    ...(timeRange ? { timeRange } : {}),
+  };
+}
+
 /**
  * 2026-05-29 — 第三道防线:LLM agent 跑完后,扫描其输出文本是否含明显失败信号。
  *
@@ -982,6 +1024,65 @@ function detectAgentOutputFailure(output: unknown): {
   return { failed: false };
 }
 
+/**
+ * 从「短路直出」步骤的结构化结果里提取可见可编辑的稿件产物。
+ *
+ * 背景：数据/工具/LLM-skill 步骤走短路路径直出时，旧逻辑 `artifacts: []` —— 翻译改写
+ * 等真正产出稿件正文的步骤（cross_language_rewrite 返回 articles[].body）也不落产物，
+ * cowork 产物区因此空着。这里按常见内容形状提取：
+ *  - resultFields.articles[]（每条 body/body_en ≥10 字）→ 每篇一个 article_draft 产物
+ *  - 单篇 {title/body}（或 _en）→ 一个产物
+ * 纯数据/列表类步骤（trending_topics 列表、classifier 仅 summary 无 body）不产出产物，
+ * 避免噪音。article_draft 含 "draft" → cowork inferArtifactKind 归 draft → 可编辑。
+ */
+export function extractShortCircuitArtifacts(
+  resultFields: Record<string, unknown> | null | undefined,
+  taskTitle: string,
+): Array<{ type: string; title: string; content: string }> {
+  const out: Array<{ type: string; title: string; content: string }> = [];
+  if (!resultFields || typeof resultFields !== "object") return out;
+
+  const pickBody = (o: Record<string, unknown>): string | null => {
+    const b = o.body ?? o.body_en ?? o.content;
+    return typeof b === "string" && b.trim().length >= 10 ? b : null;
+  };
+  const pickTitle = (o: Record<string, unknown>): string | null => {
+    const t = o.title ?? o.title_en;
+    return typeof t === "string" && t.trim() ? t : null;
+  };
+
+  const articles = (resultFields as { articles?: unknown }).articles;
+  if (Array.isArray(articles)) {
+    for (const a of articles) {
+      if (a && typeof a === "object") {
+        const rec = a as Record<string, unknown>;
+        const body = pickBody(rec);
+        if (body) {
+          out.push({
+            type: "article_draft",
+            title: pickTitle(rec) ?? taskTitle,
+            content: body,
+          });
+        }
+      }
+    }
+  }
+
+  // 单篇形状（无 articles[] 时）
+  if (out.length === 0) {
+    const body = pickBody(resultFields);
+    if (body) {
+      out.push({
+        type: "article_draft",
+        title: pickTitle(resultFields) ?? taskTitle,
+        content: body,
+      });
+    }
+  }
+
+  return out;
+}
+
 function formatPreExecOutputDeterministic(opts: {
   toolName: string;
   params: Record<string, unknown>;
@@ -1222,6 +1323,22 @@ async function executeTaskDirect(
         ]);
         let autoBound = false;
         if (
+          Object.keys(rawParams).length === 0 &&
+          task.assignedRole === "web_search"
+        ) {
+          rawParams = buildImplicitWebSearchParams(
+            mission.title,
+            missionInputParams,
+            mission.userInstruction,
+          );
+          if (Object.keys(rawParams).length > 0) {
+            autoBound = true;
+            console.log(
+              "[mission-executor] auto-bound web_search",
+              { params: rawParams, missionId, taskId },
+            );
+          }
+        } else if (
           Object.keys(rawParams).length === 0 &&
           task.assignedRole &&
           RETRIEVAL_INTENT_SLUGS_MISSION.has(task.assignedRole)
@@ -1552,6 +1669,13 @@ async function executeTaskDirect(
         );
       }
 
+      // 该步骤真出稿件正文时（如 cross_language_rewrite 的 articles[].body），
+      // 提取成产物，让 cowork 产物区能看到/编辑（失败/0 条不产出）。
+      const scArtifacts =
+        toolFailure || preExecEmpty
+          ? []
+          : extractShortCircuitArtifacts(resultFields, task.title);
+
       const deterministicOutput = {
         ...resultFields,
         stepKey: task.id,
@@ -1563,7 +1687,7 @@ async function executeTaskDirect(
             : isLLMSkillRegistered(task.assignedRole)
               ? `${task.assignedRole} LLM-skill 真实调用完成，结果已直出（未经二次 LLM 包装）`
               : `${task.assignedRole} 真实调用完成，结果已直出（未经 LLM）`,
-        artifacts: [],
+        artifacts: scArtifacts,
         metrics: {
           qualityScore: toolFailure ? 30 : preExecEmpty ? 60 : 85,
         },
@@ -1611,6 +1735,21 @@ async function executeTaskDirect(
             })
           : Promise.resolve(),
       ]);
+
+      // 落产物（稿件正文）到 mission_artifacts —— 让 cowork 产物区可见可编辑。
+      // producedBy notNull，故需有 assignedEmployeeId；失败/0 条时 scArtifacts 为空不进。
+      if (!toolFailure && task.assignedEmployeeId && scArtifacts.length) {
+        for (const a of scArtifacts) {
+          await db.insert(missionArtifacts).values({
+            missionId,
+            taskId,
+            producedBy: task.assignedEmployeeId,
+            type: a.type,
+            title: a.title,
+            content: a.content,
+          });
+        }
+      }
 
       console.log(
         `[mission-executor] short-circuited data-fetching task ${taskId} (pre-exec direct)`,

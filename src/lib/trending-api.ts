@@ -253,19 +253,50 @@ async function fetchTrendingSearchOnce(
   }
 }
 
+/**
+ * 把 /hot 全网热榜按关键词(通常是城市名)本地过滤 —— /search 端点不可用时的兜底数据源。
+ * 仍是 TopHub 真实数据(非 LLM 编造);过滤后 rank 重排为 1..N。query 为空则原样返回。
+ */
+function filterTrendingByKeyword(
+  items: TrendingItem[],
+  query: string,
+): TrendingItem[] {
+  const q = query.trim();
+  if (!q) return items;
+  return items
+    .filter((it) => it.title.includes(q))
+    .map((it, index) => ({ ...it, rank: index + 1 }));
+}
+
 async function fetchTrendingSearch(query: string): Promise<TrendingItem[]> {
   try {
     return await fetchTrendingSearchOnce(query, getTophubTimeoutMs());
   } catch (err) {
     if (!isRetryableTophubError(err)) throw err;
+    let retryErr: unknown;
     try {
       return await fetchTrendingSearchOnce(query, getTophubSearchRetryTimeoutMs());
-    } catch (retryErr) {
+    } catch (e) {
+      retryErr = e;
+    }
+    // ── /search 端点两次都不可用 → 降级到实测稳定的 /hot 全网热榜，按城市关键词
+    //    本地过滤。仍是真实数据,过滤后可能为空 —— 空也如实返回(上游短路逻辑容忍
+    //    0 条并标 completed),避免 TopHub 单个端点抽风就拖垮整条早晚报 mission。
+    try {
+      const hot = await fetchTrendingHot();
+      const filtered = filterTrendingByKeyword(hot, query);
+      console.warn(
+        `[trending-api] /search 不可用,已降级到 /hot 兜底 (query="${query}", 命中 ${filtered.length}/${hot.length} 条)`,
+      );
+      return filtered;
+    } catch (hotErr) {
       const firstMessage = err instanceof Error ? err.message : String(err);
       const retryMessage =
         retryErr instanceof Error ? retryErr.message : String(retryErr);
+      const hotMessage =
+        hotErr instanceof Error ? hotErr.message : String(hotErr);
       throw new Error(
-        `TopHub /search 第一次调用超时或网络失败(${firstMessage}),重试后仍失败(${retryMessage})`,
+        `TopHub /search 第一次调用超时或网络失败(${firstMessage}),重试后仍失败(${retryMessage}),/hot 兜底也失败(${hotMessage})`,
       );
     }
   }

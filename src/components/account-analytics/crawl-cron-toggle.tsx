@@ -28,8 +28,8 @@ interface CrawlCronToggleProps {
  *
  * 简化后的 UI：
  *   - 永远可点；如账号未绑 outlet，开启时 Server Action 自动建/复用占位 outlet
- *   - 需要补识别符时，左侧显示"前往媒体字典"链接而不是 inline 弹窗
- *     （识别符配置统一回到「采集配置 / 媒体字典」或「绑定账号」对话框里完成）
+ *   - 需要补识别符时，左侧显示"前往媒体账号库"链接而不是 inline 弹窗
+ *     （识别符配置统一回到「采集配置 / 媒体账号库」或「绑定账号」对话框里完成）
  *   - 非白名单平台（仅 douyin/weibo/kuaishou/wechat_mp 支持）：toggle 灰掉并显示"仅 4 平台可开"
  */
 export function CrawlCronToggle({
@@ -82,13 +82,13 @@ export function CrawlCronToggle({
             }}
             title={
               hasOutlet
-                ? "outlet 已建但缺识别符 —— 点击前往媒体字典补全"
-                : "尚未绑定 outlet —— 点击前往媒体字典创建"
+                ? "outlet 已建但缺识别符 —— 点击前往媒体账号库补全"
+                : "尚未绑定 outlet —— 点击前往媒体账号库创建"
             }
             className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 whitespace-nowrap border-0 bg-transparent p-0 cursor-pointer"
           >
             <AlertTriangle size={11} className="shrink-0" />
-            前往媒体字典补识别符
+            前往媒体账号库补识别符
           </button>
         ) : (
           <>
@@ -120,7 +120,7 @@ export function CrawlCronToggle({
               if (res.needsSecUid) {
                 setHasOutlet(true);
                 toast.info(
-                  "已开启自动抓取 · 接下来请到媒体字典补全识别符才能真正抓数据",
+                  "已开启自动抓取 · 接下来请到媒体账号库补全识别符才能真正抓数据",
                   { duration: 5000 },
                 );
               } else {

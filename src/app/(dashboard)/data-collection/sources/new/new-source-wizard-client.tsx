@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Check, BookMarked } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, BookMarked, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +22,7 @@ import type { AdapterMeta } from "@/lib/collection/adapter-meta";
 import type { ConfigField } from "@/lib/collection/types";
 import { createCollectionSource } from "@/app/actions/collection";
 import { OUTLET_TIER_VALUES, OUTLET_TIER_LABELS, type OutletTier } from "@/lib/collection/constants";
+import { AccountImportDialog } from "./account-import-dialog";
 
 const CRON_PRESETS = [
   { value: "__manual__", label: "手工触发" },
@@ -45,7 +46,7 @@ export interface WizardOutletOption {
   outletTier: string;
   /** M4: 该 outlet 在各平台的账号矩阵(从 channels jsonb)。
    *  - tikhub account 模式联动用 nickname/name
-   *  - "从媒体字典选 URL" picker 用 type=website 时的 url/domain */
+   *  - "从媒体账号库选 URL" picker 用 type=website 时的 url/domain */
   channels: Array<{
     type: string;
     nickname?: string;
@@ -83,8 +84,16 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
   const [outletId, setOutletId] = useState<string>("__none__");
   const [defaultOutletTier, setDefaultOutletTier] = useState<string>("__none__");
   const [defaultOutletRegion, setDefaultOutletRegion] = useState<string>("");
+  // 内联批量导入新建/命中的 outlet — 合并进候选,让 OutletMultiPicker 立即可见可选
+  const [extraOutlets, setExtraOutlets] = useState<WizardOutletOption[]>([]);
 
   const selectedMeta = adapterMetas.find((m) => m.type === sourceType);
+  const allOutlets = useMemo(() => {
+    const map = new Map<string, WizardOutletOption>();
+    for (const o of outlets) map.set(o.id, o);
+    for (const o of extraOutlets) map.set(o.id, o); // 导入的覆盖,拿最新 channels
+    return Array.from(map.values());
+  }, [outlets, extraOutlets]);
 
   const canAdvance = () => {
     if (step === 1) return Boolean(sourceType);
@@ -243,7 +252,14 @@ export function NewSourceWizardClient({ adapterMetas, outlets }: NewSourceWizard
             <TikhubConfigPanel
               config={config}
               setConfig={setConfig}
-              outlets={outlets}
+              outlets={allOutlets}
+              onImported={(imported) =>
+                setExtraOutlets((prev) => {
+                  const map = new Map(prev.map((o) => [o.id, o]));
+                  for (const o of imported) map.set(o.id, o);
+                  return Array.from(map.values());
+                })
+              }
             />
           ) : (
             <div className="flex flex-col gap-6">
@@ -707,9 +723,12 @@ interface TikhubConfigPanelProps {
   config: Record<string, unknown>;
   setConfig: (next: Record<string, unknown>) => void;
   outlets: WizardOutletOption[];
+  /** 内联批量导入完成后,把新建/命中的 outlet 上抛给向导合并进候选 */
+  onImported: (outlets: WizardOutletOption[]) => void;
 }
 
-function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProps) {
+function TikhubConfigPanel({ config, setConfig, outlets, onImported }: TikhubConfigPanelProps) {
+  const [showImport, setShowImport] = useState(false);
   const mode = (config.mode as string) ?? "keyword";
   const accountPlatforms = Array.isArray(config.accountPlatforms)
     ? (config.accountPlatforms as string[])
@@ -779,7 +798,7 @@ function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProp
         <p className="text-xs text-muted-foreground">
           {mode === "keyword"
             ? "用关键词搜索 5 平台(抖音/微博/小红书/视频号/知乎)的公开内容"
-            : "按媒体字典里录入的账号 ID 拉取该账号的最新发布(4 平台:抖音/微博/快手/公众号)"}
+            : "按媒体账号库里录入的账号 ID 拉取该账号的最新发布(4 平台:抖音/微博/快手/公众号)"}
         </p>
       </div>
 
@@ -871,6 +890,23 @@ function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProp
             </div>
           </div>
 
+          {/* 内联批量导入入口 — 无需先去媒体账号库逐个添加 */}
+          <div className="rounded-md border border-dashed border-sky-300/60 bg-sky-50/40 dark:bg-sky-950/20 px-3 py-3 flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">
+              有一批社媒账号(抖音/微博/快手/公众号)?用 Excel 模板批量导入,系统自动建库并选入本采集源,无需先去媒体账号库逐个添加。抖音可只填名称自动匹配。
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setShowImport(true)}
+            >
+              <Upload className="h-3.5 w-3.5 mr-1" />
+              批量导入账号
+            </Button>
+          </div>
+
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <Label>选择媒体 * <span className="text-xs font-normal text-muted-foreground">(可多选,需在已选平台至少配过一个账号)</span></Label>
@@ -886,7 +922,7 @@ function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProp
               <div className="rounded-md border border-dashed bg-amber-50 dark:bg-amber-950/30 px-3 py-4 text-xs text-amber-700 dark:text-amber-400">
                 ⚠️ 没有任何媒体在已选平台配置过账号。请去{" "}
                 <Link href="/data-collection/outlets" className="underline">
-                  媒体字典
+                  媒体账号库
                 </Link>{" "}
                 补全后再回来。
               </div>
@@ -943,12 +979,26 @@ function TikhubConfigPanel({ config, setConfig, outlets }: TikhubConfigPanelProp
           />
         </div>
       </div>
+
+      <AccountImportDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onComplete={({ outletIds: importedIds, outlets: importedOutlets }) => {
+          setShowImport(false);
+          const nextPlatforms = accountPlatforms.includes("douyin")
+            ? accountPlatforms
+            : [...accountPlatforms, "douyin"];
+          const nextOutletIds = Array.from(new Set([...outletIds, ...importedIds]));
+          patch({ accountPlatforms: nextPlatforms, outletIds: nextOutletIds });
+          onImported(importedOutlets);
+        }}
+      />
     </div>
   );
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// 从媒体字典选择站点 URL —— 弹窗 picker
+// 从媒体账号库选择站点 URL —— 弹窗 picker
 //
 // 用法:在 ConfigField 上设 `pickFromOutletWebsite: true`,wizard 会在该字段
 // 上方渲染一个触发按钮。点开弹窗显示所有 outlet 的 `channels[type=website].url`
@@ -1009,12 +1059,12 @@ function OutletWebsitePickerButton({ outlets, onPick }: OutletWebsitePickerButto
         onClick={() => setOpen(true)}
       >
         <BookMarked className="mr-1 h-3.5 w-3.5" />
-        从媒体字典选择
+        从媒体账号库选择
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>从媒体字典选择站点 URL</DialogTitle>
+            <DialogTitle>从媒体账号库选择站点 URL</DialogTitle>
             <DialogDescription>
               选择一条媒体的站点 URL,选定后自动填入字段,并把该媒体作为采集源所属
               outlet 一并绑定。
@@ -1030,7 +1080,7 @@ function OutletWebsitePickerButton({ outlets, onPick }: OutletWebsitePickerButto
               {filtered.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-6 text-center text-xs text-muted-foreground">
                   {options.length === 0
-                    ? "媒体字典里还没有任何 outlet 绑定 website channel — 请先到 / 数据采集 / 媒体字典 给媒体添加站点信息"
+                    ? "媒体账号库里还没有任何 outlet 绑定 website channel — 请先到 / 数据采集 / 媒体账号库 给媒体添加站点信息"
                     : "没有匹配的媒体"}
                 </div>
               ) : (

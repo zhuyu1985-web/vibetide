@@ -1,6 +1,10 @@
 import { generateText, stepCountIs } from "ai";
 import { getLanguageModel, applySkillOverride } from "./model-router";
 import { toVercelTools, createKnowledgeBaseTools, type ToolContext } from "./tool-registry";
+import { createMcpToolset } from "@/lib/mcp/toolset";
+import { isMcpEnabled } from "@/lib/mcp/feature-flags";
+import { createCliToolset } from "@/lib/cli/toolset";
+import { isCliToolsEnabled } from "@/lib/cli/feature-flags";
 import {
   buildStepInstruction,
   formatPreviousStepContext,
@@ -236,6 +240,19 @@ export async function executeAgent(
     agent.knowledgeBaseIds && agent.knowledgeBaseIds.length > 0
       ? createKnowledgeBaseTools({ employeeKnowledgeBaseIds: agent.knowledgeBaseIds })
       : undefined;
+
+  const mcp = isMcpEnabled() && context?.organizationId
+    ? await createMcpToolset(context.organizationId)
+    : null;
+
+  // CLI 工具：把 org 下启用的 cli_tools 暴露为同步执行工具（feature-flagged）。
+  // 普通 in-process ToolSet，无连接，无需 close。
+  const cliTools = isCliToolsEnabled() && context?.organizationId
+    ? await createCliToolset(context.organizationId, {
+        authorityLevel: agent.authorityLevel,
+      })
+    : undefined;
+
   const vercelTools = toVercelTools(
     agent.tools,
     agent.pluginConfigs,
@@ -245,6 +262,8 @@ export async function executeAgent(
       ...context,
       authorityDomains: agent.domainAuthoritySources,
     },
+    mcp?.tools,
+    cliTools,
   );
 
   let toolCallCount = 0;
@@ -313,51 +332,56 @@ ${input.skillSpec}
 最后另起一行附：【质量自评：XX/100】`
     : `${agent.systemPrompt}${dateContext}`;
 
-  const result = await generateText({
-    model,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
-    tools: vercelTools,
-    stopWhen: stepCountIs(20),
-    temperature: effectiveModelConfig.temperature,
-    maxOutputTokens: effectiveModelConfig.maxTokens,
-    abortSignal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
-    onStepFinish: ({ toolCalls, toolResults }) => {
-      if (toolCalls && toolCalls.length > 0) {
-        toolCallCount += toolCalls.length;
-        for (const tc of toolCalls as Array<{ toolName?: string }>) {
-          if (tc.toolName) invokedToolNames.add(tc.toolName);
+  let result: Awaited<ReturnType<typeof generateText>>;
+  try {
+    result = await generateText({
+      model,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
+      tools: vercelTools,
+      stopWhen: stepCountIs(20),
+      temperature: effectiveModelConfig.temperature,
+      maxOutputTokens: effectiveModelConfig.maxTokens,
+      abortSignal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
+      onStepFinish: ({ toolCalls, toolResults }) => {
+        if (toolCalls && toolCalls.length > 0) {
+          toolCallCount += toolCalls.length;
+          for (const tc of toolCalls as Array<{ toolName?: string }>) {
+            if (tc.toolName) invokedToolNames.add(tc.toolName);
+          }
+          onProgress?.({
+            percent: Math.min(30 + toolCallCount * 10, 80),
+            message: `已执行 ${toolCallCount} 个工具调用...`,
+          });
         }
-        onProgress?.({
-          percent: Math.min(30 + toolCallCount * 10, 80),
-          message: `已执行 ${toolCallCount} 个工具调用...`,
-        });
-      }
-      // Bug B (Phase 2): 扫 toolResults 抓 success=false, 后续覆盖 output.status。
-      // AI SDK v6 的 TypedToolResult 把工具返回值放在 `.output` 字段(见
-      // node_modules/ai/dist/index.d.ts:514-540),不是 `.result`。早期实现误读
-      // `tr.result` 导致整个失败检测分支在真实 SDK 下永远是 undefined → 静默失效。
-      if (toolResults) {
-        for (const tr of toolResults as Array<{ toolName?: string; output?: unknown }>) {
-          const r = tr.output;
-          if (!r || typeof r !== "object") continue;
-          if ((r as { success?: unknown }).success === false) {
-            const err = (r as { error?: unknown }).error as
-              | { code?: unknown; message?: unknown }
-              | undefined;
-            toolFailures.push({
-              toolName: tr.toolName ?? "unknown",
-              code: typeof err?.code === "string" ? err.code : "tool_error",
-              message:
-                typeof err?.message === "string" ? err.message : "工具返回 success=false",
-            });
-          } else {
-            successfulToolOutputs.push(r as Record<string, unknown>);
+        // Bug B (Phase 2): 扫 toolResults 抓 success=false, 后续覆盖 output.status。
+        // AI SDK v6 的 TypedToolResult 把工具返回值放在 `.output` 字段(见
+        // node_modules/ai/dist/index.d.ts:514-540),不是 `.result`。早期实现误读
+        // `tr.result` 导致整个失败检测分支在真实 SDK 下永远是 undefined → 静默失效。
+        if (toolResults) {
+          for (const tr of toolResults as Array<{ toolName?: string; output?: unknown }>) {
+            const r = tr.output;
+            if (!r || typeof r !== "object") continue;
+            if ((r as { success?: unknown }).success === false) {
+              const err = (r as { error?: unknown }).error as
+                | { code?: unknown; message?: unknown }
+                | undefined;
+              toolFailures.push({
+                toolName: tr.toolName ?? "unknown",
+                code: typeof err?.code === "string" ? err.code : "tool_error",
+                message:
+                  typeof err?.message === "string" ? err.message : "工具返回 success=false",
+              });
+            } else {
+              successfulToolOutputs.push(r as Record<string, unknown>);
+            }
           }
         }
-      }
-    },
-  });
+      },
+    });
+  } finally {
+    await mcp?.close();
+  }
 
   onProgress?.({ percent: 90, message: "正在整理输出..." });
 

@@ -40,6 +40,9 @@ export const UNIVERSAL_READ_TOOL_SLUGS = [
   "competitor_analysis",
   "data_pivoter",
   "research_query_builder",
+  // 新闻 URL 导入闭环复用能力 (2026-06-26)：视频源抽取 / 稿件结构化分析（读，秒级）
+  "video_extract",
+  "analyze_article",
 ] as const;
 
 /** 通用写工具:确定性状态变更。通用(不绑工种),但执行受 authorityLevel 门控。 */
@@ -47,6 +50,8 @@ export const UNIVERSAL_WRITE_TOOL_SLUGS = [
   "cms_publish",
   "cms_batch_publish",
   "archive_to_drafts",
+  // 通义听悟视频分析（触发付费异步任务，有副作用 → 写）(2026-06-26)
+  "tingwu_analyze",
   "cms_catalog_sync",
 ] as const;
 

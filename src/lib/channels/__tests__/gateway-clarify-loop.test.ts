@@ -34,6 +34,7 @@ vi.mock("@/lib/dal/channel-sessions", () => ({
   getOrCreateSession,
   updateSession,
   resetSession,
+  CONTENT_LOOP_TTL_MS: 604800000,
 }));
 vi.mock("@/lib/channels/clarify-or-plan", () => ({ clarifyOrPlan }));
 vi.mock("@/lib/channels/start-channel-mission", () => ({ startChannelMission }));
@@ -129,6 +130,19 @@ describe("gateway 自由消息澄清循环", () => {
     expect(startChannelMission).not.toHaveBeenCalled();
     expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "confirming" }));
     expect(r.reply).toContain("开始");
+  });
+
+  it("drafting 阶段发「获取最新热点」→ 重启热点线，不被当成改稿吞掉（hoist isHotTopicIntent）", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", scenarioPhase: "drafting",
+      loopContext: { selectedTopic: { title: "旧" } }, contextTurns: [], clarifyRounds: 0, lastArticleId: "a1",
+    });
+    const r = await handleInboundMessage({ ...msg, textContent: "获取当前最新的热点" });
+    // startContentLoop 的回执（"🔍 正在获取今天的热点…"），而不是 drafting 的"改稿"
+    expect(r.reply).toContain("获取今天的热点");
+    expect(r.reply).not.toContain("改稿");
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({ scenarioPhase: "hot_list" }));
+    expect(inngestSend).toHaveBeenCalled(); // 派了 fetch_topics
   });
 
   it("confirming + 开始 → 起 mission，running，清 pendingPlan", async () => {
@@ -350,5 +364,49 @@ describe("gateway 加配图分支", () => {
 
     expect(r.reply).toContain("没有可配图");
     expect(inngestSend).not.toHaveBeenCalled();
+  });
+});
+
+describe("gateway 问候全局拦截", () => {
+  beforeEach(() => {
+    updateSession.mockResolvedValue(undefined);
+    inngestSend.mockResolvedValue(undefined);
+  });
+
+  it("卡在 hot_list 时发「你好」→ 回友好引导 + 复位 session 到 idle", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", scenarioPhase: "hot_list",
+      loopContext: { topicCandidates: [] }, contextTurns: [], clarifyRounds: 0,
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "你好" });
+
+    // 不再答非所问（不返回"热点还在抓取中"）
+    expect(r.reply).not.toContain("热点还在抓取中");
+    expect(r.reply).toContain("你好");
+    // 复位卡住的阶段到 idle
+    expect(updateSession).toHaveBeenCalledWith("s1", expect.objectContaining({
+      scenarioPhase: "idle",
+      status: "idle",
+      loopContext: null,
+    }));
+    // 复位不得抹掉草稿：lastArticleId 不在复位 patch 里，流程可重新触发
+    expect(updateSession).toHaveBeenCalledWith(
+      "s1",
+      expect.not.objectContaining({ lastArticleId: expect.anything() }),
+    );
+    // 问候不应触发任何闭环事件
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it("idle 态发「你好」→ 回友好引导，不复位（无 scenarioPhase 变更）", async () => {
+    getOrCreateSession.mockResolvedValue({
+      id: "s1", status: "idle", scenarioPhase: "idle", contextTurns: [], clarifyRounds: 0,
+    });
+
+    const r = await handleInboundMessage({ ...msg, textContent: "hi" });
+
+    expect(r.reply).toContain("你好");
+    expect(updateSession).not.toHaveBeenCalled();
   });
 });

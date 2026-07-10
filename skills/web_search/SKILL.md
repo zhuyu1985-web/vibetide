@@ -3,7 +3,7 @@ name: web_search
 displayName: 全网搜索
 description: 面向新闻策划、热点追踪、事实核查、竞品调研四大场景的实时全网检索能力。通过博查（默认）/ Tavily（可选）API 进行跨全网精准搜索，主通道不可用时自动降级到 Google News / Bing News RSS 聚合通道，保证检索链路不中断。对召回结果做 URL 规范化去重、标题相似度合并、来源六级可信度分级（央媒 / 官方 / 行业垂直 / 主流新闻 / 社交 UGC / 营销水军）、时效性+权威性+关键词匹配度综合排序，并对高频标题做热点聚类。支持按时间范围（1h / 24h / 7d / 30d）、来源类型、黑名单域、话题类型（general / news / finance）多维筛选。当用户提及"搜一下""查最新""某话题全网怎么说""最近有什么动态""找相关报道"等关键词时调用；不用于单 URL 正文抓取或平台热榜主动发现。
 version: "3.2"
-category: data_collection
+category: web_search
 
 metadata:
   skill_kind: data_collection

@@ -21,6 +21,17 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MissionStepStream } from "@/components/cowork/mission-step-stream";
 import { MessageActions } from "@/components/cowork/message-actions";
+import { CreationPlanForm } from "@/components/cowork/creation-plan-form";
+import {
+  DraftResultCard,
+  type DraftResultMeta,
+} from "@/components/cowork/draft-result-card";
+import { IntentChip, readIntentFromMeta } from "@/components/cowork/intent-chip";
+import { InputSuggestions } from "@/components/cowork/input-suggestions";
+import { MultiVersionCard } from "@/components/cowork/multi-version-card";
+import { ImportCard, type ImportCardMeta } from "@/components/cowork/import-card";
+import { suggestInputs } from "@/lib/cowork/input-suggestions";
+import type { CreationPlan } from "@/lib/cowork/creation-plan-types";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
 import type { MessageFeedback } from "@/app/actions/cowork-conversations";
 import type { ArtifactPreviewItem } from "@/lib/cowork/artifact-preview";
@@ -111,6 +122,13 @@ export function ConversationThread({
 
   const empty = active.messages.length === 0;
 
+  // 输入框语义建议：从会话上下文派生（纯规则、零延迟）
+  const inputSuggestions = suggestInputs({
+    messageCount: active.messages.length,
+    hasDraft: active.messages.some((m) => m.kind === "draft_result"),
+    hasRunningMission: false, // TODO: 接 mission 实时状态后改为真实「未终态」判断
+  });
+
   return (
     <main className="flex flex-1 flex-col bg-background">
       {/* 顶栏 */}
@@ -168,6 +186,13 @@ export function ConversationThread({
       {/* 输入框 —— gemini-border 玻璃容器,与落地页一致 */}
       <div className="px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
+          <InputSuggestions
+            items={inputSuggestions}
+            onPick={(fill) => {
+              setInput(fill);
+              textareaRef.current?.focus();
+            }}
+          />
           <div className="gemini-border rounded-2xl bg-card transition-shadow duration-300 ease-out dark:bg-white/[0.06]">
             <div className="px-4 pb-1.5 pt-3">
               {/* 容器即输入框,故用裸 textarea(透明无边框、JS 自动撑高),与落地页同款 */}
@@ -271,10 +296,15 @@ function MessageBubble({
     );
   }
 
+  // 意图识别 chip：所有 assistant 分支顶部展示（旧消息无 meta.intent 则为 null）
+  const intentMeta = readIntentFromMeta(message.meta);
+  const intentChip = intentMeta ? <IntentChip intent={intentMeta} /> : null;
+
   if (message.kind === "mission_card" && message.missionId) {
     const missionId = message.missionId;
     return (
       <div className="space-y-2">
+        {intentChip}
         <div className="flex justify-start">
           <button
             type="button"
@@ -313,9 +343,60 @@ function MessageBubble({
     );
   }
 
+  if (message.kind === "plan_card") {
+    const plan = (message.meta as { plan?: CreationPlan } | null)?.plan;
+    if (!plan) return null;
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
+        <CreationPlanForm conversationId={message.conversationId} plan={plan} />
+      </div>
+    );
+  }
+
+  if (message.kind === "draft_result") {
+    const meta = message.meta as DraftResultMeta | null;
+    if (!meta) return null;
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
+        <DraftResultCard meta={meta} conversationId={message.conversationId} />
+      </div>
+    );
+  }
+
+  if (message.kind === "import_card") {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
+        <ImportCard
+          content={message.content}
+          meta={message.meta as ImportCardMeta | null}
+        />
+      </div>
+    );
+  }
+
+  if (message.kind === "multi_version_card") {
+    const vmeta = message.meta as
+      | { articleId?: string; platforms?: string[] }
+      | null;
+    if (!vmeta?.articleId) return null;
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {intentChip}
+        <MultiVersionCard
+          articleId={vmeta.articleId}
+          platforms={vmeta.platforms ?? []}
+        />
+      </div>
+    );
+  }
+
   // assistant text —— hover 时在气泡下方露出操作工具栏
   return (
     <div className="group flex flex-col items-start gap-1">
+      {intentChip}
       <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
         {message.content}
       </div>

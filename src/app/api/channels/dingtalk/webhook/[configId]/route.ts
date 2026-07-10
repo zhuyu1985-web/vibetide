@@ -5,6 +5,7 @@ import {
   isDingtalkTimestampValid,
 } from "@/lib/channels/signature";
 import { handleInboundMessage, formatForPlatform } from "@/lib/channels/gateway";
+import { inngest } from "@/inngest/client";
 
 export async function POST(
   req: NextRequest,
@@ -61,11 +62,52 @@ export async function POST(
       hasSessionWebhook: !!body.sessionWebhook,
     });
 
-    // Only handle text messages for MVP
+    // 语音消息：同步回"正在听写" + 派异步事件（下载→ASR→喂 gateway）。
+    // 重活进 Inngest 避免 webhook 超时（钉钉约 3s）导致平台重试。
+    if (msgtype === "audio") {
+      // 钉钉语音字段在 content 下（{msgtype:'audio', content:{downloadCode, recognition}}）；
+      // body.audio 仅作兜底。读错字段会导致 downloadCode/recognition 全空 → 下载失败。
+      const audio = (body.content ?? body.audio ?? {}) as {
+        duration?: string | number;
+        downloadCode?: string;
+        mediaId?: string;
+        recognition?: string;
+      };
+      const inlineText =
+        typeof audio.recognition === "string" ? audio.recognition.trim() : "";
+      const msgId = body.msgId ?? `dt_${Date.now()}`;
+      await inngest.send({
+        id: `voice:${msgId}`,
+        name: "channel/voice-ingest.requested",
+        data: {
+          organizationId: config.organizationId,
+          configId: config.id,
+          platform: "dingtalk",
+          externalMessageId: msgId,
+          externalUserId: body.senderStaffId ?? body.senderNick ?? "unknown",
+          chatId: body.conversationId ?? "unknown",
+          replyWebhook:
+            typeof body.sessionWebhook === "string" ? body.sessionWebhook : "",
+          media: {
+            downloadCode: audio.downloadCode ?? "",
+            mediaId: audio.mediaId ?? "",
+            format: "amr",
+            durationMs: Number(audio.duration ?? 0),
+          },
+          inlineTranscript: inlineText,
+        },
+      });
+      return NextResponse.json({
+        msgtype: "text",
+        text: { content: "🎧 收到语音，正在听写…" },
+      });
+    }
+
+    // Only handle text + voice for MVP
     if (msgtype !== "text") {
       return NextResponse.json({
         msgtype: "text",
-        text: { content: "暂不支持此类型的消息，请发送文字消息。" },
+        text: { content: "暂不支持此类型的消息，请发送文字或语音消息。" },
       });
     }
 

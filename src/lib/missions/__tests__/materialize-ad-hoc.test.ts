@@ -81,6 +81,10 @@ describe("materializeAdHocMission", () => {
       scenario: "custom",
       sourceModule: "channel:dingtalk",
       sourceEntityId: "msg1",
+      inputParams: {
+        query: "抓个热点",
+        intentSummary: "热点",
+      },
     });
   });
 
