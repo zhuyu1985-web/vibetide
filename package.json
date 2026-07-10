@@ -5,6 +5,8 @@
   "scripts": {
     "predev": "tsx scripts/build-help-meta.ts",
     "dev": "next dev -H 0.0.0.0",
+    "dev:https": "next dev -H 0.0.0.0 --experimental-https --experimental-https-key ./.certs/local.demo.chinamcloud.cn-key.pem --experimental-https-cert ./.certs/local.demo.chinamcloud.cn.pem --experimental-https-ca ./.certs/rootCA.pem",
+    "setup:https": "bash scripts/setup-local-https.sh",
     "prebuild": "tsx scripts/build-help-meta.ts",
     "build": "tsx scripts/verify-help-links.ts && next build && tsx scripts/build-help-search.ts",
     "build:help-search": "tsx scripts/build-help-search.ts",

@@ -17,7 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { signOut } from "@/app/actions/auth";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { MountGate } from "@/components/shared/mount-gate";
 
@@ -166,7 +165,9 @@ export function Topbar({ userName, unreadCount = 0 }: TopbarProps) {
                 <DropdownMenuTrigger asChild>{userTrigger}</DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => signOut()}
+                    onClick={() => {
+                      window.location.href = "/auth/logout";
+                    }}
                     className="text-red-600 dark:text-red-400 cursor-pointer"
                   >
                     <LogOut size={14} className="mr-2" />

@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Sparkles, Mail, Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn } from "@/app/actions/auth";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("logged_out") === "1") {
+      setError("");
+      return;
+    }
+    if (searchParams.get("error") === "sso_failed") {
+      setError("免登失败，请使用邮箱密码登录，或重新登录 CMC 后再试");
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

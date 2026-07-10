@@ -1,9 +1,38 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { unsealData } from "iron-session";
 import type { SessionPayload } from "@/lib/auth";
+import { absoluteUrl } from "@/lib/auth/request-origin";
 
 const COOKIE_NAME = "vibetide-session";
 const DEFAULT_TTL = 604800; // 7d
+
+function hasSsoCookies(request: NextRequest): boolean {
+  if (request.cookies.get("xn_userInfo")?.value) return true;
+  return !!(
+    request.cookies.get("login_cmc_id")?.value &&
+    request.cookies.get("login_cmc_tid")?.value
+  );
+}
+
+function shouldAttemptSso(pathname: string): boolean {
+  return (
+    !isPublic(pathname) ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register")
+  );
+}
+
+function getSsoNextPath(request: NextRequest): string {
+  const { pathname, searchParams } = request.nextUrl;
+  if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
+    const next = searchParams.get("next");
+    if (next?.startsWith("/") && !next.startsWith("//")) {
+      return next;
+    }
+    return "/home";
+  }
+  return `${pathname}${request.nextUrl.search}`;
+}
 
 export function isPublic(pathname: string): boolean {
   return (
@@ -50,14 +79,26 @@ export async function proxy(request: NextRequest) {
   const isAuthed = !!session?.id;
 
   if (isAuthed && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/home";
+    return NextResponse.redirect(absoluteUrl(request, "/home"));
+  }
+
+  if (!isAuthed && hasSsoCookies(request) && shouldAttemptSso(pathname)) {
+    // 刚退出或 SSO 已失败时停留在登录页，避免立刻再次免登
+    if (
+      pathname.startsWith("/login") &&
+      (request.nextUrl.searchParams.get("error") === "sso_failed" ||
+        request.nextUrl.searchParams.get("logged_out") === "1")
+    ) {
+      return NextResponse.next();
+    }
+
+    const url = absoluteUrl(request, "/auth/sso");
+    url.searchParams.set("next", getSsoNextPath(request));
     return NextResponse.redirect(url);
   }
 
   if (!isAuthed && !isPublic(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    const url = absoluteUrl(request, "/login");
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }

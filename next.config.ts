@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",
+    "local.demo.chinamcloud.cn",
     "192.168.*.*",
     "10.*.*.*",
     "172.16.*.*",

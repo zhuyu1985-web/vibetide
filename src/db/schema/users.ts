@@ -61,6 +61,10 @@ export const userProfiles = pgTable("user_profiles", {
   avatarUrl: text("avatar_url"),
   // Self-built auth (replaces Supabase Auth)
   email: text("email").unique(),
+  /** AES-256-CBC 加密存储，解密用 decryptPhone */
+  phone: text("phone"),
+  /** HMAC-SHA256，用于唯一性查重（密文因随机 IV 不可直接 eq） */
+  phoneHash: text("phone_hash").unique(),
   passwordHash: text("password_hash"),
   passwordHashAlgo: text("password_hash_algo").default("argon2id"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),

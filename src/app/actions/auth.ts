@@ -9,8 +9,12 @@ import {
   hashPassword,
   verifyPassword,
   setSession,
-  destroySession,
 } from "@/lib/auth";
+import {
+  isValidPhone,
+  normalizePhone,
+  preparePhoneForStorage,
+} from "@/lib/phone-crypto";
 
 const CREDENTIAL_ERROR = "邮箱或密码错误";
 
@@ -57,11 +61,15 @@ export async function signIn(formData: FormData) {
 export async function signUp(formData: FormData) {
   const email = normalizeEmail(formData.get("email") as string);
   const password = (formData.get("password") as string) ?? "";
+  const phone = normalizePhone(formData.get("phone") as string);
   const displayName =
     (formData.get("displayName") as string)?.trim() || email.split("@")[0];
 
-  if (!email || !password) {
-    return { error: "邮箱和密码必填" };
+  if (!email || !password || !phone) {
+    return { error: "邮箱、手机号和密码必填" };
+  }
+  if (!isValidPhone(phone)) {
+    return { error: "请输入有效的 11 位手机号" };
   }
   if (password.length < 8) {
     return { error: "密码至少 8 位" };
@@ -74,6 +82,14 @@ export async function signUp(formData: FormData) {
     return { error: "该邮箱已被注册" };
   }
 
+  const phoneHash = preparePhoneForStorage(phone).phoneHash;
+  const existingPhone = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.phoneHash, phoneHash),
+  });
+  if (existingPhone) {
+    return { error: "该手机号已被注册" };
+  }
+
   const defaultOrg = await db.query.organizations.findFirst({
     orderBy: (o, { asc }) => [asc(o.createdAt)],
   });
@@ -84,11 +100,15 @@ export async function signUp(formData: FormData) {
   const userId = randomUUID();
   const passwordHash = await hashPassword(password);
 
+  const storedPhone = preparePhoneForStorage(phone);
+
   await db.insert(userProfiles).values({
     id: userId,
     organizationId: defaultOrg.id,
     displayName,
     email,
+    phone: storedPhone.phone,
+    phoneHash: storedPhone.phoneHash,
     passwordHash,
     passwordHashAlgo: "argon2id",
   });
@@ -104,6 +124,5 @@ export async function signUp(formData: FormData) {
 }
 
 export async function signOut() {
-  await destroySession();
-  redirect("/login");
+  redirect("/auth/logout");
 }

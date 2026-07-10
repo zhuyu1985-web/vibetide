@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Sparkles, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Sparkles, Mail, Lock, User, Phone, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signUp } from "@/app/actions/auth";
@@ -10,6 +10,7 @@ import { signUp } from "@/app/actions/auth";
 export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,6 +23,7 @@ export default function RegisterPage() {
     const formData = new FormData();
     formData.set("displayName", displayName);
     formData.set("email", email);
+    formData.set("phone", phone);
     formData.set("password", password);
 
     // signUp 成功时 redirect("/home") 抛 NEXT_REDIRECT，Next.js framework 自动处理。
@@ -99,6 +101,30 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground/80">
+                手机号
+              </label>
+              <div className="relative">
+                <Phone
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  type="tel"
+                  placeholder="11 位手机号"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="pl-9"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  pattern="1[3-9][0-9]{9}"
+                  maxLength={11}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground/80">
                 密码
               </label>
               <div className="relative">
@@ -108,11 +134,11 @@ export default function RegisterPage() {
                 />
                 <Input
                   type="password"
-                  placeholder="至少 6 位密码"
+                  placeholder="至少 8 位密码"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-9"
-                  minLength={6}
+                  minLength={8}
                   required
                 />
               </div>
