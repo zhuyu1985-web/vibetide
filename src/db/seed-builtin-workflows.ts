@@ -138,7 +138,15 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
     steps: [
       step(1, "多源信息聚合", "news_aggregation", "新闻聚合", "data_collection", "aggregate"),
       step(2, "全网深度搜索", "web_search", "全网搜索", "web_search", "search"),
-      step(3, "事实交叉核查", "fact_check", "事实核查", "quality_review", "verify"),
+      step(
+        3,
+        "事实交叉核查",
+        "fact_check",
+        "事实核查",
+        "quality_review",
+        "verify",
+        { text: "{{step2.text}}" },
+      ),
       step(4, "突发简讯撰写", "content_generate", "内容生成", "content_gen", "write"),
       step(5, "合规快扫", "compliance_check", "合规审核", "quality_review", "compliance"),
     ],
@@ -607,7 +615,15 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       "抓取「{{keywords}}」在 {{time_range}} 内的 {{media_types}} 素材。",
     steps: [
       step(1, "多源全网搜索", "web_search", "全网搜索", "web_search", "search"),
-      step(2, "素材深度爬取", "web_deep_read", "网页深读", "web_search", "crawl"),
+      step(
+        2,
+        "素材深度爬取",
+        "batch_deep_read",
+        "批量网页深读",
+        "web_search",
+        "crawl",
+        { items: "{{step1.results}}" },
+      ),
       step(3, "素材去重与打分", "topic_extraction", "素材整合", "content_analysis", "dedupe"),
     ],
   },
@@ -2343,7 +2359,20 @@ export const BUILTIN_WORKFLOWS: BuiltinWorkflowSeed[] = [
       "原标题：{{source_title}}\n原文：{{source_body}}\n原文链接：{{source_url}}\n请翻译改写成英文，生成 {{variants_per_topic}} 个版本。",
     isFeatured: false,
     steps: [
-      step(1, "翻译改写", "cross_language_rewrite", "中英本地化改写", "content_gen", "translate"),
+      step(
+        1,
+        "翻译改写",
+        "cross_language_rewrite",
+        "中英本地化改写",
+        "content_gen",
+        "translate",
+        {
+          articles:
+            '[{"id":"{{source_topic_id}}","title":"{{source_title}}","body":"{{source_body}}","sourceUrl":"{{source_url}}","category":"auto","confidence":1}]',
+          targetLanguage: "en",
+          variantsPerTopic: "{{variants_per_topic}}",
+        },
+      ),
       step(
         2,
         "入英文稿件库（待审）",

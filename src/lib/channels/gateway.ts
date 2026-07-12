@@ -233,6 +233,7 @@ async function handleQuickCommand(
         externalUserId: msg.externalUserId,
         chatId: msg.chatId,
       },
+      inputParams: command.params,
       workflowTemplateId: template.id,
     });
 

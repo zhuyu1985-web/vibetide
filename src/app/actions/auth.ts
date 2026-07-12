@@ -11,36 +11,35 @@ import {
   setSession,
 } from "@/lib/auth";
 import {
+  hashPhone,
   isValidPhone,
   normalizePhone,
   preparePhoneForStorage,
 } from "@/lib/phone-crypto";
 
-const CREDENTIAL_ERROR = "邮箱或密码错误";
+const CREDENTIAL_ERROR = "账号或密码错误";
 
 function normalizeEmail(raw: string | null | undefined): string {
   return (raw ?? "").trim().toLowerCase();
 }
 
-export async function signIn(formData: FormData) {
-  const email = normalizeEmail(formData.get("email") as string);
-  const password = (formData.get("password") as string) ?? "";
-
-  if (!email || !password) {
-    return { error: CREDENTIAL_ERROR };
-  }
-
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.email, email),
-  });
-
+async function authenticateProfile(
+  profile: {
+    id: string;
+    organizationId: string | null;
+    displayName: string;
+    isSuperAdmin: boolean;
+    passwordHash: string | null;
+  } | undefined,
+  password: string,
+) {
   if (!profile || !profile.passwordHash || !profile.organizationId) {
-    return { error: CREDENTIAL_ERROR };
+    return { error: CREDENTIAL_ERROR } as const;
   }
 
   const ok = await verifyPassword(password, profile.passwordHash);
   if (!ok) {
-    return { error: CREDENTIAL_ERROR };
+    return { error: CREDENTIAL_ERROR } as const;
   }
 
   await db
@@ -56,6 +55,39 @@ export async function signIn(formData: FormData) {
   });
 
   redirect("/home");
+}
+
+export async function signIn(formData: FormData) {
+  const loginMode = (formData.get("loginMode") as string) ?? "phone";
+  const password = (formData.get("password") as string) ?? "";
+
+  if (!password) {
+    return { error: CREDENTIAL_ERROR };
+  }
+
+  if (loginMode === "phone") {
+    const phone = normalizePhone(formData.get("phone") as string);
+    if (!isValidPhone(phone)) {
+      return { error: CREDENTIAL_ERROR };
+    }
+
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.phoneHash, hashPhone(phone)),
+    });
+
+    return authenticateProfile(profile, password);
+  }
+
+  const email = normalizeEmail(formData.get("email") as string);
+  if (!email) {
+    return { error: CREDENTIAL_ERROR };
+  }
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.email, email),
+  });
+
+  return authenticateProfile(profile, password);
 }
 
 export async function signUp(formData: FormData) {

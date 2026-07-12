@@ -6,15 +6,22 @@ import {
   getConversationWithMessages,
 } from "@/lib/dal/cowork-conversations";
 import { CoworkClient } from "../cowork-client";
+import {
+  buildPendingInitialProcessing,
+  readInitialProcessing,
+} from "@/lib/cowork/initial-processing";
 
 export const dynamic = "force-dynamic";
 
 export default async function CoworkConversationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ conversationId: string }>;
+  searchParams: Promise<{ processing?: string }>;
 }) {
   const { conversationId } = await params;
+  const { processing } = await searchParams;
   const ctx = await getCurrentUserAndOrg();
   if (!ctx) notFound();
 
@@ -24,6 +31,14 @@ export default async function CoworkConversationPage({
     listProjectsByOrg(ctx.organizationId),
   ]);
   if (!active) notFound();
+  let initialProcessing = readInitialProcessing(active.conversation.metadata);
+  if (!initialProcessing && processing === "1") {
+    const prompt = [...active.messages]
+      .reverse()
+      .find((message) => message.role === "user")
+      ?.content.trim();
+    if (prompt) initialProcessing = buildPendingInitialProcessing(prompt);
+  }
 
   return (
     <CoworkClient
@@ -31,6 +46,7 @@ export default async function CoworkConversationPage({
       conversations={conversations}
       projects={projects}
       active={active}
+      initialProcessing={initialProcessing}
     />
   );
 }

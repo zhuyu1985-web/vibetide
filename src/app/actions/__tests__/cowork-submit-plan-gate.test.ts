@@ -10,6 +10,12 @@ vi.mock("@/lib/dal/cowork-conversations", () => ({
 vi.mock("@/lib/cowork/intent-routing", () => ({ recognizeIntentForOrg: recognizeMock }));
 vi.mock("@/lib/cowork/creation-plan", () => ({ buildCreationPlan: buildPlanMock }));
 vi.mock("@/app/actions/ad-hoc-mission", () => ({ startAdHocMission: startMissionMock }));
+vi.mock("@/lib/agent/model-router", () => ({
+  getLanguageModel: vi.fn(() => {
+    throw new Error("流式回复不应在 Server Action 中生成");
+  }),
+  getDefaultModel: vi.fn(() => "test-model"),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { submitCoworkMessage } from "../cowork-submit";
 
@@ -31,5 +37,51 @@ describe("content_creation → plan_card gate", () => {
     const res = await submitCoworkMessage("cv1", "查个资料");
     expect(startMissionMock).toHaveBeenCalled();
     expect(buildPlanMock).not.toHaveBeenCalled();
+  });
+
+  it("首页已落首条消息时不重复写入用户消息", async () => {
+    recognizeMock.mockResolvedValue({
+      intentType: "information_retrieval",
+      summary: "查",
+      confidence: 0.9,
+      steps: [{}],
+    });
+    startMissionMock.mockResolvedValue({ ok: true, missionId: "m1" });
+    await submitCoworkMessage("cv1", "查个资料", {
+      userMessageAlreadyPersisted: true,
+    });
+    expect(appendMessageMock).not.toHaveBeenCalledWith(
+      "cv1",
+      expect.objectContaining({ role: "user" }),
+    );
+  });
+
+  it("普通对话创建流式占位消息并返回消息 ID", async () => {
+    recognizeMock.mockResolvedValue({
+      intentType: "general_chat",
+      summary: "普通问答",
+      confidence: 0.9,
+      steps: [],
+    });
+    appendMessageMock
+      .mockResolvedValueOnce({ id: "user-message-1" })
+      .mockResolvedValueOnce({ id: "assistant-message-1" });
+
+    const result = await submitCoworkMessage("cv1", "介绍一下你自己");
+
+    expect(result).toEqual({
+      ok: true,
+      kind: "stream",
+      messageId: "assistant-message-1",
+    });
+    expect(appendMessageMock).toHaveBeenCalledWith(
+      "cv1",
+      expect.objectContaining({
+        role: "assistant",
+        content: "",
+        kind: "text",
+        meta: expect.objectContaining({ streaming: true }),
+      }),
+    );
   });
 });

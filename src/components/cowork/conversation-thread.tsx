@@ -7,7 +7,6 @@ import {
   useEffect,
   type KeyboardEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import {
   Loader2,
   ListChecks,
@@ -32,13 +31,14 @@ import { MultiVersionCard } from "@/components/cowork/multi-version-card";
 import { ImportCard, type ImportCardMeta } from "@/components/cowork/import-card";
 import { suggestInputs } from "@/lib/cowork/input-suggestions";
 import type { CreationPlan } from "@/lib/cowork/creation-plan-types";
-import { submitCoworkMessage } from "@/app/actions/cowork-submit";
 import type { MessageFeedback } from "@/app/actions/cowork-conversations";
 import type { ArtifactPreviewItem } from "@/lib/cowork/artifact-preview";
 import type {
   Conversation,
   ConversationMessage,
 } from "@/db/schema/conversations";
+import type { InitialProcessingState } from "@/lib/cowork/initial-processing";
+import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 
 /** 从消息 meta 里安全取出反馈值 */
 function feedbackOf(message: ConversationMessage): MessageFeedback {
@@ -48,6 +48,8 @@ function feedbackOf(message: ConversationMessage): MessageFeedback {
 
 interface Props {
   active: { conversation: Conversation; messages: ConversationMessage[] } | null;
+  initialProcessing?: InitialProcessingState | null;
+  onProcessingRetry?: () => void;
   focusedMissionId: string | null;
   /** 点对话里 mission 卡片 → 打开抽屉加载该 mission */
   onMissionFocus: (missionId: string) => void;
@@ -58,10 +60,20 @@ interface Props {
   selectedArtifactId?: string | null;
   onArtifactSelect?: (artifact: ArtifactPreviewItem) => void;
   artifactOverrides?: Record<string, ArtifactPreviewItem>;
+  streamingReply?: {
+    messageId: string | null;
+    content: string;
+    active: boolean;
+    statusLabel?: string;
+    error?: string;
+  } | null;
+  onSubmitMessage?: (text: string) => Promise<string | null>;
 }
 
 export function ConversationThread({
   active,
+  initialProcessing = null,
+  onProcessingRetry,
   focusedMissionId,
   onMissionFocus,
   onSendStart,
@@ -69,8 +81,9 @@ export function ConversationThread({
   selectedArtifactId = null,
   onArtifactSelect,
   artifactOverrides,
+  streamingReply = null,
+  onSubmitMessage,
 }: Props) {
-  const router = useRouter();
   const [input, setInput] = useState("");
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -86,14 +99,12 @@ export function ConversationThread({
   function handleSend() {
     const text = input.trim();
     if (!text || !active || pending) return;
-    const conversationId = active.conversation.id;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     onSendStart?.(); // 乐观打开右侧执行面板(loading)
     startTransition(async () => {
-      const res = await submitCoworkMessage(conversationId, text);
-      onSendSettled?.(res.ok && res.kind === "mission" ? res.missionId : null);
-      router.refresh();
+      const missionId = await onSubmitMessage?.(text);
+      onSendSettled?.(missionId ?? null);
     });
   }
 
@@ -103,9 +114,8 @@ export function ConversationThread({
     if (!t || !active || pending) return;
     onSendStart?.();
     startTransition(async () => {
-      const res = await submitCoworkMessage(active.conversation.id, t);
-      onSendSettled?.(res.ok && res.kind === "mission" ? res.missionId : null);
-      router.refresh();
+      const missionId = await onSubmitMessage?.(t);
+      onSendSettled?.(missionId ?? null);
     });
   }
 
@@ -121,6 +131,19 @@ export function ConversationThread({
   }
 
   const empty = active.messages.length === 0;
+  const hasActiveStreamingStatus = Boolean(
+    streamingReply?.active && streamingReply.statusLabel,
+  );
+  const hasUnpersistedStreamingMessage = Boolean(
+    streamingReply?.messageId &&
+      !active.messages.some(
+        (message) => message.id === streamingReply.messageId,
+      ),
+  );
+  const shouldRenderUnpersistedStreamingReply = Boolean(
+    hasUnpersistedStreamingMessage &&
+      (streamingReply?.content.trim() || !streamingReply?.active),
+  );
 
   // 输入框语义建议：从会话上下文派生（纯规则、零延迟）
   const inputSuggestions = suggestInputs({
@@ -176,9 +199,49 @@ export function ConversationThread({
                   selectedArtifactId={selectedArtifactId}
                   onArtifactSelect={onArtifactSelect}
                   artifactOverrides={artifactOverrides}
+                  contentOverride={
+                    streamingReply?.messageId === m.id
+                      ? streamingReply.content
+                      : undefined
+                  }
+                  streaming={
+                    streamingReply?.messageId === m.id &&
+                    streamingReply.active
+                  }
                 />
               );
             })}
+            {hasActiveStreamingStatus ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                <span>{streamingReply?.statusLabel}</span>
+              </div>
+            ) : null}
+            {shouldRenderUnpersistedStreamingReply ? (
+              <AssistantTextContent
+                content={streamingReply?.content ?? ""}
+                streaming={streamingReply?.active ?? false}
+              />
+            ) : null}
+            {!hasActiveStreamingStatus &&
+            !streamingReply?.active &&
+            (initialProcessing?.status === "pending" ||
+              initialProcessing?.status === "running") ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                <span>正在解析意图并安排 AI 团队处理…</span>
+              </div>
+            ) : initialProcessing?.status === "failed" ? (
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <span>
+                  处理失败：
+                  {initialProcessing.error ?? "请求中断，请重试"}
+                </span>
+                <Button variant="ghost" size="sm" onClick={onProcessingRetry}>
+                  重试
+                </Button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -276,6 +339,8 @@ function MessageBubble({
   selectedArtifactId,
   onArtifactSelect,
   artifactOverrides,
+  contentOverride,
+  streaming = false,
 }: {
   message: ConversationMessage;
   focused: boolean;
@@ -285,6 +350,8 @@ function MessageBubble({
   selectedArtifactId: string | null;
   onArtifactSelect?: (artifact: ArtifactPreviewItem) => void;
   artifactOverrides?: Record<string, ArtifactPreviewItem>;
+  contentOverride?: string;
+  streaming?: boolean;
 }) {
   if (message.role === "user") {
     return (
@@ -394,21 +461,48 @@ function MessageBubble({
   }
 
   // assistant text —— hover 时在气泡下方露出操作工具栏
+  const displayContent = contentOverride ?? message.content;
   return (
     <div className="group flex flex-col items-start gap-1">
       {intentChip}
-      <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
-        {message.content}
-      </div>
-      <MessageActions
-        text={message.content}
-        messageId={message.id}
-        initialFeedback={feedbackOf(message)}
-        onRegenerate={
-          precedingUserText ? () => onRegenerate(precedingUserText) : undefined
-        }
-        className="pl-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
-      />
+      <AssistantTextContent content={displayContent} streaming={streaming} />
+      {!streaming ? (
+        <MessageActions
+          text={displayContent}
+          messageId={message.id}
+          initialFeedback={feedbackOf(message)}
+          onRegenerate={
+            precedingUserText
+              ? () => onRegenerate(precedingUserText)
+              : undefined
+          }
+          className="pl-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AssistantTextContent({
+  content,
+  streaming,
+}: {
+  content: string;
+  streaming: boolean;
+}) {
+  return (
+    <div className="max-w-[80%] break-words rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-foreground">
+      {content ? (
+        <CollapsibleMessageContent markdown={content} />
+      ) : (
+        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+      )}
+      {streaming ? (
+        <span
+          data-streaming-cursor
+          className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-current align-middle"
+        />
+      ) : null}
     </div>
   );
 }

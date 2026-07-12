@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { PageHeader } from "@/components/shared/page-header";
 import { GlassCard } from "@/components/shared/glass-card";
@@ -56,6 +56,8 @@ export function WorkflowDetailClient({
   schedules = [],
 }: WorkflowDetailClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "schedules" ? "schedules" : "spec";
   const [mdEditing, setMdEditing] = useState(false);
   const [mdDraft, setMdDraft] = useState(workflow.content ?? "");
   const [mdSaving, setMdSaving] = useState(false);
@@ -169,7 +171,7 @@ export function WorkflowDetailClient({
       </GlassCard>
 
       {/* Tabs */}
-      <Tabs defaultValue="spec" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList variant="line" className="mb-5">
           <TabsTrigger value="spec" className="gap-1.5">
             <FileText size={14} />

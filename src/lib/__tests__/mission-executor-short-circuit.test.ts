@@ -6,12 +6,14 @@ import {
   renderStepParameters,
   buildImplicitTrendingTopicsParams,
   buildImplicitWebSearchParams,
+  resolveWorkflowToolParams,
   formatRegisteredSkillFallbackFailure,
   shouldBlockRegisteredSkillFallback,
   shouldForceInjectWorkflowTool,
   shouldUseStrictToolEnforcement,
   shouldShortCircuitForCancel,
   extractShortCircuitArtifacts,
+  getStructuredToolFailure,
 } from "../mission-executor";
 
 describe("renderStepParameters", () => {
@@ -98,6 +100,94 @@ describe("implicit tool params", () => {
       maxResults: 8,
       topic: "finance",
     });
+  });
+
+  it("为不同检索工具只生成各自 schema 接受的字段", () => {
+    expect(
+      resolveWorkflowToolParams({
+        toolName: "trend_monitor",
+        renderedParams: {},
+        missionTitle: "A股异动",
+        inputParams: { query: "A股" },
+        previousStepOutputs: [],
+      }),
+    ).toEqual({
+      ok: true,
+      params: { query: "A股", timeRange: "24h" },
+      source: "mission_context",
+    });
+  });
+
+  it("web_deep_read 从上游搜索结果提取 URL", () => {
+    expect(
+      resolveWorkflowToolParams({
+        toolName: "web_deep_read",
+        renderedParams: {},
+        missionTitle: "热点素材抓取",
+        inputParams: {},
+        previousStepOutputs: [
+          { results: [{ title: "新闻", url: "https://example.com/news" }] },
+        ],
+      }),
+    ).toEqual({
+      ok: true,
+      params: { url: "https://example.com/news" },
+      source: "upstream",
+    });
+  });
+
+  it("fact_check 从上游真实结果构造待核查文本", () => {
+    const result = resolveWorkflowToolParams({
+      toolName: "fact_check",
+      renderedParams: { text: "" },
+      missionTitle: "突发新闻追踪",
+      inputParams: {},
+      previousStepOutputs: [{ results: [{ title: "已核实新闻" }] }],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.params.text).toContain("已核实新闻");
+      expect(result.source).toBe("upstream");
+    }
+  });
+
+  it("参数无法解析时返回结构化缺失字段错误", () => {
+    expect(
+      resolveWorkflowToolParams({
+        toolName: "web_deep_read",
+        renderedParams: {},
+        missionTitle: "",
+        inputParams: {},
+        previousStepOutputs: [],
+      }),
+    ).toEqual({
+      ok: false,
+      error: {
+        category: "parameter_binding",
+        toolName: "web_deep_read",
+        missingFields: ["url"],
+        source: "workflow_template",
+      },
+    });
+  });
+});
+
+describe("structured retrieval failures", () => {
+  it("distinguishes an external service failure from a real empty result", () => {
+    expect(
+      getStructuredToolFailure({
+        results: [],
+        error: {
+          code: "external_service",
+          message: "Bocha API returned 503",
+        },
+      }),
+    ).toEqual({
+      code: "external_service",
+      message: "Bocha API returned 503",
+    });
+    expect(getStructuredToolFailure({ results: [], warnings: [] })).toBeNull();
   });
 });
 

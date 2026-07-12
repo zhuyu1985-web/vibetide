@@ -52,6 +52,7 @@ const NEWS_SCENE_FILTERS = [
 interface WorkflowsClientProps {
   myWorkflows: WorkflowTemplateRow[];
   builtinTemplates: WorkflowTemplateRow[];
+  scheduleByWorkflowId?: Record<string, { cronExpression: string; enabled: boolean }>;
   /** Super-admin bypass — allows editing/deleting builtin templates. */
   isAdmin?: boolean;
 }
@@ -63,6 +64,7 @@ interface WorkflowsClientProps {
 export function WorkflowsClient({
   myWorkflows,
   builtinTemplates,
+  scheduleByWorkflowId = {},
   isAdmin = false,
 }: WorkflowsClientProps) {
   const router = useRouter();
@@ -230,11 +232,6 @@ export function WorkflowsClient({
                   id: wf.id,
                   name: wf.name,
                   description: wf.description,
-                  triggerType: wf.triggerType ?? "manual",
-                  triggerConfig: wf.triggerConfig as {
-                    cron?: string;
-                    timezone?: string;
-                  } | null,
                   runCount: wf.runCount,
                   lastRunAt: wf.lastRunAt
                     ? wf.lastRunAt.toISOString()
@@ -242,6 +239,7 @@ export function WorkflowsClient({
                   isEnabled: wf.isEnabled,
                   steps: (wf.steps ?? []) as WorkflowStepDef[],
                 }}
+                schedule={scheduleByWorkflowId[wf.id] ?? null}
                 onRun={handleRun}
                 onEdit={handleEdit}
                 onDelete={handleDelete}

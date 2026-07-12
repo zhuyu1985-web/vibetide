@@ -30,6 +30,10 @@ import {
   resolveWorkflowTemplateId,
   startMissionFromModule,
 } from "../missions";
+import {
+  buildRetryMissionInput,
+  shouldExecuteMissionRetryDirectly,
+} from "@/lib/mission-retry-context";
 
 /**
  * B.1 Unified Scenario Workflow — Task 13
@@ -148,6 +152,7 @@ describe("startMissionFromModule dual-write (integration)", () => {
   });
 
   it("writes workflowTemplateId when provided explicitly", async () => {
+    const inputParams = { query: "A 股", timeRange: "24h" };
     const mission = await startMissionFromModule({
       organizationId: orgId,
       title: "test-explicit-id",
@@ -155,8 +160,10 @@ describe("startMissionFromModule dual-write (integration)", () => {
       userInstruction: "test",
       sourceModule: "test_dual_write",
       workflowTemplateId: templateId,
+      inputParams,
     });
     expect(mission.workflowTemplateId).toBe(templateId);
+    expect(mission.inputParams).toEqual(inputParams);
     expect(mission.scenario).toBe("custom"); // slug unchanged
   });
 
@@ -182,5 +189,36 @@ describe("startMissionFromModule dual-write (integration)", () => {
     });
     expect(mission.workflowTemplateId).toBeNull();
     expect(mission.scenario).toBe("some_custom_unmapped_key"); // slug still written
+  });
+});
+
+describe("retry mission context", () => {
+  it("copies the original workflow template and input parameters", () => {
+    expect(
+      buildRetryMissionInput({
+        title: "原任务",
+        scenario: "breaking_news",
+        userInstruction: "追踪 A 股",
+        workflowTemplateId: "template-1",
+        inputParams: { event_keywords: "A 股", time_range: "24h" },
+      }),
+    ).toMatchObject({
+      title: "原任务（重新执行）",
+      scenario: "breaking_news",
+      workflowTemplateId: "template-1",
+      inputParams: { event_keywords: "A 股", time_range: "24h" },
+    });
+  });
+
+  it("uses direct execution in local development when Inngest has no event key", () => {
+    expect(shouldExecuteMissionRetryDirectly("development", undefined)).toBe(
+      true,
+    );
+    expect(shouldExecuteMissionRetryDirectly("production", undefined)).toBe(
+      false,
+    );
+    expect(
+      shouldExecuteMissionRetryDirectly("development", "event-key"),
+    ).toBe(false);
   });
 });

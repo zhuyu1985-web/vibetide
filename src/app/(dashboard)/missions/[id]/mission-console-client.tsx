@@ -1305,53 +1305,24 @@ function extractReadableOutput(output: unknown): string {
   return parts.join("\n\n");
 }
 
-function FinalOutputRenderer({ output }: { output: unknown }) {
-  const text = extractReadableOutput(output);
+function normalizeFinalOutputMarkdown(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
 
-  // Render as markdown-like content with paragraphs
-  const paragraphs = text.split(/\n{2,}/).filter(Boolean);
+  const parsed = tryParseJson(trimmed);
+  if (parsed) {
+    return `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``;
+  }
+
+  return text;
+}
+
+function FinalOutputRenderer({ output }: { output: unknown }) {
+  const markdown = normalizeFinalOutputMarkdown(extractReadableOutput(output));
 
   return (
-    <div className="space-y-4">
-      {paragraphs.map((p, i) => {
-        const trimmed = p.trim();
-        // Heading detection
-        if (trimmed.startsWith("# ")) {
-          return <h2 key={i} className="text-lg font-bold text-gray-800 dark:text-gray-100 mt-2">{trimmed.slice(2)}</h2>;
-        }
-        if (trimmed.startsWith("## ")) {
-          return <h3 key={i} className="text-base font-bold text-gray-800 dark:text-gray-100 mt-1">{trimmed.slice(3)}</h3>;
-        }
-        if (trimmed.startsWith("### ")) {
-          return <h4 key={i} className="text-sm font-bold text-gray-700 dark:text-gray-200">{trimmed.slice(4)}</h4>;
-        }
-        // List detection
-        if (trimmed.split("\n").every(line => /^[-*•]\s/.test(line.trim()) || line.trim() === "")) {
-          return (
-            <ul key={i} className="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-              {trimmed.split("\n").filter(l => l.trim()).map((line, j) => (
-                <li key={j}>{line.replace(/^[-*•]\s*/, "")}</li>
-              ))}
-            </ul>
-          );
-        }
-        // Numbered list
-        if (trimmed.split("\n").every(line => /^\d+[.、)]\s/.test(line.trim()) || line.trim() === "")) {
-          return (
-            <ol key={i} className="list-decimal list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-              {trimmed.split("\n").filter(l => l.trim()).map((line, j) => (
-                <li key={j}>{line.replace(/^\d+[.、)]\s*/, "")}</li>
-              ))}
-            </ol>
-          );
-        }
-        // Regular paragraph
-        return (
-          <p key={i} className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-            {trimmed}
-          </p>
-        );
-      })}
+    <div className="text-gray-700 dark:text-gray-300">
+      <CollapsibleMessageContent markdown={markdown} />
     </div>
   );
 }

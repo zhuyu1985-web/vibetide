@@ -2,6 +2,7 @@
 
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
 
 /* ── Shared remark plugins ── */
 
@@ -46,7 +47,63 @@ function isRichList(node: unknown): boolean {
 
 /* ── Shared markdown component overrides ── */
 
+function formatJsonCodeBlock(value: string, language: string | null): string {
+  if (language !== "json") return value;
+
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
 export const markdownComponents: Components = {
+  /* ── Code blocks ── */
+  pre: ({ children }) => (
+    <pre className="my-3 max-w-full overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-0 text-xs leading-relaxed text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+      {children}
+    </pre>
+  ),
+  code: ({ children, className, node: _node, ...props }) => {
+    const raw = String(children);
+    const language = /language-(\w+)/.exec(className ?? "")?.[1] ?? null;
+    const isBlock = Boolean(language) || raw.includes("\n");
+
+    if (isBlock) {
+      const formatted = formatJsonCodeBlock(raw.replace(/\n$/, ""), language);
+      return (
+        <span className="block min-w-max">
+          {language && (
+            <span className="sticky left-0 block border-b border-slate-200 bg-slate-100 px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+              {language}
+            </span>
+          )}
+          <code
+            className={cn(
+              "block whitespace-pre bg-transparent px-3 py-2.5 font-mono text-[12px] leading-6 text-slate-800 dark:text-slate-100",
+              className,
+            )}
+            {...props}
+          >
+            {formatted}
+          </code>
+        </span>
+      );
+    }
+
+    return (
+      <code
+        className={cn(
+          "rounded bg-gray-100 px-1 py-0.5 font-mono text-xs text-gray-800 dark:bg-gray-700 dark:text-gray-100",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+
   /* ── Tables ── */
   table: ({ children }) => (
     <div className="overflow-x-auto my-3 rounded-lg border border-gray-200/60 dark:border-gray-700/50">

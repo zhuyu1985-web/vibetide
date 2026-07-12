@@ -72,3 +72,45 @@ export function validateCronExpression(
 export function isCronExpressionValid(expression: string, timezone: string): boolean {
   return validateCronExpression(expression, timezone).ok;
 }
+
+/** 将标准 5 段 cron 转为中文可读描述，如「每日 07:00」「每周一 10:00」。 */
+export function describeCronExpression(cron: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length < 5) return cron;
+
+  const [minute, hour, , , dayOfWeek] = parts;
+  const timeStr = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+
+  const dayNames: Record<string, string> = {
+    "0": "日",
+    "1": "一",
+    "2": "二",
+    "3": "三",
+    "4": "四",
+    "5": "五",
+    "6": "六",
+  };
+
+  if (dayOfWeek === "*") {
+    return `每日 ${timeStr}`;
+  }
+
+  const dayLabel = dayNames[dayOfWeek] ?? dayOfWeek;
+  return `每周${dayLabel} ${timeStr}`;
+}
+
+/** 计算 cron 的下一次执行时间；解析失败返回 null。 */
+export function computeNextCronRun(
+  expression: string,
+  timezone: string,
+): Date | null {
+  try {
+    const interval = CronExpressionParser.parse(expression.trim(), {
+      tz: timezone,
+      currentDate: new Date(),
+    });
+    return interval.next().toDate();
+  } catch {
+    return null;
+  }
+}

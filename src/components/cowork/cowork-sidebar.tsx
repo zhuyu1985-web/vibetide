@@ -248,12 +248,8 @@ export function CoworkSidebar({
       <div className="flex-1 overflow-y-auto px-1.5 pb-2">
         {/* 项目 —— 单入口,点进 /cowork/projects 在主区查看/管理(不在侧栏铺列表) */}
         <NavRow href="/cowork/projects" icon={FolderOpen} label="项目" />
-        {/* 定时任务 */}
-        <NavRow
-          href="/settings/scheduled-jobs"
-          icon={Clock}
-          label="定时任务"
-        />
+        {/* 定时任务 —— org 级工作流 schedule，非超管平台 cron 页 */}
+        <NavRow href="/cowork/schedules" icon={Clock} label="定时任务" />
 
         {/* 定制 —— 可展开:SKILLS / 连接器 / 个人插件 */}
         <Button

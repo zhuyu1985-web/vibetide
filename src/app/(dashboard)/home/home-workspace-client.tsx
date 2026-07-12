@@ -50,8 +50,12 @@ export function HomeWorkspaceClient({
     setInput("");
     startSubmit(async () => {
       const res = await startCoworkConversation(text);
-      if (res.ok) router.push(`/cowork/${res.conversationId}`);
-      else setInput(text);
+      if (!res.ok) {
+        setInput(text);
+        return;
+      }
+      const pathname = `/cowork/${res.conversationId}`;
+      router.push(pathname);
     });
   }
 

@@ -76,8 +76,15 @@ export interface StepCompleteInfo {
   summary: string;
 }
 
+export interface StreamStatusEvent {
+  phase: string;
+  label: string;
+}
+
 /** Callbacks for streaming chat events. */
 export interface StreamingChatCallbacks {
+  onResult?: (result: Record<string, unknown>) => void;
+  onStatus?: (status: StreamStatusEvent) => void;
   onThinking?: (step: ThinkingStep) => void;
   onSkillUsed?: (skill: SkillUsed) => void;
   onSource?: (sources: string[], totalReferences: number) => void;
@@ -148,6 +155,18 @@ export async function executeStreamingChat(
         const payload = JSON.parse(evt.data);
 
         switch (evt.event) {
+          case "result": {
+            callbacks.onResult?.(payload as Record<string, unknown>);
+            break;
+          }
+          case "status": {
+            const phase =
+              typeof payload.phase === "string" ? payload.phase : "";
+            const label =
+              typeof payload.label === "string" ? payload.label : phase;
+            if (phase) callbacks.onStatus?.({ phase, label });
+            break;
+          }
           case "thinking": {
             const step: ThinkingStep = {
               tool: payload.tool,

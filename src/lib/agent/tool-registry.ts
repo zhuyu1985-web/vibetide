@@ -45,6 +45,28 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+export function normalizeBatchDeepReadItems<T extends Record<string, unknown>>(
+  items: T[],
+): Array<T & { id: string; sourceUrl?: string }> {
+  return items.map((item, index) => {
+    const sourceUrl =
+      typeof item.sourceUrl === "string" && item.sourceUrl.trim()
+        ? item.sourceUrl.trim()
+        : typeof item.url === "string" && item.url.trim()
+          ? item.url.trim()
+          : undefined;
+    const id =
+      typeof item.id === "string" && item.id.trim()
+        ? item.id.trim()
+        : sourceUrl ?? `item-${index + 1}`;
+    return {
+      ...item,
+      id,
+      ...(sourceUrl ? { sourceUrl } : {}),
+    } as T & { id: string; sourceUrl?: string };
+  });
+}
+
 function decodeHtmlEntities(value: string) {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -430,6 +452,11 @@ function createToolDefinitions(): ToolSet {
         const trimmedQuery = query.trim();
         if (!trimmedQuery) {
           return {
+            success: false,
+            error: {
+              code: "parameter_binding",
+              message: "查询词不能为空",
+            },
             query: "",
             generatedAt: new Date().toISOString(),
             summary: "查询词为空，无法执行检索。",
@@ -448,6 +475,8 @@ function createToolDefinitions(): ToolSet {
 
         const limitedResults = Math.max(1, Math.min(maxResults, 20));
         const warnings: string[] = [];
+        const retrievalErrors: string[] = [];
+        let channelSucceeded = false;
         let fetchedItems: NewsFeedItem[] = [];
         let tavilyAnswer: string | undefined;
 
@@ -467,8 +496,11 @@ function createToolDefinitions(): ToolSet {
             });
             fetchedItems = searchResult.items;
             tavilyAnswer = searchResult.answer;
+            channelSucceeded = true;
           } catch (err) {
-            warnings.push(`${providerId} 通道失败: ${err instanceof Error ? err.message : String(err)}，回退到 RSS`);
+            const message = err instanceof Error ? err.message : String(err);
+            retrievalErrors.push(`${providerId}: ${message}`);
+            warnings.push(`${providerId} 通道失败: ${message}，回退到 RSS`);
           }
         }
 
@@ -481,6 +513,16 @@ function createToolDefinitions(): ToolSet {
           ]);
 
           const settled = await Promise.allSettled(feedRequests);
+          if (settled.some((result) => result.status === "fulfilled")) {
+            channelSucceeded = true;
+          }
+          retrievalErrors.push(
+            ...settled
+              .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+              .map((r) =>
+                r.reason instanceof Error ? r.reason.message : String(r.reason),
+              ),
+          );
           warnings.push(
             ...settled
               .filter((r): r is PromiseRejectedResult => r.status === "rejected")
@@ -511,6 +553,15 @@ function createToolDefinitions(): ToolSet {
         const hotTopics = buildHotTopics(filteredItems, Math.min(5, limitedResults));
 
         return {
+          success: channelSucceeded,
+          error: channelSucceeded
+            ? null
+            : {
+                code: "external_service",
+                message:
+                  retrievalErrors.join("; ") ||
+                  "所有检索通道均不可用",
+              },
           query: trimmedQuery,
           generatedAt: new Date().toISOString(),
           searchVariants,
@@ -614,7 +665,8 @@ function createToolDefinitions(): ToolSet {
           .array(
             z
               .object({
-                id: z.string().min(1).describe("条目 id，原样透传"),
+                id: z.string().min(1).optional().describe("条目 id；缺失时由 URL 或序号生成"),
+                url: z.string().optional().describe("web_search 返回的 URL 别名"),
                 sourceUrl: z.string().optional().describe("详情页 URL（可选；缺失则 body 用 summary 兜底）"),
                 title: z.string().optional(),
                 summary: z.string().optional(),
@@ -655,7 +707,7 @@ function createToolDefinitions(): ToolSet {
           .describe("反爬平台 host 黑名单,命中直接走 summary 兜底不调 Jina"),
       }),
       execute: async ({
-        items,
+        items: rawItems,
         maxLength = 5000,
         maxConcurrency = 3,
         confidenceThreshold = 0.7,
@@ -673,6 +725,7 @@ function createToolDefinitions(): ToolSet {
           "weibo.cn",
         ],
       }) => {
+        const items = normalizeBatchDeepReadItems(rawItems);
         // 上游 0 条 → 优雅返回。之前 schema 是 min(1),空数组被 zod 拒绝 →
         // mission-executor fallthrough 到 agent LLM 路径 → LLM 凭空编"详情正文
         // 摘要"假数据塞进 outputData,user 看到绿色"已完成"但实际是欺骗。
@@ -994,26 +1047,37 @@ function createToolDefinitions(): ToolSet {
         const warnings: string[] = [];
         let items: TrendingItem[] = [];
 
-        // env 缺失 → 显式 throw 让 mission-executor 把 step 1 标 failed,
-        // 链路立即止步,而不是静默返回空让 5 步全"completed"但全空跑(已经发生过事故)。
         if (!process.env.TRENDING_API_KEY) {
-          throw new Error(
-            "缺少 TRENDING_API_KEY 环境变量,无法访问 TopHub 热榜 API。" +
-              "请到 https://www.tophubdata.com 注册申请 API key,在 .env.local 添加:\n" +
-              "TRENDING_API_KEY=<your_key>\n" +
-              "TRENDING_API_URL=https://api.tophubdata.com",
-          );
+          const message =
+            "缺少 TRENDING_API_KEY 环境变量,无法访问 TopHub 热榜 API。";
+          return {
+            success: false,
+            error: { code: "external_service", message },
+            fetchedAt: new Date().toISOString(),
+            mode,
+            platforms: platforms ?? [],
+            topics: [],
+            crossPlatformTopics: [],
+            warnings: [message],
+          };
         }
 
         try {
           items = await fetchTrendingFromApi(mode, { platforms, limit, query });
         } catch (err) {
-          // API 调用本身失败也直接 throw,而不是软返回空 —— 软失败让 mission-executor
-          // 当成 success,后续 step 跑空数据,用户看到 5 步绿色 + 0 数据,完全没法诊断。
-          throw new Error(
-            `TopHub 热榜 API 调用失败: ${err instanceof Error ? err.message : String(err)}。` +
-              "请检查:1) TRENDING_API_KEY 是否过期 2) 网络是否能访问 api.tophubdata.com 3) API 额度是否用完",
-          );
+          const message = `TopHub 热榜 API 调用失败: ${
+            err instanceof Error ? err.message : String(err)
+          }`;
+          return {
+            success: false,
+            error: { code: "external_service", message },
+            fetchedAt: new Date().toISOString(),
+            mode,
+            platforms: platforms ?? [],
+            topics: [],
+            crossPlatformTopics: [],
+            warnings: [message],
+          };
         }
 
         if (items.length === 0) {
@@ -1021,6 +1085,8 @@ function createToolDefinitions(): ToolSet {
           // 返回 0 条 + warnings,test-run / mission console 会显示黄色 warning 让用户看到。
           warnings.push("TopHub API 调用成功但返回 0 条热榜数据。可能是平台维护中,稍后重试。");
           return {
+            success: true,
+            error: null,
             fetchedAt: new Date().toISOString(),
             mode,
             platforms: platforms ?? [],
@@ -1037,6 +1103,8 @@ function createToolDefinitions(): ToolSet {
         const activePlatforms = Array.from(new Set(items.map((i) => i.platform)));
 
         return {
+          success: true,
+          error: null,
           fetchedAt: new Date().toISOString(),
           mode,
           platforms: activePlatforms,
@@ -1077,19 +1145,37 @@ function createToolDefinitions(): ToolSet {
         const providerId = getActiveSearchProvider();
         if (!isSearchProviderConfigured()) {
           return {
+            success: false,
+            error: {
+              code: "external_service",
+              message: `未配置 ${providerId.toUpperCase()}_API_KEY`,
+            },
             query,
             generatedAt: new Date().toISOString(),
             results: [],
             warnings: [`未配置 ${providerId.toUpperCase()}_API_KEY，无法聚合新闻`],
           };
         }
-        const searchRes = await searchWeb(query.trim(), {
-          timeRange,
-          maxResults: Math.min(maxResults, 20),
-          topic,
-          includeDomains: DEFAULT_INCLUDE_DOMAINS,
-          excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
-        });
+        let searchRes;
+        try {
+          searchRes = await searchWeb(query.trim(), {
+            timeRange,
+            maxResults: Math.min(maxResults, 20),
+            topic,
+            includeDomains: DEFAULT_INCLUDE_DOMAINS,
+            excludeDomains: DEFAULT_EXCLUDE_DOMAINS,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            error: { code: "external_service", message },
+            query,
+            generatedAt: new Date().toISOString(),
+            results: [],
+            warnings: [`${providerId} 通道失败: ${message}`],
+          };
+        }
         // 字段命名沿用 web_search 的 `results` —— 下游 mission-executor
         // 统一按 `results` 检测 0 / 稀疏结果并注入强约束警示。
         const results = searchRes.items.map((it) => ({
@@ -1102,6 +1188,8 @@ function createToolDefinitions(): ToolSet {
           snippet: it.snippet,
         }));
         return {
+          success: true,
+          error: null,
           query,
           generatedAt: new Date().toISOString(),
           timeRange: timeRange ?? "unset",
@@ -1171,6 +1259,17 @@ function createToolDefinitions(): ToolSet {
         }
 
         return {
+          success:
+            searchRes.status === "fulfilled" ||
+            trendingRes.status === "fulfilled",
+          error:
+            searchRes.status === "rejected" &&
+            trendingRes.status === "rejected"
+              ? {
+                  code: "external_service",
+                  message: warnings.join("; "),
+                }
+              : null,
           query: q,
           generatedAt: new Date().toISOString(),
           timeRange,
@@ -1200,6 +1299,11 @@ function createToolDefinitions(): ToolSet {
       execute: async ({ query, platforms, limit = 10 }) => {
         if (!process.env.TRENDING_API_KEY) {
           return {
+            success: false,
+            error: {
+              code: "external_service",
+              message: "未配置 TRENDING_API_KEY",
+            },
             query,
             generatedAt: new Date().toISOString(),
             items: [],
@@ -1226,6 +1330,8 @@ function createToolDefinitions(): ToolSet {
             byPlatform.set(item.platform, list);
           }
           return {
+            success: true,
+            error: null,
             query,
             generatedAt: new Date().toISOString(),
             platforms: Array.from(byPlatform.keys()),
@@ -1245,6 +1351,11 @@ function createToolDefinitions(): ToolSet {
           };
         } catch (err) {
           return {
+            success: false,
+            error: {
+              code: "external_service",
+              message: err instanceof Error ? err.message : String(err),
+            },
             query,
             generatedAt: new Date().toISOString(),
             items: [],

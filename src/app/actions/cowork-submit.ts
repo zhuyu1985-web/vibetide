@@ -5,13 +5,12 @@
  *
  * 流程:落用户消息 → recognizeIntent → 路由:
  *   - 有可执行步骤(steps>0)→ startAdHocMission,落一条 mission_card 消息
- *   - general_chat(无步骤)→ 非流式 generateText 简单回复(流式留 P4),落 text 消息
+ *   - general_chat(无步骤)→ 落流式占位消息，由 Cowork SSE 接口生成正文
  *
  * 说明:为聚焦原型形态,workflow 类意图本批也走 ad-hoc(intent.steps),不处理
- * 模板输入表单;workflow-template 精确路由 + 流式自由聊天留 P4 细化。
+ * 模板输入表单;workflow-template 精确路由后续细化。
  */
 import { revalidatePath } from "next/cache";
-import { generateText } from "ai";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { missionArtifacts } from "@/db/schema";
@@ -24,12 +23,12 @@ import {
 import { recognizeIntentForOrg } from "@/lib/cowork/intent-routing";
 import { startAdHocMission } from "@/app/actions/ad-hoc-mission";
 import { getMissionById } from "@/lib/dal/missions";
-import { getLanguageModel, getDefaultModel } from "@/lib/agent/model-router";
 
 export type CoworkSubmitResult =
   | { ok: false; error: string }
   | { ok: true; kind: "mission"; missionId: string; intentSummary: string }
   | { ok: true; kind: "chat"; reply: string }
+  | { ok: true; kind: "stream"; messageId: string }
   | { ok: true; kind: "plan" };
 
 export type SaveCoworkArtifactDraftResult =
@@ -39,6 +38,7 @@ export type SaveCoworkArtifactDraftResult =
 export async function submitCoworkMessage(
   conversationId: string,
   message: string,
+  options: { userMessageAlreadyPersisted?: boolean } = {},
 ): Promise<CoworkSubmitResult> {
   const user = await requireAuth();
   const orgId = await getCurrentUserOrg();
@@ -50,11 +50,13 @@ export async function submitCoworkMessage(
   if (!convo) return { ok: false, error: "对话不存在或无权访问" };
 
   // 1. 落用户消息
-  await appendMessage(conversationId, {
-    role: "user",
-    content: text,
-    kind: "text",
-  });
+  if (!options.userMessageAlreadyPersisted) {
+    await appendMessage(conversationId, {
+      role: "user",
+      content: text,
+      kind: "text",
+    });
+  }
 
   // 1.5 URL 导入意图短路（确定性最高 → 绕过 LLM 意图分类，直接异步抓取入库）
   const { extractUrls } = await import("@/lib/channels/link-extract");
@@ -128,35 +130,15 @@ export async function submitCoworkMessage(
     };
   }
 
-  // general_chat → 非流式简单回复(MVP)
-  let reply = "";
-  try {
-    const model = getLanguageModel({
-      provider: "openai",
-      model: getDefaultModel(),
-      temperature: 0.7,
-      maxTokens: 800,
-    });
-    const result = await generateText({
-      model,
-      system: "你是融媒云的 AI 助手，用简洁专业的中文回答用户。",
-      prompt: text,
-      maxOutputTokens: 800,
-    });
-    reply = result.text?.trim() ?? "";
-  } catch (err) {
-    console.error("[cowork-submit] free chat failed:", err);
-  }
-  if (!reply) reply = "好的，我在。需要我帮你执行什么任务吗？";
-
-  await appendMessage(conversationId, {
+  // general_chat → 先落占位消息，由 /api/cowork/stream 真实流式生成并补全正文。
+  const assistantMessage = await appendMessage(conversationId, {
     role: "assistant",
-    content: reply,
+    content: "",
     kind: "text",
-    meta: { intent },
+    meta: { intent, streaming: true },
   });
   revalidatePath(`/cowork/${conversationId}`);
-  return { ok: true, kind: "chat", reply };
+  return { ok: true, kind: "stream", messageId: assistantMessage.id };
 }
 
 /**
@@ -192,7 +174,7 @@ export async function saveCoworkArtifactDraft(input: {
 
   const artifact = mission.artifacts.find((a) => a.id === input.artifactId);
   if (!artifact) return { ok: false, error: "产物不存在或尚未持久化" };
-  if (!["article_draft", "draft", "report", "text"].includes(artifact.type)) {
+  if (!["article_draft", "draft", "report", "text", "markdown"].includes(artifact.type)) {
     return { ok: false, error: "该产物类型暂不支持编辑保存" };
   }
 

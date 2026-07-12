@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Sparkles, Mail, Lock, User, Phone, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Phone, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { signUp } from "@/app/actions/auth";
 
 export default function RegisterPage() {
@@ -26,8 +27,6 @@ export default function RegisterPage() {
     formData.set("phone", phone);
     formData.set("password", password);
 
-    // signUp 成功时 redirect("/home") 抛 NEXT_REDIRECT，Next.js framework 自动处理。
-    // 不要 router.refresh —— 会让 /home server component 全部重 fetch，慢网下 30+s。
     const result = await signUp(formData);
     if (result?.error) {
       setError(result.error);
@@ -36,144 +35,111 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-page bg-glow">
-      <div className="w-full max-w-md px-6">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Sparkles size={22} className="text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Vibe Media</h1>
-            <p className="text-xs text-muted-foreground">数智全媒平台</p>
+    <AuthPageShell title="注册" subtitle="创建账号，组建你的 AI 团队">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground/80">姓名</label>
+          <div className="relative">
+            <User
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/80"
+            />
+            <Input
+              type="text"
+              placeholder="你的姓名"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="pl-9 h-10"
+              required
+            />
           </div>
         </div>
 
-        {/* Card */}
-        <div className="glass-secondary rounded-2xl p-8">
-          <h2 className="text-xl font-semibold text-foreground text-center mb-1">
-            注册
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mb-6">
-            创建账号，组建你的 AI 团队
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground/80">
-                姓名
-              </label>
-              <div className="relative">
-                <User
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  type="text"
-                  placeholder="你的姓名"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="pl-9"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground/80">
-                邮箱
-              </label>
-              <div className="relative">
-                <Mail
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground/80">
-                手机号
-              </label>
-              <div className="relative">
-                <Phone
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  type="tel"
-                  placeholder="11 位手机号"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-9"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  pattern="1[3-9][0-9]{9}"
-                  maxLength={11}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground/80">
-                密码
-              </label>
-              <div className="relative">
-                <Lock
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  type="password"
-                  placeholder="至少 8 位密码"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9"
-                  minLength={8}
-                  required
-                />
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/50 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                "注册"
-              )}
-            </Button>
-          </form>
-
-          <p className="text-sm text-muted-foreground text-center mt-6">
-            已有账号？{" "}
-            <Link
-              href="/login"
-              className="text-primary hover:brightness-110 font-medium"
-            >
-              登录
-            </Link>
-          </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground/80">邮箱</label>
+          <div className="relative">
+            <Mail
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/80"
+            />
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-9 h-10"
+              required
+            />
+          </div>
         </div>
-      </div>
-    </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground/80">
+            手机号
+          </label>
+          <div className="relative">
+            <Phone
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/80"
+            />
+            <Input
+              type="tel"
+              placeholder="11 位手机号"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="pl-9 h-10"
+              inputMode="numeric"
+              autoComplete="tel"
+              pattern="1[3-9][0-9]{9}"
+              maxLength={11}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground/80">密码</label>
+          <div className="relative">
+            <Lock
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/80"
+            />
+            <Input
+              type="password"
+              placeholder="至少 8 位密码"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-9 h-10"
+              minLength={8}
+              required
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-500/8 rounded-xl px-3.5 py-2.5 leading-relaxed">
+            {error}
+          </p>
+        )}
+
+        <Button
+          type="submit"
+          className="w-full h-10 text-[15px] font-medium"
+          disabled={loading}
+        >
+          {loading ? <Loader2 size={16} className="animate-spin" /> : "注册"}
+        </Button>
+      </form>
+
+      <p className="text-sm text-muted-foreground text-center mt-7">
+        已有账号？{" "}
+        <Link
+          href="/login"
+          className="text-sky-600 dark:text-sky-400 hover:brightness-110 font-medium"
+        >
+          登录
+        </Link>
+      </p>
+    </AuthPageShell>
   );
 }

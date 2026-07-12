@@ -91,6 +91,7 @@ export async function createWorkflowTemplateSchedule(
   });
 
   revalidatePath(`/workflows/${tpl.id}`);
+  revalidatePath("/cowork/schedules");
   revalidatePath("/admin/scheduled-jobs");
 
   return { ok: true, data: schedule };
@@ -149,6 +150,7 @@ export async function updateWorkflowTemplateSchedule(
   if (existing.workflowTemplateId) {
     revalidatePath(`/workflows/${existing.workflowTemplateId}`);
   }
+  revalidatePath("/cowork/schedules");
   revalidatePath("/admin/scheduled-jobs");
   return { ok: true, data: updated };
 }
@@ -170,6 +172,7 @@ export async function toggleWorkflowTemplateSchedule(
   if (existing.workflowTemplateId) {
     revalidatePath(`/workflows/${existing.workflowTemplateId}`);
   }
+  revalidatePath("/cowork/schedules");
   revalidatePath("/admin/scheduled-jobs");
   return { ok: true, data: updated };
 }
@@ -188,6 +191,7 @@ export async function deleteWorkflowTemplateSchedule(
   if (existing.workflowTemplateId) {
     revalidatePath(`/workflows/${existing.workflowTemplateId}`);
   }
+  revalidatePath("/cowork/schedules");
   revalidatePath("/admin/scheduled-jobs");
   return { ok: true };
 }

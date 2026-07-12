@@ -242,7 +242,7 @@ function normalizeRawArtifact({
     metadata,
     createdAt: asString(rawArtifact.createdAt ?? rawArtifact.created_at) || createdAt,
     version,
-    editable: source === "mission_artifact" && kind === "draft",
+    editable: source === "mission_artifact" && (kind === "draft" || kind === "markdown"),
     edited,
   };
 }

@@ -68,8 +68,12 @@ export function ProjectDetailClient({
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     startTransition(async () => {
       const res = await startCoworkConversation(text, { projectId: project.id });
-      if (res.ok) router.push(`/cowork/${res.conversationId}`);
-      else setInput(text);
+      if (!res.ok) {
+        setInput(text);
+        return;
+      }
+      const pathname = `/cowork/${res.conversationId}`;
+      router.push(pathname);
     });
   }
 

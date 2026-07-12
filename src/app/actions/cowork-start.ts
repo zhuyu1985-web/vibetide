@@ -2,8 +2,8 @@
 
 /**
  * startCoworkConversation —— 落地页"发一句话直接开新会话"的入口。
- * 建会话(标题取自首句)→ 复用 submitCoworkMessage 走意图→mission/chat →
- * 返回新会话 id 供前端跳转 /cowork/[id]。
+ * 先建会话并落首条用户消息，立即返回 id 供前端跳转；意图识别与 AI 处理
+ * 由目标会话页调用 /api/cowork/stream 在跳转后继续。
  *
  * startCoworkScenario —— 场景卡片"启动"的对话框模式入口。
  * 建会话(标题取模板名)→ 落用户指令消息 → startMissionFromTemplate(挂
@@ -15,7 +15,13 @@ import { requireAuth } from "@/lib/auth";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
 import {
   appendMessage,
+  claimInitialConversationProcessing,
   createConversation,
+  finishInitialConversationProcessing,
+  getConversationById,
+  getConversationWithMessages,
+  initializeInitialConversationProcessing,
+  resetInitialConversationProcessing,
 } from "@/lib/dal/cowork-conversations";
 import { getWorkflowTemplate } from "@/lib/dal/workflow-templates";
 import { submitCoworkMessage } from "@/app/actions/cowork-submit";
@@ -24,6 +30,10 @@ import { deriveConversationTitle } from "@/lib/cowork/conversation-title";
 import { buildUserInstruction } from "@/lib/workflow-instruction";
 import { validateInputs } from "@/lib/input-fields-validation";
 import type { InputFieldDef } from "@/lib/types";
+import {
+  buildPendingInitialProcessing,
+  readInitialProcessing,
+} from "@/lib/cowork/initial-processing";
 
 export type StartCoworkResult =
   | { ok: false; error: string }
@@ -42,17 +52,130 @@ export async function startCoworkConversation(
   const convo = await createConversation(orgId, user.id, {
     title: deriveConversationTitle(text),
     projectId: opts.projectId ?? null,
+    metadata: {
+      initialProcessing: buildPendingInitialProcessing(text),
+    },
   });
 
-  const res = await submitCoworkMessage(convo.id, text);
-  // 会话已建:即便首条执行失败也返回 id,让用户进入会话查看/重试。
-  if (!res.ok) return { ok: true, conversationId: convo.id };
+  await appendMessage(convo.id, {
+    role: "user",
+    content: text,
+    kind: "text",
+  });
+  revalidatePath(`/cowork/${convo.id}`);
+  return { ok: true, conversationId: convo.id };
+}
 
-  return {
-    ok: true,
-    conversationId: convo.id,
-    missionId: res.kind === "mission" ? res.missionId : undefined,
-  };
+export async function processStartedCoworkConversation(
+  conversationId: string,
+) {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false as const, status: "failed" as const, error: "用户未关联组织" };
+
+  let claimed = await claimInitialConversationProcessing(
+    orgId,
+    user.id,
+    conversationId,
+  );
+  if (!claimed) {
+    const conversation = await getConversationById(orgId, user.id, conversationId);
+    const current = readInitialProcessing(conversation?.metadata);
+    if (!current) {
+      const active = await getConversationWithMessages(
+        orgId,
+        user.id,
+        conversationId,
+      );
+      const prompt = [...(active?.messages ?? [])]
+        .reverse()
+        .find((message) => message.role === "user")
+        ?.content.trim();
+      if (prompt) {
+        await initializeInitialConversationProcessing(
+          orgId,
+          user.id,
+          conversationId,
+          prompt,
+        );
+        claimed = await claimInitialConversationProcessing(
+          orgId,
+          user.id,
+          conversationId,
+        );
+      }
+    }
+    if (claimed) {
+      // 旧版 `?processing=1` 会话已补状态，继续走下方真实处理。
+    } else {
+      const latest = current ?? readInitialProcessing(
+        (await getConversationById(orgId, user.id, conversationId))?.metadata,
+      );
+      return {
+        ok: latest?.status === "completed",
+        status: latest?.status ?? "failed",
+        ...(latest?.error ? { error: latest.error } : {}),
+      };
+    }
+  }
+
+  try {
+    const res = await submitCoworkMessage(conversationId, claimed.prompt, {
+      userMessageAlreadyPersisted: true,
+    });
+    if (!res.ok) {
+      await finishInitialConversationProcessing(
+        orgId,
+        user.id,
+        conversationId,
+        "failed",
+        res.error,
+      );
+      return { ok: false as const, status: "failed" as const, error: res.error };
+    }
+    if (res.kind === "stream") {
+      return {
+        ok: true as const,
+        status: "running" as const,
+        messageId: res.messageId,
+      };
+    }
+    await finishInitialConversationProcessing(
+      orgId,
+      user.id,
+      conversationId,
+      "completed",
+    );
+    return {
+      ok: true as const,
+      status: "completed" as const,
+      missionId: res.kind === "mission" ? res.missionId : undefined,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await finishInitialConversationProcessing(
+      orgId,
+      user.id,
+      conversationId,
+      "failed",
+      message,
+    );
+    return { ok: false as const, status: "failed" as const, error: message };
+  }
+}
+
+export async function retryStartedCoworkConversation(conversationId: string) {
+  const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
+  if (!orgId) return { ok: false as const, error: "用户未关联组织" };
+  const state = await resetInitialConversationProcessing(
+    orgId,
+    user.id,
+    conversationId,
+  );
+  return state
+    ? { ok: true as const, status: state.status }
+    : { ok: false as const, error: "当前会话不可重试" };
 }
 
 export type StartCoworkScenarioResult =

@@ -24,6 +24,35 @@ const REGISTRY: Record<SearchProviderId, SearchProvider> = {
 
 let lastLoggedProvider: SearchProviderId | null = null;
 
+export function isRetryableSearchError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  const message = error instanceof Error ? error.message : String(error);
+  if (/quota|rate.?limit|401|403|400|invalid|not configured/i.test(message)) {
+    return false;
+  }
+  return (
+    /\b5\d{2}\b/.test(message) ||
+    /timeout|timed out|abort|fetch failed|ECONNRESET|ECONNREFUSED|EAI_AGAIN/i.test(
+      message,
+    )
+  );
+}
+
+export async function runSearchWithRetry<T>(
+  operation: () => Promise<T>,
+  delayMs = 250,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isRetryableSearchError(error)) throw error;
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return operation();
+  }
+}
+
 /**
  * Run a web search via the currently active provider.
  *
@@ -44,5 +73,5 @@ export async function searchWeb(query: string, options: SearchOptions = {}): Pro
     console.info(`[search] active provider: ${providerId}`);
   }
 
-  return provider.search(query, options);
+  return runSearchWithRetry(() => provider.search(query, options));
 }

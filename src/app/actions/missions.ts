@@ -16,7 +16,14 @@ import { eq, and, lt, inArray, sql, gte } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
-import { executeMissionDirect } from "@/lib/mission-executor";
+import {
+  executeAllTasksDirect,
+  executeMissionDirect,
+} from "@/lib/mission-executor";
+import {
+  buildRetryMissionInput,
+  shouldExecuteMissionRetryDirectly,
+} from "@/lib/mission-retry-context";
 import { getWorkflowTemplateByLegacyKey } from "@/lib/dal/workflow-templates";
 import { inngest } from "@/inngest/client";
 
@@ -114,6 +121,7 @@ export async function startMission(data: {
   title: string;
   scenario: string;
   userInstruction: string;
+  inputParams?: Record<string, unknown>;
   /**
    * B.1 Unified Scenario Workflow: optional explicit template id. If omitted,
    * we try to resolve it from `scenario` via `legacy_scenario_key`. Falls back
@@ -163,6 +171,7 @@ export async function startMission(data: {
       leaderEmployeeId: leader.id,
       status: "queued",
       workflowTemplateId: resolvedTemplateId,
+      inputParams: data.inputParams ?? {},
     })
     .returning();
 
@@ -199,6 +208,7 @@ export async function startMissionFromModule(data: {
   sourceEntityId?: string;
   sourceEntityType?: string;
   sourceContext?: Record<string, unknown>;
+  inputParams?: Record<string, unknown>;
   /**
    * B.1 Unified Scenario Workflow: optional explicit template id. If omitted,
    * we try to resolve it from `scenario` via `legacy_scenario_key`.
@@ -231,6 +241,7 @@ export async function startMissionFromModule(data: {
       sourceEntityId: data.sourceEntityId,
       sourceEntityType: data.sourceEntityType,
       workflowTemplateId: resolvedTemplateId,
+      inputParams: data.inputParams ?? data.sourceContext ?? {},
     })
     .returning();
 
@@ -467,14 +478,7 @@ export async function retryMission(missionId: string) {
     throw new Error("只能重新执行已终止的任务");
   }
 
-  return startMission({
-    title: `${original.title}（重新执行）`,
-    scenario: original.scenario,
-    userInstruction: original.userInstruction,
-    // 关键：保留原 mission 的工作流模板，否则重试会丢模板，
-    // 走 LLM 分解或派工兜底（5 步全砸 leader），跟首次执行体验完全不一致。
-    workflowTemplateId: original.workflowTemplateId ?? undefined,
-  });
+  return startMission(buildRetryMissionInput(original));
 }
 
 /**
@@ -780,6 +784,23 @@ export async function retryMissionTask(taskId: string) {
       completedAt: null,
     })
     .where(eq(missionTasks.id, taskId));
+
+  if (
+    shouldExecuteMissionRetryDirectly(
+      process.env.NODE_ENV,
+      process.env.INNGEST_EVENT_KEY,
+    )
+  ) {
+    void executeAllTasksDirect(task.missionId).catch(async (err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[retryMissionTask] direct execution failed:", err);
+      await db
+        .update(missionTasks)
+        .set({ status: "failed", errorMessage: message })
+        .where(eq(missionTasks.id, taskId));
+    });
+    return { success: true };
+  }
 
   // I2: Inngest 投递失败回滚 status=failed，避免任务卡在 ready 永不被消费。
   // 注意 retryCount 不回滚 —— 保留递增可阻止 Inngest 真正不可用时的紧密重试循环。

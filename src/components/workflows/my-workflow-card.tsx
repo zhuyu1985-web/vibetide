@@ -3,90 +3,58 @@
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import { Play, Pencil, Trash2, Clock, Zap, AlertCircle } from "lucide-react";
 import { GlassCard } from "@/components/shared/glass-card";
+import { describeCronExpression } from "@/lib/cron";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+export interface WorkflowScheduleSummary {
+  cronExpression: string;
+  enabled: boolean;
+}
 
 interface MyWorkflowCardProps {
   workflow: {
     id: string;
     name: string;
     description: string | null;
-    triggerType: string;
-    triggerConfig: { cron?: string; timezone?: string } | null;
     runCount: number;
     lastRunAt: string | null;
     isEnabled: boolean;
     steps: WorkflowStepDef[];
   };
+  /** 来自 scheduled_jobs；无记录表示手动触发 */
+  schedule?: WorkflowScheduleSummary | null;
   onRun: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Cron helper
-// ---------------------------------------------------------------------------
-
-function describeCron(cron: string): string {
-  // Simple patterns: "minute hour * * *" or "minute hour * * dayOfWeek"
-  const parts = cron.trim().split(/\s+/);
-  if (parts.length < 5) return cron;
-
-  const [minute, hour, , , dayOfWeek] = parts;
-  const timeStr = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
-
-  const dayNames: Record<string, string> = {
-    "0": "日",
-    "1": "一",
-    "2": "二",
-    "3": "三",
-    "4": "四",
-    "5": "五",
-    "6": "六",
-  };
-
-  if (dayOfWeek === "*") {
-    return `每日 ${timeStr}`;
+function getTriggerLabel(schedule: WorkflowScheduleSummary | null | undefined): {
+  label: string;
+  isScheduled: boolean;
+} {
+  if (!schedule) {
+    return { label: "手动触发", isScheduled: false };
   }
-
-  const dayLabel = dayNames[dayOfWeek] ?? dayOfWeek;
-  return `每周${dayLabel} ${timeStr}`;
-}
-
-function getTriggerLabel(
-  triggerType: string,
-  triggerConfig: { cron?: string } | null
-): string {
-  if (triggerType === "scheduled" && triggerConfig?.cron) {
-    return `定时 · ${describeCron(triggerConfig.cron)}`;
+  const timeLabel = describeCronExpression(schedule.cronExpression);
+  if (schedule.enabled) {
+    return { label: `定时 · ${timeLabel}`, isScheduled: true };
   }
-  return "手动触发";
+  return { label: `定时已停用 · ${timeLabel}`, isScheduled: true };
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function MyWorkflowCard({
   workflow,
+  schedule = null,
   onRun,
   onEdit,
   onDelete,
 }: MyWorkflowCardProps) {
-  const triggerLabel = getTriggerLabel(
-    workflow.triggerType,
-    workflow.triggerConfig
-  );
-
-  const TriggerIcon = workflow.triggerType === "scheduled" ? Clock : Zap;
+  const { label: triggerLabel, isScheduled } = getTriggerLabel(schedule);
+  const TriggerIcon = isScheduled ? Clock : Zap;
   const stepCount = Array.isArray(workflow.steps) ? workflow.steps.length : 0;
   const isEmpty = stepCount === 0;
 
   return (
     <GlassCard hover className="group flex flex-col">
-      {/* Name + step count */}
       <div className="flex items-center gap-2 mb-2">
         <h3 className="text-base font-semibold text-gray-900 dark:text-white/90 flex-1 truncate">
           {workflow.name}
@@ -96,13 +64,11 @@ export function MyWorkflowCard({
         </span>
       </div>
 
-      {/* Trigger info */}
       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-white/45 mb-1">
         <TriggerIcon className="w-3.5 h-3.5" />
         <span>{triggerLabel}</span>
       </div>
 
-      {/* Run count or empty warning */}
       {isEmpty ? (
         <p className="inline-flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400 mb-4">
           <AlertCircle className="w-3.5 h-3.5" />
@@ -114,7 +80,6 @@ export function MyWorkflowCard({
         </p>
       )}
 
-      {/* Action buttons (visible on hover) */}
       <div className="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => !isEmpty && onRun(workflow.id)}

@@ -11,6 +11,12 @@
 import { db } from "@/db";
 import { conversations, conversationMessages } from "@/db/schema";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import {
+  buildPendingInitialProcessing,
+  INITIAL_PROCESSING_LEASE_MS,
+  readInitialProcessing,
+  type InitialProcessingStatus,
+} from "@/lib/cowork/initial-processing";
 
 export interface CreateConversationInput {
   title: string;
@@ -126,6 +132,149 @@ export async function createConversation(
   return row;
 }
 
+export async function claimInitialConversationProcessing(
+  orgId: string,
+  userId: string,
+  id: string,
+  now = new Date(),
+) {
+  const cutoff = new Date(now.getTime() - INITIAL_PROCESSING_LEASE_MS);
+  const [row] = await db
+    .update(conversations)
+    .set({
+      metadata: sql`jsonb_set(
+        coalesce(${conversations.metadata}, '{}'::jsonb),
+        '{initialProcessing}',
+        jsonb_build_object(
+          'status', 'running',
+          'prompt', ${conversations.metadata} #>> '{initialProcessing,prompt}',
+          'attempt', coalesce((${conversations.metadata} #>> '{initialProcessing,attempt}')::int, 0) + 1,
+          'updatedAt', ${now.toISOString()}::text
+        ),
+        true
+      )`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(conversations.organizationId, orgId),
+        eq(conversations.userId, userId),
+        eq(conversations.id, id),
+        sql`(
+          ${conversations.metadata} #>> '{initialProcessing,status}' = 'pending'
+          OR (
+            ${conversations.metadata} #>> '{initialProcessing,status}' = 'running'
+            AND (${conversations.metadata} #>> '{initialProcessing,updatedAt}')::timestamptz <= ${cutoff.toISOString()}::timestamptz
+          )
+        )`,
+      ),
+    )
+    .returning({ metadata: conversations.metadata });
+  return readInitialProcessing(row?.metadata) ?? null;
+}
+
+export async function initializeInitialConversationProcessing(
+  orgId: string,
+  userId: string,
+  id: string,
+  prompt: string,
+) {
+  const state = buildPendingInitialProcessing(prompt);
+  const [row] = await db
+    .update(conversations)
+    .set({
+      metadata: sql`jsonb_set(
+        coalesce(${conversations.metadata}, '{}'::jsonb),
+        '{initialProcessing}',
+        ${JSON.stringify(state)}::jsonb,
+        true
+      )`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(conversations.organizationId, orgId),
+        eq(conversations.userId, userId),
+        eq(conversations.id, id),
+        sql`${conversations.metadata} #>> '{initialProcessing,status}' IS NULL`,
+      ),
+    )
+    .returning({ metadata: conversations.metadata });
+  return readInitialProcessing(row?.metadata) ?? null;
+}
+
+export async function finishInitialConversationProcessing(
+  orgId: string,
+  userId: string,
+  id: string,
+  status: Extract<InitialProcessingStatus, "completed" | "failed">,
+  error?: string,
+) {
+  const now = new Date();
+  const errorValue = error?.trim().slice(0, 500) || null;
+  const [row] = await db
+    .update(conversations)
+    .set({
+      metadata: sql`jsonb_set(
+        coalesce(${conversations.metadata}, '{}'::jsonb),
+        '{initialProcessing}',
+        jsonb_strip_nulls(jsonb_build_object(
+          'status', ${status}::text,
+          'prompt', ${conversations.metadata} #>> '{initialProcessing,prompt}',
+          'attempt', coalesce((${conversations.metadata} #>> '{initialProcessing,attempt}')::int, 0),
+          'updatedAt', ${now.toISOString()}::text,
+          'error', ${errorValue}::text
+        )),
+        true
+      )`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(conversations.organizationId, orgId),
+        eq(conversations.userId, userId),
+        eq(conversations.id, id),
+        sql`${conversations.metadata} #>> '{initialProcessing,status}' = 'running'`,
+      ),
+    )
+    .returning({ metadata: conversations.metadata });
+  return readInitialProcessing(row?.metadata) ?? null;
+}
+
+export async function resetInitialConversationProcessing(
+  orgId: string,
+  userId: string,
+  id: string,
+) {
+  const now = new Date();
+  const [row] = await db
+    .update(conversations)
+    .set({
+      metadata: sql`jsonb_set(
+        coalesce(${conversations.metadata}, '{}'::jsonb),
+        '{initialProcessing}',
+        jsonb_build_object(
+          'status', 'pending',
+          'prompt', ${conversations.metadata} #>> '{initialProcessing,prompt}',
+          'attempt', coalesce((${conversations.metadata} #>> '{initialProcessing,attempt}')::int, 0),
+          'updatedAt', ${now.toISOString()}::text
+        ),
+        true
+      )`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(conversations.organizationId, orgId),
+        eq(conversations.userId, userId),
+        eq(conversations.id, id),
+        sql`${conversations.metadata} #>> '{initialProcessing,status}' = 'failed'`,
+      ),
+    )
+    .returning({ metadata: conversations.metadata });
+  return readInitialProcessing(row?.metadata) ?? null;
+}
+
 /**
  * 追加一条消息,并把会话的 lastMessageAt / updatedAt 顶到最新(用于会话列表
  * 置顶排序)。两条语句不放事务:时间戳轻微滞后无副作用,换取与 PgBouncer
@@ -163,6 +312,36 @@ export async function linkMissionToMessage(
     .update(conversationMessages)
     .set({ missionId })
     .where(eq(conversationMessages.id, messageId))
+    .returning();
+  return row ?? null;
+}
+
+export async function updateConversationTextMessage(
+  conversationId: string,
+  messageId: string,
+  content: string,
+  streamState: "completed" | "failed",
+  error?: string,
+) {
+  const metaPatch = {
+    streaming: false,
+    streamState,
+    ...(error ? { streamError: error.slice(0, 500) } : {}),
+  };
+  const [row] = await db
+    .update(conversationMessages)
+    .set({
+      content,
+      meta: sql`coalesce(${conversationMessages.meta}, '{}'::jsonb) || ${JSON.stringify(metaPatch)}::jsonb`,
+    })
+    .where(
+      and(
+        eq(conversationMessages.id, messageId),
+        eq(conversationMessages.conversationId, conversationId),
+        eq(conversationMessages.role, "assistant"),
+        eq(conversationMessages.kind, "text"),
+      ),
+    )
     .returning();
   return row ?? null;
 }

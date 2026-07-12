@@ -1,10 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { workflowTemplates, skills } from "@/db/schema";
+import { workflowTemplates, skills, scheduledJobs } from "@/db/schema";
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import type { InputFieldDef } from "@/lib/types";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserOrg } from "@/lib/dal/auth";
@@ -433,6 +433,7 @@ export async function updateWorkflow(
  */
 export async function deleteWorkflow(id: string) {
   const user = await requireAuth();
+  const orgId = await getCurrentUserOrg();
 
   const existing = await db.query.workflowTemplates.findFirst({
     where: eq(workflowTemplates.id, id),
@@ -441,10 +442,28 @@ export async function deleteWorkflow(id: string) {
   if (existing.isBuiltin && !(await isSuperAdmin(user.id))) {
     throw new Error("内置工作流仅管理员可删除");
   }
+  if (
+    !existing.isBuiltin &&
+    orgId &&
+    existing.organizationId !== orgId
+  ) {
+    throw new Error("无权删除该工作流");
+  }
+
+  // scheduled_jobs.workflow_template_id FK 无 ON DELETE CASCADE，需先删关联定时任务
+  await db
+    .delete(scheduledJobs)
+    .where(
+      and(
+        eq(scheduledJobs.workflowTemplateId, id),
+        eq(scheduledJobs.kind, "workflow_template"),
+      ),
+    );
 
   await db.delete(workflowTemplates).where(eq(workflowTemplates.id, id));
 
   revalidatePath("/workflows");
+  revalidatePath("/cowork/schedules");
 }
 
 /**

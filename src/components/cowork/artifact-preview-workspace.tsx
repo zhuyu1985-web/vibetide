@@ -1,26 +1,22 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
+import { useEffect, useState, useTransition } from "react";
 import {
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
   ExternalLink,
   Download,
   Save,
   X,
   Loader2,
   AlertCircle,
+  Eye,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { saveCoworkArtifactDraft } from "@/app/actions/cowork-submit";
 import { labelForKind } from "@/components/cowork/artifact-card";
+import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 import type { ArtifactPreviewItem } from "@/lib/cowork/artifact-preview";
 
 interface ArtifactPreviewWorkspaceProps {
@@ -84,38 +80,23 @@ function DraftPreview({
   artifact: ArtifactPreviewItem;
   onSaved?: (artifact: ArtifactPreviewItem) => void;
 }) {
+  const [mode, setMode] = useState<"preview" | "edit">("preview");
+  const [content, setContent] = useState(artifact.content);
   const [status, setStatus] = useState<"saved" | "dirty" | "saving" | "error">(
     "saved",
   );
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
-  const initialHtml = useMemo(() => toEditorHtml(artifact.content), [artifact.content]);
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    editable: artifact.editable,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      Placeholder.configure({ placeholder: "开始编辑稿件…" }),
-    ],
-    content: initialHtml,
-    editorProps: {
-      attributes: {
-        class:
-          "prose prose-sm dark:prose-invert max-w-none min-h-[520px] focus:outline-none",
-      },
-    },
-    onUpdate: () => {
-      setStatus("dirty");
-      setError("");
-    },
-  });
+  useEffect(() => {
+    setContent(artifact.content);
+    setStatus("saved");
+    setError("");
+    setMode("preview");
+  }, [artifact.id, artifact.content]);
 
   function save() {
-    if (!editor || !artifact.editable || isPending) return;
-    const content = editor.getHTML();
+    if (!artifact.editable || isPending) return;
     setStatus("saving");
     startTransition(async () => {
       const res = await saveCoworkArtifactDraft({
@@ -129,6 +110,7 @@ function DraftPreview({
         return;
       }
       setStatus("saved");
+      setMode("preview");
       onSaved?.({
         ...artifact,
         content,
@@ -146,38 +128,27 @@ function DraftPreview({
   return (
     <div className="flex min-h-full flex-col p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
-        <ToolbarButton
-          disabled={!editor || !artifact.editable}
-          active={editor?.isActive("bold") ?? false}
-          label="加粗"
-          onClick={() => editor?.chain().focus().toggleBold().run()}
+        <Button
+          type="button"
+          variant={mode === "preview" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => setMode("preview")}
         >
-          <Bold className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          disabled={!editor || !artifact.editable}
-          active={editor?.isActive("italic") ?? false}
-          label="斜体"
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
+          <Eye className="size-3.5" />
+          预览
+        </Button>
+        <Button
+          type="button"
+          variant={mode === "edit" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-8 gap-1.5"
+          disabled={!artifact.editable}
+          onClick={() => setMode("edit")}
         >
-          <Italic className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          disabled={!editor || !artifact.editable}
-          active={editor?.isActive("bulletList") ?? false}
-          label="无序列表"
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-        >
-          <List className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          disabled={!editor || !artifact.editable}
-          active={editor?.isActive("orderedList") ?? false}
-          label="有序列表"
-          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-        >
-          <ListOrdered className="size-4" />
-        </ToolbarButton>
+          <Pencil className="size-3.5" />
+          编辑
+        </Button>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
             {artifact.editable ? statusLabel(status) : "当前产物暂不可保存"}
@@ -185,7 +156,7 @@ function DraftPreview({
           <Button
             size="sm"
             className="h-8 gap-1.5"
-            disabled={!artifact.editable || !editor || status === "saving"}
+            disabled={!artifact.editable || status === "saving" || status === "saved"}
             onClick={save}
           >
             {status === "saving" ? (
@@ -205,11 +176,31 @@ function DraftPreview({
       )}
       <div
         className={cn(
-          "flex-1 rounded-lg border border-border bg-card px-5 py-4 shadow-sm",
+          "flex-1 rounded-lg border border-border bg-card shadow-sm",
           !artifact.editable && "bg-muted/20",
         )}
       >
-        <EditorContent editor={editor} />
+        {mode === "edit" ? (
+          <textarea
+            value={content}
+            onChange={(event) => {
+              setContent(event.target.value);
+              setStatus("dirty");
+              setError("");
+            }}
+            spellCheck={false}
+            className="min-h-[620px] w-full resize-none rounded-lg bg-transparent px-5 py-4 font-mono text-sm leading-7 text-foreground outline-none placeholder:text-muted-foreground/50"
+            placeholder="输入 Markdown 内容…"
+          />
+        ) : (
+          <div className="min-h-[620px] px-5 py-4">
+            {content.trim() ? (
+              <CollapsibleMessageContent markdown={content} />
+            ) : (
+              <p className="text-sm text-muted-foreground">该产物没有可预览内容。</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -313,35 +304,6 @@ function Unavailable({
   );
 }
 
-function ToolbarButton({
-  active,
-  disabled,
-  label,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  disabled: boolean;
-  label: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Button
-      type="button"
-      variant={active ? "secondary" : "ghost"}
-      size="icon-sm"
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="size-8 rounded-md"
-    >
-      {children}
-    </Button>
-  );
-}
-
 function statusLabel(status: "saved" | "dirty" | "saving" | "error"): string {
   const labels = {
     saved: "已保存",
@@ -350,22 +312,4 @@ function statusLabel(status: "saved" | "dirty" | "saving" | "error"): string {
     error: "保存失败",
   };
   return labels[status];
-}
-
-function toEditorHtml(content: string): string {
-  const trimmed = content.trim();
-  if (!trimmed) return "<p></p>";
-  if (/^<[\s\S]+>$/.test(trimmed)) return trimmed;
-  return trimmed
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

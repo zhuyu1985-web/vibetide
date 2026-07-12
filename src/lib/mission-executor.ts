@@ -644,6 +644,25 @@ const AGENT_FALLBACK_COMPATIBLE_REGISTERED_TOOLS = new Set([
   "content_generate",
 ]);
 
+const WORKFLOW_TOOL_PARAM_RESOLVERS = new Set([
+  "web_search",
+  "web_deep_read",
+  "news_aggregation",
+  "trending_topics",
+  "trend_monitor",
+  "heat_scoring",
+  "social_listening",
+  "fact_check",
+  "data_report",
+  "media_search",
+]);
+
+export function hasWorkflowToolParamResolver(
+  assignedRole: string | null | undefined,
+): boolean {
+  return Boolean(assignedRole && WORKFLOW_TOOL_PARAM_RESOLVERS.has(assignedRole));
+}
+
 export function shouldBlockRegisteredSkillFallback(input: {
   assignedRole: string | null | undefined;
   preExecAttempted: boolean;
@@ -665,6 +684,34 @@ export function formatRegisteredSkillFallbackFailure(
     ? `真实错误：${preExecError.trim()}`
     : "可能原因:1) 工具参数被 zod 拒绝(检查上游 step 是否产出空数据 / 字段名不匹配);2) 工具实现内部 throw(检查环境变量 / 网络 / 配额);3) workflowTemplateId 缺失或 step 参数未绑定。详见 server 日志。";
   return `工具/skill \`${role}\` 短路执行失败,拒绝降级到 LLM 编故事路径。${detail}`;
+}
+
+export function getStructuredToolFailure(
+  result: Record<string, unknown>,
+): { code: string; message: string } | null {
+  const hasFailure = result.success === false || result.error != null;
+  if (!hasFailure) return null;
+  const error = result.error;
+  if (error && typeof error === "object") {
+    const structured = error as { code?: unknown; message?: unknown };
+    return {
+      code:
+        typeof structured.code === "string"
+          ? structured.code
+          : "tool_error",
+      message:
+        typeof structured.message === "string"
+          ? structured.message
+          : "工具返回失败",
+    };
+  }
+  return {
+    code: "tool_error",
+    message:
+      typeof error === "string" && error.trim()
+        ? error.trim()
+        : "工具返回失败",
+  };
 }
 
 export function shouldForceInjectWorkflowTool(
@@ -758,6 +805,229 @@ export function buildImplicitWebSearchParams(
       : "news",
     ...(timeRange ? { timeRange } : {}),
   };
+}
+
+type WorkflowToolParamResolution =
+  | {
+      ok: true;
+      params: Record<string, unknown>;
+      source: "explicit" | "mission_context" | "upstream";
+    }
+  | {
+      ok: false;
+      error: {
+        category: "parameter_binding";
+        toolName: string;
+        missingFields: string[];
+        source: "workflow_template";
+      };
+    };
+
+function firstNonEmptyString(
+  source: Record<string, unknown> | null | undefined,
+  keys: string[],
+): string {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function findFirstUrl(value: unknown): string {
+  if (typeof value === "string") {
+    const match = value.match(/https?:\/\/[^\s"'<>]+/);
+    return match?.[0] ?? "";
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const url = findFirstUrl(item);
+      if (url) return url;
+    }
+    return "";
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const direct = firstNonEmptyString(record, ["url", "sourceUrl", "link"]);
+    if (direct) return direct;
+    for (const nested of Object.values(record)) {
+      const url = findFirstUrl(nested);
+      if (url) return url;
+    }
+  }
+  return "";
+}
+
+export function resolveWorkflowToolParams(input: {
+  toolName: string;
+  renderedParams: Record<string, unknown>;
+  missionTitle: string;
+  inputParams: Record<string, unknown> | null | undefined;
+  userInstruction?: string | null;
+  previousStepOutputs: unknown[];
+}): WorkflowToolParamResolution {
+  const explicit = Object.fromEntries(
+    Object.entries(input.renderedParams).filter(
+      ([, value]) => value !== "" && value !== null && value !== undefined,
+    ),
+  );
+  const explicitQuery = firstNonEmptyString(input.inputParams, [
+    "query",
+    "topic",
+    "keyword",
+    "keywords",
+    "event_keywords",
+    "subject",
+    "city",
+    "intentSummary",
+  ]);
+  const contextQuery =
+    explicitQuery ||
+    input.userInstruction?.trim() ||
+    input.missionTitle.trim();
+  const inferredSearch = buildImplicitWebSearchParams(
+    input.missionTitle,
+    input.inputParams,
+    input.userInstruction,
+  );
+  const source = Object.keys(explicit).length > 0 ? "explicit" : "mission_context";
+
+  switch (input.toolName) {
+    case "web_search":
+      return {
+        ok: true,
+        params: { ...inferredSearch, ...explicit },
+        source,
+      };
+    case "news_aggregation":
+      return contextQuery
+        ? {
+            ok: true,
+            params: {
+              query: contextQuery,
+              maxResults: 10,
+              topic: inferredSearch.topic ?? "news",
+              ...(inferredSearch.timeRange
+                ? { timeRange: inferredSearch.timeRange }
+                : {}),
+              ...explicit,
+            },
+            source,
+          }
+        : missing("query");
+    case "trend_monitor":
+    case "heat_scoring":
+      return contextQuery
+        ? {
+            ok: true,
+            params: {
+              query: contextQuery,
+              timeRange: inferredSearch.timeRange ?? "24h",
+              ...explicit,
+            },
+            source,
+          }
+        : missing("query");
+    case "social_listening":
+      return contextQuery
+        ? {
+            ok: true,
+            params: { query: contextQuery, limit: 10, ...explicit },
+            source,
+          }
+        : missing("query");
+    case "trending_topics":
+      return {
+        ok: true,
+        params: {
+          ...buildImplicitTrendingTopicsParams(
+            input.missionTitle,
+            input.inputParams,
+          ),
+          ...explicit,
+        },
+        source,
+      };
+    case "media_search":
+      return contextQuery
+        ? {
+            ok: true,
+            params: { keyword: contextQuery, limit: 10, ...explicit },
+            source,
+          }
+        : missing("keyword");
+    case "data_report": {
+      const message = `${input.missionTitle} ${contextQuery}`;
+      const reportType = /月|monthly/i.test(message)
+        ? "monthly"
+        : /周|weekly/i.test(message)
+          ? "weekly"
+          : "daily";
+      return {
+        ok: true,
+        params: { reportType, ...explicit },
+        source,
+      };
+    }
+    case "web_deep_read": {
+      const explicitUrl = firstNonEmptyString(explicit, ["url"]);
+      const contextUrl =
+        firstNonEmptyString(input.inputParams, ["url", "sourceUrl", "link"]) ||
+        findFirstUrl(input.previousStepOutputs);
+      const url = explicitUrl || contextUrl;
+      return url
+        ? {
+            ok: true,
+            params: { ...explicit, url },
+            source: explicitUrl ? "explicit" : contextUrl ? "upstream" : source,
+          }
+        : missing("url");
+    }
+    case "fact_check": {
+      const explicitText = firstNonEmptyString(explicit, ["text"]);
+      const inputText = firstNonEmptyString(input.inputParams, [
+        "text",
+        "body",
+        "content",
+        "claim",
+      ]);
+      const upstream = input.previousStepOutputs.at(-1);
+      const upstreamText =
+        typeof upstream === "string"
+          ? upstream.trim()
+          : upstream
+            ? JSON.stringify(upstream)
+            : "";
+      const text = explicitText || inputText || upstreamText;
+      return text
+        ? {
+            ok: true,
+            params: { ...explicit, text },
+            source: explicitText
+              ? "explicit"
+              : upstreamText
+                ? "upstream"
+                : "mission_context",
+          }
+        : missing("text");
+    }
+    default:
+      return Object.keys(explicit).length > 0
+        ? { ok: true, params: explicit, source: "explicit" }
+        : missing("parameters");
+  }
+
+  function missing(field: string): WorkflowToolParamResolution {
+    return {
+      ok: false,
+      error: {
+        category: "parameter_binding",
+        toolName: input.toolName,
+        missingFields: [field],
+        source: "workflow_template",
+      },
+    };
+  }
 }
 
 /**
@@ -1296,96 +1566,13 @@ async function executeTaskDirect(
           rawParams = parseCallParamsFromTaskDescription(task.description);
         }
 
-        // ── Auto-bind fallback for retrieval-intent steps ──────────────
-        // 观察到的事故：seed 里所有 step.config.parameters={}，导致下方
-        // `if (Object.keys(rawParams).length > 0)` 永远不过，预执行永远
-        // 不触发。LLM 看到 news_aggregation / trend_monitor 等"假工具"
-        // （tool-registry ALL_TOOLS 未注册，resolveTools 兜底给个占位
-        // execute）返回 `[xxx] 已完成处理`，就按 SKILL.md 模板 + 训练
-        // 数据编时间和来源（见 mission 98be5b76，出现 04-23 10:30 这
-        // 种未来时间幻觉）。
-        //
-        // 解法：当 step 有 skillSlug 但 parameters 为空，且 skill 属于
-        // "需要真实外部数据"的检索意图类，server 端自动构造 web_search
-        // 参数（query=mission.title + inputParams 值，timeRange 按语义
-        // 推断），真调 Tavily。其它类型 skill 保持原逻辑不动。
-        const RETRIEVAL_INTENT_SLUGS_MISSION = new Set([
-          "news_aggregation",
-          "trend_monitor",
-          "social_listening",
-          "heat_scoring",
-          "competitor_analysis",
-          "sentiment_analysis",
-          "knowledge_retrieval",
-          "case_reference",
-          "media_search",
-          "fact_check",
-        ]);
         let autoBound = false;
-        if (
-          Object.keys(rawParams).length === 0 &&
-          task.assignedRole === "web_search"
-        ) {
-          rawParams = buildImplicitWebSearchParams(
-            mission.title,
-            missionInputParams,
-            mission.userInstruction,
-          );
-          if (Object.keys(rawParams).length > 0) {
-            autoBound = true;
-            console.log(
-              "[mission-executor] auto-bound web_search",
-              { params: rawParams, missionId, taskId },
-            );
-          }
-        } else if (
-          Object.keys(rawParams).length === 0 &&
-          task.assignedRole &&
-          RETRIEVAL_INTENT_SLUGS_MISSION.has(task.assignedRole)
-        ) {
-          const inputValues = missionInputParams
-            ? Object.values(missionInputParams)
-                .filter((v) => v !== null && v !== undefined && v !== "")
-                .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v)))
-            : [];
-          const queryParts = [mission.title, ...inputValues].filter(Boolean);
-          const query = queryParts.join(" ").trim();
-          if (query) {
-            // 时间窗推断（和 chat 路径对齐）
-            const msg = `${mission.title} ${inputValues.join(" ")}`;
-            let timeRange: "24h" | "7d" | "30d" | undefined;
-            if (/今日|每日|今天|daily|实时|breaking/i.test(msg)) timeRange = "24h";
-            else if (/本周|最近一周|weekly/i.test(msg)) timeRange = "7d";
-            else if (/本月|近一月|monthly/i.test(msg)) timeRange = "30d";
-            // 统一降级到 web_search 真调 —— Tavily 是最通用的实时检索通道
-            rawParams = {
-              query,
-              maxResults: 8,
-              topic: "news",
-              ...(timeRange ? { timeRange } : {}),
-            };
-            autoBound = true;
-            console.log(
-              `[mission-executor] auto-bound web_search for ${task.assignedRole}`,
-              { query, timeRange, missionId, taskId },
-            );
-          }
-        }
-
-        if (Object.keys(rawParams).length === 0 && task.assignedRole === "trending_topics") {
-          rawParams = buildImplicitTrendingTopicsParams(
-            mission.title,
-            missionInputParams,
-          );
-          autoBound = true;
-          console.log(
-            "[mission-executor] auto-bound trending_topics",
-            { params: rawParams, missionId, taskId },
-          );
-        }
 
         // 预执行触发：显式绑定了参数，或 auto-bind 生效
-        if (Object.keys(rawParams).length > 0) {
+        if (
+          Object.keys(rawParams).length > 0 ||
+          hasWorkflowToolParamResolver(task.assignedRole)
+        ) {
           preExecAttempted = true;
           // 渲染 step.config.parameters 模板（支持 {{key}} 和 {{stepN.field}}）
           //
@@ -1435,11 +1622,37 @@ async function executeTaskDirect(
               previousStepsForRender[i] = { outputData: s };
             });
           }
-          const rendered = renderStepParameters(
+          let rendered = renderStepParameters(
             rawParams,
             { inputParams: missionInputParams ?? null },
             previousStepsForRender,
           );
+          if (hasWorkflowToolParamResolver(task.assignedRole)) {
+            const resolution = resolveWorkflowToolParams({
+              toolName: task.assignedRole,
+              renderedParams: rendered,
+              missionTitle: mission.title,
+              inputParams: missionInputParams,
+              userInstruction: mission.userInstruction,
+              previousStepOutputs: previousStepsForRender
+                .map((step) => step?.outputData)
+                .filter((output) => output !== undefined),
+            });
+            if (!resolution.ok) {
+              preExecAttempted = true;
+              throw new Error(
+                `参数绑定失败：${JSON.stringify(resolution.error)}`,
+              );
+            }
+            rendered = resolution.params;
+            autoBound = resolution.source !== "explicit";
+            if (autoBound) {
+              console.log(
+                `[mission-executor] auto-bound ${task.assignedRole}`,
+                { params: rendered, source: resolution.source, missionId, taskId },
+              );
+            }
+          }
           // 直接调用工具或 LLM-skill
           // 工具走 invokeToolDirectly（注入 org/operator 上下文）；
           // LLM-skill（topic_classifier / cross_language_rewrite）走 invokeLLMSkillDirectly。
@@ -1481,17 +1694,20 @@ async function executeTaskDirect(
             // 历史教训：之前只看 results，导致 cross_language_rewrite 返回 {articles:[]}
             // 时 preExecEmpty 没设、short-circuit 也没跳过 LLM、LLM 越权调 web_search 补料。
             const resultObj = invocation.result as
-              | { results?: unknown[]; articles?: unknown[]; topics?: unknown[] }
+              | Record<string, unknown>
               | null;
-            const listFields: Array<["results" | "articles" | "topics"]> = [
-              ["results"],
-              ["articles"],
-              ["topics"],
-            ];
+            const listFields = [
+              "results",
+              "articles",
+              "topics",
+              "items",
+              "newsItems",
+              "trendingItems",
+            ] as const;
             let listLen: number | null = null;
             let listFieldName: string | null = null;
             if (resultObj && typeof resultObj === "object") {
-              for (const [field] of listFields) {
+              for (const field of listFields) {
                 const v = resultObj[field];
                 if (Array.isArray(v)) {
                   listLen = v.length;
@@ -1623,22 +1839,7 @@ async function executeTaskDirect(
       // 路径之前无脑把 status 写成 "completed"/"success",mission 总状态显示绿色✓,
       // 用户却根本没入库 —— 这是误导。修复:result.success === false 时
       // 必须把 task 标为 failed 并把 error.message 写到 errorMessage 列。
-      const explicitToolFailure = (() => {
-        if (!resultFields || typeof resultFields !== "object") return null;
-        const r = resultFields as { success?: unknown; error?: unknown };
-        if (r.success === false) {
-          const e = r.error;
-          if (e && typeof e === "object") {
-            const err = e as { code?: unknown; message?: unknown };
-            const code = typeof err.code === "string" ? err.code : "tool_error";
-            const message =
-              typeof err.message === "string" ? err.message : "工具返回失败";
-            return { code, message };
-          }
-          return { code: "tool_error", message: "工具返回 success=false" };
-        }
-        return null;
-      })();
+      const explicitToolFailure = getStructuredToolFailure(resultFields);
 
       // ─── 2026-05-30 — 第四道防线:扫 IO 找上游兜底/失败痕迹 ───
       // 经典案例:cross_language_rewrite 翻译失败,fallback "[NEEDS REVIEW]" → 下游

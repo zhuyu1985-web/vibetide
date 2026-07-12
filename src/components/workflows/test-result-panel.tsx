@@ -3,6 +3,7 @@
 import type { WorkflowStepDef } from "@/db/schema/workflows";
 import { X, Maximize2, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { formatDuration } from "./step-card";
+import { CollapsibleMessageContent } from "@/app/(dashboard)/employee/[id]/collapsible-markdown";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +28,21 @@ interface TestResultPanelProps {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
+
+function normalizeMarkdownPreview(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return `\`\`\`json\n${JSON.stringify(JSON.parse(trimmed), null, 2)}\n\`\`\``;
+    } catch {
+      return value;
+    }
+  }
+
+  return value;
+}
 
 export function TestResultPanel({
   step,
@@ -86,8 +102,8 @@ export function TestResultPanel({
       {/* Summary */}
       {result.summary && (
         <div className="px-4 pb-2 shrink-0">
-          <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2 text-xs text-foreground">
-            {result.summary}
+          <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2 text-foreground">
+            <CollapsibleMessageContent markdown={normalizeMarkdownPreview(result.summary)} />
           </div>
         </div>
       )}
@@ -103,9 +119,9 @@ export function TestResultPanel({
             正在执行…
           </div>
         ) : result.fullResult ? (
-          <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground font-mono rounded-lg bg-black/[0.02] dark:bg-white/[0.03] p-3">
-            {result.fullResult}
-          </pre>
+          <div className="rounded-lg bg-black/[0.02] dark:bg-white/[0.03] p-3 text-foreground">
+            <CollapsibleMessageContent markdown={normalizeMarkdownPreview(result.fullResult)} />
+          </div>
         ) : (
           <div className="text-xs text-muted-foreground py-8 text-center">
             暂无输出

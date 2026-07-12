@@ -15,7 +15,9 @@
  */
 import { db } from "@/db";
 import { scheduledJobs, workflowTemplates } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { validateCronExpression } from "@/lib/cron";
 
 /** 统一 event 名 —— runner 派发 workflow_template kind 时固定用这个 */
 export const WORKFLOW_TEMPLATE_RUN_EVENT = "scheduled-jobs/workflow-template.run";
@@ -72,6 +74,63 @@ export async function listSchedulesByOrg(orgId: string) {
     .from(scheduledJobs)
     .where(orgScopedTemplateKindFilter(orgId))
     .orderBy(desc(scheduledJobs.createdAt));
+}
+
+/**
+ * 将 workflow_templates 上已废弃的 triggerType/triggerConfig 一次性迁入 scheduled_jobs。
+ * 幂等：已有 schedule 的模板跳过。工作流列表卡片仍可能读旧字段，但定时任务页与 runner 只认本表。
+ */
+export async function migrateLegacyTemplateSchedules(orgId: string): Promise<number> {
+  const existing = await db
+    .select({ templateId: scheduledJobs.workflowTemplateId })
+    .from(scheduledJobs)
+    .where(orgScopedTemplateKindFilter(orgId));
+
+  const covered = new Set(
+    existing.map((r) => r.templateId).filter((id): id is string => !!id),
+  );
+
+  const legacyTemplates = await db
+    .select({
+      id: workflowTemplates.id,
+      name: workflowTemplates.name,
+      triggerConfig: workflowTemplates.triggerConfig,
+      isEnabled: workflowTemplates.isEnabled,
+    })
+    .from(workflowTemplates)
+    .where(
+      and(
+        eq(workflowTemplates.organizationId, orgId),
+        eq(workflowTemplates.triggerType, "scheduled"),
+      ),
+    );
+
+  let migrated = 0;
+  for (const tpl of legacyTemplates) {
+    if (covered.has(tpl.id)) continue;
+
+    const cfg = tpl.triggerConfig as { cron?: string; timezone?: string } | null;
+    const cron = cfg?.cron?.trim();
+    if (!cron) continue;
+
+    const timezone = cfg?.timezone?.trim() || "Asia/Shanghai";
+    const cronCheck = validateCronExpression(cron, timezone);
+    if (!cronCheck.ok) continue;
+
+    await createSchedule(orgId, {
+      name: `wf-${tpl.id.slice(0, 8)}-${nanoid(6)}`,
+      displayName: tpl.name,
+      description: "从旧版工作流定时配置自动迁移",
+      workflowTemplateId: tpl.id,
+      cronExpression: cron,
+      timezone,
+      enabled: tpl.isEnabled ?? true,
+    });
+    covered.add(tpl.id);
+    migrated++;
+  }
+
+  return migrated;
 }
 
 /** 取单条 schedule;不存在返回 null;不是当前 org 的也返回 null(避免泄露) */
@@ -163,6 +222,39 @@ export async function deleteSchedule(orgId: string, id: string) {
   return row?.id ?? null;
 }
 
+/** 批量取模板关联的 schedule（每个模板最多 1 条迁移记录） */
+export async function listScheduleSummariesByTemplateIds(
+  orgId: string,
+  templateIds: string[],
+) {
+  if (templateIds.length === 0) return new Map<string, { cronExpression: string; enabled: boolean }>();
+
+  const rows = await db
+    .select({
+      workflowTemplateId: scheduledJobs.workflowTemplateId,
+      cronExpression: scheduledJobs.cronExpression,
+      enabled: scheduledJobs.enabled,
+    })
+    .from(scheduledJobs)
+    .where(
+      and(
+        orgScopedTemplateKindFilter(orgId),
+        inArray(scheduledJobs.workflowTemplateId, templateIds),
+      ),
+    );
+
+  const map = new Map<string, { cronExpression: string; enabled: boolean }>();
+  for (const row of rows) {
+    if (row.workflowTemplateId) {
+      map.set(row.workflowTemplateId, {
+        cronExpression: row.cronExpression,
+        enabled: row.enabled,
+      });
+    }
+  }
+  return map;
+}
+
 /** 联合查询:列 + 关联模板名,用于全局视图渲染 */
 export async function listSchedulesWithTemplateName(orgId: string) {
   return db
@@ -170,6 +262,8 @@ export async function listSchedulesWithTemplateName(orgId: string) {
       schedule: scheduledJobs,
       templateName: workflowTemplates.name,
       templateIcon: workflowTemplates.icon,
+      templateIsBuiltin: workflowTemplates.isBuiltin,
+      templateCreatedBy: workflowTemplates.createdBy,
     })
     .from(scheduledJobs)
     .leftJoin(
